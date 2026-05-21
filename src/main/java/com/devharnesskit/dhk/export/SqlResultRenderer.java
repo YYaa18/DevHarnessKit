@@ -9,17 +9,22 @@ public final class SqlResultRenderer {
     private static final int MAX_OUTPUT_BYTES = 64 * 1024;
 
     public String render(SqlExecutionResult result, String format) {
+        return render(result, format, MAX_OUTPUT_BYTES);
+    }
+
+    public String render(SqlExecutionResult result, String format, int maxOutputBytes) {
         String output;
         if ("md".equals(format)) {
             output = markdown(result);
         } else {
             output = table(result);
         }
-        if (output.getBytes().length <= MAX_OUTPUT_BYTES) {
+        int limit = Math.max(1024, maxOutputBytes);
+        if (output.getBytes().length <= limit) {
             return output;
         }
-        return output.substring(0, Math.min(output.length(), MAX_OUTPUT_BYTES - 80))
-                + "\n\n<!-- truncated: SQL_RESULT exceeded 64KB -->\n";
+        return output.substring(0, Math.min(output.length(), limit - 80))
+                + "\n\n<!-- truncated: SQL_RESULT exceeded output byte limit -->\n";
     }
 
     private String markdown(SqlExecutionResult result) {

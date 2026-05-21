@@ -18,34 +18,38 @@ public final class SqlExecutionService {
                                       SqlExecutionRequest request) throws Exception {
         try (Connection connection = connectionService.open(connectionRequest)) {
             connection.setReadOnly(true);
-            try (Statement statement = connection.createStatement()) {
-                statement.setQueryTimeout(request.timeoutSeconds());
-                statement.setMaxRows(request.limit());
-                boolean hasResultSet = statement.execute(request.sql());
-                if (!hasResultSet) {
-                    return new SqlExecutionResult(new ArrayList<SqlColumn>(), new ArrayList<List<String>>(), false);
+            return execute(connection, request);
+        }
+    }
+
+    public SqlExecutionResult execute(Connection connection, SqlExecutionRequest request) throws Exception {
+        try (Statement statement = connection.createStatement()) {
+            statement.setQueryTimeout(request.timeoutSeconds());
+            statement.setMaxRows(request.limit() + 1);
+            boolean hasResultSet = statement.execute(request.sql());
+            if (!hasResultSet) {
+                return new SqlExecutionResult(new ArrayList<SqlColumn>(), new ArrayList<List<String>>(), false);
+            }
+            try (ResultSet resultSet = statement.getResultSet()) {
+                ResultSetMetaData metaData = resultSet.getMetaData();
+                List<SqlColumn> columns = new ArrayList<SqlColumn>();
+                for (int i = 1; i <= metaData.getColumnCount(); i++) {
+                    columns.add(new SqlColumn(metaData.getColumnLabel(i), metaData.getColumnTypeName(i)));
                 }
-                try (ResultSet resultSet = statement.getResultSet()) {
-                    ResultSetMetaData metaData = resultSet.getMetaData();
-                    List<SqlColumn> columns = new ArrayList<SqlColumn>();
+                List<List<String>> rows = new ArrayList<List<String>>();
+                boolean truncated = false;
+                while (resultSet.next()) {
+                    if (rows.size() >= request.limit()) {
+                        truncated = true;
+                        break;
+                    }
+                    List<String> row = new ArrayList<String>();
                     for (int i = 1; i <= metaData.getColumnCount(); i++) {
-                        columns.add(new SqlColumn(metaData.getColumnLabel(i), metaData.getColumnTypeName(i)));
+                        row.add(truncate(resultSet.getString(i), request.maxCellLength()));
                     }
-                    List<List<String>> rows = new ArrayList<List<String>>();
-                    boolean truncated = false;
-                    while (resultSet.next()) {
-                        if (rows.size() >= request.limit()) {
-                            truncated = true;
-                            break;
-                        }
-                        List<String> row = new ArrayList<String>();
-                        for (int i = 1; i <= metaData.getColumnCount(); i++) {
-                            row.add(truncate(resultSet.getString(i), request.maxCellLength()));
-                        }
-                        rows.add(row);
-                    }
-                    return new SqlExecutionResult(columns, rows, truncated);
+                    rows.add(row);
                 }
+                return new SqlExecutionResult(columns, rows, truncated);
             }
         }
     }

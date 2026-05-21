@@ -31,8 +31,7 @@ public final class MemorySearchService {
         Set<Long> ftsIds = ftsRepository.searchIds(connection, query, Math.max(limit * 10, 100));
         int candidateLimit = Math.max(100, limit * 10);
         Map<Long, MemoryItem> candidates = new LinkedHashMap<Long, MemoryItem>();
-        List<MemoryItem> listed = memoryRepository.listCandidates(connection, projectKey, module, status, candidateLimit);
-        for (MemoryItem item : listed) {
+        for (MemoryItem item : memoryRepository.searchLike(connection, projectKey, tokens, module, status, candidateLimit)) {
             candidates.put(Long.valueOf(item.id()), item);
         }
         for (MemoryItem item : memoryRepository.findByIds(connection, projectKey, new ArrayList<Long>(ftsIds))) {
@@ -42,6 +41,9 @@ public final class MemorySearchService {
             if (module.length() > 0 && !module.equals(item.moduleName())) {
                 continue;
             }
+            candidates.put(Long.valueOf(item.id()), item);
+        }
+        for (MemoryItem item : memoryRepository.listCandidates(connection, projectKey, module, status, Math.max(limit, 20))) {
             candidates.put(Long.valueOf(item.id()), item);
         }
 
@@ -70,21 +72,35 @@ public final class MemorySearchService {
     private SearchResult score(MemoryItem item, List<String> tokens, String requestedModule, boolean ftsMatch) {
         int score = 0;
         List<String> matches = new ArrayList<String>();
-        if (requestedModule.length() > 0 && requestedModule.equals(item.moduleName())) {
-            score += 10;
-            matches.add("module");
-        }
+        boolean queryMatched = false;
         if (matchesAny(item.tags(), tokens)) {
             score += 8;
             matches.add("tags");
+            queryMatched = true;
         }
         if (matchesAny(item.title(), tokens)) {
             score += 5;
             matches.add("title");
+            queryMatched = true;
         }
         if (matchesAny(item.content(), tokens)) {
             score += 3;
             matches.add("content");
+            queryMatched = true;
+        }
+        if (ftsMatch) {
+            queryMatched = true;
+        }
+        if (!queryMatched) {
+            return new SearchResult(item, 0, "");
+        }
+        if (ftsMatch && matches.isEmpty()) {
+            score += 1;
+            matches.add("fts");
+        }
+        if (requestedModule.length() > 0 && requestedModule.equals(item.moduleName())) {
+            score += 10;
+            matches.add("module");
         }
         if ("confirmed".equals(item.status())) {
             score += 3;
@@ -96,10 +112,6 @@ public final class MemorySearchService {
         } else if (item.confidence() >= 70) {
             score += 1;
             matches.add("confidence>=70");
-        }
-        if (ftsMatch && matches.isEmpty()) {
-            score += 1;
-            matches.add("fts");
         }
         return new SearchResult(item, score, join(matches));
     }

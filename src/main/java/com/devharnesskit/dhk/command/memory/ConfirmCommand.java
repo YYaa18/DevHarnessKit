@@ -5,6 +5,7 @@ import com.devharnesskit.dhk.cli.Command;
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
+import com.devharnesskit.dhk.db.TransactionTemplate;
 import com.devharnesskit.dhk.model.MemoryItem;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.repository.FtsRepository;
@@ -21,17 +22,21 @@ public final class ConfirmCommand implements Command {
     private final ProjectService projectService;
     private final MemoryRepository memoryRepository;
     private final FtsRepository ftsRepository;
+    private final TransactionTemplate transactionTemplate;
 
     public ConfirmCommand() {
-        this(new DbConnectionFactory(), new ProjectService(), new MemoryRepository(), new FtsRepository());
+        this(new DbConnectionFactory(), new ProjectService(), new MemoryRepository(), new FtsRepository(),
+                new TransactionTemplate());
     }
 
     ConfirmCommand(DbConnectionFactory connectionFactory, ProjectService projectService,
-                   MemoryRepository memoryRepository, FtsRepository ftsRepository) {
+                   MemoryRepository memoryRepository, FtsRepository ftsRepository,
+                   TransactionTemplate transactionTemplate) {
         this.connectionFactory = connectionFactory;
         this.projectService = projectService;
         this.memoryRepository = memoryRepository;
         this.ftsRepository = ftsRepository;
+        this.transactionTemplate = transactionTemplate;
     }
 
     public int run(CommandContext context, Args args) {
@@ -68,10 +73,20 @@ public final class ConfirmCommand implements Command {
             if (confirmedBy.length() == 0) {
                 confirmedBy = "manual";
             }
-            String now = context.clock().now().toString();
-            memoryRepository.confirm(connection, project.projectKey(), id, confidence, confirmedBy, now);
-            MemoryItem updated = memoryRepository.findById(connection, project.projectKey(), id);
-            ftsRepository.sync(connection, updated);
+            final String now = context.clock().now().toString();
+            final Project currentProject = project;
+            final long memoryId = id;
+            final int confirmedConfidence = confidence;
+            final String confirmer = confirmedBy;
+            transactionTemplate.execute(connection, new TransactionTemplate.Work<Void>() {
+                public Void execute() throws Exception {
+                    memoryRepository.confirm(connection, currentProject.projectKey(), memoryId,
+                            confirmedConfidence, confirmer, now);
+                    MemoryItem updated = memoryRepository.findById(connection, currentProject.projectKey(), memoryId);
+                    ftsRepository.sync(connection, updated);
+                    return null;
+                }
+            });
             context.out().println("memory_id: " + id);
             context.out().println("status: confirmed");
             context.out().println("confidence: " + confidence);
@@ -81,6 +96,9 @@ public final class ConfirmCommand implements Command {
             context.err().println("ERROR memory confirm failed: " + ex.getMessage());
             return ExitCodes.RUNTIME_ERROR;
         } catch (RuntimeException ex) {
+            context.err().println("ERROR memory confirm failed: " + ex.getMessage());
+            return ExitCodes.RUNTIME_ERROR;
+        } catch (Exception ex) {
             context.err().println("ERROR memory confirm failed: " + ex.getMessage());
             return ExitCodes.RUNTIME_ERROR;
         }

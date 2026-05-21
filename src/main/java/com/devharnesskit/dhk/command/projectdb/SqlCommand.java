@@ -68,7 +68,7 @@ public final class SqlCommand implements Command {
         try {
             SqlExecutionResult result = executionService.execute(connectionService, connectionRequest, executionRequest);
             String format = args.option("format", "table");
-            String output = renderer.render(result, format);
+            String output = renderer.render(result, format, executionRequest.maxOutputBytes());
             if (sensitiveDataGuard.containsSensitiveData(output)) {
                 context.err().println("Sensitive SQL result rejected; output was not written.");
                 return ExitCodes.VALIDATION_ERROR;

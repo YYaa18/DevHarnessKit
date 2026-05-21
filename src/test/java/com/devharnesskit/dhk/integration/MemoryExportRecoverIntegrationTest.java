@@ -57,6 +57,55 @@ final class MemoryExportRecoverIntegrationTest {
     }
 
     @Test
+    void exportPrioritizesModuleAndKeywordRelevantMemory() throws Exception {
+        initProject();
+        addMemory("General high confidence", "General project convention.", "general", "global",
+                "project_fact", "95");
+        confirm("1");
+        addMemory("Order MyBatis convention", "Order module uses mapper SQL conventions.", "mybatis,order",
+                "order", "database_convention", "70");
+        confirm("2");
+
+        Harness export = new Harness(tempDir);
+        int exportExit = new CommandRouter().run(new String[]{
+                "memory", "export",
+                "--project-root", "demo",
+                "--task", "新增订单查询接口",
+                "--module", "order",
+                "--mode", "api",
+                "--keywords", "mybatis"
+        }, export.context());
+
+        Path currentContext = PathUtil.currentContext(tempDir.resolve("demo"));
+        String markdown = new String(Files.readAllBytes(currentContext), "UTF-8");
+
+        assertEquals(ExitCodes.SUCCESS, exportExit);
+        assertTrue(markdown.indexOf("Order MyBatis convention") < markdown.indexOf("General high confidence"));
+    }
+
+    @Test
+    void exportUsesModuleCheckpointBeforeProjectLatestFallback() throws Exception {
+        initProject();
+        checkpoint("order", "Order checkpoint summary");
+        checkpoint("user", "User checkpoint summary");
+
+        Harness export = new Harness(tempDir);
+        int exportExit = new CommandRouter().run(new String[]{
+                "memory", "export",
+                "--project-root", "demo",
+                "--task", "新增订单查询接口",
+                "--module", "order"
+        }, export.context());
+
+        Path currentContext = PathUtil.currentContext(tempDir.resolve("demo"));
+        String markdown = new String(Files.readAllBytes(currentContext), "UTF-8");
+
+        assertEquals(ExitCodes.SUCCESS, exportExit);
+        assertTrue(markdown.contains("Order checkpoint summary"));
+        assertFalse(markdown.contains("User checkpoint summary"));
+    }
+
+    @Test
     void checkpointAndRecoverWriteRecoveryContext() throws Exception {
         initProject();
         addMemory("Order gateway", "Order APIs use X-User-Id from gateway.", "order,gateway,user-id");
@@ -113,15 +162,20 @@ final class MemoryExportRecoverIntegrationTest {
     }
 
     private void addMemory(String title, String content, String tags) {
+        addMemory(title, content, tags, "global", "gateway_convention", "50");
+    }
+
+    private void addMemory(String title, String content, String tags, String module, String type, String confidence) {
         Harness add = new Harness(tempDir);
         int exitCode = new CommandRouter().run(new String[]{
                 "memory", "add",
                 "--project-root", "demo",
-                "--type", "gateway_convention",
-                "--module", "global",
+                "--type", type,
+                "--module", module,
                 "--title", title,
                 "--content", content,
-                "--tags", tags
+                "--tags", tags,
+                "--confidence", confidence
         }, add.context());
         assertEquals(ExitCodes.SUCCESS, exitCode);
     }
@@ -131,6 +185,18 @@ final class MemoryExportRecoverIntegrationTest {
         int exitCode = new CommandRouter().run(new String[]{
                 "memory", "confirm", "--project-root", "demo", "--id", id
         }, confirm.context());
+        assertEquals(ExitCodes.SUCCESS, exitCode);
+    }
+
+    private void checkpoint(String module, String summary) {
+        Harness checkpoint = new Harness(tempDir);
+        int exitCode = new CommandRouter().run(new String[]{
+                "memory", "checkpoint",
+                "--project-root", "demo",
+                "--task", "Task for " + module,
+                "--module", module,
+                "--summary", summary
+        }, checkpoint.context());
         assertEquals(ExitCodes.SUCCESS, exitCode);
     }
 

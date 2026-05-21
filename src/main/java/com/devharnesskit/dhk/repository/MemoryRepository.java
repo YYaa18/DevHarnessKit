@@ -99,6 +99,37 @@ public final class MemoryRepository {
         }
     }
 
+    public List<MemoryItem> searchLike(Connection connection, String projectKey, List<String> tokens,
+                                       String module, String status, int limit) throws SQLException {
+        if (tokens == null || tokens.isEmpty() || limit <= 0) {
+            return Collections.emptyList();
+        }
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT DISTINCT * FROM memory_item WHERE project_key = ?");
+        if (module != null && module.length() > 0) {
+            sql.append(" AND module_name = ?");
+        }
+        if (status != null && status.length() > 0) {
+            sql.append(" AND status = ?");
+        }
+        appendLikeClause(sql, tokens.size());
+        sql.append(" ORDER BY updated_at DESC, id DESC LIMIT ?");
+
+        try (PreparedStatement statement = connection.prepareStatement(sql.toString())) {
+            int index = 1;
+            statement.setString(index++, projectKey);
+            if (module != null && module.length() > 0) {
+                statement.setString(index++, module);
+            }
+            if (status != null && status.length() > 0) {
+                statement.setString(index++, status);
+            }
+            index = bindLikeTokens(statement, index, tokens);
+            statement.setInt(index, limit);
+            return list(statement);
+        }
+    }
+
     public List<MemoryItem> findByIds(Connection connection, String projectKey, List<Long> ids) throws SQLException {
         if (ids == null || ids.isEmpty()) {
             return Collections.emptyList();
@@ -147,6 +178,26 @@ public final class MemoryRepository {
         }
     }
 
+    public List<MemoryItem> searchConfirmedForExport(Connection connection, String projectKey, String module,
+                                                     List<String> tokens, int limit) throws SQLException {
+        if (tokens == null || tokens.isEmpty() || limit <= 0) {
+            return Collections.emptyList();
+        }
+        String sql = "SELECT DISTINCT * FROM memory_item WHERE project_key = ? "
+                + "AND status = 'confirmed' AND confidence >= 70 "
+                + "AND (module_name = 'global' OR module_name = ?)";
+        StringBuilder builder = new StringBuilder(sql);
+        appendLikeClause(builder, tokens.size());
+        builder.append(" ORDER BY confidence DESC, updated_at DESC, id DESC LIMIT ?");
+        try (PreparedStatement statement = connection.prepareStatement(builder.toString())) {
+            statement.setString(1, projectKey);
+            statement.setString(2, module == null || module.length() == 0 ? "global" : module);
+            int index = bindLikeTokens(statement, 3, tokens);
+            statement.setInt(index, limit);
+            return list(statement);
+        }
+    }
+
     public void markUsed(Connection connection, String projectKey, List<Long> ids, String now) throws SQLException {
         if (ids == null || ids.isEmpty()) {
             return;
@@ -186,6 +237,44 @@ public final class MemoryRepository {
                 return 0;
             }
             return resultSet.getInt(1);
+        }
+    }
+
+    private void appendLikeClause(StringBuilder sql, int tokenCount) {
+        sql.append(" AND (");
+        for (int i = 0; i < tokenCount; i++) {
+            if (i > 0) {
+                sql.append(" OR ");
+            }
+            sql.append("(lower(title) LIKE ? ESCAPE '\\' ")
+                    .append("OR lower(content) LIKE ? ESCAPE '\\' ")
+                    .append("OR lower(tags) LIKE ? ESCAPE '\\')");
+        }
+        sql.append(')');
+    }
+
+    private int bindLikeTokens(PreparedStatement statement, int startIndex, List<String> tokens) throws SQLException {
+        int index = startIndex;
+        for (String token : tokens) {
+            String pattern = "%" + escapeLike(token.toLowerCase()) + "%";
+            statement.setString(index++, pattern);
+            statement.setString(index++, pattern);
+            statement.setString(index++, pattern);
+        }
+        return index;
+    }
+
+    private String escapeLike(String token) {
+        return token.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+    }
+
+    private List<MemoryItem> list(PreparedStatement statement) throws SQLException {
+        try (ResultSet resultSet = statement.executeQuery()) {
+            List<MemoryItem> results = new ArrayList<MemoryItem>();
+            while (resultSet.next()) {
+                results.add(map(resultSet));
+            }
+            return results;
         }
     }
 

@@ -28,10 +28,11 @@ Implemented in the current codebase:
 - SQL safety guard for readonly query checks.
 - Skill/Rules packaging for `.agents/skills` and `.comate/rules`.
 - Integration tests for the memory workflow and DB SQL dry-run safety.
+- Optional live MySQL smoke tests when `DHK_TEST_MYSQL_URL`, `DHK_TEST_MYSQL_USER`, and `DHK_TEST_MYSQL_PASSWORD` are set.
+- GitHub Actions CI for Maven test/package.
 
 Planned but not part of the first committed implementation yet:
 
-- Live MySQL integration test coverage beyond dry-run.
 - V0.2 workflow persistence.
 
 See [docs/PRD.md](docs/PRD.md) and [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for the full product and implementation design.
@@ -78,6 +79,12 @@ The shaded CLI jar is generated as:
 
 ```text
 target/dhk-cli-0.1.0-all.jar
+```
+
+Run the local performance smoke after packaging:
+
+```bash
+scripts/perf-smoke.sh
 ```
 
 ## Quick Start

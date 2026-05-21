@@ -5,6 +5,7 @@ import com.devharnesskit.dhk.cli.Command;
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
+import com.devharnesskit.dhk.db.TransactionTemplate;
 import com.devharnesskit.dhk.model.MemoryItem;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.repository.FtsRepository;
@@ -26,20 +27,22 @@ public final class AddCommand implements Command {
     private final MemoryRepository memoryRepository;
     private final FtsRepository ftsRepository;
     private final SensitiveDataGuard sensitiveDataGuard;
+    private final TransactionTemplate transactionTemplate;
 
     public AddCommand() {
         this(new DbConnectionFactory(), new ProjectService(), new MemoryRepository(),
-                new FtsRepository(), new SensitiveDataGuard());
+                new FtsRepository(), new SensitiveDataGuard(), new TransactionTemplate());
     }
 
     AddCommand(DbConnectionFactory connectionFactory, ProjectService projectService,
                MemoryRepository memoryRepository, FtsRepository ftsRepository,
-               SensitiveDataGuard sensitiveDataGuard) {
+               SensitiveDataGuard sensitiveDataGuard, TransactionTemplate transactionTemplate) {
         this.connectionFactory = connectionFactory;
         this.projectService = projectService;
         this.memoryRepository = memoryRepository;
         this.ftsRepository = ftsRepository;
         this.sensitiveDataGuard = sensitiveDataGuard;
+        this.transactionTemplate = transactionTemplate;
     }
 
     public int run(CommandContext context, Args args) {
@@ -84,13 +87,20 @@ public final class AddCommand implements Command {
             if (project == null) {
                 return ExitCodes.NOT_FOUND;
             }
-            String now = context.clock().now().toString();
-            MemoryItem item = new MemoryItem(0L, project.projectKey(), module, type, "project",
+            final String now = context.clock().now().toString();
+            final Project currentProject = project;
+            final MemoryItem item = new MemoryItem(0L, currentProject.projectKey(), module, type, "project",
                     title, content, tags, "draft", confidence, "manual", "",
                     "", source, evidence, "", "", now, now, "", 0);
-            long id = memoryRepository.insert(connection, item);
-            MemoryItem inserted = memoryRepository.findById(connection, project.projectKey(), id);
-            ftsRepository.sync(connection, inserted);
+            Long insertedId = transactionTemplate.execute(connection, new TransactionTemplate.Work<Long>() {
+                public Long execute() throws Exception {
+                    long id = memoryRepository.insert(connection, item);
+                    MemoryItem inserted = memoryRepository.findById(connection, currentProject.projectKey(), id);
+                    ftsRepository.sync(connection, inserted);
+                    return Long.valueOf(id);
+                }
+            });
+            long id = insertedId.longValue();
             context.out().println("memory_id: " + id);
             context.out().println("status: draft");
             return ExitCodes.SUCCESS;
@@ -98,6 +108,9 @@ public final class AddCommand implements Command {
             context.err().println("ERROR memory add failed: " + ex.getMessage());
             return ExitCodes.RUNTIME_ERROR;
         } catch (RuntimeException ex) {
+            context.err().println("ERROR memory add failed: " + ex.getMessage());
+            return ExitCodes.RUNTIME_ERROR;
+        } catch (Exception ex) {
             context.err().println("ERROR memory add failed: " + ex.getMessage());
             return ExitCodes.RUNTIME_ERROR;
         }

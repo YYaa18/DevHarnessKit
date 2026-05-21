@@ -6,10 +6,12 @@ import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.export.CurrentContextRenderer;
+import com.devharnesskit.dhk.model.Checkpoint;
 import com.devharnesskit.dhk.model.MemoryItem;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.repository.CheckpointRepository;
 import com.devharnesskit.dhk.repository.MemoryRepository;
+import com.devharnesskit.dhk.service.ExportSelectionService;
 import com.devharnesskit.dhk.service.ProjectService;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
 import com.devharnesskit.dhk.util.PathUtil;
@@ -26,21 +28,26 @@ public final class ExportCommand implements Command {
     private final ProjectService projectService;
     private final MemoryRepository memoryRepository;
     private final CheckpointRepository checkpointRepository;
+    private final ExportSelectionService exportSelectionService;
     private final CurrentContextRenderer renderer;
     private final SensitiveDataGuard sensitiveDataGuard;
 
     public ExportCommand() {
-        this(new DbConnectionFactory(), new ProjectService(), new MemoryRepository(),
-                new CheckpointRepository(), new CurrentContextRenderer(), new SensitiveDataGuard());
+        this(new DbConnectionFactory(), new ProjectService(), new MemoryRepository(), new CheckpointRepository(),
+                null, new CurrentContextRenderer(), new SensitiveDataGuard());
     }
 
     ExportCommand(DbConnectionFactory connectionFactory, ProjectService projectService,
                   MemoryRepository memoryRepository, CheckpointRepository checkpointRepository,
-                  CurrentContextRenderer renderer, SensitiveDataGuard sensitiveDataGuard) {
+                  ExportSelectionService exportSelectionService, CurrentContextRenderer renderer,
+                  SensitiveDataGuard sensitiveDataGuard) {
         this.connectionFactory = connectionFactory;
         this.projectService = projectService;
         this.memoryRepository = memoryRepository;
         this.checkpointRepository = checkpointRepository;
+        this.exportSelectionService = exportSelectionService == null
+                ? new ExportSelectionService(memoryRepository)
+                : exportSelectionService;
         this.renderer = renderer;
         this.sensitiveDataGuard = sensitiveDataGuard;
     }
@@ -69,11 +76,13 @@ public final class ExportCommand implements Command {
             if (project == null) {
                 return ExitCodes.NOT_FOUND;
             }
-            List<MemoryItem> candidates = memoryRepository.listConfirmedForExport(connection, project.projectKey(), module, limit * 4);
+            List<MemoryItem> candidates = exportSelectionService.select(connection, project.projectKey(), module,
+                    args.option("mode", "auto"), task, args.option("keywords", ""), limit);
             List<MemoryItem> exportItems = filterSensitive(candidates, limit);
+            Checkpoint checkpoint = checkpointForModule(connection, project.projectKey(), module);
             String markdown = renderer.render(project, task, module, args.option("mode", "auto"),
                     args.option("keywords", ""), context.clock().now().toString(),
-                    exportItems, checkpointRepository.latest(connection, project.projectKey(), ""));
+                    exportItems, checkpoint);
             List<String> matches = sensitiveDataGuard.findMatches(markdown);
             if (!matches.isEmpty()) {
                 context.err().println("Sensitive data rejected during export: " + matches);
@@ -114,6 +123,17 @@ public final class ExportCommand implements Command {
             ids.add(Long.valueOf(item.id()));
         }
         return ids;
+    }
+
+    private Checkpoint checkpointForModule(Connection connection, String projectKey,
+                                           String module) throws SQLException {
+        if (module != null && module.length() > 0 && !"global".equals(module)) {
+            Checkpoint checkpoint = checkpointRepository.latest(connection, projectKey, module);
+            if (checkpoint != null) {
+                return checkpoint;
+            }
+        }
+        return checkpointRepository.latest(connection, projectKey, "");
     }
 
     private int parseLimit(CommandContext context, String rawValue) {

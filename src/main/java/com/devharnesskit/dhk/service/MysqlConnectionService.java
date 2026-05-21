@@ -8,6 +8,7 @@ import java.io.InputStreamReader;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.Locale;
 import java.util.Properties;
 
 public final class MysqlConnectionService {
@@ -22,6 +23,9 @@ public final class MysqlConnectionService {
             String port = args.option("port", "3306").trim();
             jdbcUrl = "jdbc:mysql://" + host + ":" + port + "/" + database
                     + "?useUnicode=true&characterEncoding=utf8&useSSL=false";
+        }
+        if (!jdbcUrl.toLowerCase(Locale.ROOT).startsWith("jdbc:mysql://")) {
+            return DbConnectionRequest.invalid("Only jdbc:mysql:// URLs are allowed");
         }
         String user = args.option("user").trim();
         String password = "";

@@ -7,23 +7,36 @@ public final class SqlExecutionRequest {
     private final int limit;
     private final int timeoutSeconds;
     private final int maxCellLength;
+    private final int maxOutputBytes;
 
     public SqlExecutionRequest(String sql, int limit, int timeoutSeconds, int maxCellLength) {
+        this(sql, limit, timeoutSeconds, maxCellLength, 64 * 1024);
+    }
+
+    public SqlExecutionRequest(String sql, int limit, int timeoutSeconds, int maxCellLength, int maxOutputBytes) {
         this.sql = sql;
         this.limit = limit;
         this.timeoutSeconds = timeoutSeconds;
         this.maxCellLength = maxCellLength;
+        this.maxOutputBytes = maxOutputBytes;
     }
 
     public static SqlExecutionRequest fromArgs(String sql, Args args) {
-        int maxLimit = parseInt(args.option("max-limit", "1000"), 1000);
+        int maxLimit = Math.min(parseInt(args.option("max-limit", "1000"), 1000), 1000);
+        if (maxLimit < 1) {
+            maxLimit = 1000;
+        }
         int limit = Math.min(parseInt(args.option("limit", "100"), 100), maxLimit);
         if (limit < 1) {
             limit = 100;
         }
         int timeout = parseInt(args.option("timeout-seconds", "30"), 30);
         int maxCellLength = parseInt(args.option("max-cell-length", "200"), 200);
-        return new SqlExecutionRequest(sql, limit, timeout, maxCellLength);
+        int maxOutputBytes = parseInt(args.option("max-output-bytes", String.valueOf(64 * 1024)), 64 * 1024);
+        if (maxOutputBytes < 1024) {
+            maxOutputBytes = 1024;
+        }
+        return new SqlExecutionRequest(sql, limit, timeout, maxCellLength, maxOutputBytes);
     }
 
     public String sql() {
@@ -40,6 +53,10 @@ public final class SqlExecutionRequest {
 
     public int maxCellLength() {
         return maxCellLength;
+    }
+
+    public int maxOutputBytes() {
+        return maxOutputBytes;
     }
 
     private static int parseInt(String rawValue, int defaultValue) {

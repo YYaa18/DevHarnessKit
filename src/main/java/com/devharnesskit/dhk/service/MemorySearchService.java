@@ -29,7 +29,7 @@ public final class MemorySearchService {
                                      String module, String status, int limit) throws SQLException {
         List<String> tokens = TextUtil.tokens(query);
         Set<Long> ftsIds = ftsRepository.searchIds(connection, query, Math.max(limit * 10, 100));
-        int candidateLimit = Math.max(1000, limit * 20);
+        int candidateLimit = Math.max(100, limit * 10);
         Map<Long, MemoryItem> candidates = new LinkedHashMap<Long, MemoryItem>();
         List<MemoryItem> listed = memoryRepository.listCandidates(connection, projectKey, module, status, candidateLimit);
         for (MemoryItem item : listed) {

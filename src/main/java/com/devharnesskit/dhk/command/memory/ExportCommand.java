@@ -6,14 +6,20 @@ import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.export.CurrentContextRenderer;
+import com.devharnesskit.dhk.export.WorkflowContextRenderer;
 import com.devharnesskit.dhk.model.Checkpoint;
 import com.devharnesskit.dhk.model.MemoryItem;
 import com.devharnesskit.dhk.model.Project;
+import com.devharnesskit.dhk.model.workflow.WorkflowRun;
 import com.devharnesskit.dhk.repository.CheckpointRepository;
 import com.devharnesskit.dhk.repository.MemoryRepository;
+import com.devharnesskit.dhk.repository.workflow.WorkflowGateRunRepository;
+import com.devharnesskit.dhk.repository.workflow.WorkflowPhaseRunRepository;
+import com.devharnesskit.dhk.repository.workflow.WorkflowRunRepository;
 import com.devharnesskit.dhk.service.ExportSelectionService;
 import com.devharnesskit.dhk.service.ProjectService;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
+import com.devharnesskit.dhk.service.workflow.WorkflowExportService;
 import com.devharnesskit.dhk.util.PathUtil;
 
 import java.nio.file.Files;
@@ -29,17 +35,23 @@ public final class ExportCommand implements Command {
     private final MemoryRepository memoryRepository;
     private final CheckpointRepository checkpointRepository;
     private final ExportSelectionService exportSelectionService;
+    private final WorkflowRunRepository workflowRunRepository;
+    private final WorkflowExportService workflowExportService;
     private final CurrentContextRenderer renderer;
     private final SensitiveDataGuard sensitiveDataGuard;
 
     public ExportCommand() {
         this(new DbConnectionFactory(), new ProjectService(), new MemoryRepository(), new CheckpointRepository(),
-                null, new CurrentContextRenderer(), new SensitiveDataGuard());
+                null, new WorkflowRunRepository(),
+                new WorkflowExportService(new WorkflowPhaseRunRepository(), new WorkflowGateRunRepository(),
+                        new WorkflowContextRenderer()),
+                new CurrentContextRenderer(), new SensitiveDataGuard());
     }
 
     ExportCommand(DbConnectionFactory connectionFactory, ProjectService projectService,
                   MemoryRepository memoryRepository, CheckpointRepository checkpointRepository,
-                  ExportSelectionService exportSelectionService, CurrentContextRenderer renderer,
+                  ExportSelectionService exportSelectionService, WorkflowRunRepository workflowRunRepository,
+                  WorkflowExportService workflowExportService, CurrentContextRenderer renderer,
                   SensitiveDataGuard sensitiveDataGuard) {
         this.connectionFactory = connectionFactory;
         this.projectService = projectService;
@@ -48,6 +60,8 @@ public final class ExportCommand implements Command {
         this.exportSelectionService = exportSelectionService == null
                 ? new ExportSelectionService(memoryRepository)
                 : exportSelectionService;
+        this.workflowRunRepository = workflowRunRepository;
+        this.workflowExportService = workflowExportService;
         this.renderer = renderer;
         this.sensitiveDataGuard = sensitiveDataGuard;
     }
@@ -80,9 +94,10 @@ public final class ExportCommand implements Command {
                     args.option("mode", "auto"), task, args.option("keywords", ""), limit);
             List<MemoryItem> exportItems = filterSensitive(candidates, limit);
             Checkpoint checkpoint = checkpointForModule(connection, project.projectKey(), module);
+            String workflowContext = workflowContext(connection, args);
             String markdown = renderer.render(project, task, module, args.option("mode", "auto"),
                     args.option("keywords", ""), context.clock().now().toString(),
-                    exportItems, checkpoint);
+                    exportItems, checkpoint, workflowContext);
             List<String> matches = sensitiveDataGuard.findMatches(markdown);
             if (!matches.isEmpty()) {
                 context.err().println("Sensitive data rejected during export: " + matches);
@@ -134,6 +149,18 @@ public final class ExportCommand implements Command {
             }
         }
         return checkpointRepository.latest(connection, projectKey, "");
+    }
+
+    private String workflowContext(Connection connection, Args args) throws SQLException {
+        String runKey = args.option("include-workflow", "").trim();
+        if (runKey.length() == 0) {
+            return "";
+        }
+        WorkflowRun run = workflowRunRepository.findByKey(connection, runKey);
+        if (run == null) {
+            throw new SQLException("Workflow run not found: " + runKey);
+        }
+        return workflowExportService.renderInline(connection, run);
     }
 
     private int parseLimit(CommandContext context, String rawValue) {

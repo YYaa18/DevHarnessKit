@@ -21,6 +21,14 @@ public final class HelpCommand implements Command {
         context.out().println("  dhk memory recover --latest");
         context.out().println("  dhk db test --jdbc-url <url> --user <user> --password-env <env>");
         context.out().println("  dhk db sql --sql <sql> --password-env <env>");
+        context.out().println("  dhk workflow template seed --project-root <path>");
+        context.out().println("  dhk workflow template list --project-root <path>");
+        context.out().println("  dhk workflow template show --key <workflow>");
+        context.out().println("  dhk workflow start --workflow <workflow> --task <task>");
+        context.out().println("  dhk workflow status --run <run-key>");
+        context.out().println("  dhk workflow phase pass|fail --run <run-key> --phase <phase>");
+        context.out().println("  dhk workflow gate pass|fail|waive --run <run-key> --gate <gate>");
+        context.out().println("  dhk workflow export --run <run-key>");
         context.out().println();
         context.out().println("Exit codes:");
         context.out().println("  0 success");

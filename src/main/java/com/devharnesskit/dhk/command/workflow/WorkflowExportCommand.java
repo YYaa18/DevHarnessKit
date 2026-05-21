@@ -1,0 +1,54 @@
+package com.devharnesskit.dhk.command.workflow;
+
+import com.devharnesskit.dhk.cli.Args;
+import com.devharnesskit.dhk.cli.Command;
+import com.devharnesskit.dhk.cli.CommandContext;
+import com.devharnesskit.dhk.cli.ExitCodes;
+import com.devharnesskit.dhk.db.DbConnectionFactory;
+import com.devharnesskit.dhk.export.WorkflowContextRenderer;
+import com.devharnesskit.dhk.model.workflow.WorkflowRun;
+import com.devharnesskit.dhk.repository.workflow.WorkflowGateRunRepository;
+import com.devharnesskit.dhk.repository.workflow.WorkflowPhaseRunRepository;
+import com.devharnesskit.dhk.repository.workflow.WorkflowRunRepository;
+import com.devharnesskit.dhk.service.workflow.WorkflowExportService;
+import com.devharnesskit.dhk.util.PathUtil;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.sql.Connection;
+
+public final class WorkflowExportCommand implements Command {
+    private final DbConnectionFactory connectionFactory = new DbConnectionFactory();
+    private final WorkflowRunRepository runRepository = new WorkflowRunRepository();
+    private final WorkflowExportService exportService = new WorkflowExportService(
+            new WorkflowPhaseRunRepository(), new WorkflowGateRunRepository(), new WorkflowContextRenderer());
+
+    public int run(CommandContext context, Args args) {
+        String runKey = args.option("run").trim();
+        if (runKey.length() == 0) {
+            context.err().println("Missing required parameter: --run");
+            return ExitCodes.USAGE_ERROR;
+        }
+        Path projectRoot = WorkflowCommandSupport.projectRoot(args, context);
+        Path out = args.hasOption("out")
+                ? PathUtil.resolvePath(args.option("out"), context.workingDirectory())
+                : PathUtil.workflowContext(projectRoot);
+        try (Connection connection = connectionFactory.open(projectRoot)) {
+            WorkflowRun run = runRepository.findByKey(connection, runKey);
+            if (run == null) {
+                context.err().println("Workflow run not found: " + runKey);
+                return ExitCodes.NOT_FOUND;
+            }
+            String markdown = exportService.render(connection, run, context.clock().now().toString());
+            Files.createDirectories(out.getParent());
+            Files.write(out, markdown.getBytes("UTF-8"));
+            runRepository.updateContextExportPath(connection, run.runKey(), out.toString(), context.clock().now().toString());
+            context.out().println("workflow_context_path: " + out);
+            context.out().println("run_key: " + run.runKey());
+            return ExitCodes.SUCCESS;
+        } catch (Exception ex) {
+            context.err().println("ERROR workflow export failed: " + ex.getMessage());
+            return ExitCodes.RUNTIME_ERROR;
+        }
+    }
+}

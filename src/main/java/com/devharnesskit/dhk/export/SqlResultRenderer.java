@@ -3,6 +3,7 @@ package com.devharnesskit.dhk.export;
 import com.devharnesskit.dhk.sql.SqlColumn;
 import com.devharnesskit.dhk.sql.SqlExecutionResult;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 public final class SqlResultRenderer {
@@ -19,12 +20,7 @@ public final class SqlResultRenderer {
         } else {
             output = table(result);
         }
-        int limit = Math.max(1024, maxOutputBytes);
-        if (output.getBytes().length <= limit) {
-            return output;
-        }
-        return output.substring(0, Math.min(output.length(), limit - 80))
-                + "\n\n<!-- truncated: SQL_RESULT exceeded output byte limit -->\n";
+        return limitUtf8(output, maxOutputBytes);
     }
 
     private String markdown(SqlExecutionResult result) {
@@ -71,5 +67,38 @@ public final class SqlResultRenderer {
 
     private String escapeMarkdown(String value) {
         return value == null ? "" : value.replace("|", "\\|").replace("\n", " ");
+    }
+
+    private String limitUtf8(String output, int maxOutputBytes) {
+        int limit = Math.max(1, maxOutputBytes);
+        if (output.getBytes(StandardCharsets.UTF_8).length <= limit) {
+            return output;
+        }
+        String suffix = "\n\n<!-- truncated: SQL_RESULT exceeded output byte limit -->\n";
+        if (suffix.getBytes(StandardCharsets.UTF_8).length >= limit) {
+            return truncateUtf8(suffix, limit);
+        }
+        int contentLimit = limit - suffix.getBytes(StandardCharsets.UTF_8).length;
+        return truncateUtf8(output, contentLimit) + suffix;
+    }
+
+    private String truncateUtf8(String value, int maxBytes) {
+        if (maxBytes <= 0) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder();
+        int used = 0;
+        for (int offset = 0; offset < value.length(); ) {
+            int codePoint = value.codePointAt(offset);
+            String next = new String(Character.toChars(codePoint));
+            int nextBytes = next.getBytes(StandardCharsets.UTF_8).length;
+            if (used + nextBytes > maxBytes) {
+                break;
+            }
+            builder.append(next);
+            used += nextBytes;
+            offset += Character.charCount(codePoint);
+        }
+        return builder.toString();
     }
 }

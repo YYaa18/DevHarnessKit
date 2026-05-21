@@ -2503,7 +2503,7 @@ CREATE TABLE IF NOT EXISTS workflow_event (
 
 ## 21.3 第二批表：Artifact 与 Binding
 
-V0.2-B 再实现以下表，用于把 workflow 与 memory、checkpoint、spec、文件产物关联起来。
+V0.2-B 实现以下表，用于把 workflow 与 memory、checkpoint、文件产物关联起来。
 
 ### 21.3.1 workflow_artifact
 
@@ -2523,22 +2523,14 @@ CREATE TABLE IF NOT EXISTS workflow_artifact (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     CHECK (artifact_type IN (
-        'current_context',
-        'recovery_context',
-        'workflow_context',
-        'sql_result',
-        'proposal',
-        'design',
-        'tasks',
-        'acceptance',
-        'verification',
-        'review',
-        'checkpoint',
-        'memory_suggestion',
-        'command_output',
+        'current_context', 'workflow_context', 'recovery_context',
+        'sql_result', 'checkpoint', 'command_output',
+        'memory_suggestion', 'review', 'verification',
         'custom'
     )),
-    CHECK (status IN ('draft', 'confirmed', 'deprecated', 'archived'))
+    CHECK (status IN ('draft', 'confirmed', 'deprecated', 'archived')),
+    FOREIGN KEY (project_key) REFERENCES project(project_key),
+    FOREIGN KEY (run_key) REFERENCES workflow_run(run_key)
 );
 ```
 
@@ -2577,26 +2569,7 @@ CREATE TABLE IF NOT EXISTS workflow_checkpoint_binding (
 );
 ```
 
-### 21.3.4 workflow_spec_binding
-
-```sql
-CREATE TABLE IF NOT EXISTS workflow_spec_binding (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    run_key TEXT NOT NULL,
-    change_key TEXT NOT NULL,
-    spec_path TEXT NOT NULL DEFAULT '',
-    binding_type TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    CHECK (binding_type IN (
-        'proposal',
-        'design',
-        'tasks',
-        'acceptance',
-        'verification',
-        'archived'
-    ))
-);
-```
+Spec binding 留到 V0.3，V0.2-B 不创建 `workflow_spec_binding`。
 
 ---
 
@@ -2632,6 +2605,12 @@ ON workflow_artifact(run_key, artifact_type);
 
 CREATE INDEX IF NOT EXISTS idx_workflow_memory_binding_memory
 ON workflow_memory_binding(memory_id);
+
+CREATE INDEX IF NOT EXISTS idx_workflow_memory_binding_run
+ON workflow_memory_binding(run_key, binding_type);
+
+CREATE INDEX IF NOT EXISTS idx_workflow_checkpoint_binding_run
+ON workflow_checkpoint_binding(run_key);
 ```
 
 ---
@@ -2694,6 +2673,8 @@ memory export --include-workflow: 最终 CURRENT_CONTEXT.md
 Hard gate 是阻塞约束：
 
 ```text
+phase pass/fail 只能操作 workflow_run.current_phase_key
+gate pass/fail/waive 默认只能操作 workflow_run.current_phase_key 下的 gate
 phase pass 前必须确认当前 phase 没有 pending / failed hard gate
 hard gate fail 后 run 进入 blocked
 blocked run 不允许 phase pass
@@ -2740,6 +2721,18 @@ dhk memory export --task "..." --include-workflow <run_key>
 ```
 
 V0.2-A 已支持 `--include-workflow`，默认仍让 Agent 主要读取 `CURRENT_CONTEXT.md`。
+
+## 22.5 Artifact / Binding 命令
+
+```text
+dhk workflow artifact list --run 20260521-order-api-change
+dhk workflow bind-memory --run 20260521-order-api-change --memory-id 12 --type read
+dhk workflow bind-checkpoint --run 20260521-order-api-change --checkpoint 3
+dhk workflow summary --run 20260521-order-api-change
+```
+
+`workflow export` 会自动记录 `workflow_context` artifact。
+`memory export --include-workflow` 会自动记录 `current_context` artifact 和 `exported` memory binding。
 
 ---
 

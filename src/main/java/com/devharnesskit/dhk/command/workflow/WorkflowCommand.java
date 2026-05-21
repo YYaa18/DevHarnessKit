@@ -18,6 +18,10 @@ public final class WorkflowCommand implements Command {
         commands.put("phase", new PhaseCommand());
         commands.put("gate", new GateCommand());
         commands.put("export", new WorkflowExportCommand());
+        commands.put("artifact", new ArtifactCommand());
+        commands.put("bind-memory", new BindMemoryCommand());
+        commands.put("bind-checkpoint", new BindCheckpointCommand());
+        commands.put("summary", new SummaryCommand());
     }
 
     public int run(CommandContext context, Args args) {

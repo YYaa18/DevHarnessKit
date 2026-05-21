@@ -27,8 +27,13 @@ Implemented in the current codebase:
 - `dhk workflow start/status/export`
 - `dhk workflow phase pass/fail`
 - `dhk workflow gate pass/fail/waive`
+- `dhk workflow artifact list`
+- `dhk workflow bind-memory`
+- `dhk workflow bind-checkpoint`
+- `dhk workflow summary`
 - SQLite migration and FTS fallback.
 - SQLite workflow persistence schema v2 for templates, runs, phases, gates, and events.
+- SQLite workflow audit schema v3 for artifacts, exported memory bindings, and checkpoint bindings.
 - Sensitive-data guard for memory and workflow persisted content.
 - SQL safety guard for readonly query checks.
 - Skill/Rules packaging for `.agents/skills` and `.comate/rules`.
@@ -38,7 +43,6 @@ Implemented in the current codebase:
 
 Planned but not part of the current implementation yet:
 
-- Workflow artifact/binding tables.
 - V0.3 spec persistence.
 
 See [docs/PRD.md](docs/PRD.md) and [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for the full product and implementation design.
@@ -69,6 +73,9 @@ The first MVP is split into two layers:
 
 - **V0.2: Workflow Persistence**
   SQLite-backed workflow templates, runs, phases, gates, events, and workflow context export. This is not a workflow engine; commands persist and render process state for agents.
+
+- **V0.2-B: Workflow Artifacts and Bindings**
+  Audit links between workflow runs, generated context files, exported memory, and checkpoints.
 
 ## Requirements
 
@@ -156,6 +163,10 @@ java -jar target/dhk-cli-0.1.0-all.jar memory export \
   --task "Implement order query endpoint" \
   --module order \
   --include-workflow <run-key>
+
+java -jar target/dhk-cli-0.1.0-all.jar workflow artifact list --project-root . --run <run-key>
+
+java -jar target/dhk-cli-0.1.0-all.jar workflow summary --project-root . --run <run-key>
 ```
 
 ## Safety Model
@@ -164,8 +175,11 @@ java -jar target/dhk-cli-0.1.0-all.jar memory export \
 - Confirmed facts must pass through `memory confirm`.
 - Default exports include confirmed memory only.
 - Workflow run, phase, gate, workflow export, and `memory export --include-workflow` paths reject sensitive values before persisting or rendering context.
+- Workflow phase and gate updates must target the current phase.
 - Workflow phases cannot be marked passed while pending or failed hard gates remain for that phase.
 - Failed hard gates block the run; passing or waiving the blocking hard gates can resume the run.
+- `memory export --include-workflow` records exported memory bindings and the generated current-context artifact for audit.
+- `workflow export` records the generated workflow-context artifact for audit.
 - Sensitive values such as passwords, bearer tokens, JDBC URLs, access keys, and obvious user data are rejected.
 - Raw SQL results are not stored as long-term memory.
 

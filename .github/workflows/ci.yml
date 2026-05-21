@@ -36,6 +36,8 @@ jobs:
           test -n "$RUN_KEY"
           java -jar "$JAR" workflow status --project-root "$DEMO" --run "$RUN_KEY"
           java -jar "$JAR" workflow export --project-root "$DEMO" --run "$RUN_KEY"
+          java -jar "$JAR" workflow artifact list --project-root "$DEMO" --run "$RUN_KEY"
+          java -jar "$JAR" workflow summary --project-root "$DEMO" --run "$RUN_KEY"
 
       - name: Record jar size
         run: ls -lh target/dhk-cli-0.1.0-all.jar

@@ -70,7 +70,10 @@ public final class GateCommand implements Command {
                     });
             if (!result.ok()) {
                 context.err().println(result.message());
-                return result.rejected() ? ExitCodes.USAGE_ERROR : ExitCodes.NOT_FOUND;
+                if (result.usageError()) {
+                    return ExitCodes.USAGE_ERROR;
+                }
+                return result.rejected() ? ExitCodes.VALIDATION_ERROR : ExitCodes.NOT_FOUND;
             }
             context.out().println("gate: " + gateKey);
             context.out().println("status: " + result.gateStatus());

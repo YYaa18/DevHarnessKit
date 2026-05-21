@@ -45,6 +45,7 @@ final class WorkflowIntegrationTest {
         assertTrue(secondSeed.stdout().contains("workflow_templates_inserted: 0"));
         assertEquals(1, countSchemaVersion(MigrationRunner.V1));
         assertEquals(1, countSchemaVersion(MigrationRunner.V2));
+        assertEquals(1, countSchemaVersion(MigrationRunner.V3));
 
         Harness list = new Harness(tempDir);
         int listExit = new CommandRouter().run(new String[]{
@@ -146,6 +147,14 @@ final class WorkflowIntegrationTest {
         assertTrue(currentContext.contains("Current phase:"));
         assertTrue(currentContext.contains("Read existing endpoint/service/data-access code before editing."));
 
+        Harness inspectPhasePass = new Harness(tempDir);
+        int inspectPhasePassExit = new CommandRouter().run(new String[]{
+                "workflow", "phase", "pass", "--project-root", "demo", "--run", runKey,
+                "--phase", "inspect_existing_code", "--summary", "Existing code inspected"
+        }, inspectPhasePass.context());
+        assertEquals(ExitCodes.SUCCESS, inspectPhasePassExit);
+        assertTrue(inspectPhasePass.stdout().contains("current_phase: create_change_plan"));
+
         Harness hardFail = new Harness(tempDir);
         int hardFailExit = new CommandRouter().run(new String[]{
                 "workflow", "gate", "fail", "--project-root", "demo", "--run", runKey,
@@ -161,6 +170,7 @@ final class WorkflowIntegrationTest {
         }, softStart.context());
         String secondRun = valueAfter(softStart.stdout(), "run_key: ");
         assertTrue(secondRun.endsWith("-2"));
+        executeSql("UPDATE workflow_run SET current_phase_key = 'verify_tests' WHERE run_key = '" + secondRun + "'");
 
         Harness softFail = new Harness(tempDir);
         int softFailExit = new CommandRouter().run(new String[]{
@@ -299,6 +309,123 @@ final class WorkflowIntegrationTest {
         assertEquals(ExitCodes.SUCCESS, phaseSpecificExit);
     }
 
+    @Test
+    void phaseAndGateUpdatesMustTargetCurrentPhase() {
+        seed();
+        String runKey = startApiChangeRun();
+
+        Harness futurePhasePass = new Harness(tempDir);
+        int futurePhasePassExit = new CommandRouter().run(new String[]{
+                "workflow", "phase", "pass", "--project-root", "demo", "--run", runKey,
+                "--phase", "create_checkpoint", "--summary", "Checkpoint created"
+        }, futurePhasePass.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, futurePhasePassExit);
+        assertTrue(futurePhasePass.stderr().contains("Phase is not current"));
+
+        Harness futurePhaseFail = new Harness(tempDir);
+        int futurePhaseFailExit = new CommandRouter().run(new String[]{
+                "workflow", "phase", "fail", "--project-root", "demo", "--run", runKey,
+                "--phase", "verify_tests", "--reason", "Tests failed"
+        }, futurePhaseFail.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, futurePhaseFailExit);
+        assertTrue(futurePhaseFail.stderr().contains("Phase is not current"));
+
+        Harness futureGatePass = new Harness(tempDir);
+        int futureGatePassExit = new CommandRouter().run(new String[]{
+                "workflow", "gate", "pass", "--project-root", "demo", "--run", runKey,
+                "--phase", "create_change_plan", "--gate", "impacted_files_listed",
+                "--summary", "Plan lists files"
+        }, futureGatePass.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, futureGatePassExit);
+        assertTrue(futureGatePass.stderr().contains("Gate does not belong to current phase"));
+
+        Harness futureGateFail = new Harness(tempDir);
+        int futureGateFailExit = new CommandRouter().run(new String[]{
+                "workflow", "gate", "fail", "--project-root", "demo", "--run", runKey,
+                "--phase", "create_change_plan", "--gate", "impacted_files_listed",
+                "--reason", "Plan missing files"
+        }, futureGateFail.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, futureGateFailExit);
+        assertTrue(futureGateFail.stderr().contains("Gate does not belong to current phase"));
+
+        Harness currentGatePass = new Harness(tempDir);
+        int currentGatePassExit = new CommandRouter().run(new String[]{
+                "workflow", "gate", "pass", "--project-root", "demo", "--run", runKey,
+                "--gate", "current_context_exists", "--summary", "Context exists"
+        }, currentGatePass.context());
+        assertEquals(ExitCodes.SUCCESS, currentGatePassExit);
+    }
+
+    @Test
+    void workflowArtifactsBindingsAndSummaryAreRecorded() throws Exception {
+        seed();
+        String runKey = startApiChangeRun();
+        long memoryId = addConfirmedMemory();
+
+        Harness memoryExport = new Harness(tempDir);
+        int memoryExportExit = new CommandRouter().run(new String[]{
+                "memory", "export", "--project-root", "demo", "--task", "repository task",
+                "--module", "order", "--keywords", "repository", "--include-workflow", runKey
+        }, memoryExport.context());
+        assertEquals(ExitCodes.SUCCESS, memoryExportExit);
+        assertTrue(memoryExport.stdout().contains("memory_exported: 1"));
+        assertEquals(1, countRows("workflow_artifact", "run_key = '" + runKey + "' AND artifact_type = 'current_context'"));
+        assertEquals(1, countRows("workflow_memory_binding", "run_key = '" + runKey
+                + "' AND binding_type = 'exported' AND memory_id = " + memoryId));
+
+        Harness workflowExport = new Harness(tempDir);
+        int workflowExportExit = new CommandRouter().run(new String[]{
+                "workflow", "export", "--project-root", "demo", "--run", runKey
+        }, workflowExport.context());
+        assertEquals(ExitCodes.SUCCESS, workflowExportExit);
+        assertEquals(1, countRows("workflow_artifact", "run_key = '" + runKey
+                + "' AND artifact_type = 'workflow_context'"));
+
+        Harness checkpoint = new Harness(tempDir);
+        int checkpointExit = new CommandRouter().run(new String[]{
+                "memory", "checkpoint", "--project-root", "demo",
+                "--task", "safe checkpoint", "--summary", "checkpoint summary"
+        }, checkpoint.context());
+        assertEquals(ExitCodes.SUCCESS, checkpointExit);
+        String checkpointId = valueAfter(checkpoint.stdout(), "checkpoint_id: ");
+
+        Harness bindCheckpoint = new Harness(tempDir);
+        int bindCheckpointExit = new CommandRouter().run(new String[]{
+                "workflow", "bind-checkpoint", "--project-root", "demo",
+                "--run", runKey, "--checkpoint", checkpointId
+        }, bindCheckpoint.context());
+        assertEquals(ExitCodes.SUCCESS, bindCheckpointExit);
+        assertTrue(bindCheckpoint.stdout().contains("checkpoint_binding_id:"));
+
+        Harness bindMemory = new Harness(tempDir);
+        int bindMemoryExit = new CommandRouter().run(new String[]{
+                "workflow", "bind-memory", "--project-root", "demo",
+                "--run", runKey, "--memory-id", String.valueOf(memoryId),
+                "--type", "read", "--reason", "Manual audit"
+        }, bindMemory.context());
+        assertEquals(ExitCodes.SUCCESS, bindMemoryExit);
+        assertTrue(bindMemory.stdout().contains("memory_binding_id:"));
+
+        Harness artifactList = new Harness(tempDir);
+        int artifactListExit = new CommandRouter().run(new String[]{
+                "workflow", "artifact", "list", "--project-root", "demo", "--run", runKey
+        }, artifactList.context());
+        assertEquals(ExitCodes.SUCCESS, artifactListExit);
+        assertTrue(artifactList.stdout().contains("[current_context] CURRENT_CONTEXT.md"));
+        assertTrue(artifactList.stdout().contains("[workflow_context] WORKFLOW_CONTEXT.md"));
+        assertTrue(artifactList.stdout().contains("[checkpoint] checkpoint_id=" + checkpointId));
+
+        Harness summary = new Harness(tempDir);
+        int summaryExit = new CommandRouter().run(new String[]{
+                "workflow", "summary", "--project-root", "demo", "--run", runKey
+        }, summary.context());
+        assertEquals(ExitCodes.SUCCESS, summaryExit);
+        assertTrue(summary.stdout().contains("exported_memory_count: 1"));
+        assertTrue(summary.stdout().contains("artifact_count: 3"));
+        assertTrue(summary.stdout().contains("checkpoint_count: 1"));
+        assertTrue(summary.stdout().contains("pending_hard_gate_count: 6"));
+    }
+
     private void seed() {
         Harness seed = new Harness(tempDir);
         int exitCode = new CommandRouter().run(new String[]{
@@ -315,6 +442,26 @@ final class WorkflowIntegrationTest {
         }, start.context());
         assertEquals(ExitCodes.SUCCESS, startExit);
         return valueAfter(start.stdout(), "run_key: ");
+    }
+
+    private long addConfirmedMemory() {
+        Harness add = new Harness(tempDir);
+        int addExit = new CommandRouter().run(new String[]{
+                "memory", "add", "--project-root", "demo", "--type", "project_fact",
+                "--module", "order", "--title", "Order repository convention",
+                "--content", "Order module uses repository classes for persistence.",
+                "--tags", "order,repository", "--confidence", "90"
+        }, add.context());
+        assertEquals(ExitCodes.SUCCESS, addExit);
+        long id = Long.parseLong(valueAfter(add.stdout(), "memory_id: "));
+
+        Harness confirm = new Harness(tempDir);
+        int confirmExit = new CommandRouter().run(new String[]{
+                "memory", "confirm", "--project-root", "demo", "--id", String.valueOf(id),
+                "--confidence", "90"
+        }, confirm.context());
+        assertEquals(ExitCodes.SUCCESS, confirmExit);
+        return id;
     }
 
     private int countSchemaVersion(int version) throws Exception {
@@ -343,6 +490,17 @@ final class WorkflowIntegrationTest {
                 "jdbc:sqlite:" + PathUtil.memoryDb(tempDir.resolve("demo")).toString());
              Statement statement = connection.createStatement()) {
             statement.executeUpdate(sql);
+        }
+    }
+
+    private int countRows(String tableName, String where) throws Exception {
+        try (Connection connection = DriverManager.getConnection(
+                "jdbc:sqlite:" + PathUtil.memoryDb(tempDir.resolve("demo")).toString());
+             Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery(
+                     "SELECT COUNT(*) FROM " + tableName + " WHERE " + where)) {
+            resultSet.next();
+            return resultSet.getInt(1);
         }
     }
 

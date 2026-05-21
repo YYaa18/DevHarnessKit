@@ -53,6 +53,17 @@ public final class CheckpointRepository {
         }
     }
 
+    public Checkpoint findById(Connection connection, String projectKey, long id) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT * FROM checkpoint WHERE project_key = ? AND id = ?")) {
+            statement.setString(1, projectKey);
+            statement.setLong(2, id);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next() ? map(resultSet) : null;
+            }
+        }
+    }
+
     public int countAll(Connection connection, String projectKey) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(
                 "SELECT COUNT(*) FROM checkpoint WHERE project_key = ?")) {

@@ -1468,6 +1468,8 @@ dhk workflow gate waive --run xxx --gate tests_passed --reason "Legacy project h
 hard gate failed -> workflow_run.status = blocked
 soft gate failed -> workflow_event level = warn
 waive 必须带 reason
+phase pass/fail 只能操作 workflow_run.current_phase_key
+gate pass/fail/waive 默认只能操作 workflow_run.current_phase_key 下的 gate
 phase pass 前必须确认当前 phase 没有 pending / failed hard gate
 blocked / failed / completed / abandoned run 不允许继续 phase pass
 hard gate pass / waive 后，如果当前 phase 已无阻塞 hard gate，则 blocked run 可恢复 running
@@ -1486,7 +1488,6 @@ V0.2-B 追加表：
 workflow_artifact
 workflow_memory_binding
 workflow_checkpoint_binding
-workflow_spec_binding
 ```
 
 用途：
@@ -1495,24 +1496,24 @@ workflow_spec_binding
 workflow_artifact: 记录 CURRENT_CONTEXT.md、WORKFLOW_CONTEXT.md、SQL_RESULT.md、proposal/design/tasks 等文件产物。
 workflow_memory_binding: 记录本次 run 读取、导出、建议、创建了哪些 memory。
 workflow_checkpoint_binding: 记录本次 run 创建或恢复了哪个 checkpoint。
-workflow_spec_binding: 记录本次 run 绑定了哪个 spec change。
 ```
 
 新增命令方向：
 
 ```text
-dhk workflow artifact add --run xxx --type current_context --path .agents/memory/exports/CURRENT_CONTEXT.md
+dhk workflow artifact list --run xxx
 dhk workflow bind-memory --run xxx --memory-id 12 --type exported --reason "gateway rule matched"
-dhk workflow bind-checkpoint --run xxx --checkpoint-id 3 --type created
+dhk workflow bind-checkpoint --run xxx --checkpoint 3 --type created
+dhk workflow summary --run xxx
 ```
 
-`memory export` 后续支持：
+`memory export` 支持：
 
 ```text
 dhk memory export --task "..." --include-workflow <run_key>
 ```
 
-MVP 不实现该参数。
+执行时自动记录 `current_context` artifact 和 `exported` memory binding。
 
 ---
 
@@ -1540,7 +1541,7 @@ dhk spec verify
 dhk spec archive
 ```
 
-在 V0.3 之前，spec 可以先作为 `workflow_artifact` 和 `workflow_spec_binding` 引用的文件存在。
+在 V0.3 之前，spec 可以先作为 `workflow_artifact` 引用的文件存在。
 
 ---
 
@@ -1573,6 +1574,9 @@ workflow start -> status -> export
 workflow gate fail -> run blocked
 workflow phase pass -> event 记录
 memory export --include-workflow 合并 inline workflow context
+memory export --include-workflow 记录 exported memory binding
+workflow export 记录 workflow_context artifact
+workflow artifact list / summary 输出审计结果
 ```
 
 性能要求：
@@ -1606,7 +1610,9 @@ V0.2-B 完成标准：
 
 ```text
 1. 能记录 workflow artifact。
-2. 能记录 workflow 与 memory/checkpoint/spec 的 binding。
+2. 能记录 workflow 与 memory/checkpoint 的 binding。
 3. memory export 可选合并 workflow 上下文。
-4. 能查询一次 run 使用了哪些 memory、产生了哪些 checkpoint 和 artifact。
+4. workflow export 自动记录 workflow_context artifact。
+5. workflow summary 能输出 artifact / exported memory / checkpoint / pending hard gate 计数。
+6. 能查询一次 run 使用了哪些 memory、产生了哪些 checkpoint 和 artifact。
 ```

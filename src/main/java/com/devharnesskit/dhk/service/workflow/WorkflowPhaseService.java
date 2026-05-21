@@ -39,6 +39,9 @@ public final class WorkflowPhaseService {
         if (phase == null) {
             return PhaseUpdateResult.notFound("Phase not found: " + phaseKey);
         }
+        if (!phaseKey.equals(run.currentPhaseKey())) {
+            return PhaseUpdateResult.rejected("Phase is not current. current_phase=" + run.currentPhaseKey());
+        }
         List<WorkflowGateRun> blockingHard = gateRunRepository.blockingHardForPhase(connection,
                 run.runKey(), phaseKey);
         if (!blockingHard.isEmpty()) {
@@ -60,9 +63,16 @@ public final class WorkflowPhaseService {
 
     public PhaseUpdateResult fail(Connection connection, WorkflowRun run, String phaseKey,
                                   String reason, String now) throws SQLException {
+        if ("blocked".equals(run.status()) || "failed".equals(run.status())
+                || "abandoned".equals(run.status()) || "completed".equals(run.status())) {
+            return PhaseUpdateResult.rejected("Workflow run is not fail-able while status is: " + run.status());
+        }
         WorkflowPhaseRun phase = phaseRunRepository.find(connection, run.runKey(), phaseKey);
         if (phase == null) {
             return PhaseUpdateResult.notFound("Phase not found: " + phaseKey);
+        }
+        if (!phaseKey.equals(run.currentPhaseKey())) {
+            return PhaseUpdateResult.rejected("Phase is not current. current_phase=" + run.currentPhaseKey());
         }
         phaseRunRepository.updateStatus(connection, run.runKey(), phaseKey, "failed",
                 reason, "", now, now);

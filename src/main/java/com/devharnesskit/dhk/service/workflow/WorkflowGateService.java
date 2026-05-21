@@ -37,7 +37,14 @@ public final class WorkflowGateService {
             return GateUpdateResult.notFound("Gate not found: " + gateKey);
         }
         if ("__ambiguous__".equals(gate.runKey())) {
-            return GateUpdateResult.rejected("Ambiguous gate: " + gateKey + ". Specify --phase.");
+            return GateUpdateResult.usageError("Ambiguous gate: " + gateKey + ". Specify --phase.");
+        }
+        if ("failed".equals(run.status()) || "abandoned".equals(run.status()) || "completed".equals(run.status())) {
+            return GateUpdateResult.rejected("Workflow run is not gate-updatable while status is: " + run.status());
+        }
+        if (!gate.phaseKey().equals(run.currentPhaseKey())) {
+            return GateUpdateResult.rejected("Gate does not belong to current phase. current_phase="
+                    + run.currentPhaseKey());
         }
         String status = statusForAction(action);
         boolean resolvingHardGate = ("pass".equals(action) || "waive".equals(action))
@@ -99,33 +106,40 @@ public final class WorkflowGateService {
     public static final class GateUpdateResult {
         private final boolean ok;
         private final boolean rejected;
+        private final boolean usageError;
         private final String message;
         private final String gateStatus;
         private final String runStatus;
 
-        private GateUpdateResult(boolean ok, boolean rejected, String message,
+        private GateUpdateResult(boolean ok, boolean rejected, boolean usageError, String message,
                                  String gateStatus, String runStatus) {
             this.ok = ok;
             this.rejected = rejected;
+            this.usageError = usageError;
             this.message = message;
             this.gateStatus = gateStatus;
             this.runStatus = runStatus;
         }
 
         public static GateUpdateResult ok(String gateStatus, String runStatus) {
-            return new GateUpdateResult(true, false, "", gateStatus, runStatus);
+            return new GateUpdateResult(true, false, false, "", gateStatus, runStatus);
         }
 
         public static GateUpdateResult notFound(String message) {
-            return new GateUpdateResult(false, false, message, "", "");
+            return new GateUpdateResult(false, false, false, message, "", "");
         }
 
         public static GateUpdateResult rejected(String message) {
-            return new GateUpdateResult(false, true, message, "", "");
+            return new GateUpdateResult(false, true, false, message, "", "");
+        }
+
+        public static GateUpdateResult usageError(String message) {
+            return new GateUpdateResult(false, true, true, message, "", "");
         }
 
         public boolean ok() { return ok; }
         public boolean rejected() { return rejected; }
+        public boolean usageError() { return usageError; }
         public String message() { return message; }
         public String gateStatus() { return gateStatus; }
         public String runStatus() { return runStatus; }

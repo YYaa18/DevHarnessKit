@@ -1,0 +1,9 @@
+---
+description: Load DevHarness Kit memory context before development.
+alwaysApply: true
+---
+
+Before development, prefer `.agents/memory/exports/CURRENT_CONTEXT.md` as the short project context.
+If it is missing or stale, run `.agents/skills/devharness-java-development/scripts/memory-export.* --task "<task>"`.
+If memory is not initialized, run the memory init script first.
+Do not rely on chat history as project memory.

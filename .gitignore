@@ -1,0 +1,7 @@
+.DS_Store
+target/
+.omx/
+reports/
+
+.agents/memory/
+.agents/tools/

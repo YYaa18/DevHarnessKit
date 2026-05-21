@@ -24,5 +24,18 @@ jobs:
       - name: Package
         run: mvn -DskipTests package
 
+      - name: Workflow smoke
+        run: |
+          set -euo pipefail
+          DEMO="$(mktemp -d)"
+          JAR="target/dhk-cli-0.1.0-all.jar"
+          java -jar "$JAR" memory init --project-root "$DEMO"
+          java -jar "$JAR" workflow template seed --project-root "$DEMO"
+          START_OUT="$(java -jar "$JAR" workflow start --project-root "$DEMO" --workflow api-change --task "ci smoke" --module order --mode api)"
+          RUN_KEY="$(printf '%s\n' "$START_OUT" | awk -F': ' '/run_key/ {print $2}')"
+          test -n "$RUN_KEY"
+          java -jar "$JAR" workflow status --project-root "$DEMO" --run "$RUN_KEY"
+          java -jar "$JAR" workflow export --project-root "$DEMO" --run "$RUN_KEY"
+
       - name: Record jar size
         run: ls -lh target/dhk-cli-0.1.0-all.jar

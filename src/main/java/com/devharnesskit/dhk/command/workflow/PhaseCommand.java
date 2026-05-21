@@ -8,8 +8,10 @@ import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.TransactionTemplate;
 import com.devharnesskit.dhk.model.workflow.WorkflowRun;
 import com.devharnesskit.dhk.repository.workflow.WorkflowEventRepository;
+import com.devharnesskit.dhk.repository.workflow.WorkflowGateRunRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowPhaseRunRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowRunRepository;
+import com.devharnesskit.dhk.service.SensitiveDataGuard;
 import com.devharnesskit.dhk.service.workflow.WorkflowPhaseService;
 
 import java.nio.file.Path;
@@ -18,8 +20,10 @@ import java.sql.Connection;
 public final class PhaseCommand implements Command {
     private final DbConnectionFactory connectionFactory = new DbConnectionFactory();
     private final WorkflowRunRepository runRepository = new WorkflowRunRepository();
+    private final SensitiveDataGuard sensitiveDataGuard = new SensitiveDataGuard();
     private final WorkflowPhaseService phaseService = new WorkflowPhaseService(
-            runRepository, new WorkflowPhaseRunRepository(), new WorkflowEventRepository());
+            runRepository, new WorkflowPhaseRunRepository(), new WorkflowGateRunRepository(),
+            new WorkflowEventRepository());
     private final TransactionTemplate transactionTemplate = new TransactionTemplate();
 
     public int run(CommandContext context, Args args) {
@@ -44,6 +48,11 @@ public final class PhaseCommand implements Command {
             context.err().println("Missing required parameter for phase fail: --reason");
             return ExitCodes.USAGE_ERROR;
         }
+        String evidence = args.option("evidence", "");
+        if (WorkflowCommandSupport.rejectSensitive(context, sensitiveDataGuard, "workflow phase",
+                summary, reason, evidence)) {
+            return ExitCodes.VALIDATION_ERROR;
+        }
         Path projectRoot = WorkflowCommandSupport.projectRoot(args, context);
         try (Connection connection = connectionFactory.open(projectRoot)) {
             WorkflowRun run = runRepository.findByKey(connection, runKey);
@@ -56,14 +65,14 @@ public final class PhaseCommand implements Command {
                         public WorkflowPhaseService.PhaseUpdateResult execute() throws Exception {
                             if ("pass".equals(action)) {
                                 return phaseService.pass(connection, run, phaseKey, summary,
-                                        args.option("evidence", ""), context.clock().now().toString());
+                                        evidence, context.clock().now().toString());
                             }
                             return phaseService.fail(connection, run, phaseKey, reason, context.clock().now().toString());
                         }
                     });
             if (!result.ok()) {
                 context.err().println(result.message());
-                return ExitCodes.NOT_FOUND;
+                return result.rejected() ? ExitCodes.VALIDATION_ERROR : ExitCodes.NOT_FOUND;
             }
             context.out().println("phase: " + phaseKey);
             context.out().println("status: " + ("pass".equals(action) ? "passed" : "failed"));

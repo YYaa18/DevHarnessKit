@@ -25,3 +25,4 @@ Use this skill for Java project development in repositories that include DevHarn
 - `references/recovery-flow.md`
 - `references/api-development-flow.md`
 - `references/mvc-development-flow.md`
+- `references/workflow-contract.md`

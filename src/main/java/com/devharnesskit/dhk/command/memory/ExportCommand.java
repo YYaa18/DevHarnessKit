@@ -15,6 +15,7 @@ import com.devharnesskit.dhk.repository.CheckpointRepository;
 import com.devharnesskit.dhk.repository.MemoryRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowGateRunRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowPhaseRunRepository;
+import com.devharnesskit.dhk.repository.workflow.WorkflowPhaseTemplateRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowRunRepository;
 import com.devharnesskit.dhk.service.ExportSelectionService;
 import com.devharnesskit.dhk.service.ProjectService;
@@ -44,7 +45,7 @@ public final class ExportCommand implements Command {
         this(new DbConnectionFactory(), new ProjectService(), new MemoryRepository(), new CheckpointRepository(),
                 null, new WorkflowRunRepository(),
                 new WorkflowExportService(new WorkflowPhaseRunRepository(), new WorkflowGateRunRepository(),
-                        new WorkflowContextRenderer()),
+                        new WorkflowPhaseTemplateRepository(), new WorkflowContextRenderer()),
                 new CurrentContextRenderer(), new SensitiveDataGuard());
     }
 

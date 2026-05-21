@@ -108,6 +108,13 @@ final class WorkflowIntegrationTest {
         assertEquals(ExitCodes.SUCCESS, gatePassExit);
         assertTrue(gatePass.stdout().contains("status: passed"));
 
+        Harness secondGatePass = new Harness(tempDir);
+        int secondGatePassExit = new CommandRouter().run(new String[]{
+                "workflow", "gate", "pass", "--project-root", "demo", "--run", runKey,
+                "--gate", "confirmed_memory_only", "--summary", "Only confirmed memory used"
+        }, secondGatePass.context());
+        assertEquals(ExitCodes.SUCCESS, secondGatePassExit);
+
         Harness phasePass = new Harness(tempDir);
         int phasePassExit = new CommandRouter().run(new String[]{
                 "workflow", "phase", "pass", "--project-root", "demo", "--run", runKey,
@@ -136,6 +143,8 @@ final class WorkflowIntegrationTest {
         assertEquals(ExitCodes.SUCCESS, memoryExportExit);
         assertTrue(currentContext.contains("<workflow-context>"));
         assertTrue(currentContext.contains("run_key: " + runKey));
+        assertTrue(currentContext.contains("Current phase:"));
+        assertTrue(currentContext.contains("Read existing endpoint/service/data-access code before editing."));
 
         Harness hardFail = new Harness(tempDir);
         int hardFailExit = new CommandRouter().run(new String[]{
@@ -162,12 +171,150 @@ final class WorkflowIntegrationTest {
         assertTrue(softFail.stdout().contains("run_status: running"));
     }
 
+    @Test
+    void workflowSensitiveDataIsRejectedAtWriteAndExportBoundaries() throws Exception {
+        seed();
+
+        Harness sensitiveStart = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "workflow", "start", "--project-root", "demo", "--workflow", "api-change",
+                "--task", "Authorization: Bearer eyJabcdefghij", "--module", "order", "--mode", "api"
+        }, sensitiveStart.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, startExit);
+        assertTrue(sensitiveStart.stderr().contains("Sensitive data rejected"));
+
+        String runKey = startApiChangeRun();
+
+        Harness sensitivePhase = new Harness(tempDir);
+        int phaseExit = new CommandRouter().run(new String[]{
+                "workflow", "phase", "pass", "--project-root", "demo", "--run", runKey,
+                "--phase", "export_context", "--summary", "password=abc"
+        }, sensitivePhase.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, phaseExit);
+        assertTrue(sensitivePhase.stderr().contains("Sensitive data rejected"));
+
+        Harness sensitiveGate = new Harness(tempDir);
+        int gateExit = new CommandRouter().run(new String[]{
+                "workflow", "gate", "waive", "--project-root", "demo", "--run", runKey,
+                "--gate", "current_context_exists", "--reason", "jdbc:mysql://127.0.0.1/app"
+        }, sensitiveGate.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, gateExit);
+        assertTrue(sensitiveGate.stderr().contains("Sensitive data rejected"));
+
+        executeSql("UPDATE workflow_run SET task_name = 'password=abc' WHERE run_key = '" + runKey + "'");
+
+        Harness workflowExport = new Harness(tempDir);
+        int workflowExportExit = new CommandRouter().run(new String[]{
+                "workflow", "export", "--project-root", "demo", "--run", runKey
+        }, workflowExport.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, workflowExportExit);
+        assertTrue(workflowExport.stderr().contains("Sensitive data rejected"));
+
+        executeSql("UPDATE workflow_phase_template SET instruction = 'password=abc' "
+                + "WHERE workflow_key = 'api-change' AND phase_key = 'export_context'");
+
+        Harness memoryExport = new Harness(tempDir);
+        int memoryExportExit = new CommandRouter().run(new String[]{
+                "memory", "export", "--project-root", "demo", "--task", "safe task",
+                "--include-workflow", runKey
+        }, memoryExport.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, memoryExportExit);
+        assertTrue(memoryExport.stderr().contains("Sensitive data rejected"));
+    }
+
+    @Test
+    void hardGatesBlockPhasePassAndWaiveCanResume() {
+        seed();
+        String runKey = startApiChangeRun();
+
+        Harness blockedByPendingGate = new Harness(tempDir);
+        int blockedByPendingGateExit = new CommandRouter().run(new String[]{
+                "workflow", "phase", "pass", "--project-root", "demo", "--run", runKey,
+                "--phase", "export_context", "--summary", "Context exported"
+        }, blockedByPendingGate.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, blockedByPendingGateExit);
+        assertTrue(blockedByPendingGate.stderr().contains("Blocking hard gates exist"));
+
+        Harness hardFail = new Harness(tempDir);
+        int hardFailExit = new CommandRouter().run(new String[]{
+                "workflow", "gate", "fail", "--project-root", "demo", "--run", runKey,
+                "--gate", "current_context_exists", "--reason", "Context missing"
+        }, hardFail.context());
+        assertEquals(ExitCodes.SUCCESS, hardFailExit);
+        assertTrue(hardFail.stdout().contains("run_status: blocked"));
+
+        Harness blockedRunPhasePass = new Harness(tempDir);
+        int blockedRunPhasePassExit = new CommandRouter().run(new String[]{
+                "workflow", "phase", "pass", "--project-root", "demo", "--run", runKey,
+                "--phase", "export_context", "--summary", "Context exported"
+        }, blockedRunPhasePass.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, blockedRunPhasePassExit);
+        assertTrue(blockedRunPhasePass.stderr().contains("status is: blocked"));
+
+        Harness waiveFailedGate = new Harness(tempDir);
+        int waiveFailedGateExit = new CommandRouter().run(new String[]{
+                "workflow", "gate", "waive", "--project-root", "demo", "--run", runKey,
+                "--gate", "current_context_exists", "--reason", "Context was produced outside dhk"
+        }, waiveFailedGate.context());
+        assertEquals(ExitCodes.SUCCESS, waiveFailedGateExit);
+        assertTrue(waiveFailedGate.stdout().contains("run_status: blocked"));
+
+        Harness passRemainingGate = new Harness(tempDir);
+        int passRemainingGateExit = new CommandRouter().run(new String[]{
+                "workflow", "gate", "pass", "--project-root", "demo", "--run", runKey,
+                "--gate", "confirmed_memory_only", "--summary", "Confirmed memory only"
+        }, passRemainingGate.context());
+        assertEquals(ExitCodes.SUCCESS, passRemainingGateExit);
+        assertTrue(passRemainingGate.stdout().contains("run_status: running"));
+
+        Harness phasePass = new Harness(tempDir);
+        int phasePassExit = new CommandRouter().run(new String[]{
+                "workflow", "phase", "pass", "--project-root", "demo", "--run", runKey,
+                "--phase", "export_context", "--summary", "Context exported"
+        }, phasePass.context());
+        assertEquals(ExitCodes.SUCCESS, phasePassExit);
+        assertTrue(phasePass.stdout().contains("current_phase: inspect_existing_code"));
+    }
+
+    @Test
+    void duplicateGateKeysRequirePhase() throws Exception {
+        seed();
+        String runKey = startApiChangeRun();
+        executeSql("UPDATE workflow_gate_run SET gate_key = 'same_gate' "
+                + "WHERE gate_key IN ('current_context_exists', 'impacted_files_listed')");
+
+        Harness ambiguous = new Harness(tempDir);
+        int ambiguousExit = new CommandRouter().run(new String[]{
+                "workflow", "gate", "pass", "--project-root", "demo", "--run", runKey,
+                "--gate", "same_gate", "--summary", "ok"
+        }, ambiguous.context());
+        assertEquals(ExitCodes.USAGE_ERROR, ambiguousExit);
+        assertTrue(ambiguous.stderr().contains("Ambiguous gate"));
+
+        Harness phaseSpecific = new Harness(tempDir);
+        int phaseSpecificExit = new CommandRouter().run(new String[]{
+                "workflow", "gate", "pass", "--project-root", "demo", "--run", runKey,
+                "--phase", "export_context", "--gate", "same_gate", "--summary", "ok"
+        }, phaseSpecific.context());
+        assertEquals(ExitCodes.SUCCESS, phaseSpecificExit);
+    }
+
     private void seed() {
         Harness seed = new Harness(tempDir);
         int exitCode = new CommandRouter().run(new String[]{
                 "workflow", "template", "seed", "--project-root", "demo"
         }, seed.context());
         assertEquals(ExitCodes.SUCCESS, exitCode);
+    }
+
+    private String startApiChangeRun() {
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "workflow", "start", "--project-root", "demo", "--workflow", "api-change",
+                "--task", "safe task", "--module", "order", "--mode", "api"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        return valueAfter(start.stdout(), "run_key: ");
     }
 
     private int countSchemaVersion(int version) throws Exception {
@@ -191,6 +338,14 @@ final class WorkflowIntegrationTest {
         return "";
     }
 
+    private void executeSql(String sql) throws Exception {
+        try (Connection connection = DriverManager.getConnection(
+                "jdbc:sqlite:" + PathUtil.memoryDb(tempDir.resolve("demo")).toString());
+             Statement statement = connection.createStatement()) {
+            statement.executeUpdate(sql);
+        }
+    }
+
     private static final class Harness {
         private final Path workingDirectory;
         private final ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -211,6 +366,10 @@ final class WorkflowIntegrationTest {
 
         private String stdout() {
             return out.toString();
+        }
+
+        private String stderr() {
+            return err.toString();
         }
     }
 

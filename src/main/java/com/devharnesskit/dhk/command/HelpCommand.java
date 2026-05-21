@@ -27,7 +27,7 @@ public final class HelpCommand implements Command {
         context.out().println("  dhk workflow start --workflow <workflow> --task <task>");
         context.out().println("  dhk workflow status --run <run-key>");
         context.out().println("  dhk workflow phase pass|fail --run <run-key> --phase <phase>");
-        context.out().println("  dhk workflow gate pass|fail|waive --run <run-key> --gate <gate>");
+        context.out().println("  dhk workflow gate pass|fail|waive --run <run-key> [--phase <phase>] --gate <gate>");
         context.out().println("  dhk workflow export --run <run-key>");
         context.out().println();
         context.out().println("Exit codes:");

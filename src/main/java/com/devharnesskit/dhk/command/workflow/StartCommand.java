@@ -19,6 +19,7 @@ import com.devharnesskit.dhk.repository.workflow.WorkflowPhaseTemplateRepository
 import com.devharnesskit.dhk.repository.workflow.WorkflowRunRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowTemplateRepository;
 import com.devharnesskit.dhk.service.ProjectService;
+import com.devharnesskit.dhk.service.SensitiveDataGuard;
 import com.devharnesskit.dhk.service.workflow.WorkflowStartService;
 import com.devharnesskit.dhk.util.PathUtil;
 
@@ -31,6 +32,7 @@ public final class StartCommand implements Command {
     private final ProjectService projectService = new ProjectService();
     private final ProjectRepository projectRepository = new ProjectRepository();
     private final WorkflowTemplateRepository templateRepository = new WorkflowTemplateRepository();
+    private final SensitiveDataGuard sensitiveDataGuard = new SensitiveDataGuard();
     private final WorkflowStartService startService = new WorkflowStartService(
             new WorkflowPhaseTemplateRepository(), new WorkflowGateTemplateRepository(),
             new WorkflowRunRepository(), new WorkflowPhaseRunRepository(),
@@ -53,6 +55,11 @@ public final class StartCommand implements Command {
             context.err().println("Invalid workflow mode: " + mode);
             return ExitCodes.VALIDATION_ERROR;
         }
+        String summary = args.option("summary", "");
+        if (WorkflowCommandSupport.rejectSensitive(context, sensitiveDataGuard, "workflow start",
+                task, summary, module, mode)) {
+            return ExitCodes.VALIDATION_ERROR;
+        }
         Path projectRoot = WorkflowCommandSupport.projectRoot(args, context);
         PathUtil.createMemoryDirectories(projectRoot);
         try (Connection connection = connectionFactory.open(projectRoot)) {
@@ -67,7 +74,7 @@ public final class StartCommand implements Command {
             final Project currentProject = project;
             final WorkflowTemplate selectedTemplate = template;
             final String selectedTask = task;
-            final String selectedSummary = args.option("summary", "");
+            final String selectedSummary = summary;
             final String selectedModule = module;
             final String selectedMode = mode;
             WorkflowRun run = transactionTemplate.execute(connection, new TransactionTemplate.Work<WorkflowRun>() {

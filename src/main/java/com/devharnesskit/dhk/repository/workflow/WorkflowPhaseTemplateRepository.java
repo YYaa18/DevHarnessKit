@@ -63,6 +63,18 @@ public final class WorkflowPhaseTemplateRepository {
         }
     }
 
+    public WorkflowPhaseTemplate find(Connection connection, String workflowKey,
+                                      String phaseKey) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT * FROM workflow_phase_template WHERE workflow_key = ? AND phase_key = ?")) {
+            statement.setString(1, workflowKey);
+            statement.setString(2, phaseKey);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next() ? map(resultSet) : null;
+            }
+        }
+    }
+
     private WorkflowPhaseTemplate map(ResultSet resultSet) throws SQLException {
         return new WorkflowPhaseTemplate(
                 resultSet.getLong("id"),

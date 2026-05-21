@@ -1468,6 +1468,11 @@ dhk workflow gate waive --run xxx --gate tests_passed --reason "Legacy project h
 hard gate failed -> workflow_run.status = blocked
 soft gate failed -> workflow_event level = warn
 waive 必须带 reason
+phase pass 前必须确认当前 phase 没有 pending / failed hard gate
+blocked / failed / completed / abandoned run 不允许继续 phase pass
+hard gate pass / waive 后，如果当前 phase 已无阻塞 hard gate，则 blocked run 可恢复 running
+workflow start / phase / gate / export 必须调用 SensitiveDataGuard
+workflow gate 可以只传 --gate；如果同一 run 中 gate_key 歧义，必须传 --phase
 phase pass/fail 必须写 workflow_event
 ```
 
@@ -1549,6 +1554,10 @@ workflow template list/show
 workflow start 展开 phase/gate
 workflow status 正确显示 current_phase
 gate hard fail 会 block run
+pending / failed hard gate 会阻止 phase pass
+hard gate waive 后可恢复 blocked run
+workflow 写入和导出路径拒绝敏感信息
+重复 gate_key 无 --phase 时返回 usage error
 gate waive 必须有 reason
 workflow export 输出 XML-like section
 WORKFLOW_CONTEXT.md 大小 <= 12KB
@@ -1563,6 +1572,7 @@ workflow template seed -> migration v2
 workflow start -> status -> export
 workflow gate fail -> run blocked
 workflow phase pass -> event 记录
+memory export --include-workflow 合并 inline workflow context
 ```
 
 性能要求：
@@ -1586,9 +1596,10 @@ V0.2-A 完成标准：
 3. workflow start 能生成 run、phase_run、gate_run。
 4. workflow status 能展示当前阶段和门禁状态。
 5. workflow export 能生成 WORKFLOW_CONTEXT.md。
-6. hard gate failed 能阻塞 workflow。
-7. 所有 workflow 命令遵守轻量化约束，不启动后台服务。
-8. MVP-A / MVP-B 既有命令不受 workflow schema 影响。
+6. hard gate failed 能阻塞 workflow，且 phase pass 不能绕过 pending / failed hard gate。
+7. workflow 持久化和导出路径必须拒绝敏感信息。
+8. 所有 workflow 命令遵守轻量化约束，不启动后台服务。
+9. MVP-A / MVP-B 既有命令不受 workflow schema 影响。
 ```
 
 V0.2-B 完成标准：

@@ -34,10 +34,33 @@ public final class WorkflowGateRunRepository {
     }
 
     public WorkflowGateRun findByRunGate(Connection connection, String runKey, String gateKey) throws SQLException {
+        List<WorkflowGateRun> gates = listByRunGate(connection, runKey, gateKey);
+        return gates.isEmpty() ? null : gates.get(0);
+    }
+
+    public List<WorkflowGateRun> listByRunGate(Connection connection, String runKey,
+                                               String gateKey) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(
-                "SELECT * FROM workflow_gate_run WHERE run_key = ? AND gate_key = ? ORDER BY id LIMIT 1")) {
+                "SELECT * FROM workflow_gate_run WHERE run_key = ? AND gate_key = ? ORDER BY id")) {
             statement.setString(1, runKey);
             statement.setString(2, gateKey);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                List<WorkflowGateRun> results = new ArrayList<WorkflowGateRun>();
+                while (resultSet.next()) {
+                    results.add(map(resultSet));
+                }
+                return results;
+            }
+        }
+    }
+
+    public WorkflowGateRun findByRunPhaseGate(Connection connection, String runKey, String phaseKey,
+                                              String gateKey) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT * FROM workflow_gate_run WHERE run_key = ? AND phase_key = ? AND gate_key = ?")) {
+            statement.setString(1, runKey);
+            statement.setString(2, phaseKey);
+            statement.setString(3, gateKey);
             try (ResultSet resultSet = statement.executeQuery()) {
                 return resultSet.next() ? map(resultSet) : null;
             }
@@ -65,6 +88,23 @@ public final class WorkflowGateRunRepository {
         try (PreparedStatement statement = connection.prepareStatement(
                 "SELECT * FROM workflow_gate_run WHERE run_key = ? AND phase_key = ? "
                         + "AND severity = 'hard' AND status = 'pending' ORDER BY id")) {
+            statement.setString(1, runKey);
+            statement.setString(2, phaseKey);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                List<WorkflowGateRun> results = new ArrayList<WorkflowGateRun>();
+                while (resultSet.next()) {
+                    results.add(map(resultSet));
+                }
+                return results;
+            }
+        }
+    }
+
+    public List<WorkflowGateRun> blockingHardForPhase(Connection connection, String runKey,
+                                                      String phaseKey) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT * FROM workflow_gate_run WHERE run_key = ? AND phase_key = ? "
+                        + "AND severity = 'hard' AND status IN ('pending', 'failed') ORDER BY id")) {
             statement.setString(1, runKey);
             statement.setString(2, phaseKey);
             try (ResultSet resultSet = statement.executeQuery()) {

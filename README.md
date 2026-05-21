@@ -29,7 +29,7 @@ Implemented in the current codebase:
 - `dhk workflow gate pass/fail/waive`
 - SQLite migration and FTS fallback.
 - SQLite workflow persistence schema v2 for templates, runs, phases, gates, and events.
-- Sensitive-data guard for memory content.
+- Sensitive-data guard for memory and workflow persisted content.
 - SQL safety guard for readonly query checks.
 - Skill/Rules packaging for `.agents/skills` and `.comate/rules`.
 - Integration tests for the memory workflow and DB SQL dry-run safety.
@@ -163,6 +163,9 @@ java -jar target/dhk-cli-0.1.0-all.jar memory export \
 - `memory add` writes draft memory only.
 - Confirmed facts must pass through `memory confirm`.
 - Default exports include confirmed memory only.
+- Workflow run, phase, gate, workflow export, and `memory export --include-workflow` paths reject sensitive values before persisting or rendering context.
+- Workflow phases cannot be marked passed while pending or failed hard gates remain for that phase.
+- Failed hard gates block the run; passing or waiving the blocking hard gates can resume the run.
 - Sensitive values such as passwords, bearer tokens, JDBC URLs, access keys, and obvious user data are rejected.
 - Raw SQL results are not stored as long-term memory.
 

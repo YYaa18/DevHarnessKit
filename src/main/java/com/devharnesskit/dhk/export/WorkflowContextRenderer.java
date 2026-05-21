@@ -2,6 +2,7 @@ package com.devharnesskit.dhk.export;
 
 import com.devharnesskit.dhk.model.workflow.WorkflowGateRun;
 import com.devharnesskit.dhk.model.workflow.WorkflowPhaseRun;
+import com.devharnesskit.dhk.model.workflow.WorkflowPhaseTemplate;
 import com.devharnesskit.dhk.model.workflow.WorkflowRun;
 
 import java.util.List;
@@ -10,7 +11,7 @@ public final class WorkflowContextRenderer {
     private static final int MAX_CHARS = 12 * 1024;
 
     public String render(WorkflowRun run, List<WorkflowPhaseRun> phases, List<WorkflowGateRun> gates,
-                         String generatedAt) {
+                         WorkflowPhaseTemplate currentTemplate, String generatedAt) {
         StringBuilder builder = new StringBuilder();
         builder.append("# WORKFLOW_CONTEXT\n\n");
         builder.append("<generated-at>").append(generatedAt).append("</generated-at>\n\n");
@@ -31,6 +32,7 @@ public final class WorkflowContextRenderer {
             builder.append("- key: ").append(current.phaseKey()).append('\n');
             builder.append("- name: ").append(current.phaseName()).append('\n');
             builder.append("- status: ").append(current.status()).append('\n');
+            appendTemplateDetails(builder, currentTemplate);
             if (current.outputSummary().length() > 0) {
                 builder.append("- output_summary: ").append(current.outputSummary()).append('\n');
             }
@@ -62,13 +64,28 @@ public final class WorkflowContextRenderer {
         return limit(builder.toString());
     }
 
-    public String renderInline(WorkflowRun run, List<WorkflowGateRun> gates) {
+    public String renderInline(WorkflowRun run, WorkflowPhaseRun currentPhase,
+                               WorkflowPhaseTemplate currentTemplate, List<WorkflowGateRun> gates) {
         StringBuilder builder = new StringBuilder();
         builder.append("<workflow-context>\n");
         builder.append("workflow: ").append(run.workflowKey()).append('\n');
         builder.append("run_key: ").append(run.runKey()).append('\n');
         builder.append("status: ").append(run.status()).append('\n');
         builder.append("current_phase: ").append(run.currentPhaseKey()).append("\n\n");
+        builder.append("Current phase:\n");
+        if (currentPhase == null) {
+            builder.append("- none\n\n");
+        } else {
+            builder.append("- name: ").append(currentPhase.phaseName()).append('\n');
+            builder.append("- status: ").append(currentPhase.status()).append('\n');
+            if (currentTemplate != null && currentTemplate.instruction().length() > 0) {
+                builder.append("- instruction: ").append(currentTemplate.instruction()).append('\n');
+            }
+            if (currentTemplate != null && currentTemplate.expectedOutput().length() > 0) {
+                builder.append("- expected_output: ").append(currentTemplate.expectedOutput()).append('\n');
+            }
+            builder.append('\n');
+        }
         builder.append("Pending hard gates:\n");
         int pending = 0;
         for (WorkflowGateRun gate : gates) {
@@ -82,6 +99,18 @@ public final class WorkflowContextRenderer {
         }
         builder.append("</workflow-context>\n");
         return builder.toString();
+    }
+
+    private void appendTemplateDetails(StringBuilder builder, WorkflowPhaseTemplate template) {
+        if (template == null) {
+            return;
+        }
+        if (template.instruction().length() > 0) {
+            builder.append("- instruction: ").append(template.instruction()).append('\n');
+        }
+        if (template.expectedOutput().length() > 0) {
+            builder.append("- expected_output: ").append(template.expectedOutput()).append('\n');
+        }
     }
 
     private WorkflowPhaseRun currentPhase(WorkflowRun run, List<WorkflowPhaseRun> phases) {

@@ -9,7 +9,9 @@ import com.devharnesskit.dhk.db.TransactionTemplate;
 import com.devharnesskit.dhk.model.workflow.WorkflowRun;
 import com.devharnesskit.dhk.repository.workflow.WorkflowEventRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowGateRunRepository;
+import com.devharnesskit.dhk.repository.workflow.WorkflowPhaseRunRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowRunRepository;
+import com.devharnesskit.dhk.service.SensitiveDataGuard;
 import com.devharnesskit.dhk.service.workflow.WorkflowGateService;
 
 import java.nio.file.Path;
@@ -18,8 +20,10 @@ import java.sql.Connection;
 public final class GateCommand implements Command {
     private final DbConnectionFactory connectionFactory = new DbConnectionFactory();
     private final WorkflowRunRepository runRepository = new WorkflowRunRepository();
+    private final SensitiveDataGuard sensitiveDataGuard = new SensitiveDataGuard();
     private final WorkflowGateService gateService = new WorkflowGateService(
-            runRepository, new WorkflowGateRunRepository(), new WorkflowEventRepository());
+            runRepository, new WorkflowGateRunRepository(), new WorkflowPhaseRunRepository(),
+            new WorkflowEventRepository());
     private final TransactionTemplate transactionTemplate = new TransactionTemplate();
 
     public int run(CommandContext context, Args args) {
@@ -44,6 +48,12 @@ public final class GateCommand implements Command {
             context.err().println("Missing required parameter for gate " + action + ": --reason");
             return ExitCodes.USAGE_ERROR;
         }
+        String evidence = args.option("evidence", "");
+        if (WorkflowCommandSupport.rejectSensitive(context, sensitiveDataGuard, "workflow gate",
+                summary, reason, evidence)) {
+            return ExitCodes.VALIDATION_ERROR;
+        }
+        String phaseKey = args.option("phase", "").trim();
         Path projectRoot = WorkflowCommandSupport.projectRoot(args, context);
         try (Connection connection = connectionFactory.open(projectRoot)) {
             WorkflowRun run = runRepository.findByKey(connection, runKey);
@@ -54,13 +64,13 @@ public final class GateCommand implements Command {
             WorkflowGateService.GateUpdateResult result = transactionTemplate.execute(connection,
                     new TransactionTemplate.Work<WorkflowGateService.GateUpdateResult>() {
                         public WorkflowGateService.GateUpdateResult execute() throws Exception {
-                            return gateService.update(connection, run, gateKey, action, summary, reason,
-                                    args.option("evidence", ""), context.clock().now().toString());
+                            return gateService.update(connection, run, phaseKey, gateKey, action, summary, reason,
+                                    evidence, context.clock().now().toString());
                         }
                     });
             if (!result.ok()) {
                 context.err().println(result.message());
-                return ExitCodes.NOT_FOUND;
+                return result.rejected() ? ExitCodes.USAGE_ERROR : ExitCodes.NOT_FOUND;
             }
             context.out().println("gate: " + gateKey);
             context.out().println("status: " + result.gateStatus());

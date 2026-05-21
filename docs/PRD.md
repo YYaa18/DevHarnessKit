@@ -2681,6 +2681,26 @@ dhk workflow gate waive --run xxx --gate tests_passed --reason "Legacy project h
 
 `waive` 必须记录原因。
 
+Workflow 持久化路径和导出路径必须复用 `SensitiveDataGuard`：
+
+```text
+workflow start: task / summary / module / mode
+workflow phase: summary / reason / evidence
+workflow gate: summary / reason / evidence
+workflow export: 最终 WORKFLOW_CONTEXT.md
+memory export --include-workflow: 最终 CURRENT_CONTEXT.md
+```
+
+Hard gate 是阻塞约束：
+
+```text
+phase pass 前必须确认当前 phase 没有 pending / failed hard gate
+hard gate fail 后 run 进入 blocked
+blocked run 不允许 phase pass
+hard gate pass / waive 后，如果当前 phase 已无 pending / failed hard gate，可恢复 running
+同一 run 内 gate_key 歧义时必须指定 --phase
+```
+
 ## 22.4 WORKFLOW_CONTEXT.md
 
 `workflow export` 生成短文件：
@@ -2719,7 +2739,7 @@ instruction: 输出最小变更方案，列出影响文件和验证方式。
 dhk memory export --task "..." --include-workflow <run_key>
 ```
 
-MVP 不实现 `--include-workflow`，V0.2-B 再实现。
+V0.2-A 已支持 `--include-workflow`，默认仍让 Agent 主要读取 `CURRENT_CONTEXT.md`。
 
 ---
 

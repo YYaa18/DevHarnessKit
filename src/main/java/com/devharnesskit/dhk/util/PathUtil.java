@@ -16,6 +16,7 @@ public final class PathUtil {
     public static final String CURRENT_CONTEXT = "CURRENT_CONTEXT.md";
     public static final String RECOVERY_CONTEXT = "RECOVERY_CONTEXT.md";
     public static final String WORKFLOW_CONTEXT = "WORKFLOW_CONTEXT.md";
+    public static final String SPEC_CONTEXT = "SPEC_CONTEXT.md";
 
     private PathUtil() {
     }
@@ -66,6 +67,10 @@ public final class PathUtil {
 
     public static Path workflowContext(Path projectRoot) {
         return exportsDirectory(projectRoot).resolve(WORKFLOW_CONTEXT);
+    }
+
+    public static Path specContext(Path projectRoot) {
+        return exportsDirectory(projectRoot).resolve(SPEC_CONTEXT);
     }
 
     public static void createMemoryDirectories(Path projectRoot) {

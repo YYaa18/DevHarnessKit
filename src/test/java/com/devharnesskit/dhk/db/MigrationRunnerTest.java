@@ -19,7 +19,7 @@ final class MigrationRunnerTest {
     Path tempDir;
 
     @Test
-    void migrationIsIdempotentThroughWorkflowV3() throws Exception {
+    void migrationIsIdempotentThroughSpecV4() throws Exception {
         PathUtil.createMemoryDirectories(tempDir);
         DbConnectionFactory factory = new DbConnectionFactory();
         MigrationRunner runner = new MigrationRunner();
@@ -28,8 +28,8 @@ final class MigrationRunnerTest {
             MigrationResult first = runner.migrate(connection, new FixedClock());
             MigrationResult second = runner.migrate(connection, new FixedClock());
 
-            assertEquals(MigrationRunner.V3, first.schemaVersion());
-            assertEquals(MigrationRunner.V3, second.schemaVersion());
+            assertEquals(MigrationRunner.V4, first.schemaVersion());
+            assertEquals(MigrationRunner.V4, second.schemaVersion());
             assertTrue(MigrationRunner.hasTable(connection, "schema_version"));
             assertTrue(MigrationRunner.hasTable(connection, "project"));
             assertTrue(MigrationRunner.hasTable(connection, "memory_item"));
@@ -44,9 +44,16 @@ final class MigrationRunnerTest {
             assertTrue(MigrationRunner.hasTable(connection, "workflow_artifact"));
             assertTrue(MigrationRunner.hasTable(connection, "workflow_memory_binding"));
             assertTrue(MigrationRunner.hasTable(connection, "workflow_checkpoint_binding"));
+            assertTrue(MigrationRunner.hasTable(connection, "spec_change"));
+            assertTrue(MigrationRunner.hasTable(connection, "spec_document"));
+            assertTrue(MigrationRunner.hasTable(connection, "spec_task"));
+            assertTrue(MigrationRunner.hasTable(connection, "spec_acceptance"));
+            assertTrue(MigrationRunner.hasTable(connection, "workflow_spec_binding"));
+            assertTrue(MigrationRunner.hasTable(connection, "spec_event"));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V1));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V2));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V3));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V4));
             assertTrue(indexExists(connection, "idx_memory_item_project_status_confidence"));
             assertTrue(indexExists(connection, "idx_memory_item_project_module"));
             assertTrue(indexExists(connection, "idx_checkpoint_project_created"));
@@ -56,6 +63,10 @@ final class MigrationRunnerTest {
             assertTrue(indexExists(connection, "idx_workflow_artifact_run"));
             assertTrue(indexExists(connection, "idx_workflow_memory_binding_run"));
             assertTrue(indexExists(connection, "idx_workflow_checkpoint_binding_run"));
+            assertTrue(indexExists(connection, "idx_spec_change_project_status"));
+            assertTrue(indexExists(connection, "idx_spec_document_change_type"));
+            assertTrue(indexExists(connection, "idx_workflow_spec_binding_run"));
+            assertTrue(indexExists(connection, "idx_spec_event_change"));
         }
     }
 

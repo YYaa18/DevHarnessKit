@@ -2,8 +2,9 @@
 
 ```text
 1. V0.2 Workflow 持久化层：把 Superpowers / OpenSpec / OpenHarness / Archon 等工具的流程能力抽象为 SQLite 表结构。
-2. CLI 轻量化最优设计：明确依赖、启动、命令生命周期、懒加载、内存、输出大小和可选模块策略。
-3. Harness 能力吸纳路线：不直接绑定外部工具，而是吸收其流程、门禁、artifact 和验证思想。
+2. V0.3 Spec 持久化层：把需求变更、设计文档、任务、验收和 workflow 绑定落到 SQLite。
+3. CLI 轻量化最优设计：明确依赖、启动、命令生命周期、懒加载、内存、输出大小和可选模块策略。
+4. Harness 能力吸纳路线：不直接绑定外部工具，而是吸收其流程、门禁、artifact、spec 和验证思想。
 ```
 
 ---
@@ -22,9 +23,11 @@ Agent Skill / Rule
 运行 DevHarness Kit CLI
         ↓
 memory 命名空间：SQLite memory.db 长期存储
+workflow 命名空间：开发流程状态和审计绑定
+spec 命名空间：规格变更、任务、验收和 workflow 绑定
 db 命名空间：业务库只读查询 SQL_RESULT.md
         ↓
-导出 CURRENT_CONTEXT.md / RECOVERY_CONTEXT.md / SQL_RESULT.md
+导出 CURRENT_CONTEXT.md / RECOVERY_CONTEXT.md / WORKFLOW_CONTEXT.md / SPEC_CONTEXT.md / SQL_RESULT.md
         ↓
 模型只读取短 Markdown 上下文
 ```
@@ -2174,7 +2177,7 @@ memory redact
 json 输出
 workflow_template / workflow_run / workflow_gate 等工作流持久化表（V0.2）
 workflow CLI：template/start/status/export/gate（V0.2）
-spec_change / spec_task 等规格驱动开发表（V0.3）
+spec_change / spec_task 等规格驱动开发表（V0.3 已落地）
 多项目共享
 图形界面
 ```
@@ -2784,23 +2787,27 @@ code-review
 
 ## 23.3 V0.3 吸收：Spec 层
 
-新增独立 spec 表或先通过 artifact/binding 承载：
+V0.3 采用独立 SQLite spec 表承载规格契约，artifact/binding 层继续负责 workflow 审计。Markdown 只作为 Agent 可读导出，不作为主存储。
 
 ```text
 spec_change
 spec_document
 spec_task
 spec_acceptance
+workflow_spec_binding
+spec_event
 ```
 
-命令方向：
+已实现命令：
 
 ```text
-dhk spec init
-dhk spec propose
-dhk spec plan
-dhk spec tasks
-dhk spec verify
+dhk spec create
+dhk spec document set
+dhk spec task add/update
+dhk spec acceptance add/update
+dhk spec status
+dhk spec export
+dhk spec bind-workflow
 dhk spec archive
 ```
 
@@ -2811,7 +2818,10 @@ confirmed memory
 latest checkpoint
 workflow state
 active spec tasks
+pending acceptance
 ```
+
+完整 spec 上下文由 `SPEC_CONTEXT.md` 导出，`CURRENT_CONTEXT.md` 只嵌入短 `<spec-context>`，避免把长 proposal/design 全塞进主上下文。
 
 ---
 

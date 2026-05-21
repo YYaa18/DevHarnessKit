@@ -31,19 +31,26 @@ Implemented in the current codebase:
 - `dhk workflow bind-memory`
 - `dhk workflow bind-checkpoint`
 - `dhk workflow summary`
+- `dhk spec create`
+- `dhk spec document set`
+- `dhk spec task add/update`
+- `dhk spec acceptance add/update`
+- `dhk spec status/export/archive`
+- `dhk spec bind-workflow`
 - SQLite migration and FTS fallback.
 - SQLite workflow persistence schema v2 for templates, runs, phases, gates, and events.
 - SQLite workflow audit schema v3 for artifacts, exported memory bindings, and checkpoint bindings.
-- Sensitive-data guard for memory and workflow persisted content.
+- SQLite spec persistence schema v4 for changes, documents, tasks, acceptance, events, and workflow bindings.
+- Sensitive-data guard for memory, workflow, and spec persisted content.
 - SQL safety guard for readonly query checks.
 - Skill/Rules packaging for `.agents/skills` and `.comate/rules`.
-- Integration tests for the memory workflow and DB SQL dry-run safety.
+- Integration tests for memory, workflow, spec, artifact binding, and DB SQL dry-run safety.
 - Optional live MySQL smoke tests when `DHK_TEST_MYSQL_URL`, `DHK_TEST_MYSQL_USER`, and `DHK_TEST_MYSQL_PASSWORD` are set.
 - GitHub Actions CI for Maven test/package.
 
 Planned but not part of the current implementation yet:
 
-- V0.3 spec persistence.
+- V0.3 follow-up automation around spec/workflow coordination.
 
 See [docs/PRD.md](docs/PRD.md) and [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for the full product and implementation design.
 
@@ -59,6 +66,7 @@ DevHarness Kit CLI
 SQLite memory.db + controlled readonly DB query
         ↓
 CURRENT_CONTEXT.md / RECOVERY_CONTEXT.md / SQL_RESULT.md
+SPEC_CONTEXT.md / WORKFLOW_CONTEXT.md
         ↓
 Agent reads short Markdown context
 ```
@@ -76,6 +84,9 @@ The first MVP is split into two layers:
 
 - **V0.2-B: Workflow Artifacts and Bindings**
   Audit links between workflow runs, generated context files, exported memory, and checkpoints.
+
+- **V0.3: Spec Persistence**
+  SQLite-backed spec changes, proposal/design documents, tasks, acceptance criteria, workflow binding, and `SPEC_CONTEXT.md` export. Markdown is an export format for agents, not the source of truth.
 
 ## Requirements
 
@@ -169,6 +180,55 @@ java -jar target/dhk-cli-0.1.0-all.jar workflow artifact list --project-root . -
 java -jar target/dhk-cli-0.1.0-all.jar workflow summary --project-root . --run <run-key>
 ```
 
+Create a spec change and bind it to a workflow run:
+
+```bash
+java -jar target/dhk-cli-0.1.0-all.jar spec create \
+  --project-root . \
+  --change order-query-api \
+  --title "Implement order query endpoint" \
+  --summary "Provide paginated order search for the frontend" \
+  --module order \
+  --mode api
+
+java -jar target/dhk-cli-0.1.0-all.jar spec document set \
+  --project-root . \
+  --change order-query-api \
+  --type design \
+  --content "Use Controller -> Service -> Mapper for paginated order search."
+
+java -jar target/dhk-cli-0.1.0-all.jar spec task add \
+  --project-root . \
+  --change order-query-api \
+  --task T001 \
+  --title "Add request DTO"
+
+java -jar target/dhk-cli-0.1.0-all.jar spec acceptance add \
+  --project-root . \
+  --change order-query-api \
+  --acceptance A001 \
+  --description "Paginated order query returns the standard result wrapper"
+
+java -jar target/dhk-cli-0.1.0-all.jar spec bind-workflow \
+  --project-root . \
+  --change order-query-api \
+  --run <run-key> \
+  --type implements
+```
+
+Export full spec context, or include a short spec summary in `CURRENT_CONTEXT.md`:
+
+```bash
+java -jar target/dhk-cli-0.1.0-all.jar spec export --project-root . --change order-query-api
+
+java -jar target/dhk-cli-0.1.0-all.jar memory export \
+  --project-root . \
+  --task "Implement order query endpoint" \
+  --module order \
+  --include-workflow <run-key> \
+  --include-spec order-query-api
+```
+
 ## Safety Model
 
 - `memory add` writes draft memory only.
@@ -180,6 +240,9 @@ java -jar target/dhk-cli-0.1.0-all.jar workflow summary --project-root . --run <
 - Failed hard gates block the run; passing or waiving the blocking hard gates can resume the run.
 - `memory export --include-workflow` records exported memory bindings and the generated current-context artifact for audit.
 - `workflow export` records the generated workflow-context artifact for audit.
+- Spec commands reject sensitive values before persisting or exporting spec content.
+- `spec archive` requires all tasks to be done/skipped and all acceptance criteria to be passed/waived.
+- `memory export --include-spec` embeds only a short spec summary; full proposal/design content belongs in `SPEC_CONTEXT.md`.
 - Sensitive values such as passwords, bearer tokens, JDBC URLs, access keys, and obvious user data are rejected.
 - Raw SQL results are not stored as long-term memory.
 

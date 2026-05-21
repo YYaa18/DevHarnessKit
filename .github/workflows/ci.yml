@@ -38,6 +38,12 @@ jobs:
           java -jar "$JAR" workflow export --project-root "$DEMO" --run "$RUN_KEY"
           java -jar "$JAR" workflow artifact list --project-root "$DEMO" --run "$RUN_KEY"
           java -jar "$JAR" workflow summary --project-root "$DEMO" --run "$RUN_KEY"
+          java -jar "$JAR" spec create --project-root "$DEMO" --change ci-smoke --title "CI smoke spec" --summary "Spec smoke" --module order --mode api
+          java -jar "$JAR" spec task add --project-root "$DEMO" --change ci-smoke --task T001 --title "Smoke task"
+          java -jar "$JAR" spec acceptance add --project-root "$DEMO" --change ci-smoke --acceptance A001 --description "Smoke acceptance"
+          java -jar "$JAR" spec bind-workflow --project-root "$DEMO" --change ci-smoke --run "$RUN_KEY" --type implements
+          java -jar "$JAR" spec export --project-root "$DEMO" --change ci-smoke
+          java -jar "$JAR" memory export --project-root "$DEMO" --task "ci smoke" --module order --include-workflow "$RUN_KEY" --include-spec ci-smoke
 
       - name: Record jar size
         run: ls -lh target/dhk-cli-0.1.0-all.jar

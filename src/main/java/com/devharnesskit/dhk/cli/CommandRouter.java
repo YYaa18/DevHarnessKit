@@ -4,6 +4,7 @@ import com.devharnesskit.dhk.command.HelpCommand;
 import com.devharnesskit.dhk.command.DoctorCommand;
 import com.devharnesskit.dhk.command.projectdb.DbCommand;
 import com.devharnesskit.dhk.command.memory.MemoryCommand;
+import com.devharnesskit.dhk.command.spec.SpecCommand;
 import com.devharnesskit.dhk.command.workflow.WorkflowCommand;
 
 import java.util.LinkedHashMap;
@@ -19,6 +20,7 @@ public final class CommandRouter {
         this.commands.put("memory", new MemoryCommand());
         this.commands.put("db", new DbCommand());
         this.commands.put("workflow", new WorkflowCommand());
+        this.commands.put("spec", new SpecCommand());
     }
 
     public int run(String[] rawArgs, CommandContext context) {

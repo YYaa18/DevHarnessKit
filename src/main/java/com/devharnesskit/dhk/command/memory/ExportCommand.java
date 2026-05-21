@@ -7,13 +7,20 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.export.CurrentContextRenderer;
+import com.devharnesskit.dhk.export.SpecContextRenderer;
 import com.devharnesskit.dhk.export.WorkflowContextRenderer;
 import com.devharnesskit.dhk.model.Checkpoint;
 import com.devharnesskit.dhk.model.MemoryItem;
 import com.devharnesskit.dhk.model.Project;
+import com.devharnesskit.dhk.model.spec.SpecChange;
 import com.devharnesskit.dhk.model.workflow.WorkflowRun;
 import com.devharnesskit.dhk.repository.CheckpointRepository;
 import com.devharnesskit.dhk.repository.MemoryRepository;
+import com.devharnesskit.dhk.repository.spec.SpecAcceptanceRepository;
+import com.devharnesskit.dhk.repository.spec.SpecChangeRepository;
+import com.devharnesskit.dhk.repository.spec.SpecDocumentRepository;
+import com.devharnesskit.dhk.repository.spec.SpecTaskRepository;
+import com.devharnesskit.dhk.repository.spec.WorkflowSpecBindingRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowGateRunRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowArtifactRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowCheckpointBindingRepository;
@@ -25,6 +32,7 @@ import com.devharnesskit.dhk.repository.workflow.WorkflowRunRepository;
 import com.devharnesskit.dhk.service.ExportSelectionService;
 import com.devharnesskit.dhk.service.ProjectService;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
+import com.devharnesskit.dhk.service.spec.SpecExportService;
 import com.devharnesskit.dhk.service.workflow.WorkflowArtifactService;
 import com.devharnesskit.dhk.service.workflow.WorkflowExportService;
 import com.devharnesskit.dhk.util.PathUtil;
@@ -44,6 +52,8 @@ public final class ExportCommand implements Command {
     private final CheckpointRepository checkpointRepository;
     private final ExportSelectionService exportSelectionService;
     private final WorkflowRunRepository workflowRunRepository;
+    private final SpecChangeRepository specChangeRepository;
+    private final SpecExportService specExportService;
     private final WorkflowExportService workflowExportService;
     private final WorkflowArtifactService workflowArtifactService;
     private final CurrentContextRenderer renderer;
@@ -51,7 +61,9 @@ public final class ExportCommand implements Command {
 
     public ExportCommand() {
         this(new DbConnectionFactory(), new MigrationRunner(), new ProjectService(), new MemoryRepository(), new CheckpointRepository(),
-                null, new WorkflowRunRepository(),
+                null, new WorkflowRunRepository(), new SpecChangeRepository(),
+                new SpecExportService(new SpecDocumentRepository(), new SpecTaskRepository(),
+                        new SpecAcceptanceRepository(), new WorkflowSpecBindingRepository(), new SpecContextRenderer()),
                 new WorkflowExportService(new WorkflowPhaseRunRepository(), new WorkflowGateRunRepository(),
                         new WorkflowPhaseTemplateRepository(), new WorkflowContextRenderer()),
                 new WorkflowArtifactService(new WorkflowArtifactRepository(), new WorkflowMemoryBindingRepository(),
@@ -62,6 +74,7 @@ public final class ExportCommand implements Command {
     ExportCommand(DbConnectionFactory connectionFactory, MigrationRunner migrationRunner, ProjectService projectService,
                   MemoryRepository memoryRepository, CheckpointRepository checkpointRepository,
                   ExportSelectionService exportSelectionService, WorkflowRunRepository workflowRunRepository,
+                  SpecChangeRepository specChangeRepository, SpecExportService specExportService,
                   WorkflowExportService workflowExportService, WorkflowArtifactService workflowArtifactService,
                   CurrentContextRenderer renderer, SensitiveDataGuard sensitiveDataGuard) {
         this.connectionFactory = connectionFactory;
@@ -73,6 +86,8 @@ public final class ExportCommand implements Command {
                 ? new ExportSelectionService(memoryRepository)
                 : exportSelectionService;
         this.workflowRunRepository = workflowRunRepository;
+        this.specChangeRepository = specChangeRepository;
+        this.specExportService = specExportService;
         this.workflowExportService = workflowExportService;
         this.workflowArtifactService = workflowArtifactService;
         this.renderer = renderer;
@@ -110,10 +125,12 @@ public final class ExportCommand implements Command {
             Checkpoint checkpoint = checkpointForModule(connection, project.projectKey(), module);
             WorkflowRun workflowRun = includedWorkflowRun(connection, args);
             String workflowContext = workflowRun == null ? "" : workflowExportService.renderInline(connection, workflowRun);
+            SpecChange specChange = includedSpecChange(connection, project, args);
+            String specContext = specChange == null ? "" : specExportService.renderInline(connection, specChange);
             String now = context.clock().now().toString();
             String markdown = renderer.render(project, task, module, args.option("mode", "auto"),
                     args.option("keywords", ""), now,
-                    exportItems, checkpoint, workflowContext);
+                    exportItems, checkpoint, workflowContext, specContext);
             List<String> matches = sensitiveDataGuard.findMatches(markdown);
             if (!matches.isEmpty()) {
                 context.err().println("Sensitive data rejected during export: " + matches);
@@ -184,6 +201,18 @@ public final class ExportCommand implements Command {
             throw new SQLException("Workflow run not found: " + runKey);
         }
         return run;
+    }
+
+    private SpecChange includedSpecChange(Connection connection, Project project, Args args) throws SQLException {
+        String changeKey = args.option("include-spec", "").trim();
+        if (changeKey.length() == 0) {
+            return null;
+        }
+        SpecChange change = specChangeRepository.findByKey(connection, changeKey);
+        if (change == null || !project.projectKey().equals(change.projectKey())) {
+            throw new SQLException("Spec change not found: " + changeKey);
+        }
+        return change;
     }
 
     private int parseLimit(CommandContext context, String rawValue) {

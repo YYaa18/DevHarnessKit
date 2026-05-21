@@ -13,6 +13,7 @@ import com.devharnesskit.dhk.repository.workflow.WorkflowCheckpointBindingReposi
 import com.devharnesskit.dhk.repository.workflow.WorkflowGateRunRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowMemoryBindingRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowRunRepository;
+import com.devharnesskit.dhk.repository.spec.WorkflowSpecBindingRepository;
 
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -26,6 +27,7 @@ public final class SummaryCommand implements Command {
     private final WorkflowMemoryBindingRepository memoryBindingRepository = new WorkflowMemoryBindingRepository();
     private final WorkflowCheckpointBindingRepository checkpointBindingRepository = new WorkflowCheckpointBindingRepository();
     private final WorkflowGateRunRepository gateRunRepository = new WorkflowGateRunRepository();
+    private final WorkflowSpecBindingRepository specBindingRepository = new WorkflowSpecBindingRepository();
 
     public int run(CommandContext context, Args args) {
         String runKey = args.option("run").trim();
@@ -50,7 +52,9 @@ public final class SummaryCommand implements Command {
                     + memoryBindingRepository.countByRunAndType(connection, run.runKey(), "exported"));
             context.out().println("artifact_count: " + artifactRepository.countByRun(connection, run.runKey()));
             context.out().println("checkpoint_count: " + checkpointBindingRepository.countByRun(connection, run.runKey()));
+            context.out().println("bound_spec_count: " + specBindingRepository.countByRun(connection, run.runKey()));
             context.out().println("pending_hard_gate_count: " + pendingHardGateCount(connection, run.runKey()));
+            context.out().println("blocking_hard_gate_count: " + blockingHardGateCount(connection, run.runKey()));
             return ExitCodes.SUCCESS;
         } catch (Exception ex) {
             context.err().println("ERROR workflow summary failed: " + ex.getMessage());
@@ -63,6 +67,18 @@ public final class SummaryCommand implements Command {
         int count = 0;
         for (WorkflowGateRun gate : gates) {
             if ("hard".equals(gate.severity()) && "pending".equals(gate.status())) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private int blockingHardGateCount(Connection connection, String runKey) throws Exception {
+        List<WorkflowGateRun> gates = gateRunRepository.listByRun(connection, runKey);
+        int count = 0;
+        for (WorkflowGateRun gate : gates) {
+            if ("hard".equals(gate.severity())
+                    && ("pending".equals(gate.status()) || "failed".equals(gate.status()))) {
                 count++;
             }
         }

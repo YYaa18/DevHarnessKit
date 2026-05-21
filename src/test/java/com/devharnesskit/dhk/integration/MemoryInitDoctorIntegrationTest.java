@@ -65,7 +65,7 @@ final class MemoryInitDoctorIntegrationTest {
         int exitCode = new CommandRouter().run(new String[]{"doctor", "--project-root", root.toString()}, doctorHarness.context());
 
         assertEquals(ExitCodes.SUCCESS, exitCode);
-        assertTrue(doctorHarness.stdout().contains("schema_version: ok (3)"));
+        assertTrue(doctorHarness.stdout().contains("schema_version: ok (4)"));
         assertTrue(doctorHarness.stdout().contains("mysql_driver: ok"));
         assertTrue(doctorHarness.stdout().contains("memory_total: 0"));
         assertTrue(doctorHarness.stdout().contains("checkpoint_total: 0"));

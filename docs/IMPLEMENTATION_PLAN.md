@@ -134,7 +134,7 @@ db test 动态注入 MySQL 连接并验证
 - 本地服务模式 / daemon 模式
 - workflow_template / workflow_run / workflow_gate 等工作流持久化表（V0.2）
 - workflow CLI：template/start/status/export/gate（V0.2）
-- spec_change / spec_task 等规格驱动开发表（V0.3）
+- spec_change / spec_task 等规格驱动开发表（V0.3 已落地为 schema v4）
 - 连接池
 - Spring / Guice / ORM
 
@@ -1519,29 +1519,41 @@ dhk memory export --task "..." --include-workflow <run_key>
 
 ## 12. V0.3 补充计划：Spec 持久化
 
-V0.3 才实现规格驱动开发表和命令。不要在 V0.2-A 抢先做。
+V0.3 已实现规格驱动开发表和最小 CLI 闭环。实现仍保持 SQLite 为主存储，Markdown 只作为 Agent 读取的导出格式；不引入 YAML parser、daemon、外部 spec CLI 或 LLM API。
 
-预留表：
+已实现表：
 
 ```text
 spec_change
 spec_document
 spec_task
 spec_acceptance
+workflow_spec_binding
+spec_event
 ```
 
-命令方向：
+已实现命令：
 
 ```text
-dhk spec init
-dhk spec propose
-dhk spec plan
-dhk spec tasks
-dhk spec verify
+dhk spec create
+dhk spec document set
+dhk spec task add
+dhk spec task update
+dhk spec acceptance add
+dhk spec acceptance update
+dhk spec status
+dhk spec export
+dhk spec bind-workflow
 dhk spec archive
 ```
 
-在 V0.3 之前，spec 可以先作为 `workflow_artifact` 引用的文件存在。
+`memory export` 支持：
+
+```text
+dhk memory export --task "..." --include-spec <change_key>
+```
+
+导出的 `CURRENT_CONTEXT.md` 只内嵌短 spec 摘要、active tasks 和 acceptance；完整 proposal/design/tasks/acceptance 由 `SPEC_CONTEXT.md` 承载。
 
 ---
 
@@ -1577,6 +1589,8 @@ memory export --include-workflow 合并 inline workflow context
 memory export --include-workflow 记录 exported memory binding
 workflow export 记录 workflow_context artifact
 workflow artifact list / summary 输出审计结果
+spec create / document / task / acceptance / status / export / bind-workflow / archive
+memory export --include-spec 合并短 spec context
 ```
 
 性能要求：

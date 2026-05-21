@@ -15,6 +15,13 @@ public final class CurrentContextRenderer {
     public String render(Project project, String task, String module, String mode, String keywords,
                          String generatedAt, List<MemoryItem> memory, Checkpoint checkpoint,
                          String workflowContext) {
+        return render(project, task, module, mode, keywords, generatedAt, memory, checkpoint,
+                workflowContext, "");
+    }
+
+    public String render(Project project, String task, String module, String mode, String keywords,
+                         String generatedAt, List<MemoryItem> memory, Checkpoint checkpoint,
+                         String workflowContext, String specContext) {
         StringBuilder builder = new StringBuilder();
         builder.append("# CURRENT_CONTEXT\n\n");
         builder.append("<generated-at>").append(generatedAt).append("</generated-at>\n\n");
@@ -57,6 +64,9 @@ public final class CurrentContextRenderer {
         builder.append("</recent-checkpoint>\n\n");
         if (workflowContext != null && workflowContext.length() > 0) {
             builder.append(workflowContext).append('\n');
+        }
+        if (specContext != null && specContext.length() > 0) {
+            builder.append(specContext).append('\n');
         }
         builder.append("<agent-instructions>\n");
         builder.append("1. First make a minimal change plan from this context.\n");

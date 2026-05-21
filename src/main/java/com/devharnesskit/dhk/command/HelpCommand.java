@@ -33,6 +33,14 @@ public final class HelpCommand implements Command {
         context.out().println("  dhk workflow bind-memory --run <run-key> --memory-id <id>");
         context.out().println("  dhk workflow bind-checkpoint --run <run-key> --checkpoint <id>");
         context.out().println("  dhk workflow summary --run <run-key>");
+        context.out().println("  dhk spec create --change <key> --title <title>");
+        context.out().println("  dhk spec document set --change <key> --type <type> --content <text>|--file <path>");
+        context.out().println("  dhk spec task add|update --change <key> --task <task>");
+        context.out().println("  dhk spec acceptance add|update --change <key> --acceptance <acceptance>");
+        context.out().println("  dhk spec status --change <key>");
+        context.out().println("  dhk spec export --change <key>");
+        context.out().println("  dhk spec bind-workflow --change <key> --run <run-key>");
+        context.out().println("  dhk spec archive --change <key> --reason <reason>");
         context.out().println();
         context.out().println("Exit codes:");
         context.out().println("  0 success");

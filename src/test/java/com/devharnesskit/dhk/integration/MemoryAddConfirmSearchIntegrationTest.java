@@ -149,6 +149,55 @@ final class MemoryAddConfirmSearchIntegrationTest {
     }
 
     @Test
+    void searchHandlesChineseAndCodeStyleTokensWithExplain() {
+        initProject();
+        addMemory("订单查询服务规则",
+                "OrderQueryService uses order_query_mapper and order-query-cache for 订单分页查询。",
+                "order-api,订单查询,OrderQueryService,order_query_mapper");
+        Harness confirm = new Harness(tempDir);
+        int confirmExit = new CommandRouter().run(new String[]{
+                "memory", "confirm", "--project-root", "demo", "--id", "1", "--confidence", "90"
+        }, confirm.context());
+        assertEquals(ExitCodes.SUCCESS, confirmExit);
+
+        Harness chinese = new Harness(tempDir);
+        int chineseExit = new CommandRouter().run(new String[]{
+                "memory", "search", "--project-root", "demo", "--q", "订单分页", "--status", "confirmed", "--explain"
+        }, chinese.context());
+        assertEquals(ExitCodes.SUCCESS, chineseExit);
+        assertTrue(chinese.stdout().contains("订单查询服务规则"));
+        assertTrue(chinese.stdout().contains("match:"));
+        assertTrue(chinese.stdout().contains("content"));
+
+        Harness camel = new Harness(tempDir);
+        int camelExit = new CommandRouter().run(new String[]{
+                "memory", "search", "--project-root", "demo", "--q", "orderQueryService",
+                "--status", "confirmed", "--explain"
+        }, camel.context());
+        assertEquals(ExitCodes.SUCCESS, camelExit);
+        assertTrue(camel.stdout().contains("订单查询服务规则"));
+        assertTrue(camel.stdout().contains("score:"));
+        assertTrue(camel.stdout().contains("tags"));
+
+        Harness snake = new Harness(tempDir);
+        int snakeExit = new CommandRouter().run(new String[]{
+                "memory", "search", "--project-root", "demo", "--q", "order query mapper",
+                "--status", "confirmed", "--explain"
+        }, snake.context());
+        assertEquals(ExitCodes.SUCCESS, snakeExit);
+        assertTrue(snake.stdout().contains("订单查询服务规则"));
+        assertTrue(snake.stdout().contains("match:"));
+
+        Harness kebab = new Harness(tempDir);
+        int kebabExit = new CommandRouter().run(new String[]{
+                "memory", "search", "--project-root", "demo", "--q", "order-query-cache",
+                "--status", "confirmed", "--explain"
+        }, kebab.context());
+        assertEquals(ExitCodes.SUCCESS, kebabExit);
+        assertTrue(kebab.stdout().contains("订单查询服务规则"));
+    }
+
+    @Test
     void sensitivePolicyRedactsFinancialPiiInsteadOfRejecting() throws Exception {
         initProject();
         Path root = tempDir.resolve("demo");

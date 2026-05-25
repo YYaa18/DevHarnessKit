@@ -82,6 +82,8 @@ match
 score
 ```
 
+The `match` field lists the weighted fields that contributed to the score, such as `tags`, `title`, `content`, `fts`, `module`, and confidence/status hints.
+
 `memory export`:
 
 ```text

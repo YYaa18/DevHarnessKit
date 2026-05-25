@@ -56,6 +56,14 @@ dhk memory search --q gateway --explain
 
 The score is a ranking aid, not a stable public API.
 
+Search uses three layers:
+
+- SQLite FTS when available for ASCII-like tokens.
+- LIKE fallback over title, content, and tags for every search.
+- Java-side scoring where tags outrank title and title outranks content.
+
+Chinese search should be treated as LIKE-based in `0.1.x`; add Chinese phrases and useful English or code tags when saving memory. Code-like terms are tokenized both as their original shape and split parts, so `orderQueryService`, `order_query_service`, and `order-query-service` can all contribute matches.
+
 ## JSON Output
 
 Use `--json` for machine-readable output:

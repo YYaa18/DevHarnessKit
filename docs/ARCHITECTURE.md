@@ -60,6 +60,8 @@ Goal is not an autonomous workflow engine. It records state, renders the next de
 
 `GOAL_CONTEXT.md` and `GOAL_SUMMARY.md` are generated Markdown exports. They are stable enough for alpha agents and scripts to read, but SQLite goal/workflow/spec rows and the completion checkpoint remain the source of truth. Regenerate exports with the matching CLI instead of hand-editing them.
 
+Goal metrics and replay are alpha derived models documented in [GOAL_METRICS_REPLAY.md](GOAL_METRICS_REPLAY.md). They summarize existing goal rows for future routine reporting without adding a new source of truth or public CLI surface.
+
 ## Workflow
 
 Workflow records development process state:

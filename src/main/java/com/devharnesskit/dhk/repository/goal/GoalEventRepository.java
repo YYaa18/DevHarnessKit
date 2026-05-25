@@ -7,6 +7,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 
 public final class GoalEventRepository {
     public long insert(Connection connection, GoalEvent event) throws SQLException {
@@ -28,5 +30,30 @@ public final class GoalEventRepository {
                 return resultSet.getLong(1);
             }
         }
+    }
+
+    public List<GoalEvent> listByGoal(Connection connection, String goalKey) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT * FROM goal_event WHERE goal_key = ? ORDER BY created_at, id")) {
+            statement.setString(1, goalKey);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                List<GoalEvent> results = new ArrayList<GoalEvent>();
+                while (resultSet.next()) {
+                    results.add(map(resultSet));
+                }
+                return results;
+            }
+        }
+    }
+
+    private GoalEvent map(ResultSet resultSet) throws SQLException {
+        return new GoalEvent(
+                resultSet.getLong("id"),
+                resultSet.getString("goal_key"),
+                resultSet.getString("event_type"),
+                resultSet.getString("level"),
+                resultSet.getString("message"),
+                resultSet.getString("data"),
+                resultSet.getString("created_at"));
     }
 }

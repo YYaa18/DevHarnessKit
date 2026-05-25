@@ -1,0 +1,96 @@
+package com.devharnesskit.dhk.service.goal;
+
+import com.devharnesskit.dhk.model.goal.GoalArtifact;
+import com.devharnesskit.dhk.model.goal.GoalCheck;
+import com.devharnesskit.dhk.model.goal.GoalEvent;
+import com.devharnesskit.dhk.model.goal.GoalMetricsSnapshot;
+import com.devharnesskit.dhk.model.goal.GoalReplayEntry;
+import com.devharnesskit.dhk.model.goal.GoalRun;
+import com.devharnesskit.dhk.model.goal.GoalStep;
+import org.junit.jupiter.api.Test;
+
+import java.util.Arrays;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+class GoalMetricsServiceTest {
+    private final GoalMetricsService service = new GoalMetricsService();
+
+    @Test
+    void snapshotDerivesCountsAndDurationFromGoalFacts() {
+        GoalMetricsSnapshot snapshot = service.snapshot(goal(),
+                Arrays.asList(step(1, "inspect", "recorded"), step(2, "verify", "rejected")),
+                Arrays.asList(check("compile", "passed", true, 3),
+                        check("test", "failed", true, 4),
+                        check("workflow", "waived", false, 4),
+                        check("db", "skipped", false, 2)),
+                Arrays.asList(event("goal_started", "2026-01-01T00:00:01Z")),
+                Arrays.asList(artifact("goal_summary", "2026-01-01T00:10:01Z")));
+
+        assertEquals(GoalMetricsSnapshot.SCHEMA_VERSION, snapshot.schemaVersion());
+        assertEquals("goal-1", snapshot.goalKey());
+        assertEquals(4, snapshot.expectedSteps());
+        assertEquals(4, snapshot.recordedSteps());
+        assertEquals(1, snapshot.acceptedSteps());
+        assertEquals(4, snapshot.totalChecks());
+        assertEquals(2, snapshot.requiredChecks());
+        assertEquals(1, snapshot.passedChecks());
+        assertEquals(1, snapshot.failedChecks());
+        assertEquals(1, snapshot.skippedChecks());
+        assertEquals(1, snapshot.waivedChecks());
+        assertEquals(2, snapshot.staleChecks());
+        assertEquals(1, snapshot.totalEvents());
+        assertEquals(1, snapshot.totalArtifacts());
+        assertEquals(600000L, snapshot.durationMs());
+    }
+
+    @Test
+    void replayOrdersGoalFactsAndAssignsStableSequences() {
+        List<GoalReplayEntry> replay = service.replay(goal(),
+                Arrays.asList(step(1, "inspect", "recorded")),
+                Arrays.asList(check("compile", "passed", true, 4)),
+                Arrays.asList(event("goal_started", "2026-01-01T00:00:01Z")),
+                Arrays.asList(artifact("goal_summary", "2026-01-01T00:04:00Z")));
+
+        assertEquals(6, replay.size());
+        assertEntry(replay.get(0), 1, "goal_run", "goal_created");
+        assertEntry(replay.get(1), 2, "goal_event", "goal_started");
+        assertEntry(replay.get(2), 3, "goal_step", "inspect");
+        assertEntry(replay.get(3), 4, "goal_check", "compile");
+        assertEntry(replay.get(4), 5, "goal_artifact", "goal_summary");
+        assertEntry(replay.get(5), 6, "goal_run", "goal_completed");
+        assertEquals(GoalReplayEntry.SCHEMA_VERSION, replay.get(0).schemaVersion());
+    }
+
+    private static void assertEntry(GoalReplayEntry entry, int sequence, String source, String kind) {
+        assertEquals(sequence, entry.sequence());
+        assertEquals(source, entry.source());
+        assertEquals(kind, entry.kind());
+    }
+
+    private static GoalRun goal() {
+        return new GoalRun("goal-1", "project", "workflow", "spec", "java-api-change",
+                "Task", "goal", "api", "done", "completed", "completed", 4, 4,
+                "2026-01-01T00:00:00Z", "2026-01-01T00:10:00Z", "2026-01-01T00:10:00Z");
+    }
+
+    private static GoalStep step(int index, String action, String status) {
+        return new GoalStep(index, "goal-1", index, action, action + " summary",
+                "", "evidence", status, "2026-01-01T00:0" + index + ":00Z");
+    }
+
+    private static GoalCheck check(String key, String status, boolean required, int stepCount) {
+        return new GoalCheck(1L, "goal-1", key, "command", required, stepCount,
+                key + " command", status, key + " summary", key + ".log",
+                "2026-01-01T00:03:00Z", "2026-01-01T00:03:00Z", "2026-01-01T00:03:00Z");
+    }
+
+    private static GoalEvent event(String type, String createdAt) {
+        return new GoalEvent(1L, "goal-1", type, "info", type + " message", "", createdAt);
+    }
+
+    private static GoalArtifact artifact(String type, String createdAt) {
+        return new GoalArtifact(1L, "goal-1", type, type, "artifact.md", "", "summary", createdAt);
+    }
+}

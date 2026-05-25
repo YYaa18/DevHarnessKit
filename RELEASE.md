@@ -14,7 +14,7 @@ Current release channel: `alpha / developer preview`.
 3. Run tests and package:
 
    ```bash
-   mvn clean package
+   mvn -B clean package
    java -jar target/dhk-cli-0.1.0-alpha-all.jar version
    ```
 
@@ -28,11 +28,63 @@ Current release channel: `alpha / developer preview`.
    target/devharnesskit-0.1.0-alpha.tar.gz
    ```
 
-5. Generate checksums:
+5. Confirm archive contents:
+
+   ```bash
+   unzip -l target/devharnesskit-0.1.0-alpha.zip | grep 'lib/dhk.jar'
+   unzip -l target/devharnesskit-0.1.0-alpha.zip | grep 'LICENSE'
+   unzip -l target/devharnesskit-0.1.0-alpha.zip | grep 'THIRD_PARTY_NOTICES.md'
+   unzip -l target/devharnesskit-0.1.0-alpha.zip | grep '.agents/skills/devharness-goal-development/SKILL.md'
+   unzip -l target/devharnesskit-0.1.0-alpha.zip | grep '.agents/skills/devharness-goal-development/scripts/goal-start.sh'
+   unzip -l target/devharnesskit-0.1.0-alpha.zip | grep '.agents/skills/devharness-goal-development/scripts/goal-start.bat'
+   unzip -l target/devharnesskit-0.1.0-alpha.zip | grep '.comate/rules/java-development-guard.mdr'
+   tar -tzf target/devharnesskit-0.1.0-alpha.tar.gz | grep 'lib/dhk.jar'
+   ```
+
+6. Confirm the archive jar and Unix wrapper can run:
+
+   ```bash
+   ARCHIVE_ROOT="$(mktemp -d)"
+   unzip -q target/devharnesskit-0.1.0-alpha.zip -d "$ARCHIVE_ROOT"
+   java -jar "$ARCHIVE_ROOT/devharnesskit-0.1.0-alpha/lib/dhk.jar" version
+   "$ARCHIVE_ROOT/devharnesskit-0.1.0-alpha/.agents/skills/devharness-goal-development/scripts/dhk.sh" version
+   ```
+
+   Windows `.bat` wrappers are verified by archive presence in this local checklist. Run them on Windows before a release promoted beyond alpha.
+
+7. Run packaged CLI smoke:
+
+   ```bash
+   SMOKE_ROOT="$(mktemp -d)"
+   JAR="target/dhk-cli-0.1.0-alpha-all.jar"
+   java -jar "$JAR" memory init --project-root "$SMOKE_ROOT"
+   java -jar "$JAR" doctor --project-root "$SMOKE_ROOT" --json | grep '"command": "doctor"'
+   java -jar "$JAR" memory export --project-root "$SMOKE_ROOT" --task "release smoke" --module global --json | grep '"command": "memory export"'
+   GOAL_KEY="$(java -jar "$JAR" goal start --project-root "$SMOKE_ROOT" --profile bugfix --task "release smoke goal" --module global | sed -n 's/^goal_key: //p' | head -n 1)"
+   test -n "$GOAL_KEY"
+   java -jar "$JAR" goal status --project-root "$SMOKE_ROOT" --goal "$GOAL_KEY" --json | grep '"command": "goal status"'
+   ```
+
+8. Confirm alpha wording:
+
+   ```bash
+   grep -n "0.1.0-alpha" README.md
+   grep -n "developer preview" README.md RELEASE.md
+   grep -n "not.*stable\\|Do not publish.*stable" README.md
+   ```
+
+9. Generate checksums:
 
    ```bash
    cd target
    sha256sum dhk-cli-0.1.0-alpha-all.jar devharnesskit-0.1.0-alpha.zip devharnesskit-0.1.0-alpha.tar.gz > SHA256SUMS
+   ```
+
+   On macOS:
+
+   ```bash
+   cd target
+   shasum -a 256 dhk-cli-0.1.0-alpha-all.jar devharnesskit-0.1.0-alpha.zip devharnesskit-0.1.0-alpha.tar.gz > SHA256SUMS
    ```
 
 ## GitHub Release

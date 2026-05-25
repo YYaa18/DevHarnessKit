@@ -1,0 +1,10 @@
+{
+  "email": "reject",
+  "phone": "reject",
+  "identity_number": "reject",
+  "jwt": "reject",
+  "api_key": "reject",
+  "jdbc:mysql://": "reject",
+  "private key block": "reject",
+  "authorization:": "reject"
+}

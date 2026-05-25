@@ -177,6 +177,17 @@ final class MemoryAddConfirmSearchIntegrationTest {
         assertTrue(search.stdout().contains("[REDACTED_PHONE]"));
         assertTrue(search.stdout().contains("[REDACTED_EMAIL]"));
         assertTrue(search.stdout().contains("[REDACTED_IDENTITY_NUMBER]"));
+
+        Harness secret = new Harness(tempDir);
+        int secretExit = new CommandRouter().run(new String[]{
+                "memory", "add",
+                "--project-root", "demo",
+                "--type", "project_fact",
+                "--title", "Secret still rejected",
+                "--content", "api_key=abc123"
+        }, secret.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, secretExit);
+        assertTrue(secret.stderr().contains("Sensitive data rejected"));
     }
 
     @Test

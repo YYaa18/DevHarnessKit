@@ -26,7 +26,12 @@ Recommended financial-system baseline:
 {
   "email": "redact",
   "phone": "redact",
-  "identity_number": "redact"
+  "identity_number": "redact",
+  "jwt": "reject",
+  "api_key": "reject",
+  "jdbc:mysql://": "reject",
+  "private key block": "reject",
+  "authorization:": "reject"
 }
 ```
 
@@ -37,6 +42,19 @@ With that policy, `test@example.com`, `13800138000`, and `11010519491231002X` ar
 [REDACTED_PHONE]
 [REDACTED_IDENTITY_NUMBER]
 ```
+
+Credential-like values still reject by default. For example:
+
+| Example shape | Recommended action | Reason |
+| --- | --- | --- |
+| `test@example.com` | `redact` or `allow` | Common business PII in requirements, tickets, and test cases. |
+| `13800138000` | `redact` or `allow` | Common business PII in financial workflows. |
+| `11010519491231002X` | `redact` or `allow` | Common business PII and high-risk if exported raw. |
+| `jwt eyJ...` | `reject` | Authentication credential. |
+| `api_key=...` | `reject` | Application credential. |
+| `jdbc:mysql://...` | `reject` | May expose host, schema, user, or connection options. |
+| `Authorization: ...` | `reject` | Request credential. |
+| `-----BEGIN OPENSSH PRIVATE KEY-----` | `reject` | Private key material. |
 
 ## Supported Keys
 
@@ -70,6 +88,53 @@ identity number
 ```
 
 Aliases are accepted for common names such as `identity_number`, `id_card`, `mobile`, `phone_number`, and `api_key`.
+
+## Financial Project Examples
+
+Use this when PII should never be written raw to memory or context exports:
+
+```json
+{
+  "email": "redact",
+  "phone": "redact",
+  "identity_number": "redact",
+  "jwt": "reject",
+  "api_key": "reject",
+  "jdbc:mysql://": "reject",
+  "private key block": "reject",
+  "authorization:": "reject"
+}
+```
+
+Use this only when local development data is synthetic or otherwise safe for agents to see:
+
+```json
+{
+  "email": "allow",
+  "phone": "allow",
+  "identity_number": "allow",
+  "jwt": "reject",
+  "api_key": "reject",
+  "jdbc:mysql://": "reject",
+  "private key block": "reject",
+  "authorization:": "reject"
+}
+```
+
+Use this for public examples or repositories where personal data should hard-stop persistence/export:
+
+```json
+{
+  "email": "reject",
+  "phone": "reject",
+  "identity_number": "reject",
+  "jwt": "reject",
+  "api_key": "reject",
+  "jdbc:mysql://": "reject",
+  "private key block": "reject",
+  "authorization:": "reject"
+}
+```
 
 ## Guidance
 

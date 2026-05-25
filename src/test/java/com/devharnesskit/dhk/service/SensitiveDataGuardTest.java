@@ -5,8 +5,11 @@ import org.junit.jupiter.api.io.TempDir;
 
 import com.devharnesskit.dhk.util.PathUtil;
 
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -60,5 +63,82 @@ final class SensitiveDataGuardTest {
         } finally {
             SensitiveDataGuard.clearProjectPolicy();
         }
+    }
+
+    @Test
+    void strictFixtureRejectsFinancialPii() throws Exception {
+        useFixture("strict-reject.json");
+        try {
+            String pii = "contact test@example.com phone 13800138000 id 11010519491231002X";
+            List<String> matches = guard.findMatches(pii);
+
+            assertTrue(matches.contains("email"));
+            assertTrue(matches.contains("phone"));
+            assertTrue(matches.contains("identity number"));
+        } finally {
+            SensitiveDataGuard.clearProjectPolicy();
+        }
+    }
+
+    @Test
+    void financialRedactFixtureRedactsPiiButStillRejectsSecrets() throws Exception {
+        useFixture("financial-redact-pii.json");
+        try {
+            String pii = "contact test@example.com phone 13800138000 id 11010519491231002X";
+            assertFalse(guard.containsSensitiveData(pii));
+            assertTrue(guard.redactedMatches(pii).contains("email"));
+            assertEquals("contact [REDACTED_EMAIL] phone [REDACTED_PHONE] id [REDACTED_IDENTITY_NUMBER]",
+                    guard.redact(pii));
+
+            List<String> secretMatches = guard.findMatches(secretSample());
+            assertTrue(secretMatches.contains("jwt"));
+            assertTrue(secretMatches.contains("api_key="));
+            assertTrue(secretMatches.contains("jdbc:mysql://"));
+            assertTrue(secretMatches.contains("private key block"));
+            assertTrue(secretMatches.contains("authorization:"));
+        } finally {
+            SensitiveDataGuard.clearProjectPolicy();
+        }
+    }
+
+    @Test
+    void financialAllowFixtureAllowsPiiButStillRejectsSecrets() throws Exception {
+        useFixture("financial-allow-pii.json");
+        try {
+            String pii = "contact test@example.com phone 13800138000 id 11010519491231002X";
+            assertFalse(guard.containsSensitiveData(pii));
+            assertTrue(guard.redactedMatches(pii).isEmpty());
+            assertEquals(pii, guard.redact(pii));
+
+            List<String> secretMatches = guard.findMatches(secretSample());
+            assertTrue(secretMatches.contains("jwt"));
+            assertTrue(secretMatches.contains("api_key="));
+            assertTrue(secretMatches.contains("jdbc:mysql://"));
+            assertTrue(secretMatches.contains("private key block"));
+            assertTrue(secretMatches.contains("authorization:"));
+        } finally {
+            SensitiveDataGuard.clearProjectPolicy();
+        }
+    }
+
+    private void useFixture(String name) throws Exception {
+        Files.createDirectories(PathUtil.devharnessDirectory(tempDir));
+        InputStream input = SensitiveDataGuardTest.class.getResourceAsStream(
+                "/fixtures/sensitive-policy/" + name);
+        assertTrue(input != null);
+        try {
+            Files.copy(input, PathUtil.sensitivePolicy(tempDir), StandardCopyOption.REPLACE_EXISTING);
+        } finally {
+            input.close();
+        }
+        SensitiveDataGuard.useProjectPolicy(tempDir);
+    }
+
+    private String secretSample() {
+        return "jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkw.signaturepart\n"
+                + "api_key=abc123\n"
+                + "jdbc:mysql://127.0.0.1/demo\n"
+                + "Authorization: Bearer abcdefghijk\n"
+                + "-----BEGIN OPENSSH PRIVATE KEY-----";
     }
 }

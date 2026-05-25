@@ -167,6 +167,7 @@ Each check includes:
 ```text
 check_key
 status
+step_count_at_check
 result_summary
 evidence_path
 ```

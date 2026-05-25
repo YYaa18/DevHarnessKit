@@ -34,6 +34,7 @@ public final class GoalCheckCommand implements Command {
             for (GoalCheck result : checks) {
                 context.out().println("check_key: " + result.checkKey());
                 context.out().println("status: " + result.status());
+                context.out().println("step_count_at_check: " + result.stepCountAtCheck());
                 context.out().println("result_summary: " + result.resultSummary());
                 if (result.evidencePath().length() > 0) {
                     context.out().println("evidence_path: " + result.evidencePath());
@@ -55,6 +56,7 @@ public final class GoalCheckCommand implements Command {
             rawChecks.add(JsonOutput.object(
                     JsonOutput.stringField("check_key", check.checkKey()),
                     JsonOutput.stringField("status", check.status()),
+                    JsonOutput.numberField("step_count_at_check", check.stepCountAtCheck()),
                     JsonOutput.stringField("result_summary", check.resultSummary()),
                     JsonOutput.stringField("evidence_path", check.evidencePath())
             ).trim());

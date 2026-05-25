@@ -205,7 +205,7 @@ public final class GoalCheckService {
     private GoalCheck save(Connection connection, GoalRun goal, String checkKey, String checkType,
                            String command, String status, String summary, Path evidencePath,
                            String now) throws Exception {
-        GoalCheck check = new GoalCheck(0L, goal.goalKey(), checkKey, checkType, true,
+        GoalCheck check = new GoalCheck(0L, goal.goalKey(), checkKey, checkType, true, goal.stepCount(),
                 command, status, summary, evidencePath == null ? "" : evidencePath.toString(),
                 now, now, now);
         checkRepository.upsert(connection, check);

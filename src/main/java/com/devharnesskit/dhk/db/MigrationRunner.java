@@ -19,6 +19,7 @@ public final class MigrationRunner {
     public static final int V3 = 3;
     public static final int V4 = 4;
     public static final int V5 = 5;
+    public static final int V6 = 6;
 
     public MigrationResult migrate(Connection connection, Clock clock) throws SQLException {
         String backupPath = backupBeforeUpgrade(connection, clock);
@@ -102,6 +103,7 @@ public final class MigrationRunner {
         migrateV3(connection, clock);
         migrateV4(connection, clock);
         migrateV5(connection, clock);
+        migrateV6(connection, clock);
 
         boolean ftsAvailable = true;
         String ftsError = "";
@@ -120,7 +122,7 @@ public final class MigrationRunner {
             return "";
         }
         int currentVersion = currentSchemaVersion(connection);
-        if (currentVersion >= V5) {
+        if (currentVersion >= V6) {
             return "";
         }
         try {
@@ -137,7 +139,7 @@ public final class MigrationRunner {
             }
             MemoryBackupService backupService = new MemoryBackupService();
             Path out = backupService.defaultBackupPath(projectRoot, clock.now().toString(),
-                    "pre-migration-v" + currentVersion + "-to-v" + V5);
+                    "pre-migration-v" + currentVersion + "-to-v" + V6);
             backupService.writeBackup(PathUtil.memoryDirectory(projectRoot), out);
             return out.toString();
         } catch (IOException ex) {
@@ -623,6 +625,16 @@ public final class MigrationRunner {
             if (!schemaVersionExists(connection, V5)) {
                 statement.executeUpdate("INSERT INTO schema_version(version, description, applied_at) VALUES ("
                         + V5 + ", 'V0.4 goal orchestration MVP schema', '" + clock.now().toString() + "')");
+            }
+        }
+    }
+
+    private void migrateV6(Connection connection, Clock clock) throws SQLException {
+        addColumnIfMissing(connection, "goal_check", "step_count_at_check", "INTEGER NOT NULL DEFAULT 0");
+        try (Statement statement = connection.createStatement()) {
+            if (!schemaVersionExists(connection, V6)) {
+                statement.executeUpdate("INSERT INTO schema_version(version, description, applied_at) VALUES ("
+                        + V6 + ", 'V0.4.1 goal check freshness metadata schema', '" + clock.now().toString() + "')");
             }
         }
     }

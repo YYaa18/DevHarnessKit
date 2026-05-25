@@ -13,40 +13,42 @@ import java.util.List;
 public final class GoalCheckRepository {
     public long upsert(Connection connection, GoalCheck check) throws SQLException {
         try (PreparedStatement update = connection.prepareStatement(
-                "UPDATE goal_check SET check_type = ?, required = ?, command = ?, status = ?, "
+                "UPDATE goal_check SET check_type = ?, required = ?, step_count_at_check = ?, command = ?, status = ?, "
                         + "result_summary = ?, evidence_path = ?, checked_at = ?, updated_at = ? "
                         + "WHERE goal_key = ? AND check_key = ?")) {
             update.setString(1, check.checkType());
             update.setInt(2, check.required() ? 1 : 0);
-            update.setString(3, check.command());
-            update.setString(4, check.status());
-            update.setString(5, check.resultSummary());
-            update.setString(6, check.evidencePath());
-            update.setString(7, check.checkedAt());
-            update.setString(8, check.updatedAt());
-            update.setString(9, check.goalKey());
-            update.setString(10, check.checkKey());
+            update.setInt(3, check.stepCountAtCheck());
+            update.setString(4, check.command());
+            update.setString(5, check.status());
+            update.setString(6, check.resultSummary());
+            update.setString(7, check.evidencePath());
+            update.setString(8, check.checkedAt());
+            update.setString(9, check.updatedAt());
+            update.setString(10, check.goalKey());
+            update.setString(11, check.checkKey());
             if (update.executeUpdate() > 0) {
                 GoalCheck existing = find(connection, check.goalKey(), check.checkKey());
                 return existing == null ? 0L : existing.id();
             }
         }
         try (PreparedStatement insert = connection.prepareStatement(
-                "INSERT INTO goal_check(goal_key, check_key, check_type, required, command, status, "
+                "INSERT INTO goal_check(goal_key, check_key, check_type, required, step_count_at_check, command, status, "
                         + "result_summary, evidence_path, checked_at, created_at, updated_at) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 Statement.RETURN_GENERATED_KEYS)) {
             insert.setString(1, check.goalKey());
             insert.setString(2, check.checkKey());
             insert.setString(3, check.checkType());
             insert.setInt(4, check.required() ? 1 : 0);
-            insert.setString(5, check.command());
-            insert.setString(6, check.status());
-            insert.setString(7, check.resultSummary());
-            insert.setString(8, check.evidencePath());
-            insert.setString(9, check.checkedAt());
-            insert.setString(10, check.createdAt());
-            insert.setString(11, check.updatedAt());
+            insert.setInt(5, check.stepCountAtCheck());
+            insert.setString(6, check.command());
+            insert.setString(7, check.status());
+            insert.setString(8, check.resultSummary());
+            insert.setString(9, check.evidencePath());
+            insert.setString(10, check.checkedAt());
+            insert.setString(11, check.createdAt());
+            insert.setString(12, check.updatedAt());
             insert.executeUpdate();
             try (ResultSet resultSet = insert.getGeneratedKeys()) {
                 if (!resultSet.next()) {
@@ -89,6 +91,7 @@ public final class GoalCheckRepository {
                 resultSet.getString("check_key"),
                 resultSet.getString("check_type"),
                 resultSet.getInt("required") == 1,
+                resultSet.getInt("step_count_at_check"),
                 resultSet.getString("command"),
                 resultSet.getString("status"),
                 resultSet.getString("result_summary"),

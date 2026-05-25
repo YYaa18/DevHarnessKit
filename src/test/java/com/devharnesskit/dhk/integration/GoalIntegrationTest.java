@@ -155,6 +155,7 @@ final class GoalIntegrationTest {
         assertEquals(ExitCodes.SUCCESS, checkExit);
         assertTrue(check.stdout().contains("check_key: compile"));
         assertTrue(check.stdout().contains("status: skipped"));
+        assertTrue(check.stdout().contains("step_count_at_check: 4"));
         assertTrue(check.stdout().contains("check_key: sensitive"));
         assertTrue(Files.isRegularFile(PathUtil.goalCheckArtifactsDirectory(root, goalKey).resolve("compile.log")));
 
@@ -383,6 +384,7 @@ final class GoalIntegrationTest {
         assertEquals(ExitCodes.SUCCESS, checkExit);
         assertTrue(checkJson.stdout().contains("\"count\": 1"));
         assertTrue(checkJson.stdout().contains("\"check_key\": \"sensitive\""));
+        assertTrue(checkJson.stdout().contains("\"step_count_at_check\": 0"));
 
         Harness evaluateBeforeStepsJson = new Harness(tempDir);
         int evaluateBeforeStepsExit = new CommandRouter().run(new String[]{
@@ -447,6 +449,8 @@ final class GoalIntegrationTest {
         try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(root));
              Statement statement = connection.createStatement()) {
             assertEquals(5, count(statement, "SELECT COUNT(*) FROM goal_check WHERE goal_key = '" + goalKey + "'"));
+            assertEquals(5, count(statement, "SELECT COUNT(*) FROM goal_check WHERE goal_key = '" + goalKey
+                    + "' AND step_count_at_check = 4"));
             assertEquals(1, count(statement, "SELECT COUNT(*) FROM checkpoint"));
             assertEquals(1, count(statement, "SELECT COUNT(*) FROM goal_run WHERE goal_key = '" + goalKey + "' AND status = 'completed'"));
             assertTrue(count(statement, "SELECT COUNT(*) FROM goal_artifact WHERE goal_key = '" + goalKey + "'") >= 3);

@@ -24,6 +24,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class GoalIntegrationTest {
+    /*
+     * V0.4.1 goal hardening matrix:
+     * stale checks, sensitive leaks, skipped Java checks, workflow hard gates,
+     * spec closure, export recovery, and successful completion bindings.
+     */
     @TempDir
     Path tempDir;
 
@@ -540,6 +545,103 @@ final class GoalIntegrationTest {
         assertEquals(ExitCodes.VALIDATION_ERROR, completeExit);
         assertTrue(complete.stdout().contains("decision: not_ready"));
         assertTrue(complete.stdout().contains("check workflow is failed; accepted_statuses=passed"));
+    }
+
+    @Test
+    void goalCompleteFailsWhenSpecCheckReportsOpenTaskAndAcceptance() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Files.createDirectories(PathUtil.goalProfilesDirectory(root));
+        Files.write(PathUtil.goalProfile(root, "custom-spec-strict"), ("{\n"
+                + "  \"workflow_key\": \"api-change\",\n"
+                + "  \"requires_spec\": \"true\",\n"
+                + "  \"default_mode\": \"api\",\n"
+                + "  \"actions\": \"inspect,verify\"\n"
+                + "}\n").getBytes("UTF-8"));
+        Files.write(PathUtil.goalCheckPolicy(root), ("{\n"
+                + "  \"required_checks\": \"spec\",\n"
+                + "  \"accepted_spec_statuses\": \"passed\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "custom-spec-strict",
+                "--task", "Strict spec closure",
+                "--module", "goal"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+        String specChange = firstValue(start.stdout(), "spec_change: ");
+
+        Harness task = new Harness(tempDir);
+        int taskExit = new CommandRouter().run(new String[]{
+                "spec", "task", "add",
+                "--project-root", "demo",
+                "--change", specChange,
+                "--task", "T001",
+                "--title", "Close implementation task",
+                "--description", "Must be done before completion",
+                "--phase", "verify"
+        }, task.context());
+        assertEquals(ExitCodes.SUCCESS, taskExit);
+
+        Harness acceptance = new Harness(tempDir);
+        int acceptanceExit = new CommandRouter().run(new String[]{
+                "spec", "acceptance", "add",
+                "--project-root", "demo",
+                "--change", specChange,
+                "--acceptance", "A001",
+                "--description", "Completion acceptance must pass",
+                "--expected", "Spec acceptance status is passed or waived"
+        }, acceptance.context());
+        assertEquals(ExitCodes.SUCCESS, acceptanceExit);
+
+        Harness inspectStep = new Harness(tempDir);
+        int inspectStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Inspection complete",
+                "--evidence", "evidence=inspection"
+        }, inspectStep.context());
+        assertEquals(ExitCodes.SUCCESS, inspectStepExit);
+
+        Harness verifyStep = new Harness(tempDir);
+        int verifyStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Verification complete",
+                "--evidence", "compile_result=not required; test_result=not required; sensitive_result=not required"
+        }, verifyStep.context());
+        assertEquals(ExitCodes.SUCCESS, verifyStepExit);
+
+        Harness check = new Harness(tempDir);
+        int checkExit = new CommandRouter().run(new String[]{
+                "goal", "check", "--project-root", "demo", "--goal", goalKey, "--all"
+        }, check.context());
+        assertEquals(ExitCodes.SUCCESS, checkExit);
+        assertTrue(check.stdout().contains("check_key: spec"));
+        assertTrue(check.stdout().contains("status: failed"));
+        assertTrue(check.stdout().contains("task T001 is pending"));
+        assertTrue(check.stdout().contains("acceptance A001 is pending"));
+
+        Harness evaluate = new Harness(tempDir);
+        int evaluateExit = new CommandRouter().run(new String[]{
+                "goal", "evaluate", "--project-root", "demo", "--goal", goalKey
+        }, evaluate.context());
+        assertEquals(ExitCodes.SUCCESS, evaluateExit);
+        assertTrue(evaluate.stdout().contains("decision: not_ready"));
+        assertTrue(evaluate.stdout().contains("check spec is failed; accepted_statuses=passed"));
+
+        Harness complete = new Harness(tempDir);
+        int completeExit = new CommandRouter().run(new String[]{
+                "goal", "complete", "--project-root", "demo", "--goal", goalKey
+        }, complete.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, completeExit);
+        assertTrue(complete.stdout().contains("decision: not_ready"));
+        assertTrue(complete.stdout().contains("check spec is failed; accepted_statuses=passed"));
     }
 
     @Test

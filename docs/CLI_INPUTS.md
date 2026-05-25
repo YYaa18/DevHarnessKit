@@ -30,6 +30,7 @@ Use exactly one SQL source:
 dhk db sql --dry-run --sql "SELECT 1"
 dhk db sql --dry-run --sql-file query.sql
 cat query.sql | dhk db sql --dry-run --sql-stdin
+dhk db sql --explain --sql "SELECT * FROM t_order WHERE id = 1"
 ```
 
 `--sql-file` and `--sql-stdin` still pass through the same SQL safety guard as `--sql`.

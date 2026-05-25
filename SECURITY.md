@@ -51,6 +51,8 @@ These checks are guardrails only:
 
 Always use database credentials that have read-only privileges at the database server. Do not connect DevHarness Kit to production databases with write-capable credentials.
 
+`dhk db sql --explain` is treated as a readonly inspection operation after SQL validation, but it may run without the JDBC read-only hint because MySQL 8 with Connector/J 5.1 can reject `EXPLAIN` when that hint is enabled. This makes database-level read-only credentials especially important for execution-plan checks.
+
 ## Workflow and Spec Safety
 
 Workflow and spec commands record manual/audit state for agents and humans. They do not execute tests automatically unless a user explicitly wires external commands around them, and they do not prove implementation correctness.

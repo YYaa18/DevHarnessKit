@@ -21,6 +21,7 @@ final class DbCompatibilityProbeServiceTest {
             assertTrue(output.contains("driver_name:"));
             assertTrue(output.contains("readonly_requested: true"));
             assertTrue(output.contains("probe_select_1: ok"));
+            assertTrue(output.contains("probe_explain_select_1: ok"));
             assertTrue(output.contains("probe_show_tables: fail:"));
             assertTrue(output.contains("server_sql_mode: unknown:"));
         }

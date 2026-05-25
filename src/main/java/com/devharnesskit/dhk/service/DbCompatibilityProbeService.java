@@ -14,7 +14,7 @@ public final class DbCompatibilityProbeService {
         lines.add("readonly_requested: " + readOnlyRequested);
         lines.add("readonly_effective: " + readOnlyState(connection));
         lines.add("probe_select_1: " + probeStatement(connection, "SELECT 1"));
-        lines.add("probe_explain_select_1: " + probeStatement(connection, "EXPLAIN SELECT 1"));
+        lines.add("probe_explain_select_1: " + probeExplainStatement(connection));
         lines.add("probe_show_tables: " + probeStatement(connection, "SHOW TABLES"));
         lines.add("server_version_query: " + querySingleValue(connection, "SELECT VERSION()", 1));
         lines.add("server_time_zone: " + querySingleValue(connection, "SHOW VARIABLES LIKE 'time_zone'", 2));
@@ -60,6 +60,36 @@ public final class DbCompatibilityProbeService {
             return "ok";
         } catch (Exception ex) {
             return "fail: " + summarize(ex);
+        }
+    }
+
+    private String probeExplainStatement(Connection connection) {
+        Boolean originalReadOnly = originalReadOnly(connection);
+        if (Boolean.TRUE.equals(originalReadOnly)) {
+            try {
+                connection.setReadOnly(false);
+            } catch (Exception ex) {
+                return "fail: " + summarize(ex);
+            }
+        }
+        try {
+            return probeStatement(connection, "EXPLAIN SELECT 1");
+        } finally {
+            if (Boolean.TRUE.equals(originalReadOnly)) {
+                try {
+                    connection.setReadOnly(true);
+                } catch (Exception ignored) {
+                    // Compatibility probe output should not fail just because a driver cannot restore the hint.
+                }
+            }
+        }
+    }
+
+    private Boolean originalReadOnly(Connection connection) {
+        try {
+            return Boolean.valueOf(connection.isReadOnly());
+        } catch (Exception ex) {
+            return null;
         }
     }
 

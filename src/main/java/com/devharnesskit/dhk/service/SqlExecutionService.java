@@ -17,7 +17,9 @@ public final class SqlExecutionService {
                                       DbConnectionRequest connectionRequest,
                                       SqlExecutionRequest request) throws Exception {
         try (Connection connection = connectionService.open(connectionRequest)) {
-            connection.setReadOnly(true);
+            if (request.useJdbcReadOnlyHint()) {
+                connection.setReadOnly(true);
+            }
             return execute(connection, request);
         }
     }

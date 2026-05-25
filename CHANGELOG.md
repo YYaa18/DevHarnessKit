@@ -15,6 +15,7 @@ Initial developer-preview release.
 - `memory search --explain`.
 - `--json` output for doctor, memory search/export, and goal status/check/evaluate/complete.
 - DB readonly beta hardening: MySQL URL compatibility flags, DB risk notice, `db test --json`, `db sql --dry-run --json`, and `db sql --format json`.
+- DB explain plan compatibility: `db sql --explain` works with MySQL 8 and Connector/J 5.1 by avoiding the JDBC read-only hint for validated `EXPLAIN` statements.
 - `memory backup`.
 - Automatic pre-migration memory backups with old-db fixture coverage.
 - Section-budgeted `CURRENT_CONTEXT.md` with a truncation report.

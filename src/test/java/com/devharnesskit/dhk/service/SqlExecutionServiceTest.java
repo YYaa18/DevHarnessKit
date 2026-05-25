@@ -35,4 +35,17 @@ final class SqlExecutionServiceTest {
 
         assertEquals(1000, request.limit());
     }
+
+    @Test
+    void explainStatementsDoNotUseJdbcReadOnlyHint() {
+        SqlExecutionRequest explain = SqlExecutionRequest.fromArgs("EXPLAIN SELECT 1", Args.parse(new String[]{
+                "db", "sql", "--explain"
+        }));
+        SqlExecutionRequest select = SqlExecutionRequest.fromArgs("SELECT 1", Args.parse(new String[]{
+                "db", "sql"
+        }));
+
+        assertEquals(false, explain.useJdbcReadOnlyHint());
+        assertTrue(select.useJdbcReadOnlyHint());
+    }
 }

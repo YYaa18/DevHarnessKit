@@ -122,6 +122,12 @@ Treat failed optional probes as compatibility information, not always as fatal e
 
 `dhk db test --json` emits the same probe lines as a `probes` array for scripts.
 
+## Explain Plans
+
+`dhk db sql --explain --sql "SELECT ..."` validates the input as a readonly `SELECT`, executes `EXPLAIN SELECT ...`, and returns the execution plan.
+
+Connector/J 5.1 can reject `EXPLAIN SELECT ...` on MySQL 8 when JDBC `Connection.setReadOnly(true)` is enabled, even though execution plans are a normal development workflow. For compatibility, DevHarness Kit does not request the JDBC read-only hint for `EXPLAIN` statements. The SQL safety guard still only allows `EXPLAIN` around readonly statements, and users must still use database credentials that are read-only at the database server.
+
 ## Common Failures
 
 ### MySQL 8 `caching_sha2_password`

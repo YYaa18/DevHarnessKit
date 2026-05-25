@@ -2,6 +2,8 @@ package com.devharnesskit.dhk.sql;
 
 import com.devharnesskit.dhk.cli.Args;
 
+import java.util.Locale;
+
 public final class SqlExecutionRequest {
     private final String sql;
     private final int limit;
@@ -59,11 +61,28 @@ public final class SqlExecutionRequest {
         return maxOutputBytes;
     }
 
+    public boolean useJdbcReadOnlyHint() {
+        return !isExplainStatement();
+    }
+
+    public boolean isExplainStatement() {
+        return firstKeyword(sql).equals("explain");
+    }
+
     private static int parseInt(String rawValue, int defaultValue) {
         try {
             return Integer.parseInt(rawValue);
         } catch (NumberFormatException ex) {
             return defaultValue;
         }
+    }
+
+    private static String firstKeyword(String value) {
+        String trimmed = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+        int end = 0;
+        while (end < trimmed.length() && Character.isLetter(trimmed.charAt(end))) {
+            end++;
+        }
+        return end == 0 ? "" : trimmed.substring(0, end);
     }
 }

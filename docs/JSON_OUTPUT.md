@@ -180,6 +180,8 @@ decision
 ready_to_complete
 missing_count
 missing
+stale_count
+stale_checks
 next_action
 next_command
 ```
@@ -203,6 +205,8 @@ decision
 ready_to_complete
 missing_count
 missing
+stale_count
+stale_checks
 next_action
 next_command
 ```

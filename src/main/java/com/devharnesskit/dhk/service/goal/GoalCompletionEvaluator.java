@@ -21,6 +21,7 @@ public final class GoalCompletionEvaluator {
     public GoalEvaluation evaluate(GoalRun goal, List<GoalCheck> checks, GoalCheckPolicy policy,
                                    GoalProfile profile, List<GoalStep> steps) {
         List<String> missing = new ArrayList<String>();
+        List<String> staleChecks = new ArrayList<String>();
         if ("failed".equals(goal.status()) || "abandoned".equals(goal.status())) {
             missing.add("goal status is " + goal.status());
         }
@@ -37,10 +38,16 @@ public final class GoalCompletionEvaluator {
             }
             if (!isAccepted(check.status())) {
                 missing.add("check " + required + " is " + check.status());
+                continue;
+            }
+            if (check.stepCountAtCheck() < recordedSteps) {
+                missing.add("check " + required + " is stale: checked_at_step="
+                        + check.stepCountAtCheck() + " current_step=" + recordedSteps);
+                staleChecks.add(required);
             }
         }
         if (missing.isEmpty()) {
-            return new GoalEvaluation("ready_to_complete", new String[0],
+            return new GoalEvaluation("ready_to_complete", new String[0], new String[0],
                     "complete_goal", "dhk goal complete --goal " + goal.goalKey());
         }
         String first = missing.get(0);
@@ -58,6 +65,7 @@ public final class GoalCompletionEvaluator {
             nextCommand = "dhk goal status --goal " + goal.goalKey();
         }
         return new GoalEvaluation("not_ready", missing.toArray(new String[missing.size()]),
+                staleChecks.toArray(new String[staleChecks.size()]),
                 nextAction, nextCommand);
     }
 

@@ -35,6 +35,8 @@ public final class GoalEvaluateCommand implements Command {
                     JsonOutput.booleanField("ready_to_complete", evaluation.readyToComplete()),
                     JsonOutput.numberField("missing_count", evaluation.missing().length),
                     JsonOutput.rawField("missing", JsonOutput.stringArray(evaluation.missing())),
+                    JsonOutput.numberField("stale_count", evaluation.staleChecks().length),
+                    JsonOutput.rawField("stale_checks", JsonOutput.stringArray(evaluation.staleChecks())),
                     JsonOutput.stringField("next_action", evaluation.nextAction()),
                     JsonOutput.stringField("next_command", evaluation.nextCommand())
             ));

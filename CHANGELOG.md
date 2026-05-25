@@ -35,3 +35,4 @@ Initial developer-preview release.
 - Release archives with third-party notices and checksums.
 - Goal-first agent skill package with start/resume/next/step/check/evaluate/complete wrapper scripts.
 - Goal check freshness metadata: schema v6 records `step_count_at_check` for each `goal check` result and exposes it in text/JSON output.
+- Goal stale-check enforcement: `goal evaluate` and `goal complete` now reject required checks recorded before the latest goal step.

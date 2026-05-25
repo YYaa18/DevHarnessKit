@@ -330,6 +330,95 @@ final class GoalIntegrationTest {
     }
 
     @Test
+    void goalEvaluateRejectsStaleChecksUntilTheyAreRerun() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Files.createDirectories(PathUtil.goalProfilesDirectory(root));
+        Files.write(PathUtil.goalProfile(root, "custom-stale"), ("{\n"
+                + "  \"workflow_key\": \"api-change\",\n"
+                + "  \"requires_spec\": \"false\",\n"
+                + "  \"default_mode\": \"api\",\n"
+                + "  \"actions\": \"inspect,verify\"\n"
+                + "}\n").getBytes("UTF-8"));
+        Files.write(PathUtil.goalCheckPolicy(root), ("{\n"
+                + "  \"required_checks\": \"sensitive\",\n"
+                + "  \"fail_pending_hard_gates\": \"true\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "custom-stale",
+                "--task", "Stale check guard",
+                "--module", "goal"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        Harness inspectStep = new Harness(tempDir);
+        int inspectStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Inspection complete",
+                "--evidence", "evidence=inspection"
+        }, inspectStep.context());
+        assertEquals(ExitCodes.SUCCESS, inspectStepExit);
+
+        Harness earlyCheck = new Harness(tempDir);
+        int earlyCheckExit = new CommandRouter().run(new String[]{
+                "goal", "check", "--project-root", "demo", "--goal", goalKey, "--all"
+        }, earlyCheck.context());
+        assertEquals(ExitCodes.SUCCESS, earlyCheckExit);
+        assertTrue(earlyCheck.stdout().contains("step_count_at_check: 1"));
+
+        Harness verifyStep = new Harness(tempDir);
+        int verifyStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Verification evidence recorded",
+                "--evidence", "compile_result=not required; test_result=not required; sensitive_result=early check needs rerun"
+        }, verifyStep.context());
+        assertEquals(ExitCodes.SUCCESS, verifyStepExit);
+
+        Harness staleEvaluate = new Harness(tempDir);
+        int staleEvaluateExit = new CommandRouter().run(new String[]{
+                "goal", "evaluate", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, staleEvaluate.context());
+        assertEquals(ExitCodes.SUCCESS, staleEvaluateExit);
+        assertTrue(staleEvaluate.stdout().contains("\"decision\": \"not_ready\""));
+        assertTrue(staleEvaluate.stdout().contains("check sensitive is stale: checked_at_step=1 current_step=2"));
+        assertTrue(staleEvaluate.stdout().contains("\"stale_count\": 1"));
+        assertTrue(staleEvaluate.stdout().contains("\"sensitive\""));
+        assertTrue(staleEvaluate.stdout().contains("\"next_command\": \"dhk goal check --goal " + goalKey
+                + " --check sensitive\""));
+
+        Harness staleComplete = new Harness(tempDir);
+        int staleCompleteExit = new CommandRouter().run(new String[]{
+                "goal", "complete", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, staleComplete.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, staleCompleteExit);
+        assertTrue(staleComplete.stdout().contains("\"status\": \"not_ready\""));
+        assertTrue(staleComplete.stdout().contains("\"stale_count\": 1"));
+
+        Harness freshCheck = new Harness(tempDir);
+        int freshCheckExit = new CommandRouter().run(new String[]{
+                "goal", "check", "--project-root", "demo", "--goal", goalKey, "--all"
+        }, freshCheck.context());
+        assertEquals(ExitCodes.SUCCESS, freshCheckExit);
+        assertTrue(freshCheck.stdout().contains("step_count_at_check: 2"));
+
+        Harness readyEvaluate = new Harness(tempDir);
+        int readyEvaluateExit = new CommandRouter().run(new String[]{
+                "goal", "evaluate", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, readyEvaluate.context());
+        assertEquals(ExitCodes.SUCCESS, readyEvaluateExit);
+        assertTrue(readyEvaluate.stdout().contains("\"decision\": \"ready_to_complete\""));
+        assertTrue(readyEvaluate.stdout().contains("\"stale_count\": 0"));
+    }
+
+    @Test
     void goalUsesConfiguredProfileCheckPolicyAndJsonOutput() throws Exception {
         Path root = tempDir.resolve("demo");
         Files.createDirectories(PathUtil.goalProfilesDirectory(root));
@@ -414,6 +503,13 @@ final class GoalIntegrationTest {
                 "--evidence", "compile_result=skipped; test_result=custom goal check; sensitive_result=ok"
         }, customVerify.context());
         assertEquals(ExitCodes.SUCCESS, customVerifyExit);
+
+        Harness freshCheckJson = new Harness(tempDir);
+        int freshCheckExit = new CommandRouter().run(new String[]{
+                "goal", "check", "--project-root", "demo", "--goal", goalKey, "--all", "--json"
+        }, freshCheckJson.context());
+        assertEquals(ExitCodes.SUCCESS, freshCheckExit);
+        assertTrue(freshCheckJson.stdout().contains("\"step_count_at_check\": 2"));
 
         Harness evaluateJson = new Harness(tempDir);
         int evaluateExit = new CommandRouter().run(new String[]{

@@ -14,17 +14,19 @@ import com.devharnesskit.dhk.repository.workflow.WorkflowRunRepository;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
 import com.devharnesskit.dhk.util.PathUtil;
 
-import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 public final class GoalCheckService {
     public static final String[] REQUIRED_CHECKS = GoalCheckPolicy.DEFAULT_REQUIRED_CHECKS;
+    static final int MAX_COMMAND_LOG_BYTES = 256 * 1024;
 
     private final GoalCheckRepository checkRepository;
     private final SpecTaskRepository taskRepository;
@@ -102,7 +104,9 @@ public final class GoalCheckService {
         CommandResult result = execute(projectRoot, command, 120);
         writeLog(log, result.output());
         String status = result.exitCode() == 0 ? "passed" : "failed";
-        String summary = checkKey + " exit_code=" + result.exitCode();
+        String summary = checkKey + " exit_code=" + result.exitCode()
+                + " duration_ms=" + result.durationMs()
+                + " output_truncated=" + result.truncated();
         return save(connection, goal, checkKey, "command", commandText, status, summary, log, now);
     }
 
@@ -221,40 +225,78 @@ public final class GoalCheckService {
         Files.write(path, content.getBytes("UTF-8"));
     }
 
-    private CommandResult execute(Path projectRoot, String[] command, int timeoutSeconds) throws Exception {
+    CommandResult execute(Path projectRoot, String[] command, int timeoutSeconds) throws Exception {
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(projectRoot.toFile());
         builder.redirectErrorStream(true);
+        Instant startedAt = Instant.now();
+        long startedNanos = System.nanoTime();
         Process process = builder.start();
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        InputStream input = process.getInputStream();
-        byte[] buffer = new byte[4096];
-        long deadline = timeoutSeconds <= 0
-                ? Long.MAX_VALUE
-                : System.currentTimeMillis() + (timeoutSeconds * 1000L);
-        while (true) {
-            drain(input, buffer, output);
-            if (process.waitFor(100, TimeUnit.MILLISECONDS)) {
-                break;
+        final BoundedOutput output = new BoundedOutput(MAX_COMMAND_LOG_BYTES);
+        final InputStream input = process.getInputStream();
+        Thread reader = new Thread(new Runnable() {
+            public void run() {
+                byte[] buffer = new byte[4096];
+                try {
+                    int read;
+                    while ((read = input.read(buffer)) >= 0) {
+                        output.write(buffer, 0, read);
+                    }
+                } catch (Exception ex) {
+                    output.write("\nOUTPUT READER ERROR: " + ex.getMessage() + "\n");
+                }
             }
-            if (System.currentTimeMillis() >= deadline) {
-                process.destroy();
-                output.write("\nCHECK TIMEOUT\n".getBytes("UTF-8"));
-                return new CommandResult(124, output.toString("UTF-8"));
-            }
+        }, "dhk-goal-check-output-reader");
+        reader.setDaemon(true);
+        reader.start();
+
+        boolean timedOut = false;
+        boolean finished;
+        if (timeoutSeconds <= 0) {
+            process.waitFor();
+            finished = true;
+        } else {
+            finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
         }
-        drain(input, buffer, output);
-        return new CommandResult(process.exitValue(), output.toString("UTF-8"));
+        int exitCode;
+        if (!finished) {
+            timedOut = true;
+            process.destroy();
+            if (!process.waitFor(1, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                process.waitFor(1, TimeUnit.SECONDS);
+            }
+            exitCode = 124;
+        } else {
+            exitCode = process.exitValue();
+        }
+        reader.join(1000L);
+        Instant finishedAt = Instant.now();
+        long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedNanos);
+        return new CommandResult(exitCode, commandLog(projectRoot, command, startedAt,
+                finishedAt, durationMs, timedOut, output), durationMs, timedOut, output.truncated());
     }
 
-    private void drain(InputStream input, byte[] buffer, ByteArrayOutputStream output) throws Exception {
-        while (input.available() > 0) {
-            int read = input.read(buffer);
-            if (read < 0) {
-                break;
-            }
-            output.write(buffer, 0, read);
+    private String commandLog(Path projectRoot, String[] command, Instant startedAt, Instant finishedAt,
+                              long durationMs, boolean timedOut, BoundedOutput output) throws Exception {
+        StringBuilder builder = new StringBuilder();
+        builder.append("command: ").append(join(command)).append('\n');
+        builder.append("working_directory: ").append(projectRoot.toAbsolutePath().normalize()).append('\n');
+        builder.append("started_at: ").append(startedAt.toString()).append('\n');
+        builder.append("finished_at: ").append(finishedAt.toString()).append('\n');
+        builder.append("duration_ms: ").append(durationMs).append('\n');
+        builder.append("timeout: ").append(timedOut).append('\n');
+        builder.append("output_truncated: ").append(output.truncated()).append('\n');
+        builder.append('\n');
+        builder.append(output.text());
+        if (timedOut) {
+            builder.append("\nCHECK TIMEOUT\n");
         }
+        if (output.truncated()) {
+            builder.append("\nCOMMAND OUTPUT TRUNCATED after ")
+                    .append(MAX_COMMAND_LOG_BYTES).append(" bytes\n");
+        }
+        return builder.toString();
     }
 
     private String join(String[] command) {
@@ -268,16 +310,72 @@ public final class GoalCheckService {
         return builder.toString();
     }
 
-    private static final class CommandResult {
+    static final class CommandResult {
         private final int exitCode;
         private final String output;
+        private final long durationMs;
+        private final boolean timedOut;
+        private final boolean truncated;
 
-        private CommandResult(int exitCode, String output) {
+        private CommandResult(int exitCode, String output, long durationMs,
+                              boolean timedOut, boolean truncated) {
             this.exitCode = exitCode;
             this.output = output == null ? "" : output;
+            this.durationMs = durationMs;
+            this.timedOut = timedOut;
+            this.truncated = truncated;
         }
 
-        private int exitCode() { return exitCode; }
-        private String output() { return output; }
+        int exitCode() { return exitCode; }
+        String output() { return output; }
+        long durationMs() { return durationMs; }
+        boolean timedOut() { return timedOut; }
+        boolean truncated() { return truncated; }
+    }
+
+    private static final class BoundedOutput {
+        private final byte[] buffer;
+        private int size;
+        private boolean truncated;
+
+        private BoundedOutput(int maxBytes) {
+            this.buffer = new byte[maxBytes];
+        }
+
+        synchronized void write(byte[] source, int offset, int length) {
+            if (length <= 0) {
+                return;
+            }
+            if (source == null) {
+                return;
+            }
+            int remaining = buffer.length - size;
+            if (remaining <= 0) {
+                truncated = true;
+                return;
+            }
+            int copy = Math.min(remaining, length);
+            System.arraycopy(source, offset, buffer, size, copy);
+            size += copy;
+            if (copy < length) {
+                truncated = true;
+            }
+        }
+
+        void write(String value) {
+            if (value == null) {
+                return;
+            }
+            byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+            write(bytes, 0, bytes.length);
+        }
+
+        synchronized String text() throws Exception {
+            return new String(buffer, 0, size, "UTF-8");
+        }
+
+        synchronized boolean truncated() {
+            return truncated;
+        }
     }
 }

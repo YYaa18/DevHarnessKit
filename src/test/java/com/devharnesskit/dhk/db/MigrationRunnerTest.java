@@ -112,6 +112,35 @@ final class MigrationRunnerTest {
     }
 
     @Test
+    void migrationUpgradesV2WorkflowFixtureToSpecAndGoalSchemasAndPreservesWorkflowRows() throws Exception {
+        PathUtil.createMemoryDirectories(tempDir);
+        loadFixture("v2-workflow-before-artifacts.sql");
+
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(tempDir))) {
+            MigrationResult result = new MigrationRunner().migrate(connection, new FixedClock());
+
+            assertEquals(MigrationRunner.V5, result.schemaVersion());
+            assertTrue(result.backupPath().contains("pre-migration-v2-to-v5"));
+            assertTrue(Files.isRegularFile(Paths.get(result.backupPath())));
+            assertTrue(MigrationRunner.hasTable(connection, "workflow_artifact"));
+            assertTrue(MigrationRunner.hasTable(connection, "workflow_memory_binding"));
+            assertTrue(MigrationRunner.hasTable(connection, "spec_change"));
+            assertTrue(MigrationRunner.hasTable(connection, "goal_run"));
+            assertEquals(1, countRows(connection, "workflow_template"));
+            assertEquals(1, countRows(connection, "workflow_run"));
+            assertEquals(1, countRows(connection, "workflow_phase_run"));
+            assertEquals(1, countRows(connection, "workflow_gate_run"));
+            assertEquals(1, countRowsWhere(connection, "workflow_run",
+                    "run_key = 'fixture-run' AND status = 'running' AND current_phase_key = 'export_context'"));
+            assertEquals(1, countRowsWhere(connection, "workflow_gate_run",
+                    "run_key = 'fixture-run' AND gate_key = 'current_context_exists' AND status = 'passed'"));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V3));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V4));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V5));
+        }
+    }
+
+    @Test
     void migrationUpgradesV4FixtureToGoalSchemaAndPreservesSpecRows() throws Exception {
         PathUtil.createMemoryDirectories(tempDir);
         loadFixture("v4-before-goal.sql");
@@ -125,6 +154,15 @@ final class MigrationRunnerTest {
             assertTrue(MigrationRunner.hasTable(connection, "goal_run"));
             assertTrue(MigrationRunner.hasTable(connection, "goal_check"));
             assertEquals(1, countRows(connection, "spec_change"));
+            assertEquals(1, countRows(connection, "spec_document"));
+            assertEquals(1, countRows(connection, "spec_task"));
+            assertEquals(1, countRows(connection, "spec_acceptance"));
+            assertEquals(1, countRows(connection, "workflow_spec_binding"));
+            assertEquals(1, countRows(connection, "spec_event"));
+            assertEquals(1, countRowsWhere(connection, "spec_task",
+                    "change_key = 'fixture-change' AND task_key = 'T001' AND status = 'done'"));
+            assertEquals(1, countRowsWhere(connection, "spec_acceptance",
+                    "change_key = 'fixture-change' AND acceptance_key = 'A001' AND status = 'passed'"));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V5));
         }
     }
@@ -183,6 +221,14 @@ final class MigrationRunnerTest {
     private int countRows(Connection connection, String tableName) throws Exception {
         try (Statement statement = connection.createStatement();
              ResultSet resultSet = statement.executeQuery("SELECT COUNT(*) FROM " + tableName)) {
+            resultSet.next();
+            return resultSet.getInt(1);
+        }
+    }
+
+    private int countRowsWhere(Connection connection, String tableName, String where) throws Exception {
+        try (Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery("SELECT COUNT(*) FROM " + tableName + " WHERE " + where)) {
             resultSet.next();
             return resultSet.getInt(1);
         }

@@ -244,6 +244,80 @@ final class SpecIntegrationTest {
         assertTrue(waive.stderr().contains("requires --evidence or --reason"));
     }
 
+    @Test
+    void archiveRejectsBlockedOrFailedStateAndAllowsSkippedOrWaivedState() {
+        createSpec();
+        Harness taskAdd = new Harness(tempDir);
+        new CommandRouter().run(new String[]{
+                "spec", "task", "add", "--project-root", "demo",
+                "--change", "order-query-api",
+                "--task", "T001",
+                "--title", "Implement DTO"
+        }, taskAdd.context());
+        Harness acceptanceAdd = new Harness(tempDir);
+        new CommandRouter().run(new String[]{
+                "spec", "acceptance", "add", "--project-root", "demo",
+                "--change", "order-query-api",
+                "--acceptance", "A001",
+                "--description", "DTO contract reviewed"
+        }, acceptanceAdd.context());
+
+        Harness taskBlocked = new Harness(tempDir);
+        int taskBlockedExit = new CommandRouter().run(new String[]{
+                "spec", "task", "update", "--project-root", "demo",
+                "--change", "order-query-api",
+                "--task", "T001",
+                "--status", "blocked",
+                "--evidence", "waiting on API decision"
+        }, taskBlocked.context());
+        assertEquals(ExitCodes.SUCCESS, taskBlockedExit);
+        Harness acceptanceFailed = new Harness(tempDir);
+        int acceptanceFailedExit = new CommandRouter().run(new String[]{
+                "spec", "acceptance", "update", "--project-root", "demo",
+                "--change", "order-query-api",
+                "--acceptance", "A001",
+                "--status", "failed",
+                "--evidence", "contract mismatch"
+        }, acceptanceFailed.context());
+        assertEquals(ExitCodes.SUCCESS, acceptanceFailedExit);
+
+        Harness archiveBlocked = new Harness(tempDir);
+        int archiveBlockedExit = new CommandRouter().run(new String[]{
+                "spec", "archive", "--project-root", "demo",
+                "--change", "order-query-api", "--reason", "not safe yet"
+        }, archiveBlocked.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, archiveBlockedExit);
+        assertTrue(archiveBlocked.stderr().contains("open_task_count: 1"));
+        assertTrue(archiveBlocked.stderr().contains("open_acceptance_count: 1"));
+
+        Harness taskSkipped = new Harness(tempDir);
+        int taskSkippedExit = new CommandRouter().run(new String[]{
+                "spec", "task", "update", "--project-root", "demo",
+                "--change", "order-query-api",
+                "--task", "T001",
+                "--status", "skipped",
+                "--evidence", "no code change needed"
+        }, taskSkipped.context());
+        assertEquals(ExitCodes.SUCCESS, taskSkippedExit);
+        Harness acceptanceWaived = new Harness(tempDir);
+        int acceptanceWaivedExit = new CommandRouter().run(new String[]{
+                "spec", "acceptance", "update", "--project-root", "demo",
+                "--change", "order-query-api",
+                "--acceptance", "A001",
+                "--status", "waived",
+                "--reason", "covered by external review"
+        }, acceptanceWaived.context());
+        assertEquals(ExitCodes.SUCCESS, acceptanceWaivedExit);
+
+        Harness archive = new Harness(tempDir);
+        int archiveExit = new CommandRouter().run(new String[]{
+                "spec", "archive", "--project-root", "demo",
+                "--change", "order-query-api", "--reason", "closed by skip and waiver"
+        }, archive.context());
+        assertEquals(ExitCodes.SUCCESS, archiveExit);
+        assertTrue(archive.stdout().contains("status: archived"));
+    }
+
     private void seedWorkflow() {
         Harness seed = new Harness(tempDir);
         int exitCode = new CommandRouter().run(new String[]{

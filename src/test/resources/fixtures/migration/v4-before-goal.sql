@@ -41,3 +41,74 @@ CREATE TABLE spec_change (
 );
 INSERT INTO spec_change(change_key, project_key, title, summary, module_name, mode, status, priority, source_kind, created_by, created_at, updated_at, archived_at)
 VALUES ('fixture-change', 'demo', 'Fixture change', 'Existing v4 spec state', 'order', 'api', 'draft', 'normal', 'manual', 'fixture', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '');
+
+CREATE TABLE spec_document (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  change_key TEXT NOT NULL,
+  document_type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  content TEXT NOT NULL,
+  content_hash TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'draft',
+  version INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+INSERT INTO spec_document(change_key, document_type, title, content, content_hash, status, version, created_at, updated_at)
+VALUES ('fixture-change', 'design', 'Fixture design', 'Existing design body', 'hash-design', 'confirmed', 1, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z');
+
+CREATE TABLE spec_task (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  change_key TEXT NOT NULL,
+  task_key TEXT NOT NULL,
+  task_order INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending',
+  phase_key TEXT NOT NULL DEFAULT '',
+  evidence TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  completed_at TEXT NOT NULL DEFAULT ''
+);
+INSERT INTO spec_task(change_key, task_key, task_order, title, description, status, phase_key, evidence, created_at, updated_at, completed_at)
+VALUES ('fixture-change', 'T001', 1, 'Existing fixture task', 'Preserve task row', 'done', 'implement_minimal_change', 'done before upgrade', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z');
+
+CREATE TABLE spec_acceptance (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  change_key TEXT NOT NULL,
+  acceptance_key TEXT NOT NULL,
+  acceptance_order INTEGER NOT NULL,
+  description TEXT NOT NULL,
+  expected_result TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending',
+  evidence TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  verified_at TEXT NOT NULL DEFAULT ''
+);
+INSERT INTO spec_acceptance(change_key, acceptance_key, acceptance_order, description, expected_result, status, evidence, created_at, updated_at, verified_at)
+VALUES ('fixture-change', 'A001', 1, 'Existing fixture acceptance', 'Acceptance preserved', 'passed', 'passed before upgrade', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z');
+
+CREATE TABLE workflow_spec_binding (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_key TEXT NOT NULL,
+  change_key TEXT NOT NULL,
+  binding_type TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+INSERT INTO workflow_spec_binding(run_key, change_key, binding_type, created_at)
+VALUES ('fixture-run', 'fixture-change', 'implements', '2026-01-01T00:00:00Z');
+
+CREATE TABLE spec_event (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_key TEXT NOT NULL,
+  change_key TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  level TEXT NOT NULL DEFAULT 'info',
+  message TEXT NOT NULL,
+  data TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+);
+INSERT INTO spec_event(project_key, change_key, event_type, level, message, data, created_at)
+VALUES ('demo', 'fixture-change', 'change_created', 'info', 'Fixture spec created', '', '2026-01-01T00:00:00Z');

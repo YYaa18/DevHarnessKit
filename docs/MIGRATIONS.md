@@ -34,10 +34,16 @@ Current fixture coverage includes:
 
 ```text
 v1-project-minimal.sql   old project table without later metadata columns
+v2-workflow-before-artifacts.sql
+                         workflow templates/runs/phases/gates/events before artifact and spec tables
 v4-before-goal.sql       pre-goal schema with existing spec state
 ```
 
 These fixtures verify that old databases are backed up before upgrade, important rows are preserved, and the current v5 goal tables are created.
+
+The workflow fixture verifies that v2 `workflow_template`, `workflow_run`, `workflow_phase_run`, `workflow_gate_run`, and `workflow_event` rows survive upgrade while v3 artifact binding tables, v4 spec tables, and v5 goal tables are added.
+
+The spec fixture verifies that v4 `spec_change`, `spec_document`, `spec_task`, `spec_acceptance`, `workflow_spec_binding`, and `spec_event` rows survive upgrade while v5 goal tables are added.
 
 For older v1 project tables, migration repairs missing project metadata columns such as `root_path`, `language`, `framework`, and `database_type` with conservative defaults.
 
@@ -56,8 +62,9 @@ If migration or initialization fails:
 2. Check whether `.agents/memory/backups/` contains a `pre-migration-*` zip.
 3. Copy `.agents/memory/memory.db`, `.agents/memory/project.json`, and any `pre-migration-*` zip to a safe location.
 4. Do not delete the original database until the backup zip has been inspected.
-5. Re-run with the latest patched CLI.
-6. If the database is still not usable, open an issue with the CLI version, schema version, command, and error output.
+5. If workflow or spec commands fail after migration, run `dhk doctor`, then inspect whether workflow/spec rows are present before retrying write commands.
+6. Re-run with the latest patched CLI.
+7. If the database is still not usable, open an issue with the CLI version, schema version, command, and error output.
 
 If DevHarness Kit cannot create the pre-migration backup, migration fails before applying schema changes. This is intentional: an older database should not be upgraded without a recoverable copy.
 

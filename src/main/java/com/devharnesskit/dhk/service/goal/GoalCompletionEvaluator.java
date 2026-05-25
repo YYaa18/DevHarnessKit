@@ -25,6 +25,9 @@ public final class GoalCompletionEvaluator {
         if ("failed".equals(goal.status()) || "abandoned".equals(goal.status())) {
             missing.add("goal status is " + goal.status());
         }
+        if ("context_export_failed".equals(goal.status()) || "context_exporting".equals(goal.status())) {
+            missing.add("context export is not ready: status is " + goal.status());
+        }
         int requiredSteps = profile == null ? 0 : profile.actions().length;
         int recordedSteps = steps == null ? goal.stepCount() : steps.size();
         if (requiredSteps > 0 && recordedSteps < requiredSteps) {

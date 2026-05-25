@@ -42,7 +42,7 @@ final class CommandRouterTest {
         assertEquals(ExitCodes.SUCCESS, exitCode);
         assertTrue(harness.stdout().contains("DevHarness Kit 0.1.0-alpha"));
         assertTrue(harness.stdout().contains("release_channel: alpha / developer preview"));
-        assertTrue(harness.stdout().contains("schema_version: 6"));
+        assertTrue(harness.stdout().contains("schema_version: 7"));
     }
 
     @Test

@@ -247,6 +247,106 @@ final class GoalIntegrationTest {
     }
 
     @Test
+    void goalStartExportFailureCanResumeWithoutDuplicateRuns() throws Exception {
+        Path root = tempDir.resolve("demo");
+        PathUtil.createMemoryDirectories(root);
+        Files.deleteIfExists(PathUtil.goalContext(root));
+        Files.createDirectory(PathUtil.goalContext(root));
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "java-api-change",
+                "--task", "Recover failed start export",
+                "--module", "goal"
+        }, start.context());
+        assertEquals(ExitCodes.RUNTIME_ERROR, startExit);
+        assertTrue(start.stderr().contains("ERROR goal start failed"));
+
+        String goalKey = singleString(root, "SELECT goal_key FROM goal_run");
+        assertEquals("context_export_failed", singleString(root,
+                "SELECT status FROM goal_run WHERE goal_key = '" + goalKey + "'"));
+        assertEquals(1, countRows(root, "workflow_run"));
+        assertEquals(1, countRows(root, "spec_change"));
+
+        Harness next = new Harness(tempDir);
+        int nextExit = new CommandRouter().run(new String[]{
+                "goal", "next", "--project-root", "demo"
+        }, next.context());
+        assertEquals(ExitCodes.SUCCESS, nextExit);
+        assertTrue(next.stdout().contains("current_action: recover_context_export"));
+        assertTrue(next.stdout().contains("next_command: dhk goal resume --goal " + goalKey));
+
+        Files.delete(PathUtil.goalContext(root));
+        Harness resume = new Harness(tempDir);
+        int resumeExit = new CommandRouter().run(new String[]{
+                "goal", "resume", "--project-root", "demo"
+        }, resume.context());
+        assertEquals(ExitCodes.SUCCESS, resumeExit);
+        assertTrue(resume.stdout().contains("goal_key: " + goalKey));
+        assertTrue(resume.stdout().contains("status: context_ready"));
+        assertTrue(resume.stdout().contains("current_action: inspect_existing_code"));
+        assertTrue(Files.isRegularFile(PathUtil.goalContext(root)));
+        assertEquals(1, countRows(root, "goal_run"));
+        assertEquals(1, countRows(root, "workflow_run"));
+        assertEquals(1, countRows(root, "spec_change"));
+    }
+
+    @Test
+    void goalStepExportFailureCanResumeWithoutDuplicateSteps() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "java-api-change",
+                "--task", "Recover failed step export",
+                "--module", "goal"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        Files.delete(PathUtil.goalContext(root));
+        Files.createDirectory(PathUtil.goalContext(root));
+        Harness step = new Harness(tempDir);
+        int stepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Inspected existing controller/service/mapper/tests",
+                "--evidence", "existing_controller,existing_service,existing_mapper,existing_tests"
+        }, step.context());
+        assertEquals(ExitCodes.RUNTIME_ERROR, stepExit);
+        assertTrue(step.stderr().contains("ERROR goal step failed"));
+        assertEquals("context_export_failed", singleString(root,
+                "SELECT status FROM goal_run WHERE goal_key = '" + goalKey + "'"));
+        assertEquals("create_change_plan", singleString(root,
+                "SELECT current_action FROM goal_run WHERE goal_key = '" + goalKey + "'"));
+        assertEquals(1, countRows(root, "goal_step"));
+
+        Harness next = new Harness(tempDir);
+        int nextExit = new CommandRouter().run(new String[]{
+                "goal", "next", "--project-root", "demo", "--goal", goalKey
+        }, next.context());
+        assertEquals(ExitCodes.SUCCESS, nextExit);
+        assertTrue(next.stdout().contains("current_action: recover_context_export"));
+
+        Files.delete(PathUtil.goalContext(root));
+        Harness resume = new Harness(tempDir);
+        int resumeExit = new CommandRouter().run(new String[]{
+                "goal", "resume", "--project-root", "demo", "--goal", goalKey
+        }, resume.context());
+        assertEquals(ExitCodes.SUCCESS, resumeExit);
+        assertTrue(resume.stdout().contains("status: planning"));
+        assertTrue(resume.stdout().contains("current_action: create_change_plan"));
+        assertTrue(Files.isRegularFile(PathUtil.goalContext(root)));
+        assertEquals(1, countRows(root, "goal_step"));
+        assertEquals(1, countRows(root, "workflow_run"));
+        assertEquals(1, countRows(root, "spec_change"));
+    }
+
+    @Test
     void goalSensitiveCheckScansOriginalContextAndKeepsLogsRedacted() throws Exception {
         Path root = tempDir.resolve("demo");
         Files.createDirectories(PathUtil.goalProfilesDirectory(root));
@@ -701,7 +801,11 @@ final class GoalIntegrationTest {
             assertEquals(1, count(statement, "SELECT COUNT(*) FROM workflow_run"));
             assertEquals(1, count(statement, "SELECT COUNT(*) FROM spec_change"));
             assertEquals(1, count(statement, "SELECT COUNT(*) FROM workflow_spec_binding"));
-            assertEquals(1, count(statement, "SELECT COUNT(*) FROM goal_event WHERE goal_key = '" + goalKey + "'"));
+            assertTrue(count(statement, "SELECT COUNT(*) FROM goal_event WHERE goal_key = '" + goalKey + "'") >= 2);
+            assertEquals(1, count(statement, "SELECT COUNT(*) FROM goal_event WHERE goal_key = '" + goalKey
+                    + "' AND event_type = 'goal_started'"));
+            assertEquals(1, count(statement, "SELECT COUNT(*) FROM goal_event WHERE goal_key = '" + goalKey
+                    + "' AND event_type = 'goal_context_exported'"));
         }
     }
 
@@ -721,6 +825,22 @@ final class GoalIntegrationTest {
         try (ResultSet resultSet = statement.executeQuery(sql)) {
             resultSet.next();
             return resultSet.getInt(1);
+        }
+    }
+
+    private int countRows(Path root, String tableName) throws Exception {
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(root));
+             Statement statement = connection.createStatement()) {
+            return count(statement, "SELECT COUNT(*) FROM " + tableName);
+        }
+    }
+
+    private String singleString(Path root, String sql) throws Exception {
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(root));
+             Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery(sql)) {
+            resultSet.next();
+            return resultSet.getString(1);
         }
     }
 

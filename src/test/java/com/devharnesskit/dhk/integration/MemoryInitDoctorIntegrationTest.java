@@ -77,7 +77,7 @@ final class MemoryInitDoctorIntegrationTest {
         int exitCode = new CommandRouter().run(new String[]{"doctor", "--project-root", root.toString()}, doctorHarness.context());
 
         assertEquals(ExitCodes.SUCCESS, exitCode);
-        assertTrue(doctorHarness.stdout().contains("schema_version: ok (6)"));
+        assertTrue(doctorHarness.stdout().contains("schema_version: ok (7)"));
         assertTrue(doctorHarness.stdout().contains("mysql_driver: ok"));
         assertTrue(doctorHarness.stdout().contains("sensitive_policy: default"));
         assertTrue(doctorHarness.stdout().contains("memory_total: 0"));
@@ -89,7 +89,7 @@ final class MemoryInitDoctorIntegrationTest {
         }, jsonDoctorHarness.context());
         assertEquals(ExitCodes.SUCCESS, jsonExitCode);
         assertTrue(jsonDoctorHarness.stdout().contains("\"command\": \"doctor\""));
-        assertTrue(jsonDoctorHarness.stdout().contains("\"schema_version\": 6"));
+        assertTrue(jsonDoctorHarness.stdout().contains("\"schema_version\": 7"));
         assertTrue(jsonDoctorHarness.stdout().contains("\"mysql_driver_loaded\": true"));
     }
 

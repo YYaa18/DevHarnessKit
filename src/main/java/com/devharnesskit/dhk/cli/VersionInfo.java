@@ -6,7 +6,7 @@ import com.devharnesskit.dhk.db.MigrationRunner;
 public final class VersionInfo {
     public static final String FALLBACK_VERSION = "0.1.0-alpha";
     public static final String RELEASE_CHANNEL = "alpha / developer preview";
-    public static final int CURRENT_SCHEMA_VERSION = MigrationRunner.V6;
+    public static final int CURRENT_SCHEMA_VERSION = MigrationRunner.V7;
 
     private VersionInfo() {
     }

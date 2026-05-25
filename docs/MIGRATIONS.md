@@ -6,7 +6,7 @@ DevHarness Kit stores project state in:
 .agents/memory/memory.db
 ```
 
-Current schema version: `6`.
+Current schema version: `7`.
 
 ## Current Schema Versions
 
@@ -18,6 +18,7 @@ Current schema version: `6`.
 | v4 | Spec changes, documents, tasks, acceptance criteria, events, and workflow bindings. |
 | v5 | Goal orchestration runs, steps, events, checks, and artifacts. |
 | v6 | Goal check freshness metadata with `goal_check.step_count_at_check`. |
+| v7 | Goal context export recovery statuses for resumable failed exports. |
 
 ## Alpha Compatibility Policy
 
@@ -30,7 +31,7 @@ When an existing non-empty database is below the current schema version, DevHarn
 .agents/memory/backups/
 ```
 
-The backup filename includes the old and new schema versions, for example `pre-migration-v1-to-v6`.
+The backup filename includes the old and new schema versions, for example `pre-migration-v1-to-v7`.
 
 Current fixture coverage includes:
 
@@ -43,7 +44,7 @@ v5-goal-before-step-count.sql
                          goal schema before check freshness metadata
 ```
 
-These fixtures verify that old databases are backed up before upgrade, important rows are preserved, and the current v6 schema is created.
+These fixtures verify that old databases are backed up before upgrade, important rows are preserved, and the current v7 schema is created.
 
 The workflow fixture verifies that v2 `workflow_template`, `workflow_run`, `workflow_phase_run`, `workflow_gate_run`, and `workflow_event` rows survive upgrade while v3 artifact binding tables, v4 spec tables, v5 goal tables, and v6 check metadata are added.
 

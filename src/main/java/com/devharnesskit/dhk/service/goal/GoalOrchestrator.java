@@ -118,7 +118,7 @@ public final class GoalOrchestrator {
                             String firstAction = profile.actions().length == 0 ? "" : profile.actions()[0];
                             GoalRun goal = new GoalRun(goalKey, project.projectKey(), workflowRun.runKey(),
                                     specChange == null ? "" : specChange.changeKey(), profile.profileKey(),
-                                    task, module, selectedMode, condition, "context_ready", firstAction,
+                                    task, module, selectedMode, condition, "context_exporting", firstAction,
                                     30, 0, now, now, "");
                             goalRunRepository.insert(connection, goal);
                             goalEventRepository.insert(connection, new GoalEvent(0L, goalKey, "goal_started",
@@ -126,9 +126,10 @@ public final class GoalOrchestrator {
                             return new GoalStartTransaction(goal, workflowRun, specChange);
                         }
                     });
-            Path contextPath = contextService.export(connection, projectRoot, project, result.goal(),
-                    result.workflowRun(), result.specChange(), now);
-            return new GoalStartResult(result.goal(), result.workflowRun(), result.specChange(), contextPath);
+            Path contextPath = exportGoalContext(connection, projectRoot, project, result.goal(),
+                    result.workflowRun(), result.specChange(), "context_ready", now);
+            GoalRun readyGoal = goalRunRepository.findByKey(connection, result.goal().goalKey());
+            return new GoalStartResult(readyGoal, result.workflowRun(), result.specChange(), contextPath);
         }
     }
 
@@ -172,6 +173,10 @@ public final class GoalOrchestrator {
             if (goal == null) {
                 throw new IllegalStateException("Goal not found: " + goalKey);
             }
+            if (isContextExportIncomplete(goal.status())) {
+                throw new IllegalStateException("Goal context export is incomplete; run dhk goal resume --goal "
+                        + goal.goalKey());
+            }
             GoalProfile profile = requireProfile(projectRoot, goal.profileKey());
             GoalPlan plan = planner.plan(goal, profile);
             validateStepEvidence(plan, summary, changedFiles, evidence);
@@ -182,7 +187,7 @@ public final class GoalOrchestrator {
                     action, summary, changedFiles, evidence, "accepted", now));
             String nextAction = planner.nextAction(profile, action);
             String status = planner.statusForAction(nextAction);
-            goalRunRepository.updateProgress(connection, goal.goalKey(), status, nextAction, nextIndex, now);
+            goalRunRepository.updateProgress(connection, goal.goalKey(), "context_exporting", nextAction, nextIndex, now);
             goalEventRepository.insert(connection, new GoalEvent(0L, goal.goalKey(), "goal_step_recorded",
                     "info", "Goal step recorded", action, now));
             GoalRun updated = goalRunRepository.findByKey(connection, goal.goalKey());
@@ -190,9 +195,10 @@ public final class GoalOrchestrator {
             WorkflowRun workflowRun = workflowRunRepository.findByKey(connection, updated.workflowRunKey());
             SpecChange specChange = updated.specChangeKey().length() == 0
                     ? null : specChangeRepository.findByKey(connection, updated.specChangeKey());
-            Path contextPath = contextService.export(connection, projectRoot, project, updated,
-                    workflowRun, specChange, now);
-            return new GoalStepResult(stepId, updated, contextPath);
+            Path contextPath = exportGoalContext(connection, projectRoot, project, updated,
+                    workflowRun, specChange, status, now);
+            GoalRun readyGoal = goalRunRepository.findByKey(connection, goal.goalKey());
+            return new GoalStepResult(stepId, readyGoal, contextPath);
         }
     }
 
@@ -207,8 +213,9 @@ public final class GoalOrchestrator {
             WorkflowRun workflowRun = workflowRunRepository.findByKey(connection, goal.workflowRunKey());
             SpecChange specChange = goal.specChangeKey().length() == 0
                     ? null : specChangeRepository.findByKey(connection, goal.specChangeKey());
-            return contextService.export(connection, projectRoot, project, goal, workflowRun, specChange,
-                    context.clock().now().toString());
+            String now = context.clock().now().toString();
+            return exportGoalContext(connection, projectRoot, project, goal, workflowRun, specChange,
+                    targetStatusAfterExport(goal), now);
         }
     }
 
@@ -305,6 +312,47 @@ public final class GoalOrchestrator {
             contextService.export(connection, projectRoot, project, result.goal(), workflowRun, specChange, now);
             return result;
         }
+    }
+
+    private Path exportGoalContext(Connection connection, Path projectRoot, Project project, GoalRun goal,
+                                   WorkflowRun workflowRun, SpecChange specChange, String targetStatus,
+                                   String now) throws Exception {
+        goalRunRepository.updateStatus(connection, goal.goalKey(), "context_exporting", now);
+        GoalRun exportGoal = withStatus(goalRunRepository.findByKey(connection, goal.goalKey()), targetStatus, now);
+        try {
+            Path contextPath = contextService.export(connection, projectRoot, project, exportGoal,
+                    workflowRun, specChange, now);
+            goalRunRepository.updateStatus(connection, goal.goalKey(), targetStatus, now);
+            goalEventRepository.insert(connection, new GoalEvent(0L, goal.goalKey(), "goal_context_exported",
+                    "info", "Goal context exported", targetStatus, now));
+            return contextPath;
+        } catch (Exception ex) {
+            goalRunRepository.updateStatus(connection, goal.goalKey(), "context_export_failed", now);
+            goalEventRepository.insert(connection, new GoalEvent(0L, goal.goalKey(), "goal_context_export_failed",
+                    "error", "Goal context export failed", ex.getMessage(), now));
+            throw ex;
+        }
+    }
+
+    private String targetStatusAfterExport(GoalRun goal) {
+        if (isContextExportIncomplete(goal.status())) {
+            if (goal.stepCount() <= 0) {
+                return "context_ready";
+            }
+            return planner.statusForAction(goal.currentAction());
+        }
+        return goal.status();
+    }
+
+    private boolean isContextExportIncomplete(String status) {
+        return "context_export_failed".equals(status) || "context_exporting".equals(status);
+    }
+
+    private GoalRun withStatus(GoalRun goal, String status, String now) {
+        return new GoalRun(goal.goalKey(), goal.projectKey(), goal.workflowRunKey(), goal.specChangeKey(),
+                goal.profileKey(), goal.taskName(), goal.moduleName(), goal.mode(), goal.conditionText(),
+                status, goal.currentAction(), goal.maxSteps(), goal.stepCount(), goal.createdAt(), now,
+                goal.completedAt());
     }
 
     private GoalEvaluation evaluate(Connection connection, Path projectRoot, GoalRun goal) throws Exception {

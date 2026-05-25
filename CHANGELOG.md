@@ -37,3 +37,4 @@ Initial developer-preview release.
 - Goal check freshness metadata: schema v6 records `step_count_at_check` for each `goal check` result and exposes it in text/JSON output.
 - Goal stale-check enforcement: `goal evaluate` and `goal complete` now reject required checks recorded before the latest goal step.
 - Goal check status policy: built-in Java goal profiles now require passed compile/test/sensitive/spec checks, with project-level `accepted_<check>_statuses` overrides for non-Maven flows.
+- Goal context export recovery: schema v7 adds resumable `context_exporting` and `context_export_failed` states for failed `GOAL_CONTEXT.md` exports.

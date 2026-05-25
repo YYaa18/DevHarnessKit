@@ -14,6 +14,12 @@ public final class GoalPlanner {
     };
 
     public GoalPlan plan(GoalRun goal, GoalProfile profile) {
+        if ("context_export_failed".equals(goal.status()) || "context_exporting".equals(goal.status())) {
+            return new GoalPlan("recover_context_export",
+                    "Goal context export is incomplete. Run goal resume before continuing.",
+                    new String[0], FORBIDDEN,
+                    "dhk goal resume --goal " + goal.goalKey());
+        }
         String action = goal.currentAction();
         if (action.length() == 0 && profile.actions().length > 0) {
             action = profile.actions()[0];

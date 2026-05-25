@@ -59,7 +59,8 @@ CREATE TABLE goal_check (
   checked_at TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  UNIQUE(goal_key, check_key)
+  UNIQUE(goal_key, check_key),
+  FOREIGN KEY (goal_key) REFERENCES goal_run(goal_key)
 );
 INSERT INTO goal_check(goal_key, check_key, check_type, required, command, status, result_summary, evidence_path, checked_at, created_at, updated_at)
 VALUES ('fixture-goal', 'sensitive', 'sensitive', 1, '', 'passed', 'old v5 sensitive check', '', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z');

@@ -55,6 +55,16 @@ public final class GoalRunRepository {
         }
     }
 
+    public void updateStatus(Connection connection, String goalKey, String status, String now) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "UPDATE goal_run SET status = ?, updated_at = ? WHERE goal_key = ?")) {
+            statement.setString(1, status);
+            statement.setString(2, now);
+            statement.setString(3, goalKey);
+            statement.executeUpdate();
+        }
+    }
+
     public void complete(Connection connection, String goalKey, String completedAt, String now) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(
                 "UPDATE goal_run SET status = 'completed', current_action = 'completed', "

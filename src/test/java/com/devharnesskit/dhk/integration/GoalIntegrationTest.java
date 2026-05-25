@@ -162,6 +162,15 @@ final class GoalIntegrationTest {
         assertTrue(start.stdout().contains("spec_change: "));
         assertTrue(start.stdout().contains("current_action: custom_inspect"));
 
+        Harness completeNotReadyJson = new Harness(tempDir);
+        int completeNotReadyExit = new CommandRouter().run(new String[]{
+                "goal", "complete", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, completeNotReadyJson.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, completeNotReadyExit);
+        assertTrue(completeNotReadyJson.stdout().contains("\"command\": \"goal complete\""));
+        assertTrue(completeNotReadyJson.stdout().contains("\"status\": \"not_ready\""));
+        assertTrue(completeNotReadyJson.stdout().contains("check sensitive is pending"));
+
         Harness statusJson = new Harness(tempDir);
         int statusExit = new CommandRouter().run(new String[]{
                 "goal", "status", "--project-root", "demo", "--goal", goalKey, "--json"
@@ -184,6 +193,15 @@ final class GoalIntegrationTest {
         }, evaluateJson.context());
         assertEquals(ExitCodes.SUCCESS, evaluateExit);
         assertTrue(evaluateJson.stdout().contains("\"decision\": \"ready_to_complete\""));
+
+        Harness completeJson = new Harness(tempDir);
+        int completeExit = new CommandRouter().run(new String[]{
+                "goal", "complete", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, completeJson.context());
+        assertEquals(ExitCodes.SUCCESS, completeExit);
+        assertTrue(completeJson.stdout().contains("\"command\": \"goal complete\""));
+        assertTrue(completeJson.stdout().contains("\"status\": \"completed\""));
+        assertTrue(completeJson.stdout().contains("\"summary_path\": "));
     }
 
     private void assertGoalRows(Path root, String goalKey) throws Exception {

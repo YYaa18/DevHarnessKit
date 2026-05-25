@@ -70,7 +70,7 @@ dhk goal evaluate --goal <goal-key> --json
 dhk goal complete --goal <goal-key> --json
 ```
 
-JSON output is intended for scripts and agents. It is still alpha and may expand before 1.0, but existing field names should be changed conservatively.
+JSON output is intended for scripts and agents. It is still alpha and may expand before 1.0, but existing field names should be changed conservatively. See [JSON_OUTPUT.md](JSON_OUTPUT.md) for required fields and not-ready behavior.
 
 ## Backup
 

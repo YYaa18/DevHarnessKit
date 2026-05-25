@@ -34,7 +34,18 @@ public final class GoalCompleteCommand implements Command {
             }
             return ExitCodes.SUCCESS;
         } catch (GoalOrchestrator.GoalNotReadyException ex) {
-            GoalEvaluateCommand.print(context, args, ex.evaluation());
+            if (JsonOutput.enabled(args)) {
+                context.out().print(JsonOutput.object(
+                        JsonOutput.stringField("command", "goal complete"),
+                        JsonOutput.stringField("status", "not_ready"),
+                        JsonOutput.stringField("decision", ex.evaluation().decision()),
+                        JsonOutput.rawField("missing", JsonOutput.stringArray(ex.evaluation().missing())),
+                        JsonOutput.stringField("next_action", ex.evaluation().nextAction()),
+                        JsonOutput.stringField("next_command", ex.evaluation().nextCommand())
+                ));
+            } else {
+                GoalEvaluateCommand.print(context, args, ex.evaluation());
+            }
             return ExitCodes.VALIDATION_ERROR;
         } catch (Exception ex) {
             context.err().println("ERROR goal complete failed: " + ex.getMessage());

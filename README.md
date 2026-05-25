@@ -254,6 +254,7 @@ Read [SECURITY.md](SECURITY.md) before using DB readonly features.
 - [docs/DEVHARNESS_GOAL_CLI_ORCHESTRATION_PLAN.md](docs/DEVHARNESS_GOAL_CLI_ORCHESTRATION_PLAN.md): V0.4 goal orchestration plan.
 - [docs/DEVHARNESS_SKILLS_REDESIGN_PLAN.md](docs/DEVHARNESS_SKILLS_REDESIGN_PLAN.md): goal-first skill redesign plan.
 - [docs/GOAL_CONFIGURATION.md](docs/GOAL_CONFIGURATION.md): project-level goal profile and check policy configuration.
+- [docs/JSON_OUTPUT.md](docs/JSON_OUTPUT.md): alpha JSON output commands and required fields.
 - [docs/MIGRATIONS.md](docs/MIGRATIONS.md): SQLite schema compatibility and recovery policy.
 - [docs/ROADMAP.md](docs/ROADMAP.md): release maturity plan.
 - [docs/SENSITIVE_POLICY.md](docs/SENSITIVE_POLICY.md): project-level sensitive-data reject/redact/allow policy.

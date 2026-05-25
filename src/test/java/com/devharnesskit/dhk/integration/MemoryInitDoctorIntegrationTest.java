@@ -56,6 +56,15 @@ final class MemoryInitDoctorIntegrationTest {
 
         assertEquals(ExitCodes.NOT_FOUND, exitCode);
         assertTrue(harness.stdout().contains("memory_db: missing"));
+
+        Harness jsonHarness = new Harness(tempDir);
+        int jsonExitCode = new CommandRouter().run(new String[]{
+                "doctor", "--project-root", "missing", "--json"
+        }, jsonHarness.context());
+        assertEquals(ExitCodes.NOT_FOUND, jsonExitCode);
+        assertTrue(jsonHarness.stdout().contains("\"command\": \"doctor\""));
+        assertTrue(jsonHarness.stdout().contains("\"memory_db_ok\": false"));
+        assertTrue(jsonHarness.stdout().contains("\"project_json_ok\": false"));
     }
 
     @Test

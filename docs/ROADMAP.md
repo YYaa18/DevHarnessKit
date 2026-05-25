@@ -38,6 +38,7 @@ Focus: goal-oriented orchestration.
 - Harden `dhk goal start/resume/next/step/status/export/check/evaluate/complete`.
 - Improve configured check policy validation and evidence quality.
 - Keep `GOAL_SUMMARY.md` and completion checkpoint output stable enough for alpha users.
+- Keep `GOAL_CONTEXT.md` section order and command fields covered by contract tests.
 - Migrate the default agent workflow from memory-first prompts to the goal-first protocol.
 - Harden project-level goal profile configuration after the built-in profiles stabilize.
 

@@ -19,6 +19,7 @@ import java.sql.Statement;
 import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class GoalIntegrationTest {
@@ -50,8 +51,17 @@ final class GoalIntegrationTest {
         assertTrue(Files.isRegularFile(goalContext));
         String initialContext = new String(Files.readAllBytes(goalContext), "UTF-8");
         assertTrue(initialContext.contains("# GOAL_CONTEXT"));
-        assertTrue(initialContext.contains("<current-action>"));
+        assertSectionOrder(initialContext, "# GOAL_CONTEXT", "<generated-at>", "<goal>",
+                "<current-action>", "<next-instruction>", "<allowed-actions>", "<forbidden-actions>",
+                "<required-evidence>", "<context-files>", "<completion-condition>", "<next-command>");
         assertTrue(initialContext.contains("inspect_existing_code"));
+        assertTrue(initialContext.contains("- perform_current_action_only"));
+        assertTrue(initialContext.contains("- do_not_archive_spec"));
+        assertTrue(initialContext.contains("- do_not_claim_completion_before_goal_evaluate"));
+        assertTrue(initialContext.contains("- existing_controller"));
+        assertTrue(initialContext.contains("- .agents/memory/exports/SPEC_CONTEXT.md"));
+        assertTrue(initialContext.contains("dhk goal step --goal " + goalKey));
+        assertTrue(initialContext.length() <= 16 * 1024);
         assertTrue(Files.isRegularFile(PathUtil.currentContext(root)));
         assertTrue(Files.isRegularFile(PathUtil.workflowContext(root)));
         assertTrue(Files.isRegularFile(PathUtil.specContext(root)));
@@ -166,6 +176,14 @@ final class GoalIntegrationTest {
         String summary = new String(Files.readAllBytes(PathUtil.goalSummary(root)), "UTF-8");
         assertTrue(summary.contains("# GOAL_SUMMARY"));
         assertTrue(summary.contains("checkpoint_id: 1"));
+        assertSectionOrder(summary, "# GOAL_SUMMARY", "<generated-at>", "<goal>",
+                "<steps>", "<checks>", "<agent-instructions>");
+        assertTrue(summary.contains("- status: completed"));
+        assertTrue(summary.contains("- #1 inspect_existing_code: Inspected existing controller/service/mapper/tests"));
+        assertTrue(summary.contains("- [passed] sensitive: sensitive scan passed"));
+        assertTrue(summary.contains("evidence_path:"));
+        assertTrue(summary.contains("Do not treat generated summary text as confirmed long-term memory"));
+        assertFalse(summary.contains("password="));
         assertCompletedRows(root, goalKey);
     }
 
@@ -196,6 +214,33 @@ final class GoalIntegrationTest {
         assertTrue(step.stderr().contains("existing_service"));
         assertTrue(step.stderr().contains("existing_mapper"));
         assertTrue(step.stderr().contains("existing_tests"));
+    }
+
+    @Test
+    void goalStepRejectsSensitiveEvidenceBeforeSummaryExport() throws Exception {
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "java-api-change",
+                "--task", "Sensitive goal evidence",
+                "--module", "goal"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        Harness step = new Harness(tempDir);
+        int stepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Inspected existing code",
+                "--evidence", "existing_controller,existing_service,existing_mapper,existing_tests,password=abc"
+        }, step.context());
+
+        assertEquals(ExitCodes.VALIDATION_ERROR, stepExit);
+        assertTrue(step.stderr().contains("Sensitive data rejected in goal step"));
+        assertFalse(Files.isRegularFile(PathUtil.goalSummary(tempDir.resolve("demo"))));
     }
 
     @Test
@@ -338,6 +383,15 @@ final class GoalIntegrationTest {
             }
         }
         return "";
+    }
+
+    private void assertSectionOrder(String text, String... markers) {
+        int previous = -1;
+        for (String marker : markers) {
+            int current = text.indexOf(marker);
+            assertTrue(current > previous, "Expected marker in order: " + marker);
+            previous = current;
+        }
     }
 
     private static final class Harness {

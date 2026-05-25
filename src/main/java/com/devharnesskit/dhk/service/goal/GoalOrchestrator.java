@@ -42,6 +42,7 @@ import com.devharnesskit.dhk.repository.workflow.WorkflowRunRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowTemplateRepository;
 import com.devharnesskit.dhk.service.ProjectService;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
+import com.devharnesskit.dhk.service.policy.PolicyHookService;
 import com.devharnesskit.dhk.service.spec.SpecService;
 import com.devharnesskit.dhk.service.workflow.WorkflowSeedService;
 import com.devharnesskit.dhk.service.workflow.WorkflowStartService;
@@ -88,6 +89,7 @@ public final class GoalOrchestrator {
     private final GoalCompletionEvaluator completionEvaluator = new GoalCompletionEvaluator();
     private final GoalSummaryRenderer summaryRenderer = new GoalSummaryRenderer();
     private final SensitiveDataGuard sensitiveDataGuard = new SensitiveDataGuard();
+    private final PolicyHookService policyHookService = new PolicyHookService();
     private final TransactionTemplate transactionTemplate = new TransactionTemplate();
 
     public GoalStartResult start(CommandContext context, Path projectRoot, String profileKey,
@@ -284,6 +286,7 @@ public final class GoalOrchestrator {
             final List<GoalStep> steps = goalStepRepository.listByGoal(connection, goal.goalKey());
             final List<GoalCheck> checks = goalCheckRepository.listByGoal(connection, goal.goalKey());
             final Project project = projectService.readProject(PathUtil.projectJson(projectRoot));
+            policyHookService.requireGoalCompleteAllowed(projectRoot, steps);
             GoalCompleteResult result = transactionTemplate.execute(connection,
                     new TransactionTemplate.Work<GoalCompleteResult>() {
                         public GoalCompleteResult execute() throws Exception {

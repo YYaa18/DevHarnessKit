@@ -8,7 +8,7 @@ It does not replace:
 - `goal-profiles/*.json`, which defines goal process actions and evidence.
 - `goal-check-policy.json`, which configures goal check commands and accepted check statuses.
 
-In the current alpha, `policy.json` is diagnostic and declarative. Blocking enforcement is introduced by explicit hook points, not by this file alone.
+In the current alpha, `policy.json` is enforced only at the hook points listed below. It is not a general sandbox.
 
 ## Example
 
@@ -69,6 +69,18 @@ Doctor warns about:
 - invalid DB environment keys.
 
 `doctor --json` returns policy warnings under `policy_warnings`.
+
+## Hook Points
+
+The first alpha hook points are:
+
+| Hook | Command path | What can block |
+| --- | --- | --- |
+| `before-goal-complete` | `dhk goal complete` | `forbidden_dhk_commands`, missing `allowed_dhk_commands`, or goal steps that changed `protected_files`. |
+| `before-db-sql` | `dhk db sql` | `forbidden_dhk_commands`, missing `allowed_dhk_commands`, or non-dry-run SQL without `--i-understand-db-readonly-risk` when `db_sql_requires_explicit_request` is true. |
+| `before-context-export` | `dhk memory export` and goal context exports | `context_export_allowed_files`, `context_export_forbidden_files`, and sensitive matches when `context_export_block_on_sensitive` is true. |
+
+No policy file means these hooks are permissive. A configured policy file can block commands with validation errors; hooks never call a network service or daemon.
 
 ## Security Notes
 

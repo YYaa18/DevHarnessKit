@@ -6,6 +6,7 @@ import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.model.goal.GoalRun;
 import com.devharnesskit.dhk.service.goal.GoalOrchestrator;
+import com.devharnesskit.dhk.service.policy.PolicyViolationException;
 import com.devharnesskit.dhk.util.JsonOutput;
 
 import java.nio.file.Path;
@@ -49,6 +50,17 @@ public final class GoalCompleteCommand implements Command {
                 ));
             } else {
                 GoalEvaluateCommand.print(context, args, ex.evaluation());
+            }
+            return ExitCodes.VALIDATION_ERROR;
+        } catch (PolicyViolationException ex) {
+            if (JsonOutput.enabled(args)) {
+                context.out().print(JsonOutput.object(
+                        JsonOutput.stringField("command", "goal complete"),
+                        JsonOutput.stringField("status", "rejected"),
+                        JsonOutput.stringField("reason", ex.getMessage())
+                ));
+            } else {
+                context.err().println(ex.getMessage());
             }
             return ExitCodes.VALIDATION_ERROR;
         } catch (Exception ex) {

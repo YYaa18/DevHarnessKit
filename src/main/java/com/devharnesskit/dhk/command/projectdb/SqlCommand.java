@@ -9,6 +9,8 @@ import com.devharnesskit.dhk.service.MysqlConnectionService;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
 import com.devharnesskit.dhk.service.SqlExecutionService;
 import com.devharnesskit.dhk.service.SqlSafetyGuard;
+import com.devharnesskit.dhk.service.policy.PolicyHookService;
+import com.devharnesskit.dhk.service.policy.PolicyViolationException;
 import com.devharnesskit.dhk.sql.DbConnectionRequest;
 import com.devharnesskit.dhk.sql.SqlExecutionRequest;
 import com.devharnesskit.dhk.sql.SqlExecutionResult;
@@ -26,20 +28,22 @@ public final class SqlCommand implements Command {
     private final SqlExecutionService executionService;
     private final SqlResultRenderer renderer;
     private final SensitiveDataGuard sensitiveDataGuard;
+    private final PolicyHookService policyHookService;
 
     public SqlCommand() {
         this(new MysqlConnectionService(), new SqlSafetyGuard(), new SqlExecutionService(),
-                new SqlResultRenderer(), new SensitiveDataGuard());
+                new SqlResultRenderer(), new SensitiveDataGuard(), new PolicyHookService());
     }
 
     SqlCommand(MysqlConnectionService connectionService, SqlSafetyGuard safetyGuard,
                SqlExecutionService executionService, SqlResultRenderer renderer,
-               SensitiveDataGuard sensitiveDataGuard) {
+               SensitiveDataGuard sensitiveDataGuard, PolicyHookService policyHookService) {
         this.connectionService = connectionService;
         this.safetyGuard = safetyGuard;
         this.executionService = executionService;
         this.renderer = renderer;
         this.sensitiveDataGuard = sensitiveDataGuard;
+        this.policyHookService = policyHookService;
     }
 
     public int run(CommandContext context, Args args) {
@@ -57,6 +61,7 @@ public final class SqlCommand implements Command {
         }
         boolean explain = args.hasFlag("explain");
         boolean dryRun = args.hasFlag("dry-run");
+        Path projectRoot = PathUtil.resolveProjectRoot(args, context.workingDirectory());
         SqlSafetyResult safety = safetyGuard.validate(sql, explain);
         if (!safety.allowed()) {
             if (json) {
@@ -69,6 +74,12 @@ public final class SqlCommand implements Command {
             } else {
                 context.err().println("SQL rejected: " + safety.reason());
             }
+            return ExitCodes.VALIDATION_ERROR;
+        }
+        try {
+            policyHookService.requireDbSqlAllowed(projectRoot, args, dryRun);
+        } catch (PolicyViolationException ex) {
+            context.err().println(ex.getMessage());
             return ExitCodes.VALIDATION_ERROR;
         }
         if (dryRun) {

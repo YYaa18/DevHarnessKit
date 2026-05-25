@@ -644,6 +644,45 @@ final class GoalIntegrationTest {
     }
 
     @Test
+    void policyCanBlockGoalCompleteWhenProtectedFileChanged() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "java-api-change",
+                "--task", "Protected file completion guard",
+                "--module", "goal",
+                "--mode", "api"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        recordJavaGoalSteps(goalKey);
+        writeMinimalPom(root);
+
+        Harness check = new Harness(tempDir);
+        int checkExit = new CommandRouter().run(new String[]{
+                "goal", "check", "--project-root", "demo", "--goal", goalKey, "--all"
+        }, check.context());
+        assertEquals(ExitCodes.SUCCESS, checkExit);
+
+        Files.write(PathUtil.devharnessPolicy(root), ("{\n"
+                + "  \"mode\": \"strict\",\n"
+                + "  \"protected_files\": \"src/main/java/com/devharnesskit/dhk/service/goal/GoalCheckPolicy.java\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness complete = new Harness(tempDir);
+        int completeExit = new CommandRouter().run(new String[]{
+                "goal", "complete", "--project-root", "demo", "--goal", goalKey
+        }, complete.context());
+
+        assertEquals(ExitCodes.VALIDATION_ERROR, completeExit);
+        assertTrue(complete.stderr().contains("Policy blocked goal complete"));
+        assertTrue(complete.stderr().contains("protected file changed"));
+    }
+
+    @Test
     void goalCompleteFailsWhenWorkflowCheckReportsPendingHardGates() throws Exception {
         Path root = tempDir.resolve("demo");
         Files.createDirectories(PathUtil.goalProfilesDirectory(root));

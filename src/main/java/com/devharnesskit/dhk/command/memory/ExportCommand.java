@@ -32,6 +32,8 @@ import com.devharnesskit.dhk.repository.workflow.WorkflowRunRepository;
 import com.devharnesskit.dhk.service.ExportSelectionService;
 import com.devharnesskit.dhk.service.ProjectService;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
+import com.devharnesskit.dhk.service.policy.PolicyHookService;
+import com.devharnesskit.dhk.service.policy.PolicyViolationException;
 import com.devharnesskit.dhk.service.spec.SpecExportService;
 import com.devharnesskit.dhk.service.workflow.WorkflowArtifactService;
 import com.devharnesskit.dhk.service.workflow.WorkflowExportService;
@@ -59,6 +61,7 @@ public final class ExportCommand implements Command {
     private final WorkflowArtifactService workflowArtifactService;
     private final CurrentContextRenderer renderer;
     private final SensitiveDataGuard sensitiveDataGuard;
+    private final PolicyHookService policyHookService;
 
     public ExportCommand() {
         this(new DbConnectionFactory(), new MigrationRunner(), new ProjectService(), new MemoryRepository(), new CheckpointRepository(),
@@ -69,7 +72,7 @@ public final class ExportCommand implements Command {
                         new WorkflowPhaseTemplateRepository(), new WorkflowContextRenderer()),
                 new WorkflowArtifactService(new WorkflowArtifactRepository(), new WorkflowMemoryBindingRepository(),
                         new WorkflowCheckpointBindingRepository(), new WorkflowEventRepository()),
-                new CurrentContextRenderer(), new SensitiveDataGuard());
+                new CurrentContextRenderer(), new SensitiveDataGuard(), new PolicyHookService());
     }
 
     ExportCommand(DbConnectionFactory connectionFactory, MigrationRunner migrationRunner, ProjectService projectService,
@@ -77,7 +80,8 @@ public final class ExportCommand implements Command {
                   ExportSelectionService exportSelectionService, WorkflowRunRepository workflowRunRepository,
                   SpecChangeRepository specChangeRepository, SpecExportService specExportService,
                   WorkflowExportService workflowExportService, WorkflowArtifactService workflowArtifactService,
-                  CurrentContextRenderer renderer, SensitiveDataGuard sensitiveDataGuard) {
+                  CurrentContextRenderer renderer, SensitiveDataGuard sensitiveDataGuard,
+                  PolicyHookService policyHookService) {
         this.connectionFactory = connectionFactory;
         this.migrationRunner = migrationRunner;
         this.projectService = projectService;
@@ -93,6 +97,7 @@ public final class ExportCommand implements Command {
         this.workflowArtifactService = workflowArtifactService;
         this.renderer = renderer;
         this.sensitiveDataGuard = sensitiveDataGuard;
+        this.policyHookService = policyHookService;
     }
 
     public int run(CommandContext context, Args args) {
@@ -135,6 +140,7 @@ public final class ExportCommand implements Command {
                     exportItems, checkpoint, workflowContext, specContext);
             markdown = sensitiveDataGuard.redact(markdown);
             List<String> matches = sensitiveDataGuard.findMatches(markdown);
+            policyHookService.requireContextExportAllowed(projectRoot, out, markdown, matches);
             if (!matches.isEmpty()) {
                 context.err().println("Sensitive data rejected during export: " + matches);
                 return ExitCodes.VALIDATION_ERROR;
@@ -168,6 +174,9 @@ public final class ExportCommand implements Command {
         } catch (SQLException ex) {
             context.err().println("ERROR memory export failed: " + ex.getMessage());
             return ExitCodes.RUNTIME_ERROR;
+        } catch (PolicyViolationException ex) {
+            context.err().println(ex.getMessage());
+            return ExitCodes.VALIDATION_ERROR;
         } catch (Exception ex) {
             context.err().println("ERROR memory export failed: " + ex.getMessage());
             return ExitCodes.RUNTIME_ERROR;

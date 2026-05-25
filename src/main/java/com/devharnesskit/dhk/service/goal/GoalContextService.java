@@ -25,6 +25,7 @@ import com.devharnesskit.dhk.repository.workflow.WorkflowPhaseRunRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowPhaseTemplateRepository;
 import com.devharnesskit.dhk.service.ExportSelectionService;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
+import com.devharnesskit.dhk.service.policy.PolicyHookService;
 import com.devharnesskit.dhk.service.spec.SpecExportService;
 import com.devharnesskit.dhk.service.workflow.WorkflowExportService;
 import com.devharnesskit.dhk.util.PathUtil;
@@ -48,6 +49,7 @@ public final class GoalContextService {
     private final GoalCheckRepository goalCheckRepository;
     private final GoalStepRepository goalStepRepository;
     private final SensitiveDataGuard sensitiveDataGuard;
+    private final PolicyHookService policyHookService;
 
     public GoalContextService() {
         this(new ExportSelectionService(new MemoryRepository()), new CheckpointRepository(),
@@ -58,7 +60,8 @@ public final class GoalContextService {
                         new SpecContextRenderer()),
                 new CurrentContextRenderer(), new GoalContextRenderer(), new GoalProfileService(),
                 new GoalPlanner(), new GoalCheckPolicyService(), new GoalCompletionEvaluator(),
-                new GoalCheckRepository(), new GoalStepRepository(), new SensitiveDataGuard());
+                new GoalCheckRepository(), new GoalStepRepository(), new SensitiveDataGuard(),
+                new PolicyHookService());
     }
 
     GoalContextService(ExportSelectionService exportSelectionService,
@@ -73,7 +76,8 @@ public final class GoalContextService {
                        GoalCompletionEvaluator completionEvaluator,
                        GoalCheckRepository goalCheckRepository,
                        GoalStepRepository goalStepRepository,
-                       SensitiveDataGuard sensitiveDataGuard) {
+                       SensitiveDataGuard sensitiveDataGuard,
+                       PolicyHookService policyHookService) {
         this.exportSelectionService = exportSelectionService;
         this.checkpointRepository = checkpointRepository;
         this.workflowExportService = workflowExportService;
@@ -87,6 +91,7 @@ public final class GoalContextService {
         this.goalCheckRepository = goalCheckRepository;
         this.goalStepRepository = goalStepRepository;
         this.sensitiveDataGuard = sensitiveDataGuard;
+        this.policyHookService = policyHookService;
     }
 
     public Path export(Connection connection, Path projectRoot, Project project, GoalRun goal,
@@ -95,14 +100,14 @@ public final class GoalContextService {
         Files.createDirectories(PathUtil.exportsDirectory(projectRoot));
 
         String workflowContext = workflowRun == null ? "" : workflowExportService.render(connection, workflowRun, generatedAt);
-        workflowContext = write(PathUtil.workflowContext(projectRoot), workflowContext);
+        workflowContext = write(projectRoot, PathUtil.workflowContext(projectRoot), workflowContext);
 
         String inlineWorkflow = workflowRun == null ? "" : workflowExportService.renderInline(connection, workflowRun);
         String specContext = "";
         String inlineSpec = "";
         if (specChange != null) {
             specContext = specExportService.renderFull(connection, specChange, generatedAt);
-            specContext = write(PathUtil.specContext(projectRoot), specContext);
+            specContext = write(projectRoot, PathUtil.specContext(projectRoot), specContext);
             inlineSpec = specExportService.renderInline(connection, specChange);
         }
 
@@ -111,7 +116,7 @@ public final class GoalContextService {
         Checkpoint checkpoint = checkpointRepository.latest(connection, project.projectKey(), goal.moduleName());
         String current = currentContextRenderer.render(project, goal.taskName(), goal.moduleName(),
                 goal.mode(), goal.profileKey(), generatedAt, memory, checkpoint, inlineWorkflow, inlineSpec);
-        write(PathUtil.currentContext(projectRoot), current);
+        write(projectRoot, PathUtil.currentContext(projectRoot), current);
 
         GoalProfile profile = profileService.find(projectRoot, goal.profileKey());
         GoalPlan plan = planner.plan(goal, profile);
@@ -121,19 +126,21 @@ public final class GoalContextService {
                 goalStepRepository.listByGoal(connection, goal.goalKey())).missing();
         String goalContext = goalContextRenderer.render(goal, plan, policy.requiredChecks(profile),
                 completionBlockers, generatedAt);
-        return writePath(PathUtil.goalContext(projectRoot), goalContext);
+        return writePath(projectRoot, PathUtil.goalContext(projectRoot), goalContext);
     }
 
-    private String write(Path path, String text) throws Exception {
-        writePath(path, text);
+    private String write(Path projectRoot, Path path, String text) throws Exception {
+        writePath(projectRoot, path, text);
         return sensitiveDataGuard.redact(text);
     }
 
-    private Path writePath(Path path, String text) throws Exception {
+    private Path writePath(Path projectRoot, Path path, String text) throws Exception {
         String output = sensitiveDataGuard.redact(text);
-        if (sensitiveDataGuard.containsSensitiveData(output)) {
+        List<String> matches = sensitiveDataGuard.findMatches(output);
+        policyHookService.requireContextExportAllowed(projectRoot, path, output, matches);
+        if (!matches.isEmpty()) {
             throw new IllegalStateException("Sensitive data rejected during goal context export: "
-                    + sensitiveDataGuard.findMatches(output));
+                    + matches);
         }
         Files.createDirectories(path.getParent());
         Files.write(path, output.getBytes("UTF-8"));

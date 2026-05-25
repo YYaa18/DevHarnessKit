@@ -66,6 +66,50 @@ final class DbSqlDryRunIntegrationTest {
     }
 
     @Test
+    void policyCanBlockDbSqlEvenForDryRun() throws Exception {
+        Path projectRoot = tempDir.resolve("demo");
+        Files.createDirectories(PathUtil.devharnessDirectory(projectRoot));
+        Files.write(PathUtil.devharnessPolicy(projectRoot), ("{\n"
+                + "  \"mode\": \"strict\",\n"
+                + "  \"forbidden_dhk_commands\": \"db sql\"\n"
+                + "}\n").getBytes("UTF-8"));
+        Harness harness = new Harness(tempDir);
+
+        int exitCode = new CommandRouter().run(new String[]{
+                "db", "sql",
+                "--project-root", "demo",
+                "--dry-run",
+                "--sql", "SELECT 1"
+        }, harness.context());
+
+        assertEquals(ExitCodes.VALIDATION_ERROR, exitCode);
+        assertTrue(harness.stderr().contains("Policy blocked db sql"));
+        assertTrue(harness.stderr().contains("command is forbidden by policy"));
+    }
+
+    @Test
+    void policyAllowsDbSqlWhenCommandIsAllowed() throws Exception {
+        Path projectRoot = tempDir.resolve("demo");
+        Files.createDirectories(PathUtil.devharnessDirectory(projectRoot));
+        Files.write(PathUtil.devharnessPolicy(projectRoot), ("{\n"
+                + "  \"mode\": \"strict\",\n"
+                + "  \"allowed_dhk_commands\": \"db sql\",\n"
+                + "  \"db_sql_requires_explicit_request\": \"false\"\n"
+                + "}\n").getBytes("UTF-8"));
+        Harness harness = new Harness(tempDir);
+
+        int exitCode = new CommandRouter().run(new String[]{
+                "db", "sql",
+                "--project-root", "demo",
+                "--dry-run",
+                "--sql", "SELECT 1"
+        }, harness.context());
+
+        assertEquals(ExitCodes.SUCCESS, exitCode);
+        assertTrue(harness.stdout().contains("sql_safety: ok"));
+    }
+
+    @Test
     void dryRunJsonReportsRejectedSql() {
         Harness harness = new Harness(tempDir);
 

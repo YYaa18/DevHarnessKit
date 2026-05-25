@@ -1,0 +1,155 @@
+package com.devharnesskit.dhk.service.policy;
+
+import com.devharnesskit.dhk.cli.Args;
+import com.devharnesskit.dhk.model.goal.GoalStep;
+import com.devharnesskit.dhk.model.policy.DevHarnessPolicy;
+
+import java.nio.file.Path;
+import java.util.List;
+import java.util.regex.Pattern;
+
+public final class PolicyHookService {
+    private final DevHarnessPolicyService policyService;
+
+    public PolicyHookService() {
+        this(new DevHarnessPolicyService());
+    }
+
+    PolicyHookService(DevHarnessPolicyService policyService) {
+        this.policyService = policyService;
+    }
+
+    public void requireGoalCompleteAllowed(Path projectRoot, List<GoalStep> steps) {
+        if (!policyService.hasPolicy(projectRoot)) {
+            return;
+        }
+        DevHarnessPolicy policy = policyService.load(projectRoot);
+        PolicyDecision command = commandDecision(policy, "goal complete");
+        if (!command.allowed()) {
+            throw new PolicyViolationException("Policy blocked goal complete: " + command.reason());
+        }
+        for (GoalStep step : steps) {
+            String[] files = splitChangedFiles(step.changedFiles());
+            for (String file : files) {
+                if (matchesAny(file, policy.protectedFiles())) {
+                    throw new PolicyViolationException("Policy blocked goal complete: protected file changed: "
+                            + file);
+                }
+            }
+        }
+    }
+
+    public void requireDbSqlAllowed(Path projectRoot, Args args, boolean dryRun) {
+        if (!policyService.hasPolicy(projectRoot)) {
+            return;
+        }
+        DevHarnessPolicy policy = policyService.load(projectRoot);
+        PolicyDecision command = commandDecision(policy, "db sql");
+        if (!command.allowed()) {
+            throw new PolicyViolationException("Policy blocked db sql: " + command.reason());
+        }
+        if (!dryRun && policy.dbSqlRequiresExplicitRequest()
+                && !args.hasFlag("i-understand-db-readonly-risk")) {
+            throw new PolicyViolationException("Policy blocked db sql: "
+                    + "db_sql_requires_explicit_request requires --i-understand-db-readonly-risk");
+        }
+    }
+
+    public void requireContextExportAllowed(Path projectRoot, Path out, String content,
+                                            List<String> sensitiveMatches) {
+        if (!policyService.hasPolicy(projectRoot)) {
+            return;
+        }
+        DevHarnessPolicy policy = policyService.load(projectRoot);
+        String relative = relative(projectRoot, out);
+        if (policy.contextExportAllowedFiles().length > 0
+                && !matchesAny(relative, policy.contextExportAllowedFiles())) {
+            throw new PolicyViolationException("Policy blocked context export: output path is not allowed: "
+                    + relative);
+        }
+        if (matchesAny(relative, policy.contextExportForbiddenFiles())) {
+            throw new PolicyViolationException("Policy blocked context export: output path is forbidden: "
+                    + relative);
+        }
+        if (policy.contextExportBlockOnSensitive() && sensitiveMatches != null && !sensitiveMatches.isEmpty()) {
+            throw new PolicyViolationException("Policy blocked context export: sensitive matches "
+                    + sensitiveMatches);
+        }
+    }
+
+    private PolicyDecision commandDecision(DevHarnessPolicy policy, String command) {
+        if (matchesCommand(command, policy.forbiddenDhkCommands())) {
+            return PolicyDecision.block("command is forbidden by policy: " + command);
+        }
+        if (policy.allowedDhkCommands().length > 0 && !matchesCommand(command, policy.allowedDhkCommands())) {
+            return PolicyDecision.block("command is not in allowed_dhk_commands: " + command);
+        }
+        return PolicyDecision.allow();
+    }
+
+    private boolean matchesCommand(String command, String[] prefixes) {
+        for (String prefix : prefixes) {
+            if (command.equals(prefix) || command.startsWith(prefix + " ")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String[] splitChangedFiles(String changedFiles) {
+        if (changedFiles == null || changedFiles.trim().length() == 0) {
+            return new String[0];
+        }
+        String normalized = changedFiles.replace('\n', ',').replace(';', ',');
+        String[] parts = normalized.split(",");
+        java.util.List<String> result = new java.util.ArrayList<String>();
+        for (String part : parts) {
+            String file = part.trim();
+            if (file.length() > 0) {
+                result.add(file);
+            }
+        }
+        return result.toArray(new String[result.size()]);
+    }
+
+    private String relative(Path projectRoot, Path path) {
+        Path absoluteRoot = projectRoot.toAbsolutePath().normalize();
+        Path absolutePath = path.toAbsolutePath().normalize();
+        if (absolutePath.startsWith(absoluteRoot)) {
+            return normalize(absoluteRoot.relativize(absolutePath).toString());
+        }
+        return normalize(absolutePath.toString());
+    }
+
+    private boolean matchesAny(String value, String[] globs) {
+        String normalized = normalize(value);
+        for (String glob : globs) {
+            if (globMatches(normalized, normalize(glob))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean globMatches(String value, String glob) {
+        StringBuilder regex = new StringBuilder();
+        for (int i = 0; i < glob.length(); i++) {
+            char ch = glob.charAt(i);
+            if (ch == '*') {
+                if (i + 1 < glob.length() && glob.charAt(i + 1) == '*') {
+                    regex.append(".*");
+                    i++;
+                } else {
+                    regex.append("[^/]*");
+                }
+            } else {
+                regex.append(Pattern.quote(String.valueOf(ch)));
+            }
+        }
+        return value.matches(regex.toString());
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.trim().replace('\\', '/');
+    }
+}

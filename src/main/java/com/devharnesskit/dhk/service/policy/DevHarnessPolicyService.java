@@ -53,6 +53,10 @@ public final class DevHarnessPolicyService {
         }
     }
 
+    public boolean hasPolicy(Path projectRoot) {
+        return projectRoot != null && Files.isRegularFile(PathUtil.devharnessPolicy(projectRoot));
+    }
+
     public List<Diagnostic> diagnose(Path projectRoot) {
         List<Diagnostic> diagnostics = new ArrayList<Diagnostic>();
         if (projectRoot == null) {

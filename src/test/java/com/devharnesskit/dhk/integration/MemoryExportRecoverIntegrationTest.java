@@ -112,6 +112,32 @@ final class MemoryExportRecoverIntegrationTest {
     }
 
     @Test
+    void policyCanBlockForbiddenContextExportPath() throws Exception {
+        initProject();
+        Path root = tempDir.resolve("demo");
+        addMemory("Confirmed policy export", "Policy hooks protect context exports.", "policy,export");
+        confirm("1");
+        Files.write(PathUtil.devharnessPolicy(root), ("{\n"
+                + "  \"mode\": \"strict\",\n"
+                + "  \"context_export_forbidden_files\": \".agents/memory/exports/CURRENT_CONTEXT.md\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness export = new Harness(tempDir);
+        int exportExit = new CommandRouter().run(new String[]{
+                "memory", "export",
+                "--project-root", "demo",
+                "--task", "Policy export guard",
+                "--module", "global",
+                "--keywords", "policy"
+        }, export.context());
+
+        assertEquals(ExitCodes.VALIDATION_ERROR, exportExit);
+        assertTrue(export.stderr().contains("Policy blocked context export"));
+        assertTrue(export.stderr().contains("output path is forbidden"));
+        assertFalse(Files.isRegularFile(PathUtil.currentContext(root)));
+    }
+
+    @Test
     void exportPrioritizesModuleAndKeywordRelevantMemory() throws Exception {
         initProject();
         addMemory("General high confidence", "General project convention.", "general", "global",

@@ -26,15 +26,18 @@ final class GoalSkillPackagingTest {
         assertScriptPair(skillRoot, "goal-step");
         assertScriptPair(skillRoot, "goal-check");
         assertScriptPair(skillRoot, "goal-evaluate");
+        assertScriptPair(skillRoot, "goal-verify");
         assertScriptPair(skillRoot, "goal-complete");
         assertScriptPair(skillRoot, "goal-status");
         assertScriptPair(skillRoot, "goal-export");
 
         String skill = read(skillRoot.resolve("SKILL.md"));
+        assertTrue(skill.contains("goal-verify.sh"));
         assertTrue(skill.contains("goal-check.sh --all"));
         assertTrue(skill.contains("goal-evaluate.sh"));
         assertTrue(skill.contains("goal-complete.sh"));
         assertTrue(skill.contains("required evidence keys from GOAL_CONTEXT"));
+        assertTrue(skill.contains("Perform only the `current_action`"));
 
         assertProjectRootInjection(skillRoot);
         assertGoalWrapper(skillRoot, "goal-start", "start");
@@ -43,6 +46,7 @@ final class GoalSkillPackagingTest {
         assertGoalWrapper(skillRoot, "goal-step", "step");
         assertGoalWrapper(skillRoot, "goal-check", "check");
         assertGoalWrapper(skillRoot, "goal-evaluate", "evaluate");
+        assertGoalWrapper(skillRoot, "goal-verify", "verify");
         assertGoalWrapper(skillRoot, "goal-complete", "complete");
         assertGoalWrapper(skillRoot, "goal-status", "status");
         assertGoalWrapper(skillRoot, "goal-export", "export");
@@ -52,9 +56,11 @@ final class GoalSkillPackagingTest {
         String forbidden = read(skillRoot.resolve("references/forbidden-actions.md"));
         String selfCheck = read(skillRoot.resolve("references/self-check-format.md"));
         assertTrue(protocol.contains("Use wrapper scripts under `scripts/`"));
+        assertTrue(protocol.contains("Run `goal verify` before final completion"));
         assertTrue(evidence.contains("Mirror required evidence keys exactly"));
         assertTrue(forbidden.contains("direct lower-level `dhk memory ...`"));
         assertTrue(forbidden.contains("`db sql`"));
+        assertTrue(forbidden.contains("claiming completion before `goal verify`"));
         assertTrue(selfCheck.contains("goal evaluate"));
     }
 

@@ -11,4 +11,5 @@ Forbidden unless GOAL_CONTEXT or the user explicitly allows it:
 - `memory confirm`
 - `db sql`
 - writing secrets or raw SQL results to memory
-- claiming completion before `goal evaluate` and `goal complete`
+- claiming completion before `goal verify` or `goal evaluate`
+- claiming completion before `goal complete` succeeds

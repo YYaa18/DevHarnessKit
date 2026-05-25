@@ -131,6 +131,7 @@ public final class ExportCommand implements Command {
             String markdown = renderer.render(project, task, module, args.option("mode", "auto"),
                     args.option("keywords", ""), now,
                     exportItems, checkpoint, workflowContext, specContext);
+            markdown = sensitiveDataGuard.redact(markdown);
             List<String> matches = sensitiveDataGuard.findMatches(markdown);
             if (!matches.isEmpty()) {
                 context.err().println("Sensitive data rejected during export: " + matches);

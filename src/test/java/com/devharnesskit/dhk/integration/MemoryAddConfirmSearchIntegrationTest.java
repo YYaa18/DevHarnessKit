@@ -4,6 +4,7 @@ import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.CommandRouter;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.util.Clock;
+import com.devharnesskit.dhk.util.PathUtil;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -108,6 +109,64 @@ final class MemoryAddConfirmSearchIntegrationTest {
 
         assertEquals(ExitCodes.VALIDATION_ERROR, sensitiveExit);
         assertTrue(sensitive.stderr().contains("Sensitive data rejected"));
+    }
+
+    @Test
+    void addReadsContentFileAndSearchExplainShowsScore() throws Exception {
+        initProject();
+        Path contentFile = tempDir.resolve("memory-content.md");
+        Files.write(contentFile, "Gateway user identity comes from X-User-Id.".getBytes("UTF-8"));
+
+        Harness add = new Harness(tempDir);
+        int addExit = new CommandRouter().run(new String[]{
+                "memory", "add",
+                "--project-root", "demo",
+                "--type", "gateway_convention",
+                "--title", "Gateway identity file",
+                "--content-file", contentFile.toString(),
+                "--tags", "gateway,user-id"
+        }, add.context());
+        assertEquals(ExitCodes.SUCCESS, addExit);
+
+        Harness search = new Harness(tempDir);
+        int searchExit = new CommandRouter().run(new String[]{
+                "memory", "search", "--project-root", "demo", "--q", "gateway", "--explain"
+        }, search.context());
+        assertEquals(ExitCodes.SUCCESS, searchExit);
+        assertTrue(search.stdout().contains("[1] Gateway identity file"));
+        assertTrue(search.stdout().contains("score:"));
+        assertTrue(search.stdout().contains("explain: match lists weighted fields"));
+    }
+
+    @Test
+    void sensitivePolicyRedactsFinancialPiiInsteadOfRejecting() throws Exception {
+        initProject();
+        Path root = tempDir.resolve("demo");
+        Files.createDirectories(PathUtil.devharnessDirectory(root));
+        Files.write(PathUtil.sensitivePolicy(root), ("{\n"
+                + "  \"email\": \"redact\",\n"
+                + "  \"phone\": \"redact\",\n"
+                + "  \"identity_number\": \"redact\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness add = new Harness(tempDir);
+        int addExit = new CommandRouter().run(new String[]{
+                "memory", "add",
+                "--project-root", "demo",
+                "--type", "project_fact",
+                "--title", "PII sample",
+                "--content", "客户手机号 13800138000，邮箱 test@example.com，身份证 11010519491231002X"
+        }, add.context());
+        assertEquals(ExitCodes.SUCCESS, addExit);
+
+        Harness search = new Harness(tempDir);
+        int searchExit = new CommandRouter().run(new String[]{
+                "memory", "search", "--project-root", "demo", "--q", "PII"
+        }, search.context());
+        assertEquals(ExitCodes.SUCCESS, searchExit);
+        assertTrue(search.stdout().contains("[REDACTED_PHONE]"));
+        assertTrue(search.stdout().contains("[REDACTED_EMAIL]"));
+        assertTrue(search.stdout().contains("[REDACTED_IDENTITY_NUMBER]"));
     }
 
     @Test

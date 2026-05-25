@@ -17,6 +17,7 @@ import com.devharnesskit.dhk.repository.spec.SpecEventRepository;
 import com.devharnesskit.dhk.service.ProjectService;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
 import com.devharnesskit.dhk.service.spec.SpecDocumentService;
+import com.devharnesskit.dhk.util.InputUtil;
 import com.devharnesskit.dhk.util.PathUtil;
 
 import java.nio.file.Files;
@@ -54,10 +55,6 @@ public final class SpecDocumentCommand implements Command {
         if (!SpecDocumentService.isDocumentStatusAllowed(status)) {
             context.err().println("Invalid document status: " + status);
             return ExitCodes.VALIDATION_ERROR;
-        }
-        if (args.hasOption("content") == args.hasOption("file")) {
-            context.err().println("Provide exactly one of --content or --file");
-            return ExitCodes.USAGE_ERROR;
         }
         String title = args.option("title", type).trim();
         if (title.length() == 0) {
@@ -102,10 +99,30 @@ public final class SpecDocumentCommand implements Command {
     }
 
     private String content(CommandContext context, Args args) throws Exception {
+        int count = 0;
         if (args.hasOption("content")) {
-            return args.option("content");
+            count++;
         }
-        Path file = PathUtil.resolvePath(args.option("file"), context.workingDirectory());
-        return new String(Files.readAllBytes(file), "UTF-8");
+        if (args.hasOption("content-file")) {
+            count++;
+        }
+        if (args.hasOption("file")) {
+            count++;
+        }
+        if (args.hasFlag("content-stdin")) {
+            count++;
+        }
+        if (count != 1) {
+            throw new InputUtil.InputException("Provide exactly one of --content, --content-file, --file, or --content-stdin");
+        }
+        if (args.hasOption("file")) {
+            Path file = PathUtil.resolvePath(args.option("file"), context.workingDirectory());
+            try {
+                return sensitiveDataGuard.redact(new String(Files.readAllBytes(file), "UTF-8"));
+            } catch (Exception ex) {
+                throw new InputUtil.InputException("Failed to read --file: " + ex.getMessage());
+            }
+        }
+        return InputUtil.readExclusiveText(context, args, "content", "content-file", "content-stdin");
     }
 }

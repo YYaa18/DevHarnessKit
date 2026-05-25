@@ -33,6 +33,28 @@ final class CommandRouterTest {
         assertTrue(harness.stderr().contains("Unknown command: scan"));
     }
 
+    @Test
+    void versionCommandReturnsAlphaVersion() {
+        Harness harness = new Harness();
+
+        int exitCode = new CommandRouter().run(new String[]{"version"}, harness.context());
+
+        assertEquals(ExitCodes.SUCCESS, exitCode);
+        assertTrue(harness.stdout().contains("DevHarness Kit 0.1.0-alpha"));
+        assertTrue(harness.stdout().contains("release_channel: alpha / developer preview"));
+        assertTrue(harness.stdout().contains("schema_version: 5"));
+    }
+
+    @Test
+    void versionFlagReturnsVersion() {
+        Harness harness = new Harness();
+
+        int exitCode = new CommandRouter().run(new String[]{"--version"}, harness.context());
+
+        assertEquals(ExitCodes.SUCCESS, exitCode);
+        assertTrue(harness.stdout().contains("DevHarness Kit 0.1.0-alpha"));
+    }
+
     private static final class Harness {
         private final ByteArrayOutputStream out = new ByteArrayOutputStream();
         private final ByteArrayOutputStream err = new ByteArrayOutputStream();

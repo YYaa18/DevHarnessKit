@@ -1,5 +1,7 @@
 # DevHarness Kit CLI MVP 实施计划
 
+> Historical design note: this implementation plan records earlier MVP planning and may include outdated artifact names, schema notes, or future work. The current open-source surface is documented in `README.md`, `docs/ARCHITECTURE.md`, `docs/MIGRATIONS.md`, and `SECURITY.md`.
+
 本版补充内容：
 
 ```text

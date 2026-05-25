@@ -22,7 +22,8 @@ public final class MysqlConnectionService {
             }
             String port = args.option("port", "3306").trim();
             jdbcUrl = "jdbc:mysql://" + host + ":" + port + "/" + database
-                    + "?useUnicode=true&characterEncoding=utf8&useSSL=false";
+                    + "?useUnicode=true&characterEncoding=utf8&useSSL=false"
+                    + "&zeroDateTimeBehavior=convertToNull";
         }
         if (!jdbcUrl.toLowerCase(Locale.ROOT).startsWith("jdbc:mysql://")) {
             return DbConnectionRequest.invalid("Only jdbc:mysql:// URLs are allowed");
@@ -63,6 +64,29 @@ public final class MysqlConnectionService {
         properties.setProperty("connectTimeout", String.valueOf(request.connectTimeoutMs()));
         properties.setProperty("socketTimeout", String.valueOf(request.socketTimeoutMs()));
         return DriverManager.getConnection(request.jdbcUrl(), properties);
+    }
+
+    public String compatibilityHint(Exception ex) {
+        String message = ex.getMessage();
+        if (message == null) {
+            return "";
+        }
+        String lower = message.toLowerCase(Locale.ROOT);
+        if (lower.contains("caching_sha2_password")) {
+            return "Connector/J 5.1.49 cannot authenticate MySQL 8 accounts using caching_sha2_password. "
+                    + "Create the DevHarness Kit readonly user with mysql_native_password.";
+        }
+        if (lower.contains("server timezone") || lower.contains("time zone") || lower.contains("timezone")) {
+            return "Add an explicit serverTimezone parameter to --jdbc-url, for example serverTimezone=Asia/Shanghai.";
+        }
+        if (lower.contains("public key retrieval")) {
+            return "For local MySQL 8 testing, either use mysql_native_password or add allowPublicKeyRetrieval=true "
+                    + "only to a local/test JDBC URL.";
+        }
+        if (lower.contains("access denied")) {
+            return "Check that the account exists for this host and has read-only privileges on the target schema.";
+        }
+        return "";
     }
 
     private int parseInt(String rawValue, int defaultValue) {

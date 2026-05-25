@@ -55,6 +55,7 @@ public final class SpecExportCommand implements Command {
                 return ExitCodes.NOT_FOUND;
             }
             String markdown = exportService.renderFull(connection, change, context.clock().now().toString());
+            markdown = sensitiveDataGuard.redact(markdown);
             List<String> matches = sensitiveDataGuard.findMatches(markdown);
             if (!matches.isEmpty()) {
                 context.err().println("Sensitive data rejected during spec export: " + matches);

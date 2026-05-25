@@ -37,9 +37,14 @@ final class PathUtilTest {
         Path root = tempDir.resolve("demo");
 
         assertEquals(root.resolve(".agents/memory"), PathUtil.memoryDirectory(root));
+        assertEquals(root.resolve(".agents/devharness"), PathUtil.devharnessDirectory(root));
+        assertEquals(root.resolve(".agents/devharness/sensitive-policy.json"), PathUtil.sensitivePolicy(root));
         assertEquals(root.resolve(".agents/memory/exports"), PathUtil.exportsDirectory(root));
+        assertEquals(root.resolve(".agents/memory/artifacts"), PathUtil.artifactsDirectory(root));
+        assertEquals(root.resolve(".agents/memory/artifacts/goals/goal-1/checks"), PathUtil.goalCheckArtifactsDirectory(root, "goal-1"));
         assertEquals(root.resolve(".agents/memory/project.json"), PathUtil.projectJson(root));
         assertEquals(root.resolve(".agents/memory/memory.db"), PathUtil.memoryDb(root));
+        assertEquals(root.resolve(".agents/memory/exports/GOAL_SUMMARY.md"), PathUtil.goalSummary(root));
     }
 
     @Test
@@ -49,6 +54,8 @@ final class PathUtilTest {
         PathUtil.createMemoryDirectories(root);
 
         assertTrue(Files.isDirectory(root.resolve(".agents/memory")));
+        assertTrue(Files.isDirectory(root.resolve(".agents/devharness")));
         assertTrue(Files.isDirectory(root.resolve(".agents/memory/exports")));
+        assertTrue(Files.isDirectory(root.resolve(".agents/memory/artifacts")));
     }
 }

@@ -10,6 +10,7 @@ import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.repository.CheckpointRepository;
 import com.devharnesskit.dhk.service.ProjectService;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
+import com.devharnesskit.dhk.util.InputUtil;
 import com.devharnesskit.dhk.util.PathUtil;
 
 import java.nio.file.Path;
@@ -37,9 +38,15 @@ public final class CheckpointCommand implements Command {
 
     public int run(CommandContext context, Args args) {
         String task = args.option("task").trim();
-        String summary = args.option("summary").trim();
+        String summary;
+        try {
+            summary = InputUtil.readExclusiveText(context, args, "summary", "summary-file", "summary-stdin").trim();
+        } catch (InputUtil.InputException ex) {
+            context.err().println(ex.getMessage());
+            return ExitCodes.USAGE_ERROR;
+        }
         if (task.length() == 0 || summary.length() == 0) {
-            context.err().println("Missing required parameters: --task, --summary");
+            context.err().println("Missing required parameters: --task and summary");
             return ExitCodes.USAGE_ERROR;
         }
         String module = args.option("module", "global").trim();

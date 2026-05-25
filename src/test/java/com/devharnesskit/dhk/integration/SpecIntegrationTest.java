@@ -71,6 +71,18 @@ final class SpecIntegrationTest {
         assertEquals(ExitCodes.SUCCESS, documentUpdateExit);
         assertTrue(documentUpdate.stdout().contains("version: 2"));
 
+        Path notesFile = tempDir.resolve("notes.md");
+        Files.write(notesFile, "从文件读取规格备注".getBytes("UTF-8"));
+        Harness fileDocument = new Harness(tempDir);
+        int fileDocumentExit = new CommandRouter().run(new String[]{
+                "spec", "document", "set", "--project-root", "demo",
+                "--change", "order-query-api",
+                "--type", "notes",
+                "--content-file", notesFile.toString()
+        }, fileDocument.context());
+        assertEquals(ExitCodes.SUCCESS, fileDocumentExit);
+        assertTrue(fileDocument.stdout().contains("document_type: notes"));
+
         Harness sensitiveDocument = new Harness(tempDir);
         int sensitiveDocumentExit = new CommandRouter().run(new String[]{
                 "spec", "document", "set", "--project-root", "demo",

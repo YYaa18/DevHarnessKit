@@ -52,6 +52,7 @@ public final class DoctorCommand implements Command {
         Path dbPath = PathUtil.memoryDb(projectRoot);
         Path projectJson = PathUtil.projectJson(projectRoot);
         Path exportsDir = PathUtil.exportsDirectory(projectRoot);
+        Path sensitivePolicy = PathUtil.sensitivePolicy(projectRoot);
 
         context.out().println("DevHarness Kit doctor");
         context.out().println("java.version: " + System.getProperty("java.version"));
@@ -62,6 +63,9 @@ public final class DoctorCommand implements Command {
         missing = printCheck(context, "memory_db", Files.isRegularFile(dbPath), dbPath.toString()) || missing;
         missing = printCheck(context, "project_json", Files.isRegularFile(projectJson), projectJson.toString()) || missing;
         missing = printCheck(context, "exports_dir", Files.isDirectory(exportsDir) && Files.isWritable(exportsDir), exportsDir.toString()) || missing;
+        context.out().println("sensitive_policy: "
+                + (Files.isRegularFile(sensitivePolicy) ? "configured" : "default")
+                + " (" + sensitivePolicy + ")");
 
         boolean mysqlDriverLoaded = false;
         try {
@@ -131,7 +135,8 @@ public final class DoctorCommand implements Command {
                 if (!Files.isRegularFile(file)) {
                     continue;
                 }
-                List<String> matches = sensitiveDataGuard.findMatches(new String(Files.readAllBytes(file), "UTF-8"));
+                String content = sensitiveDataGuard.redact(new String(Files.readAllBytes(file), "UTF-8"));
+                List<String> matches = sensitiveDataGuard.findMatches(content);
                 if (!matches.isEmpty()) {
                     context.err().println("WARNING sensitive export content: " + file + " matches " + matches);
                 }

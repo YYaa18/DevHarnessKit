@@ -1,0 +1,65 @@
+# SQLite Migration Policy
+
+DevHarness Kit stores project state in:
+
+```text
+.agents/memory/memory.db
+```
+
+Current schema version: `5`.
+
+## Current Schema Versions
+
+| Version | Scope |
+| --- | --- |
+| v1 | Memory core project, memory, checkpoint, and indexes. |
+| v2 | Workflow templates, runs, phases, gates, and events. |
+| v3 | Workflow artifacts, memory bindings, and checkpoint bindings. |
+| v4 | Spec changes, documents, tasks, acceptance criteria, events, and workflow bindings. |
+| v5 | Goal orchestration runs, steps, events, checks, and artifacts. |
+
+## Alpha Compatibility Policy
+
+`0.1.0-alpha` initializes and migrates project databases in place. The schema is not yet a stable public contract.
+
+Before using DevHarness Kit on important project data:
+
+1. Commit or back up `.agents/memory/`.
+2. Run `dhk doctor --project-root <path>`.
+3. Run the intended command.
+4. Re-run `dhk doctor --project-root <path>`.
+
+## Recovery Guidance
+
+If migration or initialization fails:
+
+1. Stop running further write commands.
+2. Copy `.agents/memory/memory.db` and `.agents/memory/project.json` to a safe location.
+3. Re-run with the latest patched CLI.
+4. If the database is still not usable, open an issue with the CLI version, schema version, command, and error output.
+
+## Built-In Backup
+
+Use `memory backup` before risky upgrades:
+
+```bash
+dhk memory backup --project-root .
+dhk memory backup --project-root . --out /tmp/dhk-memory-backup.zip
+```
+
+The backup zip includes `project.json`, `memory.db`, and files directly under `exports/`.
+
+## Rules for Future Migrations
+
+Future schema changes should follow these rules before a stable release:
+
+- each migration has a clear version and description;
+- migrations run inside a transaction where SQLite supports it;
+- important user databases are backed up before destructive or risky changes;
+- old database fixtures are tested in CI;
+- migrations are forward-compatible within supported minor versions;
+- downgrades are documented as unsupported unless explicitly implemented.
+
+## Export Compatibility
+
+Markdown exports are generated context, not source of truth. If an export format changes, regenerate it from SQLite with the matching CLI version.

@@ -70,6 +70,7 @@ public final class RecoverCommand implements Command {
             List<MemoryItem> memory = memoryRepository.listConfirmedForExport(connection, project.projectKey(),
                     checkpoint.moduleName(), 20);
             String markdown = renderer.render(context.clock().now().toString(), checkpoint, memory);
+            markdown = sensitiveDataGuard.redact(markdown);
             List<String> matches = sensitiveDataGuard.findMatches(markdown);
             if (!matches.isEmpty()) {
                 context.err().println("Sensitive data rejected during recover: " + matches);

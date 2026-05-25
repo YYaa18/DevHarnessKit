@@ -27,11 +27,23 @@ public final class Args {
         for (int i = 0; i < rawArgs.length; i++) {
             String token = rawArgs[i];
             if (token.startsWith("--") && token.length() > 2) {
-                String key = token.substring(2);
-                if (i + 1 < rawArgs.length && !rawArgs[i + 1].startsWith("--")) {
+                String option = token.substring(2);
+                int equalsIndex = option.indexOf('=');
+                if (equalsIndex >= 0) {
+                    String key = option.substring(0, equalsIndex);
+                    String value = option.substring(equalsIndex + 1);
+                    if (key.length() == 0) {
+                        positionals.add(token);
+                    } else {
+                        options.put(key, value);
+                        flags.remove(key);
+                    }
+                } else if (i + 1 < rawArgs.length && !rawArgs[i + 1].startsWith("--")) {
+                    String key = option;
                     options.put(key, rawArgs[++i]);
                     flags.remove(key);
                 } else {
+                    String key = option;
                     flags.add(key);
                     options.remove(key);
                 }
@@ -85,5 +97,21 @@ public final class Args {
 
     public Set<String> flags() {
         return flags;
+    }
+
+    public Args redacted(com.devharnesskit.dhk.service.SensitiveDataGuard guard, Set<String> excludedOptions) {
+        List<String> redactedPositionals = new ArrayList<String>();
+        for (String positional : positionals) {
+            redactedPositionals.add(guard.redact(positional));
+        }
+        Map<String, String> redactedOptions = new LinkedHashMap<String, String>();
+        for (Map.Entry<String, String> entry : options.entrySet()) {
+            if (excludedOptions.contains(entry.getKey())) {
+                redactedOptions.put(entry.getKey(), entry.getValue());
+            } else {
+                redactedOptions.put(entry.getKey(), guard.redact(entry.getValue()));
+            }
+        }
+        return new Args(redactedPositionals, redactedOptions, new LinkedHashSet<String>(flags));
     }
 }

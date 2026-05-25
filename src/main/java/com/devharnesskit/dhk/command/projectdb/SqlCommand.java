@@ -13,6 +13,7 @@ import com.devharnesskit.dhk.sql.DbConnectionRequest;
 import com.devharnesskit.dhk.sql.SqlExecutionRequest;
 import com.devharnesskit.dhk.sql.SqlExecutionResult;
 import com.devharnesskit.dhk.sql.SqlSafetyResult;
+import com.devharnesskit.dhk.util.InputUtil;
 import com.devharnesskit.dhk.util.PathUtil;
 
 import java.nio.file.Files;
@@ -41,9 +42,15 @@ public final class SqlCommand implements Command {
     }
 
     public int run(CommandContext context, Args args) {
-        String sql = args.option("sql").trim();
+        String sql;
+        try {
+            sql = InputUtil.readExclusiveText(context, args, "sql", "sql-file", "sql-stdin", false).trim();
+        } catch (InputUtil.InputException ex) {
+            context.err().println(ex.getMessage());
+            return ExitCodes.USAGE_ERROR;
+        }
         if (sql.length() == 0) {
-            context.err().println("Missing required parameter: --sql");
+            context.err().println("Missing required SQL text");
             return ExitCodes.USAGE_ERROR;
         }
         boolean explain = args.hasFlag("explain");
@@ -55,7 +62,7 @@ public final class SqlCommand implements Command {
         }
         if (dryRun) {
             context.out().println("sql_safety: ok");
-            context.out().println("sql: " + safety.executableSql());
+            context.out().println("sql: " + sensitiveDataGuard.redact(safety.executableSql()));
             return ExitCodes.SUCCESS;
         }
 
@@ -69,6 +76,7 @@ public final class SqlCommand implements Command {
             SqlExecutionResult result = executionService.execute(connectionService, connectionRequest, executionRequest);
             String format = args.option("format", "table");
             String output = renderer.render(result, format, executionRequest.maxOutputBytes());
+            output = sensitiveDataGuard.redact(output);
             if (sensitiveDataGuard.containsSensitiveData(output)) {
                 context.err().println("Sensitive SQL result rejected; output was not written.");
                 return ExitCodes.VALIDATION_ERROR;

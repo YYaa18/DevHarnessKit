@@ -13,6 +13,7 @@ import com.devharnesskit.dhk.repository.MemoryRepository;
 import com.devharnesskit.dhk.service.MemoryType;
 import com.devharnesskit.dhk.service.ProjectService;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
+import com.devharnesskit.dhk.util.InputUtil;
 import com.devharnesskit.dhk.util.PathUtil;
 import com.devharnesskit.dhk.util.TagUtil;
 
@@ -48,9 +49,15 @@ public final class AddCommand implements Command {
     public int run(CommandContext context, Args args) {
         String type = args.option("type").trim();
         String title = args.option("title").trim();
-        String content = args.option("content").trim();
+        String content;
+        try {
+            content = InputUtil.readExclusiveText(context, args, "content", "content-file", "content-stdin").trim();
+        } catch (InputUtil.InputException ex) {
+            context.err().println(ex.getMessage());
+            return ExitCodes.USAGE_ERROR;
+        }
         if (type.length() == 0 || title.length() == 0 || content.length() == 0) {
-            context.err().println("Missing required parameters: --type, --title, --content");
+            context.err().println("Missing required parameters: --type, --title, and content");
             return ExitCodes.USAGE_ERROR;
         }
         if (!MemoryType.isAllowed(type)) {

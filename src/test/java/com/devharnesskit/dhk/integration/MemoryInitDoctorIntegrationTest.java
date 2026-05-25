@@ -15,6 +15,7 @@ import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.zip.ZipFile;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -39,9 +40,11 @@ final class MemoryInitDoctorIntegrationTest {
         assertTrue(Files.isRegularFile(PathUtil.memoryDb(root)));
         assertTrue(Files.isRegularFile(PathUtil.projectJson(root)));
         assertTrue(Files.isDirectory(PathUtil.exportsDirectory(root)));
+        assertTrue(Files.isDirectory(PathUtil.devharnessDirectory(root)));
         assertTrue(Files.isRegularFile(PathUtil.projectIndex(root)));
         assertEquals(firstProject.projectKey(), secondProject.projectKey());
         assertTrue(firstHarness.stdout().contains("memory init complete"));
+        assertTrue(firstHarness.stdout().contains("sensitive_policy:"));
         assertTrue(secondHarness.stdout().contains("fts:"));
     }
 
@@ -65,10 +68,34 @@ final class MemoryInitDoctorIntegrationTest {
         int exitCode = new CommandRouter().run(new String[]{"doctor", "--project-root", root.toString()}, doctorHarness.context());
 
         assertEquals(ExitCodes.SUCCESS, exitCode);
-        assertTrue(doctorHarness.stdout().contains("schema_version: ok (4)"));
+        assertTrue(doctorHarness.stdout().contains("schema_version: ok (5)"));
         assertTrue(doctorHarness.stdout().contains("mysql_driver: ok"));
+        assertTrue(doctorHarness.stdout().contains("sensitive_policy: default"));
         assertTrue(doctorHarness.stdout().contains("memory_total: 0"));
         assertTrue(doctorHarness.stdout().contains("checkpoint_total: 0"));
+    }
+
+    @Test
+    void memoryBackupCreatesZipArchive() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Harness initHarness = new Harness(tempDir);
+        new CommandRouter().run(new String[]{"memory", "init", "--project-root", "demo"}, initHarness.context());
+
+        Path out = tempDir.resolve("backup.zip");
+        Harness backupHarness = new Harness(tempDir);
+        int exitCode = new CommandRouter().run(new String[]{
+                "memory", "backup", "--project-root", "demo", "--out", out.toString()
+        }, backupHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, exitCode);
+        assertTrue(backupHarness.stdout().contains("backup_path: " + out));
+        assertTrue(Files.isRegularFile(out));
+        try (ZipFile zip = new ZipFile(out.toFile())) {
+            assertTrue(zip.getEntry(PathUtil.PROJECT_JSON) != null);
+            assertTrue(zip.getEntry(PathUtil.MEMORY_DB) != null);
+            assertTrue(zip.getEntry(PathUtil.EXPORTS_DIRECTORY + "/" + PathUtil.PROJECT_INDEX) != null);
+        }
+        assertTrue(Files.isDirectory(root.resolve(".agents").resolve("memory")));
     }
 
     private static final class Harness {

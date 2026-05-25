@@ -4,11 +4,13 @@ import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.CommandRouter;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.util.Clock;
+import com.devharnesskit.dhk.util.PathUtil;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 
@@ -31,6 +33,42 @@ final class DbSqlDryRunIntegrationTest {
         assertEquals(ExitCodes.SUCCESS, exitCode);
         assertTrue(harness.stdout().contains("sql_safety: ok"));
         assertTrue(harness.stdout().contains("SELECT 1"));
+    }
+
+    @Test
+    void dryRunReadsSqlFile() throws Exception {
+        Path sqlFile = tempDir.resolve("query.sql");
+        Files.write(sqlFile, "SELECT 1 AS ok".getBytes("UTF-8"));
+        Harness harness = new Harness(tempDir);
+
+        int exitCode = new CommandRouter().run(new String[]{
+                "db", "sql", "--dry-run", "--sql-file", sqlFile.toString()
+        }, harness.context());
+
+        assertEquals(ExitCodes.SUCCESS, exitCode);
+        assertTrue(harness.stdout().contains("sql_safety: ok"));
+        assertTrue(harness.stdout().contains("SELECT 1 AS ok"));
+    }
+
+    @Test
+    void dryRunKeepsSqlExecutableButRedactsPolicyOutput() throws Exception {
+        Path projectRoot = tempDir.resolve("demo");
+        Files.createDirectories(PathUtil.devharnessDirectory(projectRoot));
+        Files.write(PathUtil.sensitivePolicy(projectRoot), ("{\n"
+                + "  \"phone\": \"redact\"\n"
+                + "}\n").getBytes("UTF-8"));
+        Harness harness = new Harness(tempDir);
+
+        int exitCode = new CommandRouter().run(new String[]{
+                "db", "sql",
+                "--project-root", "demo",
+                "--dry-run",
+                "--sql", "SELECT * FROM customer WHERE phone = '13800138000'"
+        }, harness.context());
+
+        assertEquals(ExitCodes.SUCCESS, exitCode);
+        assertTrue(harness.stdout().contains("sql_safety: ok"));
+        assertTrue(harness.stdout().contains("[REDACTED_PHONE]"));
     }
 
     @Test

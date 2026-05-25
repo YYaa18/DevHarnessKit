@@ -90,13 +90,11 @@ public final class MemorySearchService {
         }
         if (ftsMatch) {
             queryMatched = true;
+            score += 1;
+            matches.add("fts");
         }
         if (!queryMatched) {
             return new SearchResult(item, 0, "");
-        }
-        if (ftsMatch && matches.isEmpty()) {
-            score += 1;
-            matches.add("fts");
         }
         if (requestedModule.length() > 0 && requestedModule.equals(item.moduleName())) {
             score += 10;

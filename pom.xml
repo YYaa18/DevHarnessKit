@@ -5,15 +5,16 @@
 
     <groupId>com.devharnesskit</groupId>
     <artifactId>dhk-cli</artifactId>
-    <version>0.1.0</version>
+    <version>0.1.0-alpha</version>
     <packaging>jar</packaging>
 
     <name>DevHarness Kit CLI</name>
-    <description>Local CLI for DevHarness Kit project memory and readonly database queries.</description>
+    <description>Local-first CLI harness for coding-agent memory, specs, workflow state, and readonly database inspection.</description>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.release>8</maven.compiler.release>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
         <junit.jupiter.version>5.10.2</junit.jupiter.version>
         <sqlite.jdbc.version>3.53.1.0</sqlite.jdbc.version>
         <mysql.connector.version>5.1.49</mysql.connector.version>
@@ -45,7 +46,8 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.13.0</version>
                 <configuration>
-                    <release>${maven.compiler.release}</release>
+                    <source>${maven.compiler.source}</source>
+                    <target>${maven.compiler.target}</target>
                 </configuration>
             </plugin>
             <plugin>
@@ -67,14 +69,40 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <finalName>dhk-cli-0.1.0-all</finalName>
+                            <finalName>${project.artifactId}-${project.version}-all</finalName>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <mainClass>com.devharnesskit.dhk.Main</mainClass>
+                                    <manifestEntries>
+                                        <Implementation-Title>${project.name}</Implementation-Title>
+                                        <Implementation-Version>${project.version}</Implementation-Version>
+                                    </manifestEntries>
                                 </transformer>
                             </transformers>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>3.7.1</version>
+                <executions>
+                    <execution>
+                        <id>release-archive</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <configuration>
+                            <descriptors>
+                                <descriptor>src/assembly/release.xml</descriptor>
+                            </descriptors>
+                            <finalName>devharnesskit-${project.version}</finalName>
+                            <appendAssemblyId>false</appendAssemblyId>
+                            <tarLongFileMode>gnu</tarLongFileMode>
                         </configuration>
                     </execution>
                 </executions>

@@ -4,7 +4,7 @@ set -eu
 # Developer validation helper. Requires the sqlite3 CLI to bulk-load
 # sample memory rows; runtime DevHarness Kit commands do not require it.
 
-JAR="${1:-target/dhk-cli-0.1.0-all.jar}"
+JAR="${1:-target/dhk-cli-0.1.0-alpha-all.jar}"
 if [ ! -f "$JAR" ]; then
   echo "Jar not found: $JAR" >&2
   echo "Run: mvn -DskipTests package" >&2

@@ -51,6 +51,7 @@ public final class SearchCommand implements Command {
         if (limit <= 0) {
             return ExitCodes.VALIDATION_ERROR;
         }
+        boolean explain = args.hasFlag("explain");
 
         Path projectRoot = PathUtil.resolveProjectRoot(args, context.workingDirectory());
         try (Connection connection = connectionFactory.open(projectRoot)) {
@@ -72,6 +73,11 @@ public final class SearchCommand implements Command {
                 context.out().println("  tags: " + result.item().tags());
                 context.out().println("  content: " + result.item().summary(160));
                 context.out().println("  match: " + result.match());
+                if (explain) {
+                    context.out().println("  score: " + result.score());
+                    context.out().println("  query: " + query);
+                    context.out().println("  explain: match lists weighted fields; tags=8 title=5 content=3 fts=1 module=10 confirmed=3 confidence=1..2");
+                }
             }
             return ExitCodes.SUCCESS;
         } catch (SQLException ex) {

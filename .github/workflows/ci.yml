@@ -6,7 +6,24 @@ on:
 
 jobs:
   maven:
-    runs-on: ubuntu-latest
+    name: Maven (${{ matrix.os }}, Java ${{ matrix.java }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            java: '8'
+            smoke: false
+          - os: ubuntu-latest
+            java: '17'
+            smoke: true
+          - os: windows-latest
+            java: '17'
+            smoke: false
+          - os: macos-latest
+            java: '17'
+            smoke: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -15,20 +32,24 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '11'
+          java-version: ${{ matrix.java }}
           cache: maven
 
       - name: Test
-        run: mvn clean test
+        run: mvn -B clean test
 
       - name: Package
-        run: mvn -DskipTests package
+        run: mvn -B -DskipTests package
+
+      - name: Version smoke
+        run: java -jar target/dhk-cli-0.1.0-alpha-all.jar version
 
       - name: Workflow smoke
+        if: matrix.smoke
         run: |
           set -euo pipefail
           DEMO="$(mktemp -d)"
-          JAR="target/dhk-cli-0.1.0-all.jar"
+          JAR="target/dhk-cli-0.1.0-alpha-all.jar"
           java -jar "$JAR" memory init --project-root "$DEMO"
           java -jar "$JAR" workflow template seed --project-root "$DEMO"
           START_OUT="$(java -jar "$JAR" workflow start --project-root "$DEMO" --workflow api-change --task "ci smoke" --module order --mode api)"
@@ -45,5 +66,6 @@ jobs:
           java -jar "$JAR" spec export --project-root "$DEMO" --change ci-smoke
           java -jar "$JAR" memory export --project-root "$DEMO" --task "ci smoke" --module order --include-workflow "$RUN_KEY" --include-spec ci-smoke
 
-      - name: Record jar size
-        run: ls -lh target/dhk-cli-0.1.0-all.jar
+      - name: Record artifacts
+        if: matrix.os == 'ubuntu-latest'
+        run: ls -lh target/dhk-cli-0.1.0-alpha-all.jar target/devharnesskit-0.1.0-alpha.*

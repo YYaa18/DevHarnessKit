@@ -8,8 +8,11 @@ import java.nio.file.Path;
 
 public final class PathUtil {
     public static final String AGENTS_DIRECTORY = ".agents";
+    public static final String DEVHARNESS_DIRECTORY = "devharness";
     public static final String MEMORY_DIRECTORY = "memory";
     public static final String EXPORTS_DIRECTORY = "exports";
+    public static final String ARTIFACTS_DIRECTORY = "artifacts";
+    public static final String BACKUPS_DIRECTORY = "backups";
     public static final String PROJECT_JSON = "project.json";
     public static final String MEMORY_DB = "memory.db";
     public static final String PROJECT_INDEX = "PROJECT_INDEX.md";
@@ -17,6 +20,9 @@ public final class PathUtil {
     public static final String RECOVERY_CONTEXT = "RECOVERY_CONTEXT.md";
     public static final String WORKFLOW_CONTEXT = "WORKFLOW_CONTEXT.md";
     public static final String SPEC_CONTEXT = "SPEC_CONTEXT.md";
+    public static final String GOAL_CONTEXT = "GOAL_CONTEXT.md";
+    public static final String GOAL_SUMMARY = "GOAL_SUMMARY.md";
+    public static final String SENSITIVE_POLICY_JSON = "sensitive-policy.json";
 
     private PathUtil() {
     }
@@ -41,8 +47,32 @@ public final class PathUtil {
         return projectRoot.resolve(AGENTS_DIRECTORY).resolve(MEMORY_DIRECTORY);
     }
 
+    public static Path devharnessDirectory(Path projectRoot) {
+        return projectRoot.resolve(AGENTS_DIRECTORY).resolve(DEVHARNESS_DIRECTORY);
+    }
+
+    public static Path sensitivePolicy(Path projectRoot) {
+        return devharnessDirectory(projectRoot).resolve(SENSITIVE_POLICY_JSON);
+    }
+
     public static Path exportsDirectory(Path projectRoot) {
         return memoryDirectory(projectRoot).resolve(EXPORTS_DIRECTORY);
+    }
+
+    public static Path artifactsDirectory(Path projectRoot) {
+        return memoryDirectory(projectRoot).resolve(ARTIFACTS_DIRECTORY);
+    }
+
+    public static Path goalArtifactsDirectory(Path projectRoot, String goalKey) {
+        return artifactsDirectory(projectRoot).resolve("goals").resolve(goalKey);
+    }
+
+    public static Path goalCheckArtifactsDirectory(Path projectRoot, String goalKey) {
+        return goalArtifactsDirectory(projectRoot, goalKey).resolve("checks");
+    }
+
+    public static Path backupsDirectory(Path projectRoot) {
+        return memoryDirectory(projectRoot).resolve(BACKUPS_DIRECTORY);
     }
 
     public static Path projectJson(Path projectRoot) {
@@ -73,9 +103,19 @@ public final class PathUtil {
         return exportsDirectory(projectRoot).resolve(SPEC_CONTEXT);
     }
 
+    public static Path goalContext(Path projectRoot) {
+        return exportsDirectory(projectRoot).resolve(GOAL_CONTEXT);
+    }
+
+    public static Path goalSummary(Path projectRoot) {
+        return exportsDirectory(projectRoot).resolve(GOAL_SUMMARY);
+    }
+
     public static void createMemoryDirectories(Path projectRoot) {
         try {
+            Files.createDirectories(devharnessDirectory(projectRoot));
             Files.createDirectories(exportsDirectory(projectRoot));
+            Files.createDirectories(artifactsDirectory(projectRoot));
         } catch (IOException ex) {
             throw new IllegalStateException("Failed to create memory directories: " + ex.getMessage(), ex);
         }

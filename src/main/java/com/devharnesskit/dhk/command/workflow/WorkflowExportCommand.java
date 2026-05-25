@@ -55,6 +55,7 @@ public final class WorkflowExportCommand implements Command {
                 return ExitCodes.NOT_FOUND;
             }
             String markdown = exportService.render(connection, run, context.clock().now().toString());
+            markdown = sensitiveDataGuard.redact(markdown);
             if (WorkflowCommandSupport.rejectSensitive(context, sensitiveDataGuard,
                     "workflow export", markdown)) {
                 return ExitCodes.VALIDATION_ERROR;

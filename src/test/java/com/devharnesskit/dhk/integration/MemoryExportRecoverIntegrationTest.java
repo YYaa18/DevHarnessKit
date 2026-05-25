@@ -57,6 +57,46 @@ final class MemoryExportRecoverIntegrationTest {
     }
 
     @Test
+    void exportRedactsExistingPiiWhenPolicyChangesToRedact() throws Exception {
+        initProject();
+        Path root = tempDir.resolve("demo");
+        Files.write(PathUtil.sensitivePolicy(root), ("{\n"
+                + "  \"email\": \"allow\",\n"
+                + "  \"phone\": \"allow\",\n"
+                + "  \"identity_number\": \"allow\"\n"
+                + "}\n").getBytes("UTF-8"));
+        addMemory("Customer PII sample",
+                "Contact 13800138000, test@example.com, 11010519491231002X.",
+                "customer,pii", "global", "project_fact", "80");
+        confirm("1");
+        Files.write(PathUtil.sensitivePolicy(root), ("{\n"
+                + "  \"email\": \"redact\",\n"
+                + "  \"phone\": \"redact\",\n"
+                + "  \"identity_number\": \"redact\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness export = new Harness(tempDir);
+        int exportExit = new CommandRouter().run(new String[]{
+                "memory", "export",
+                "--project-root", "demo",
+                "--task", "PII review",
+                "--module", "global",
+                "--keywords", "pii"
+        }, export.context());
+
+        Path currentContext = PathUtil.currentContext(root);
+        String markdown = new String(Files.readAllBytes(currentContext), "UTF-8");
+
+        assertEquals(ExitCodes.SUCCESS, exportExit);
+        assertTrue(markdown.contains("[REDACTED_PHONE]"));
+        assertTrue(markdown.contains("[REDACTED_EMAIL]"));
+        assertTrue(markdown.contains("[REDACTED_IDENTITY_NUMBER]"));
+        assertFalse(markdown.contains("13800138000"));
+        assertFalse(markdown.contains("test@example.com"));
+        assertFalse(markdown.contains("11010519491231002X"));
+    }
+
+    @Test
     void exportPrioritizesModuleAndKeywordRelevantMemory() throws Exception {
         initProject();
         addMemory("General high confidence", "General project convention.", "general", "global",

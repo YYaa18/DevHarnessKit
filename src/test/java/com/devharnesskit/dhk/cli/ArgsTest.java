@@ -35,4 +35,13 @@ final class ArgsTest {
 
         assertEquals("20", args.option("limit"));
     }
+
+    @Test
+    void parsesEqualsOptions() {
+        Args args = Args.parse(new String[]{"memory", "export", "--project-root=/tmp/demo", "--task=Order query"});
+
+        assertEquals("/tmp/demo", args.option("project-root"));
+        assertEquals("Order query", args.option("task"));
+        assertFalse(args.hasFlag("project-root"));
+    }
 }

@@ -13,15 +13,17 @@ public final class MemoryCommand implements Command {
     private final ExportCommand exportCommand;
     private final CheckpointCommand checkpointCommand;
     private final RecoverCommand recoverCommand;
+    private final BackupCommand backupCommand;
 
     public MemoryCommand() {
         this(new InitCommand(), new AddCommand(), new ConfirmCommand(), new SearchCommand(),
-                new ExportCommand(), new CheckpointCommand(), new RecoverCommand());
+                new ExportCommand(), new CheckpointCommand(), new RecoverCommand(), new BackupCommand());
     }
 
     MemoryCommand(InitCommand initCommand, AddCommand addCommand, ConfirmCommand confirmCommand,
                   SearchCommand searchCommand, ExportCommand exportCommand,
-                  CheckpointCommand checkpointCommand, RecoverCommand recoverCommand) {
+                  CheckpointCommand checkpointCommand, RecoverCommand recoverCommand,
+                  BackupCommand backupCommand) {
         this.initCommand = initCommand;
         this.addCommand = addCommand;
         this.confirmCommand = confirmCommand;
@@ -29,6 +31,7 @@ public final class MemoryCommand implements Command {
         this.exportCommand = exportCommand;
         this.checkpointCommand = checkpointCommand;
         this.recoverCommand = recoverCommand;
+        this.backupCommand = backupCommand;
     }
 
     public int run(CommandContext context, Args args) {
@@ -53,6 +56,9 @@ public final class MemoryCommand implements Command {
         }
         if ("recover".equals(subCommand)) {
             return recoverCommand.run(context, args);
+        }
+        if ("backup".equals(subCommand)) {
+            return backupCommand.run(context, args);
         }
         context.err().println("Unknown memory command: " + subCommand);
         context.err().println("Run `dhk help` for usage.");

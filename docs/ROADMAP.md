@@ -1,0 +1,57 @@
+# Roadmap
+
+DevHarness Kit should stabilize by narrowing the open-source surface before adding major features.
+
+## 0.1.x
+
+Focus: Memory core readiness.
+
+- Stabilize `memory init/add/confirm/search/export/checkpoint/recover`.
+- Keep file/stdin inputs and `memory backup` compatible across patch releases.
+- Keep `doctor` dependable across platforms.
+- Keep sensitive-data checks fail-closed where persistence or export is involved.
+- Publish alpha releases with third-party notices, security notes, checksums, and release archives.
+
+## 0.2.x
+
+Focus: DB readonly as an optional beta module.
+
+- Move toward modern MySQL Connector/J support.
+- Make DB risk warnings and docs more visible.
+- Add `--sql-file` and `--sql-stdin`.
+- Consider separating memory-only and DB-enabled artifacts.
+
+## 0.3.x
+
+Focus: Workflow alpha hardening.
+
+- Stabilize workflow output shape.
+- Improve artifact and binding audit views.
+- Keep workflow clearly framed as state recording, not an execution engine.
+
+## 0.4.x
+
+Focus: goal-oriented orchestration.
+
+- Harden `dhk goal start/resume/next/step/status/export/check/evaluate/complete`.
+- Improve check policy configuration and evidence quality.
+- Keep `GOAL_SUMMARY.md` and completion checkpoint output stable enough for alpha users.
+- Migrate the default agent workflow from memory-first prompts to the goal-first protocol.
+- Add profile configuration after the built-in profiles stabilize.
+
+## 0.5.x
+
+Focus: Spec alpha hardening.
+
+- Stabilize spec export shape.
+- Improve task and acceptance reporting.
+- Add fixture-based migration tests for spec schema.
+
+## 1.0
+
+Focus: stable CLI and schema compatibility.
+
+- Document supported schema migration paths.
+- Provide release checksums and reproducible packaging instructions.
+- Define stable command/output contracts.
+- Split optional modules if dependency and licensing boundaries require it.

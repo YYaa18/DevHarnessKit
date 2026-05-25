@@ -1,3 +1,5 @@
+> Historical design note: this PRD records product thinking and may include planned or superseded details. The current open-source surface is documented in `README.md`, `docs/ARCHITECTURE.md`, `docs/MIGRATIONS.md`, and `SECURITY.md`.
+
 本版在原有 MVP-A / MVP-B 基础上补充三类设计：
 
 ```text

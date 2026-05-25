@@ -7,6 +7,11 @@ public final class GoalContextRenderer {
     private static final int MAX_CHARS = 16 * 1024;
 
     public String render(GoalRun goal, GoalPlan plan, String generatedAt) {
+        return render(goal, plan, new String[0], new String[0], generatedAt);
+    }
+
+    public String render(GoalRun goal, GoalPlan plan, String[] requiredChecks,
+                         String[] completionBlockers, String generatedAt) {
         StringBuilder builder = new StringBuilder();
         builder.append("# GOAL_CONTEXT\n\n");
         builder.append("<generated-at>").append(generatedAt).append("</generated-at>\n\n");
@@ -50,6 +55,10 @@ public final class GoalContextRenderer {
         }
         builder.append("</required-evidence>\n\n");
 
+        builder.append("<required-checks>\n");
+        appendList(builder, requiredChecks, "none");
+        builder.append("</required-checks>\n\n");
+
         builder.append("<context-files>\n");
         builder.append("- .agents/memory/exports/CURRENT_CONTEXT.md\n");
         builder.append("- .agents/memory/exports/WORKFLOW_CONTEXT.md\n");
@@ -57,6 +66,10 @@ public final class GoalContextRenderer {
             builder.append("- .agents/memory/exports/SPEC_CONTEXT.md\n");
         }
         builder.append("</context-files>\n\n");
+
+        builder.append("<completion-blockers>\n");
+        appendList(builder, completionBlockers, "none");
+        builder.append("</completion-blockers>\n\n");
 
         builder.append("<completion-condition>\n");
         builder.append("- goal evaluate must return ready_to_complete before final completion\n");
@@ -66,6 +79,16 @@ public final class GoalContextRenderer {
 
         builder.append("<next-command>\n").append(plan.nextCommand()).append("\n</next-command>\n");
         return limit(builder.toString());
+    }
+
+    private void appendList(StringBuilder builder, String[] values, String emptyValue) {
+        if (values == null || values.length == 0) {
+            builder.append("- ").append(emptyValue).append('\n');
+            return;
+        }
+        for (String value : values) {
+            builder.append("- ").append(value).append('\n');
+        }
     }
 
     private String limit(String text) {

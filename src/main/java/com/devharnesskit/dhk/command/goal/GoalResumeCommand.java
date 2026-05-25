@@ -4,6 +4,7 @@ import com.devharnesskit.dhk.cli.Args;
 import com.devharnesskit.dhk.cli.Command;
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
+import com.devharnesskit.dhk.model.goal.GoalEvaluation;
 import com.devharnesskit.dhk.model.goal.GoalPlan;
 import com.devharnesskit.dhk.model.goal.GoalRun;
 import com.devharnesskit.dhk.service.goal.GoalOrchestrator;
@@ -20,7 +21,8 @@ public final class GoalResumeCommand implements Command {
             orchestrator.export(context, projectRoot, goal.goalKey());
             GoalRun resumed = orchestrator.find(context, projectRoot, goal.goalKey());
             GoalPlan plan = orchestrator.plan(projectRoot, resumed);
-            GoalCommandSupport.printPlan(context, projectRoot, resumed, plan);
+            GoalEvaluation evaluation = orchestrator.evaluate(context, projectRoot, resumed.goalKey());
+            GoalCommandSupport.printPlan(context, projectRoot, resumed, plan, evaluation.missing());
             return ExitCodes.SUCCESS;
         } catch (Exception ex) {
             context.err().println("ERROR goal resume failed: " + ex.getMessage());

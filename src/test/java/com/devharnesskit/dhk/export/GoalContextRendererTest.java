@@ -18,13 +18,32 @@ final class GoalContextRendererTest {
                 new String[]{"do_not_claim_completion_before_goal_evaluate"},
                 "dhk goal step --goal goal-1 --summary \"done\" --evidence \"" + repeat("evidence ", 3000));
 
-        String markdown = new GoalContextRenderer().render(goal, plan, "now");
+        String markdown = new GoalContextRenderer().render(goal, plan,
+                new String[]{"compile", "test", "sensitive"},
+                new String[]{"check compile is pending"}, "now");
 
         assertTrue(markdown.length() <= 16 * 1024);
         assertTrue(markdown.contains("# GOAL_CONTEXT"));
+        assertSectionOrder(markdown, "# GOAL_CONTEXT", "<generated-at>", "<goal>",
+                "<current-action>", "<next-instruction>", "<allowed-actions>", "<forbidden-actions>",
+                "<required-evidence>", "<required-checks>", "<context-files>", "<completion-blockers>",
+                "<completion-condition>", "<next-command>");
+        assertTrue(markdown.contains("<required-checks>"));
+        assertTrue(markdown.contains("- compile"));
+        assertTrue(markdown.contains("<completion-blockers>"));
+        assertTrue(markdown.contains("- check compile is pending"));
         assertTrue(markdown.contains("<completion-condition>"));
         assertTrue(markdown.contains("<next-command>"));
         assertTrue(markdown.contains("<!-- truncated: goal context exceeded budget -->"));
+    }
+
+    private void assertSectionOrder(String text, String... markers) {
+        int previous = -1;
+        for (String marker : markers) {
+            int current = text.indexOf(marker);
+            assertTrue(current > previous, "Expected marker in order: " + marker);
+            previous = current;
+        }
     }
 
     private String repeat(String text, int count) {

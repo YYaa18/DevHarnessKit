@@ -14,6 +14,8 @@ import com.devharnesskit.dhk.model.spec.SpecChange;
 import com.devharnesskit.dhk.model.workflow.WorkflowRun;
 import com.devharnesskit.dhk.repository.CheckpointRepository;
 import com.devharnesskit.dhk.repository.MemoryRepository;
+import com.devharnesskit.dhk.repository.goal.GoalCheckRepository;
+import com.devharnesskit.dhk.repository.goal.GoalStepRepository;
 import com.devharnesskit.dhk.repository.spec.SpecAcceptanceRepository;
 import com.devharnesskit.dhk.repository.spec.SpecDocumentRepository;
 import com.devharnesskit.dhk.repository.spec.SpecTaskRepository;
@@ -41,6 +43,10 @@ public final class GoalContextService {
     private final GoalContextRenderer goalContextRenderer;
     private final GoalProfileService profileService;
     private final GoalPlanner planner;
+    private final GoalCheckPolicyService checkPolicyService;
+    private final GoalCompletionEvaluator completionEvaluator;
+    private final GoalCheckRepository goalCheckRepository;
+    private final GoalStepRepository goalStepRepository;
     private final SensitiveDataGuard sensitiveDataGuard;
 
     public GoalContextService() {
@@ -51,7 +57,8 @@ public final class GoalContextService {
                         new SpecAcceptanceRepository(), new WorkflowSpecBindingRepository(),
                         new SpecContextRenderer()),
                 new CurrentContextRenderer(), new GoalContextRenderer(), new GoalProfileService(),
-                new GoalPlanner(), new SensitiveDataGuard());
+                new GoalPlanner(), new GoalCheckPolicyService(), new GoalCompletionEvaluator(),
+                new GoalCheckRepository(), new GoalStepRepository(), new SensitiveDataGuard());
     }
 
     GoalContextService(ExportSelectionService exportSelectionService,
@@ -62,6 +69,10 @@ public final class GoalContextService {
                        GoalContextRenderer goalContextRenderer,
                        GoalProfileService profileService,
                        GoalPlanner planner,
+                       GoalCheckPolicyService checkPolicyService,
+                       GoalCompletionEvaluator completionEvaluator,
+                       GoalCheckRepository goalCheckRepository,
+                       GoalStepRepository goalStepRepository,
                        SensitiveDataGuard sensitiveDataGuard) {
         this.exportSelectionService = exportSelectionService;
         this.checkpointRepository = checkpointRepository;
@@ -71,6 +82,10 @@ public final class GoalContextService {
         this.goalContextRenderer = goalContextRenderer;
         this.profileService = profileService;
         this.planner = planner;
+        this.checkPolicyService = checkPolicyService;
+        this.completionEvaluator = completionEvaluator;
+        this.goalCheckRepository = goalCheckRepository;
+        this.goalStepRepository = goalStepRepository;
         this.sensitiveDataGuard = sensitiveDataGuard;
     }
 
@@ -100,7 +115,12 @@ public final class GoalContextService {
 
         GoalProfile profile = profileService.find(projectRoot, goal.profileKey());
         GoalPlan plan = planner.plan(goal, profile);
-        String goalContext = goalContextRenderer.render(goal, plan, generatedAt);
+        GoalCheckPolicy policy = checkPolicyService.load(projectRoot);
+        String[] completionBlockers = completionEvaluator.evaluate(goal,
+                goalCheckRepository.listByGoal(connection, goal.goalKey()), policy, profile,
+                goalStepRepository.listByGoal(connection, goal.goalKey())).missing();
+        String goalContext = goalContextRenderer.render(goal, plan, policy.requiredChecks(),
+                completionBlockers, generatedAt);
         return writePath(PathUtil.goalContext(projectRoot), goalContext);
     }
 

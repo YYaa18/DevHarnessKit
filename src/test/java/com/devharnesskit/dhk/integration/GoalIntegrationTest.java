@@ -59,12 +59,15 @@ final class GoalIntegrationTest {
         assertTrue(initialContext.contains("# GOAL_CONTEXT"));
         assertSectionOrder(initialContext, "# GOAL_CONTEXT", "<generated-at>", "<goal>",
                 "<current-action>", "<next-instruction>", "<allowed-actions>", "<forbidden-actions>",
-                "<required-evidence>", "<context-files>", "<completion-condition>", "<next-command>");
+                "<required-evidence>", "<required-checks>", "<context-files>", "<completion-blockers>",
+                "<completion-condition>", "<next-command>");
         assertTrue(initialContext.contains("inspect_existing_code"));
         assertTrue(initialContext.contains("- perform_current_action_only"));
         assertTrue(initialContext.contains("- do_not_archive_spec"));
         assertTrue(initialContext.contains("- do_not_claim_completion_before_goal_evaluate"));
         assertTrue(initialContext.contains("- existing_controller"));
+        assertTrue(initialContext.contains("- compile"));
+        assertTrue(initialContext.contains("- check compile is pending"));
         assertTrue(initialContext.contains("- .agents/memory/exports/SPEC_CONTEXT.md"));
         assertTrue(initialContext.contains("dhk goal step --goal " + goalKey));
         assertTrue(initialContext.length() <= 16 * 1024);
@@ -80,7 +83,13 @@ final class GoalIntegrationTest {
         }, next.context());
         assertEquals(ExitCodes.SUCCESS, nextExit);
         assertTrue(next.stdout().contains("current_action: inspect_existing_code"));
+        assertTrue(next.stdout().contains("allowed_actions:"));
+        assertTrue(next.stdout().contains("forbidden_actions:"));
         assertTrue(next.stdout().contains("required_evidence:"));
+        assertTrue(next.stdout().contains("required_checks:"));
+        assertTrue(next.stdout().contains("context_files:"));
+        assertTrue(next.stdout().contains("completion_blockers:"));
+        assertTrue(next.stdout().contains("check compile is pending"));
 
         Harness step = new Harness(tempDir);
         int stepExit = new CommandRouter().run(new String[]{

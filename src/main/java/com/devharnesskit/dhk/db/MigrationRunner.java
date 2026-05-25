@@ -97,6 +97,7 @@ public final class MigrationRunner {
                         + V1 + ", 'MVP memory schema', '" + clock.now().toString() + "')");
             }
         }
+        repairProjectColumns(connection);
         migrateV2(connection, clock);
         migrateV3(connection, clock);
         migrateV4(connection, clock);
@@ -157,6 +158,38 @@ public final class MigrationRunner {
                 }
             }
             return null;
+        }
+    }
+
+    private void repairProjectColumns(Connection connection) throws SQLException {
+        addColumnIfMissing(connection, "project", "root_path", "TEXT NOT NULL DEFAULT ''");
+        addColumnIfMissing(connection, "project", "project_type", "TEXT NOT NULL DEFAULT 'unknown'");
+        addColumnIfMissing(connection, "project", "language", "TEXT NOT NULL DEFAULT 'java'");
+        addColumnIfMissing(connection, "project", "framework", "TEXT NOT NULL DEFAULT 'unknown'");
+        addColumnIfMissing(connection, "project", "database_type", "TEXT NOT NULL DEFAULT 'unknown'");
+        addColumnIfMissing(connection, "project", "created_at", "TEXT NOT NULL DEFAULT ''");
+        addColumnIfMissing(connection, "project", "updated_at", "TEXT NOT NULL DEFAULT ''");
+    }
+
+    private void addColumnIfMissing(Connection connection, String tableName, String columnName,
+                                    String definition) throws SQLException {
+        if (columnExists(connection, tableName, columnName)) {
+            return;
+        }
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + definition);
+        }
+    }
+
+    private boolean columnExists(Connection connection, String tableName, String columnName) throws SQLException {
+        try (Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery("PRAGMA table_info(" + tableName + ")")) {
+            while (resultSet.next()) {
+                if (columnName.equals(resultSet.getString("name"))) {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 

@@ -30,6 +30,17 @@ When an existing non-empty database is below the current schema version, DevHarn
 
 The backup filename includes the old and new schema versions, for example `pre-migration-v1-to-v5`.
 
+Current fixture coverage includes:
+
+```text
+v1-project-minimal.sql   old project table without later metadata columns
+v4-before-goal.sql       pre-goal schema with existing spec state
+```
+
+These fixtures verify that old databases are backed up before upgrade, important rows are preserved, and the current v5 goal tables are created.
+
+For older v1 project tables, migration repairs missing project metadata columns such as `root_path`, `language`, `framework`, and `database_type` with conservative defaults.
+
 Before using DevHarness Kit on important project data:
 
 1. Commit or back up `.agents/memory/`.
@@ -42,9 +53,13 @@ Before using DevHarness Kit on important project data:
 If migration or initialization fails:
 
 1. Stop running further write commands.
-2. Copy `.agents/memory/memory.db` and `.agents/memory/project.json` to a safe location.
-3. Re-run with the latest patched CLI.
-4. If the database is still not usable, open an issue with the CLI version, schema version, command, and error output.
+2. Check whether `.agents/memory/backups/` contains a `pre-migration-*` zip.
+3. Copy `.agents/memory/memory.db`, `.agents/memory/project.json`, and any `pre-migration-*` zip to a safe location.
+4. Do not delete the original database until the backup zip has been inspected.
+5. Re-run with the latest patched CLI.
+6. If the database is still not usable, open an issue with the CLI version, schema version, command, and error output.
+
+If DevHarness Kit cannot create the pre-migration backup, migration fails before applying schema changes. This is intentional: an older database should not be upgraded without a recoverable copy.
 
 ## Built-In Backup
 

@@ -5,6 +5,14 @@ import com.devharnesskit.dhk.model.goal.GoalRun;
 
 public final class GoalContextRenderer {
     private static final int MAX_CHARS = 16 * 1024;
+    private static final String[] STRUCTURED_EVIDENCE_FIELDS = new String[]{
+            "--read-files",
+            "--changed-files",
+            "--tests-run",
+            "--compile-result",
+            "--risks",
+            "--pending"
+    };
 
     public String render(GoalRun goal, GoalPlan plan, String generatedAt) {
         return render(goal, plan, new String[0], new String[0], generatedAt);
@@ -54,6 +62,10 @@ public final class GoalContextRenderer {
             builder.append("- concise_summary\n");
         }
         builder.append("</required-evidence>\n\n");
+
+        builder.append("<structured-evidence-fields>\n");
+        appendList(builder, STRUCTURED_EVIDENCE_FIELDS, "none");
+        builder.append("</structured-evidence-fields>\n\n");
 
         builder.append("<required-checks>\n");
         appendList(builder, requiredChecks, "none");

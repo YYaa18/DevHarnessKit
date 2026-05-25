@@ -17,6 +17,14 @@ final class GoalCommandSupport {
             "record_goal_step_after_work",
             "run_goal_next_before_continuing"
     };
+    private static final String[] STRUCTURED_EVIDENCE_FIELDS = new String[]{
+            "--read-files",
+            "--changed-files",
+            "--tests-run",
+            "--compile-result",
+            "--risks",
+            "--pending"
+    };
 
     private GoalCommandSupport() {
     }
@@ -51,6 +59,10 @@ final class GoalCommandSupport {
         context.out().println("required_evidence:");
         for (String evidence : plan.requiredEvidence()) {
             context.out().println("  - " + evidence);
+        }
+        context.out().println("structured_evidence_fields:");
+        for (String field : STRUCTURED_EVIDENCE_FIELDS) {
+            context.out().println("  - " + field);
         }
         context.out().println("forbidden_actions:");
         for (String action : plan.forbiddenActions()) {

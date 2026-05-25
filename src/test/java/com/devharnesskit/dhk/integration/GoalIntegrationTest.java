@@ -59,13 +59,15 @@ final class GoalIntegrationTest {
         assertTrue(initialContext.contains("# GOAL_CONTEXT"));
         assertSectionOrder(initialContext, "# GOAL_CONTEXT", "<generated-at>", "<goal>",
                 "<current-action>", "<next-instruction>", "<allowed-actions>", "<forbidden-actions>",
-                "<required-evidence>", "<required-checks>", "<context-files>", "<completion-blockers>",
-                "<completion-condition>", "<next-command>");
+                "<required-evidence>", "<structured-evidence-fields>", "<required-checks>",
+                "<context-files>", "<completion-blockers>", "<completion-condition>", "<next-command>");
         assertTrue(initialContext.contains("inspect_existing_code"));
         assertTrue(initialContext.contains("- perform_current_action_only"));
         assertTrue(initialContext.contains("- do_not_archive_spec"));
         assertTrue(initialContext.contains("- do_not_claim_completion_before_goal_evaluate"));
         assertTrue(initialContext.contains("- existing_controller"));
+        assertTrue(initialContext.contains("- --read-files"));
+        assertTrue(initialContext.contains("- --compile-result"));
         assertTrue(initialContext.contains("- compile"));
         assertTrue(initialContext.contains("- check compile is pending"));
         assertTrue(initialContext.contains("- .agents/memory/exports/SPEC_CONTEXT.md"));
@@ -86,6 +88,8 @@ final class GoalIntegrationTest {
         assertTrue(next.stdout().contains("allowed_actions:"));
         assertTrue(next.stdout().contains("forbidden_actions:"));
         assertTrue(next.stdout().contains("required_evidence:"));
+        assertTrue(next.stdout().contains("structured_evidence_fields:"));
+        assertTrue(next.stdout().contains("--read-files"));
         assertTrue(next.stdout().contains("required_checks:"));
         assertTrue(next.stdout().contains("context_files:"));
         assertTrue(next.stdout().contains("completion_blockers:"));
@@ -248,6 +252,118 @@ final class GoalIntegrationTest {
         assertTrue(step.stderr().contains("existing_service"));
         assertTrue(step.stderr().contains("existing_mapper"));
         assertTrue(step.stderr().contains("existing_tests"));
+    }
+
+    @Test
+    void goalStepAcceptsStructuredEvidenceFieldsAndPersistsThem() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "java-api-change",
+                "--task", "Structured evidence",
+                "--module", "goal"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        Harness inspectStep = new Harness(tempDir);
+        int inspectStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Inspected files with structured evidence",
+                "--read-files", "GoalStepCommand.java,GoalOrchestrator.java,GoalIntegrationTest.java"
+        }, inspectStep.context());
+        assertEquals(ExitCodes.SUCCESS, inspectStepExit);
+        assertTrue(inspectStep.stdout().contains("current_action: create_change_plan"));
+
+        String evidence = singleString(root, "SELECT evidence FROM goal_step WHERE goal_key = '" + goalKey + "'");
+        assertTrue(evidence.contains("read_files=GoalStepCommand.java,GoalOrchestrator.java,GoalIntegrationTest.java"));
+
+        Harness planStep = new Harness(tempDir);
+        int planStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Planned with structured risks",
+                "--changed-files", "src/main/java/com/devharnesskit/dhk/command/goal/GoalStepCommand.java",
+                "--risks", "Evidence aliases must remain compatible",
+                "--evidence", "verification_plan=GoalIntegrationTest"
+        }, planStep.context());
+        assertEquals(ExitCodes.SUCCESS, planStepExit);
+        String planEvidence = singleString(root, "SELECT evidence FROM goal_step WHERE goal_key = '"
+                + goalKey + "' AND step_index = 2");
+        assertTrue(planEvidence.contains("changed_files=src/main/java/com/devharnesskit/dhk/command/goal/GoalStepCommand.java"));
+        assertTrue(planEvidence.contains("risks=Evidence aliases must remain compatible"));
+        assertTrue(planEvidence.contains("risk_points=Evidence aliases must remain compatible"));
+
+        Harness implementStep = new Harness(tempDir);
+        int implementStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Implemented structured evidence support",
+                "--changed-files", "src/main/java/com/devharnesskit/dhk/command/goal/GoalStepCommand.java"
+        }, implementStep.context());
+        assertEquals(ExitCodes.SUCCESS, implementStepExit);
+
+        Harness verifyStep = new Harness(tempDir);
+        int verifyStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Verified with structured fields",
+                "--compile-result", "passed",
+                "--tests-run", "GoalIntegrationTest",
+                "--pending", "none",
+                "--evidence", "sensitive_result=passed"
+        }, verifyStep.context());
+        assertEquals(ExitCodes.SUCCESS, verifyStepExit);
+        String verifyEvidence = singleString(root, "SELECT evidence FROM goal_step WHERE goal_key = '"
+                + goalKey + "' AND step_index = 4");
+        assertTrue(verifyEvidence.contains("compile_result=passed"));
+        assertTrue(verifyEvidence.contains("tests_run=GoalIntegrationTest"));
+        assertTrue(verifyEvidence.contains("test_result=GoalIntegrationTest"));
+        assertTrue(verifyEvidence.contains("pending=none"));
+    }
+
+    @Test
+    void goalStepStructuredEvidenceStillReportsMissingRequiredItems() throws Exception {
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "java-api-change",
+                "--task", "Structured evidence missing",
+                "--module", "goal"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        Harness inspectStep = new Harness(tempDir);
+        int inspectStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Inspected files",
+                "--read-files", "GoalStepCommand.java"
+        }, inspectStep.context());
+        assertEquals(ExitCodes.SUCCESS, inspectStepExit);
+
+        Harness planStep = new Harness(tempDir);
+        int planStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Planned with only structured risks",
+                "--changed-files", "GoalStepCommand.java",
+                "--risks", "Missing verification plan"
+        }, planStep.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, planStepExit);
+        assertTrue(planStep.stderr().contains("Goal step evidence missing required items"));
+        assertTrue(planStep.stderr().contains("verification_plan"));
     }
 
     @Test

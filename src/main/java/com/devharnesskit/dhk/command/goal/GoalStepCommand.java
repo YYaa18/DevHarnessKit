@@ -20,10 +20,12 @@ public final class GoalStepCommand implements Command {
         }
         String changedFiles = args.option("changed-files", "").trim();
         String evidence = args.option("evidence", "").trim();
+        String structuredEvidence = structuredEvidence(args, changedFiles);
+        String combinedEvidence = combineEvidence(evidence, structuredEvidence);
         Path projectRoot = GoalCommandSupport.projectRoot(args, context);
         try {
             GoalOrchestrator.GoalStepResult result = orchestrator.step(context, projectRoot, goalKey,
-                    summary, changedFiles, evidence);
+                    summary, changedFiles, combinedEvidence);
             context.out().println("step_id: " + result.stepId());
             context.out().println("goal_key: " + result.goal().goalKey());
             context.out().println("status: " + result.goal().status());
@@ -38,5 +40,43 @@ public final class GoalStepCommand implements Command {
             context.err().println("ERROR goal step failed: " + ex.getMessage());
             return ExitCodes.RUNTIME_ERROR;
         }
+    }
+
+    private String structuredEvidence(Args args, String changedFiles) {
+        StringBuilder builder = new StringBuilder();
+        appendField(builder, "read_files", args.option("read-files", ""));
+        if (changedFiles.length() > 0) {
+            appendField(builder, "changed_files", changedFiles);
+        }
+        String testsRun = args.option("tests-run", "");
+        appendField(builder, "tests_run", testsRun);
+        appendField(builder, "test_result", testsRun);
+        appendField(builder, "compile_result", args.option("compile-result", ""));
+        String risks = args.option("risks", "");
+        appendField(builder, "risks", risks);
+        appendField(builder, "risk_points", risks);
+        appendField(builder, "pending", args.option("pending", ""));
+        return builder.toString();
+    }
+
+    private void appendField(StringBuilder builder, String key, String value) {
+        String text = value == null ? "" : value.trim();
+        if (text.length() == 0) {
+            return;
+        }
+        if (builder.length() > 0) {
+            builder.append('\n');
+        }
+        builder.append(key).append('=').append(text);
+    }
+
+    private String combineEvidence(String evidence, String structuredEvidence) {
+        if (evidence.length() == 0) {
+            return structuredEvidence;
+        }
+        if (structuredEvidence.length() == 0) {
+            return evidence;
+        }
+        return evidence + "\n" + structuredEvidence;
     }
 }

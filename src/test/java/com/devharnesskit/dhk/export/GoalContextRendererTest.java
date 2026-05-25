@@ -26,8 +26,11 @@ final class GoalContextRendererTest {
         assertTrue(markdown.contains("# GOAL_CONTEXT"));
         assertSectionOrder(markdown, "# GOAL_CONTEXT", "<generated-at>", "<goal>",
                 "<current-action>", "<next-instruction>", "<allowed-actions>", "<forbidden-actions>",
-                "<required-evidence>", "<required-checks>", "<context-files>", "<completion-blockers>",
-                "<completion-condition>", "<next-command>");
+                "<required-evidence>", "<structured-evidence-fields>", "<required-checks>",
+                "<context-files>", "<completion-blockers>", "<completion-condition>", "<next-command>");
+        assertTrue(markdown.contains("<structured-evidence-fields>"));
+        assertTrue(markdown.contains("- --read-files"));
+        assertTrue(markdown.contains("- --compile-result"));
         assertTrue(markdown.contains("<required-checks>"));
         assertTrue(markdown.contains("- compile"));
         assertTrue(markdown.contains("<completion-blockers>"));

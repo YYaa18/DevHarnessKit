@@ -447,7 +447,22 @@ public final class GoalOrchestrator {
 
     private boolean containsEvidenceKey(String lowerEvidence, String key) {
         String normalized = key.toLowerCase(java.util.Locale.ROOT).replace('-', '_').replace(' ', '_');
-        return lowerEvidence.contains(normalized);
+        if (lowerEvidence.contains(normalized)) {
+            return true;
+        }
+        if (normalized.startsWith("existing_")) {
+            return lowerEvidence.contains("read_files=");
+        }
+        if ("impacted_files".equals(normalized)) {
+            return lowerEvidence.contains("changed_files=") || lowerEvidence.contains("read_files=");
+        }
+        if ("risk_points".equals(normalized)) {
+            return lowerEvidence.contains("risks=");
+        }
+        if ("test_result".equals(normalized)) {
+            return lowerEvidence.contains("tests_run=");
+        }
+        return false;
     }
 
     private GoalProfile requireProfile(String profileKey) {

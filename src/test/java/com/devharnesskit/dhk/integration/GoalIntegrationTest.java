@@ -100,7 +100,42 @@ final class GoalIntegrationTest {
         }, evaluateBeforeChecks.context());
         assertEquals(ExitCodes.SUCCESS, evaluateBeforeChecksExit);
         assertTrue(evaluateBeforeChecks.stdout().contains("decision: not_ready"));
+        assertTrue(evaluateBeforeChecks.stdout().contains("goal steps incomplete: expected 4 actions, recorded 1"));
         assertTrue(evaluateBeforeChecks.stdout().contains("check compile is pending"));
+
+        Harness planStep = new Harness(tempDir);
+        int planStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Planned impacted files, risks, and verification",
+                "--evidence", "impacted_files=GoalIntegrationTest; risk_points=evidence model; verification_plan=goal tests"
+        }, planStep.context());
+        assertEquals(ExitCodes.SUCCESS, planStepExit);
+        assertTrue(planStep.stdout().contains("current_action: implement_minimal_change"));
+
+        Harness implementStep = new Harness(tempDir);
+        int implementStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Implemented minimal goal evidence changes",
+                "--changed-files", "src/main/java/com/devharnesskit/dhk/service/goal/GoalCompletionEvaluator.java",
+                "--evidence", "implementation_summary=evaluator requires action evidence"
+        }, implementStep.context());
+        assertEquals(ExitCodes.SUCCESS, implementStepExit);
+        assertTrue(implementStep.stdout().contains("current_action: verify"));
+
+        Harness verifyStep = new Harness(tempDir);
+        int verifyStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Recorded verification evidence",
+                "--evidence", "compile_result=skipped; test_result=goal integration; sensitive_result=ok"
+        }, verifyStep.context());
+        assertEquals(ExitCodes.SUCCESS, verifyStepExit);
+        assertTrue(verifyStep.stdout().contains("current_action: verify"));
 
         Harness check = new Harness(tempDir);
         int checkExit = new CommandRouter().run(new String[]{
@@ -132,6 +167,35 @@ final class GoalIntegrationTest {
         assertTrue(summary.contains("# GOAL_SUMMARY"));
         assertTrue(summary.contains("checkpoint_id: 1"));
         assertCompletedRows(root, goalKey);
+    }
+
+    @Test
+    void goalStepRequiresEvidenceForCurrentAction() throws Exception {
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "java-api-change",
+                "--task", "Evidence hardening",
+                "--module", "goal"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        Harness step = new Harness(tempDir);
+        int stepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Inspected something",
+                "--evidence", "existing_controller"
+        }, step.context());
+
+        assertEquals(ExitCodes.VALIDATION_ERROR, stepExit);
+        assertTrue(step.stderr().contains("Goal step evidence missing required items"));
+        assertTrue(step.stderr().contains("existing_service"));
+        assertTrue(step.stderr().contains("existing_mapper"));
+        assertTrue(step.stderr().contains("existing_tests"));
     }
 
     @Test
@@ -169,6 +233,9 @@ final class GoalIntegrationTest {
         assertEquals(ExitCodes.VALIDATION_ERROR, completeNotReadyExit);
         assertTrue(completeNotReadyJson.stdout().contains("\"command\": \"goal complete\""));
         assertTrue(completeNotReadyJson.stdout().contains("\"status\": \"not_ready\""));
+        assertTrue(completeNotReadyJson.stdout().contains("\"ready_to_complete\": false"));
+        assertTrue(completeNotReadyJson.stdout().contains("\"missing_count\": 2"));
+        assertTrue(completeNotReadyJson.stdout().contains("goal steps incomplete: expected 2 actions, recorded 0"));
         assertTrue(completeNotReadyJson.stdout().contains("check sensitive is pending"));
 
         Harness statusJson = new Harness(tempDir);
@@ -187,12 +254,43 @@ final class GoalIntegrationTest {
         assertTrue(checkJson.stdout().contains("\"count\": 1"));
         assertTrue(checkJson.stdout().contains("\"check_key\": \"sensitive\""));
 
+        Harness evaluateBeforeStepsJson = new Harness(tempDir);
+        int evaluateBeforeStepsExit = new CommandRouter().run(new String[]{
+                "goal", "evaluate", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, evaluateBeforeStepsJson.context());
+        assertEquals(ExitCodes.SUCCESS, evaluateBeforeStepsExit);
+        assertTrue(evaluateBeforeStepsJson.stdout().contains("\"decision\": \"not_ready\""));
+        assertTrue(evaluateBeforeStepsJson.stdout().contains("\"missing_count\": 1"));
+
+        Harness customStep = new Harness(tempDir);
+        int customStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Custom inspection complete",
+                "--evidence", "evidence=custom inspection"
+        }, customStep.context());
+        assertEquals(ExitCodes.SUCCESS, customStepExit);
+        assertTrue(customStep.stdout().contains("current_action: verify"));
+
+        Harness customVerify = new Harness(tempDir);
+        int customVerifyExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Custom verification complete",
+                "--evidence", "compile_result=skipped; test_result=custom goal check; sensitive_result=ok"
+        }, customVerify.context());
+        assertEquals(ExitCodes.SUCCESS, customVerifyExit);
+
         Harness evaluateJson = new Harness(tempDir);
         int evaluateExit = new CommandRouter().run(new String[]{
                 "goal", "evaluate", "--project-root", "demo", "--goal", goalKey, "--json"
         }, evaluateJson.context());
         assertEquals(ExitCodes.SUCCESS, evaluateExit);
         assertTrue(evaluateJson.stdout().contains("\"decision\": \"ready_to_complete\""));
+        assertTrue(evaluateJson.stdout().contains("\"ready_to_complete\": true"));
+        assertTrue(evaluateJson.stdout().contains("\"missing_count\": 0"));
 
         Harness completeJson = new Harness(tempDir);
         int completeExit = new CommandRouter().run(new String[]{
@@ -262,6 +360,10 @@ final class GoalIntegrationTest {
 
         private String stdout() {
             return out.toString();
+        }
+
+        private String stderr() {
+            return err.toString();
         }
     }
 

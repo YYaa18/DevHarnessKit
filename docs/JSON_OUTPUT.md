@@ -174,6 +174,8 @@ evidence_path
 ```text
 command
 decision
+ready_to_complete
+missing_count
 missing
 next_action
 next_command
@@ -195,6 +197,8 @@ summary_path
 command
 status
 decision
+ready_to_complete
+missing_count
 missing
 next_action
 next_command

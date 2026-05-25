@@ -173,6 +173,8 @@ public final class GoalOrchestrator {
                 throw new IllegalStateException("Goal not found: " + goalKey);
             }
             GoalProfile profile = requireProfile(projectRoot, goal.profileKey());
+            GoalPlan plan = planner.plan(goal, profile);
+            validateStepEvidence(plan, summary, changedFiles, evidence);
             String now = context.clock().now().toString();
             int nextIndex = goal.stepCount() + 1;
             String action = goal.currentAction();
@@ -307,7 +309,8 @@ public final class GoalOrchestrator {
 
     private GoalEvaluation evaluate(Connection connection, Path projectRoot, GoalRun goal) throws Exception {
         return completionEvaluator.evaluate(goal, goalCheckRepository.listByGoal(connection, goal.goalKey()),
-                checkPolicyService.load(projectRoot));
+                checkPolicyService.load(projectRoot), requireProfile(projectRoot, goal.profileKey()),
+                goalStepRepository.listByGoal(connection, goal.goalKey()));
     }
 
     private List<GoalCheck> single(GoalCheck check) {
@@ -328,6 +331,54 @@ public final class GoalOrchestrator {
             builder.append(step.changedFiles());
         }
         return builder.length() == 0 ? "none" : builder.toString();
+    }
+
+    private void validateStepEvidence(GoalPlan plan, String summary, String changedFiles, String evidence) {
+        List<String> missing = new ArrayList<String>();
+        String evidenceText = evidence == null ? "" : evidence.trim();
+        String lowerEvidence = evidenceText.toLowerCase(java.util.Locale.ROOT);
+        String lowerChangedFiles = changedFiles == null ? "" : changedFiles.trim().toLowerCase(java.util.Locale.ROOT);
+        for (String required : plan.requiredEvidence()) {
+            String key = required == null ? "" : required.trim();
+            if (key.length() == 0) {
+                continue;
+            }
+            if ("summary".equals(key)) {
+                if (summary == null || summary.trim().length() == 0) {
+                    missing.add(key);
+                }
+                continue;
+            }
+            if ("evidence".equals(key)) {
+                if (evidenceText.length() == 0) {
+                    missing.add(key);
+                }
+                continue;
+            }
+            if ("changed_files".equals(key)) {
+                if (lowerChangedFiles.length() == 0 && !containsEvidenceKey(lowerEvidence, key)) {
+                    missing.add(key);
+                }
+                continue;
+            }
+            if ("implementation_summary".equals(key)) {
+                if ((summary == null || summary.trim().length() == 0) && !containsEvidenceKey(lowerEvidence, key)) {
+                    missing.add(key);
+                }
+                continue;
+            }
+            if (!containsEvidenceKey(lowerEvidence, key)) {
+                missing.add(key);
+            }
+        }
+        if (!missing.isEmpty()) {
+            throw new IllegalArgumentException("Goal step evidence missing required items: " + missing);
+        }
+    }
+
+    private boolean containsEvidenceKey(String lowerEvidence, String key) {
+        String normalized = key.toLowerCase(java.util.Locale.ROOT).replace('-', '_').replace(' ', '_');
+        return lowerEvidence.contains(normalized);
     }
 
     private GoalProfile requireProfile(String profileKey) {

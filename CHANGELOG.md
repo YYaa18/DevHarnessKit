@@ -9,6 +9,7 @@ Initial developer-preview release.
 - Workflow alpha: templates, runs, phases, gates, artifacts, bindings, summary, and export.
 - Spec alpha: changes, documents, tasks, acceptance criteria, status, archive, workflow binding, and export.
 - Goal orchestration alpha MVP: `goal start`, `goal resume`, `goal next`, `goal step`, `goal status`, `goal export`, `goal check`, `goal evaluate`, `goal complete`, schema v5, `GOAL_CONTEXT.md`, and `GOAL_SUMMARY.md`.
+- Goal evidence hardening: `goal step` validates required evidence for the current action and `goal evaluate` refuses completion until configured actions are recorded.
 - Sensitive-data guard for persisted and exported content paths.
 - `dhk version`.
 - File/stdin input for memory content, checkpoint summaries, SQL, and spec documents.

@@ -39,6 +39,8 @@ public final class GoalCompleteCommand implements Command {
                         JsonOutput.stringField("command", "goal complete"),
                         JsonOutput.stringField("status", "not_ready"),
                         JsonOutput.stringField("decision", ex.evaluation().decision()),
+                        JsonOutput.booleanField("ready_to_complete", ex.evaluation().readyToComplete()),
+                        JsonOutput.numberField("missing_count", ex.evaluation().missing().length),
                         JsonOutput.rawField("missing", JsonOutput.stringArray(ex.evaluation().missing())),
                         JsonOutput.stringField("next_action", ex.evaluation().nextAction()),
                         JsonOutput.stringField("next_command", ex.evaluation().nextCommand())

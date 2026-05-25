@@ -27,6 +27,8 @@ Notes:
 - `actions` is a comma-separated list.
 - `workflow_key` must match a seeded workflow template.
 - If the profile file is invalid, the built-in profile with the same key is used when available.
+- A goal is not ready to complete until every configured action has a recorded `goal step`.
+- `goal step` validates the current action's required evidence. Built-in action evidence keys should appear in `--evidence`, while `changed_files` may be satisfied by `--changed-files`.
 
 ## Check Policy
 

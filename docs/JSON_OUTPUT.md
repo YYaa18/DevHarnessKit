@@ -19,6 +19,7 @@ dhk db sql --sql "SELECT 1" --format json --jdbc-url <url> --user <user> --passw
 dhk goal status --goal <goal-key> --json
 dhk goal check --goal <goal-key> --all --json
 dhk goal evaluate --goal <goal-key> --json
+dhk goal verify --goal <goal-key> --json
 dhk goal complete --goal <goal-key> --json
 ```
 
@@ -185,6 +186,27 @@ stale_checks
 next_action
 next_command
 ```
+
+`goal verify`:
+
+```text
+command
+goal_key
+decision
+ready_to_complete
+check_count
+checks
+failed_count
+failed_checks
+missing_count
+missing
+stale_count
+stale_checks
+next_action
+next_command
+```
+
+`goal verify` runs required checks before evaluating readiness. `failed_checks` lists checks with `failed` status; skipped-disallowed checks are reported through `missing`.
 
 `goal complete` success:
 

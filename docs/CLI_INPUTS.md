@@ -102,6 +102,7 @@ dhk db sql --sql "SELECT 1" --format json --jdbc-url <url> --user <user> --passw
 dhk goal status --goal <goal-key> --json
 dhk goal check --goal <goal-key> --all --json
 dhk goal evaluate --goal <goal-key> --json
+dhk goal verify --goal <goal-key> --json
 dhk goal complete --goal <goal-key> --json
 ```
 

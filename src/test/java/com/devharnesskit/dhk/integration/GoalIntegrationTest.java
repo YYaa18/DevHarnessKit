@@ -173,6 +173,19 @@ final class GoalIntegrationTest {
         assertTrue(evaluateReady.stdout().contains("decision: ready_to_complete"));
         assertTrue(evaluateReady.stdout().contains("next_command: dhk goal complete --goal " + goalKey));
 
+        Harness verifyReady = new Harness(tempDir);
+        int verifyReadyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "demo", "--goal", goalKey
+        }, verifyReady.context());
+        assertEquals(ExitCodes.SUCCESS, verifyReadyExit);
+        assertTrue(verifyReady.stdout().contains("goal_key: " + goalKey));
+        assertTrue(verifyReady.stdout().contains("decision: ready_to_complete"));
+        assertTrue(verifyReady.stdout().contains("ready_to_complete: true"));
+        assertTrue(verifyReady.stdout().contains("checks:"));
+        assertTrue(verifyReady.stdout().contains("compile: passed"));
+        assertTrue(verifyReady.stdout().contains("failed_checks:"));
+        assertTrue(verifyReady.stdout().contains("next_command: dhk goal complete --goal " + goalKey));
+
         Harness complete = new Harness(tempDir);
         int completeExit = new CommandRouter().run(new String[]{
                 "goal", "complete", "--project-root", "demo", "--goal", goalKey
@@ -429,6 +442,17 @@ final class GoalIntegrationTest {
         assertTrue(evaluate.stdout().contains("decision: not_ready"));
         assertTrue(evaluate.stdout().contains("check sensitive is failed"));
 
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, verify.context());
+        assertEquals(ExitCodes.SUCCESS, verifyExit);
+        assertTrue(verify.stdout().contains("\"command\": \"goal verify\""));
+        assertTrue(verify.stdout().contains("\"decision\": \"not_ready\""));
+        assertTrue(verify.stdout().contains("\"failed_count\": 1"));
+        assertTrue(verify.stdout().contains("\"sensitive: sensitive scan failed"));
+        assertFalse(verify.stdout().contains(rawSecret));
+
         Harness complete = new Harness(tempDir);
         int completeExit = new CommandRouter().run(new String[]{
                 "goal", "complete", "--project-root", "demo", "--goal", goalKey
@@ -472,6 +496,18 @@ final class GoalIntegrationTest {
         assertTrue(evaluate.stdout().contains("\"decision\": \"not_ready\""));
         assertTrue(evaluate.stdout().contains("check compile is skipped; accepted_statuses=passed"));
         assertTrue(evaluate.stdout().contains("check test is skipped; accepted_statuses=passed"));
+
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, verify.context());
+        assertEquals(ExitCodes.SUCCESS, verifyExit);
+        assertTrue(verify.stdout().contains("\"command\": \"goal verify\""));
+        assertTrue(verify.stdout().contains("\"decision\": \"not_ready\""));
+        assertTrue(verify.stdout().contains("\"ready_to_complete\": false"));
+        assertTrue(verify.stdout().contains("\"missing_count\": 2"));
+        assertTrue(verify.stdout().contains("check compile is skipped; accepted_statuses=passed"));
+        assertTrue(verify.stdout().contains("check test is skipped; accepted_statuses=passed"));
 
         Harness complete = new Harness(tempDir);
         int completeExit = new CommandRouter().run(new String[]{
@@ -780,6 +816,16 @@ final class GoalIntegrationTest {
         assertEquals(ExitCodes.VALIDATION_ERROR, staleCompleteExit);
         assertTrue(staleComplete.stdout().contains("\"status\": \"not_ready\""));
         assertTrue(staleComplete.stdout().contains("\"stale_count\": 1"));
+
+        Harness verifyFresh = new Harness(tempDir);
+        int verifyFreshExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, verifyFresh.context());
+        assertEquals(ExitCodes.SUCCESS, verifyFreshExit);
+        assertTrue(verifyFresh.stdout().contains("\"command\": \"goal verify\""));
+        assertTrue(verifyFresh.stdout().contains("\"decision\": \"ready_to_complete\""));
+        assertTrue(verifyFresh.stdout().contains("\"check_count\": 1"));
+        assertTrue(verifyFresh.stdout().contains("\"stale_count\": 0"));
 
         Harness freshCheck = new Harness(tempDir);
         int freshCheckExit = new CommandRouter().run(new String[]{

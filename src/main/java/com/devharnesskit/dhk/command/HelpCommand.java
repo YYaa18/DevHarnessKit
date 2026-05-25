@@ -30,6 +30,7 @@ public final class HelpCommand implements Command {
         context.out().println("  dhk goal step --goal <goal-key> --summary <summary> [--changed-files <files>] [--evidence <evidence>]");
         context.out().println("  dhk goal check [--goal <goal-key>] --check <check-key>|--all");
         context.out().println("  dhk goal evaluate [--goal <goal-key>]");
+        context.out().println("  dhk goal verify [--goal <goal-key>]");
         context.out().println("  dhk goal complete [--goal <goal-key>]");
         context.out().println("  dhk goal status [--goal <goal-key>]");
         context.out().println("  dhk goal export [--goal <goal-key>]");

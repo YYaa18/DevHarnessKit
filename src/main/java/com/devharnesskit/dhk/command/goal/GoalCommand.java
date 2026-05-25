@@ -34,6 +34,9 @@ public final class GoalCommand implements Command {
         commands.put("evaluate", new Supplier<Command>() {
             public Command get() { return new GoalEvaluateCommand(); }
         });
+        commands.put("verify", new Supplier<Command>() {
+            public Command get() { return new GoalVerifyCommand(); }
+        });
         commands.put("complete", new Supplier<Command>() {
             public Command get() { return new GoalCompleteCommand(); }
         });

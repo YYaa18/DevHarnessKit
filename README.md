@@ -156,7 +156,7 @@ java -jar target/dhk-cli-0.1.0-alpha-all.jar memory export \
   --keywords "gateway,mybatis,mysql"
 ```
 
-Use `--json` for machine-readable output on supported commands such as `doctor`, `memory search`, `memory export`, `db test`, `db sql --dry-run`, `goal status`, `goal check`, `goal evaluate`, and `goal complete`. Use `dhk db sql --format json` for JSON query results.
+Use `--json` for machine-readable output on supported commands such as `doctor`, `memory search`, `memory export`, `db test`, `db sql --dry-run`, `goal status`, `goal check`, `goal evaluate`, `goal verify`, and `goal complete`. Use `dhk db sql --format json` for JSON query results.
 
 Seed workflow templates and start a run:
 
@@ -215,13 +215,14 @@ java -jar target/dhk-cli-0.1.0-alpha-all.jar goal step --project-root . --goal <
 java -jar target/dhk-cli-0.1.0-alpha-all.jar goal status --project-root . --goal <goal-key>
 ```
 
-Before claiming completion, run goal checks, evaluate readiness, and complete the goal:
+Before claiming completion, run goal verification and complete the goal:
 
 ```bash
-java -jar target/dhk-cli-0.1.0-alpha-all.jar goal check --project-root . --goal <goal-key> --all
-java -jar target/dhk-cli-0.1.0-alpha-all.jar goal evaluate --project-root . --goal <goal-key>
+java -jar target/dhk-cli-0.1.0-alpha-all.jar goal verify --project-root . --goal <goal-key>
 java -jar target/dhk-cli-0.1.0-alpha-all.jar goal complete --project-root . --goal <goal-key>
 ```
+
+`goal verify` runs the required checks and evaluates readiness in one command. `goal check` and `goal evaluate` remain available for lower-level debugging.
 
 `goal complete` writes `.agents/memory/exports/GOAL_SUMMARY.md`, records completion artifacts, and creates a checkpoint.
 

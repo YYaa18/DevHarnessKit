@@ -21,6 +21,7 @@ final class CommandRouterTest {
         assertEquals(ExitCodes.SUCCESS, exitCode);
         assertTrue(harness.stdout().contains("DevHarness Kit CLI"));
         assertTrue(harness.stdout().contains("dhk memory init"));
+        assertTrue(harness.stdout().contains("dhk goal verify"));
     }
 
     @Test

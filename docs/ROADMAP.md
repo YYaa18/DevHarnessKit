@@ -22,6 +22,7 @@ Focus: DB readonly as an optional beta module.
 - Make DB risk warnings and docs more visible.
 - Add `--sql-file` and `--sql-stdin`.
 - Add machine-readable DB probe and dry-run output.
+- Plan deterministic SQL safety fuzz/property tests before DB readonly can move beyond beta.
 - Revisit the module split decision in [decisions/0001-module-split-and-installer-strategy.md](decisions/0001-module-split-and-installer-strategy.md) after DB readonly contracts settle.
 - If install ergonomics becomes necessary, prefer a simple archive-based install script before Homebrew, Scoop, SDKMAN, or other package-manager channels.
 
@@ -60,5 +61,5 @@ Focus: stable CLI and schema compatibility.
 - Provide release checksums and reproducible packaging instructions.
 - Promote the `0.1.x` compatibility contract into a stricter stable command/output/schema contract.
 - Define post-1.0 semantic versioning and deprecation windows before claiming stability.
-- Add coverage thresholds after the JaCoCo report baseline is reviewed.
+- Revisit coverage threshold enforcement using [decisions/0002-coverage-threshold-and-sql-safety-fuzz.md](decisions/0002-coverage-threshold-and-sql-safety-fuzz.md) after the CLI surface and DB safety tests stabilize.
 - Split optional modules only if dependency licensing, redistribution, package size, or user demand justifies the extra artifact surface.

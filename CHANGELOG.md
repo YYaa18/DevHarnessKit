@@ -17,6 +17,7 @@ Initial developer-preview release.
 - Migration fixture coverage for v2 workflow state and richer v4 spec state, plus archive-state tests for blocked/failed versus skipped/waived spec closure.
 - Compatibility contract docs for stable-ish alpha, beta, and alpha CLI/schema/JSON/export surfaces, including downgrade and deprecation policy.
 - Module split and installer strategy decision record: keep one shaded alpha jar plus release archives in `0.1.x`, revisit memory-only/DB artifacts before promoting DB readonly or installers.
+- Coverage threshold decision and SQL safety fuzz backlog: keep JaCoCo report-only in `0.1.x`, record the current baseline, and require targeted SQL guard fuzz/property tests before stable DB readonly claims.
 - Sensitive-data guard for persisted and exported content paths.
 - `dhk version`.
 - File/stdin input for memory content, checkpoint summaries, SQL, and spec documents.

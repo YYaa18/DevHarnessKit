@@ -33,6 +33,8 @@ DevHarness Kit includes a best-effort sensitive-data guard. It rejects obvious v
 
 Projects can configure `.agents/devharness/sensitive-policy.json` to set pattern actions to `reject`, `redact`, or `allow`. For financial systems, prefer `redact` for common business PII such as email, phone, and identity number, while keeping credentials and secrets at the default `reject` action.
 
+Context exports use a reject-oriented posture when sensitive findings remain. Goal completion summaries are generated in redaction mode first and then rejected if sensitive patterns still remain after redaction. This keeps completion records usable while still avoiding raw secret output.
+
 The guard is heuristic. Users are responsible for reviewing exported context. Do not rely on it as a complete DLP system.
 
 See [docs/SENSITIVE_POLICY.md](docs/SENSITIVE_POLICY.md) for the policy format.

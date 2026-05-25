@@ -75,6 +75,8 @@ public final class GoalProfileService {
                     parseBoolean(value(raw, "completion_require_fresh_checks", "true")),
                     parseBoolean(value(raw, "completion_allow_skipped_checks", "true")),
                     parseBoolean(value(raw, "completion_require_checkpoint", "true")),
+                    parseBoolean(value(raw, "spec_require_non_empty_tasks", Boolean.toString(specRequired))),
+                    parseBoolean(value(raw, "spec_require_non_empty_acceptance", Boolean.toString(specRequired))),
                     actionMappings(raw, actions));
         } catch (Exception ex) {
             return null;
@@ -95,18 +97,26 @@ public final class GoalProfileService {
                 new String[]{"compile_result", "test_result", "sensitive_result"});
 
         Map<String, GoalActionMapping> mappings = new LinkedHashMap<String, GoalActionMapping>();
+        String[] inspectGates = "mvc-change".equals(workflowKey)
+                ? new String[]{"mvc_confirmed"} : new String[0];
+        String verifyPhase = "mvc-change".equals(workflowKey) ? "verify_view_flow" : "verify_tests";
+        String[] verifyGates = "mvc-change".equals(workflowKey)
+                ? new String[]{"view_name_checked", "model_fields_checked", "form_validation_checked"}
+                : new String[0];
+
         mappings.put("inspect_existing_code", new GoalActionMapping("inspect_existing_code",
-                "inspect_existing_code", new String[0], "", "manual"));
+                "inspect_existing_code", inspectGates, "inspect_existing_code", ""));
         mappings.put("create_change_plan", new GoalActionMapping("create_change_plan",
                 "create_change_plan", new String[]{"impacted_files_listed", "verification_plan_ready"},
-                "", "manual"));
+                "create_change_plan", ""));
         mappings.put("implement_minimal_change", new GoalActionMapping("implement_minimal_change",
-                "implement_minimal_change", new String[0], "", "manual"));
+                "implement_minimal_change", new String[0], "implement_minimal_change", ""));
         mappings.put("verify", new GoalActionMapping("verify",
-                "verify_tests", new String[]{"tests_recorded"}, "", "manual"));
+                verifyPhase, verifyGates, "verify", "auto_pass"));
 
         return new GoalProfile(profileKey, workflowKey, true, defaultMode, actions, evidence,
-                GoalCheckPolicy.DEFAULT_REQUIRED_CHECKS, true, false, true, mappings);
+                new String[]{"compile", "test", "sensitive", "workflow", "spec"},
+                true, false, true, true, true, mappings);
     }
 
     private Map<String, String[]> requiredEvidence(Map<String, String> raw) {

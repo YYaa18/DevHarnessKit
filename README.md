@@ -14,7 +14,7 @@ This repository is `0.1.0-alpha` and should be treated as a developer preview.
 | Doctor | Stable-ish alpha | Validates project memory storage and export paths. |
 | Sensitive guard | Alpha | Best-effort heuristic guard with project-level reject/redact/allow policy. Not a complete DLP system. |
 | DB readonly | Beta | Useful for inspection, but SQL guard is not a permission boundary. Use read-only database credentials. |
-| Goal orchestration | Alpha | High-level `dhk goal` protocol for start/resume/next/step/check/evaluate/complete and short context export. |
+| Goal orchestration | Experimental alpha | High-level `dhk goal` protocol for start/resume/next/step/check/evaluate/verify/complete and short context export. It is the preferred harness entry for agent work, but not stable. |
 | Workflow | Alpha | Records process state for audit and context export. It is not a workflow engine. |
 | Spec | Alpha | Records change documents, tasks, acceptance, and status. Markdown is export only. |
 | Agent packaging | Alpha | Ships `.agents/skills` and `.comate/rules` helpers for agent workflows. |
@@ -226,6 +226,8 @@ java -jar target/dhk-cli-0.1.0-alpha-all.jar goal complete --project-root . --go
 
 `goal complete` writes `.agents/memory/exports/GOAL_SUMMARY.md`, records completion artifacts, and creates a checkpoint.
 
+Goal orchestration is still experimental alpha. Built-in Java profiles are intentionally strict: skipped compile/test checks are not accepted, required specs must contain at least one closed task and one closed acceptance item, and pending hard workflow gates block completion unless mapped goal actions or accepted checks close them. `goal complete` closes the checkpoint gate while creating the completion checkpoint.
+
 For agent-facing usage, `.agents/skills/devharness-goal-development/` provides goal-first wrapper scripts such as `goal-start.sh`, `goal-next.sh`, `goal-step.sh`, `goal-check.sh`, `goal-evaluate.sh`, and `goal-complete.sh`.
 
 Projects can customize goal profiles, required checks, and accepted check statuses with `.agents/devharness/goal-profiles/*.json` and `.agents/devharness/goal-check-policy.json`.
@@ -245,6 +247,7 @@ Projects can customize goal profiles, required checks, and accepted check status
 - Do not connect DevHarness Kit to production databases with write-capable credentials.
 - Workflow gates are manual/audit state unless explicitly wired to commands.
 - Goal orchestration is a deterministic CLI protocol over existing modules. `goal evaluate` checks recorded evidence before `goal complete`, but the project still does not prove code correctness.
+- Goal context exports reject sensitive findings. Goal completion summaries use redaction before writing, then reject if sensitive patterns still remain after redaction.
 - DevHarness Kit records development process state; it does not prove code correctness.
 
 Read [SECURITY.md](SECURITY.md) before using DB readonly features.

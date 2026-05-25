@@ -15,13 +15,16 @@ public final class GoalProfile {
     private final boolean completionRequireFreshChecks;
     private final boolean completionAllowSkippedChecks;
     private final boolean completionRequireCheckpoint;
+    private final boolean specRequireNonEmptyTasks;
+    private final boolean specRequireNonEmptyAcceptance;
     private final Map<String, GoalActionMapping> actionMappings;
 
     public GoalProfile(String profileKey, String workflowKey, boolean specRequired,
                        String defaultMode, String[] actions) {
         this(profileKey, workflowKey, specRequired, defaultMode, actions,
                 new LinkedHashMap<String, String[]>(), new String[0],
-                true, true, true, new LinkedHashMap<String, GoalActionMapping>());
+                true, true, true, specRequired, specRequired,
+                new LinkedHashMap<String, GoalActionMapping>());
     }
 
     public GoalProfile(String profileKey, String workflowKey, boolean specRequired,
@@ -31,6 +34,22 @@ public final class GoalProfile {
                        boolean completionRequireFreshChecks,
                        boolean completionAllowSkippedChecks,
                        boolean completionRequireCheckpoint,
+                       Map<String, GoalActionMapping> actionMappings) {
+        this(profileKey, workflowKey, specRequired, defaultMode, actions,
+                requiredEvidenceByAction, requiredChecks, completionRequireFreshChecks,
+                completionAllowSkippedChecks, completionRequireCheckpoint,
+                specRequired, specRequired, actionMappings);
+    }
+
+    public GoalProfile(String profileKey, String workflowKey, boolean specRequired,
+                       String defaultMode, String[] actions,
+                       Map<String, String[]> requiredEvidenceByAction,
+                       String[] requiredChecks,
+                       boolean completionRequireFreshChecks,
+                       boolean completionAllowSkippedChecks,
+                       boolean completionRequireCheckpoint,
+                       boolean specRequireNonEmptyTasks,
+                       boolean specRequireNonEmptyAcceptance,
                        Map<String, GoalActionMapping> actionMappings) {
         this.profileKey = profileKey;
         this.workflowKey = workflowKey;
@@ -42,6 +61,8 @@ public final class GoalProfile {
         this.completionRequireFreshChecks = completionRequireFreshChecks;
         this.completionAllowSkippedChecks = completionAllowSkippedChecks;
         this.completionRequireCheckpoint = completionRequireCheckpoint;
+        this.specRequireNonEmptyTasks = specRequireNonEmptyTasks;
+        this.specRequireNonEmptyAcceptance = specRequireNonEmptyAcceptance;
         this.actionMappings = copyMappings(actionMappings);
     }
 
@@ -54,6 +75,8 @@ public final class GoalProfile {
     public boolean completionRequireFreshChecks() { return completionRequireFreshChecks; }
     public boolean completionAllowSkippedChecks() { return completionAllowSkippedChecks; }
     public boolean completionRequireCheckpoint() { return completionRequireCheckpoint; }
+    public boolean specRequireNonEmptyTasks() { return specRequireNonEmptyTasks; }
+    public boolean specRequireNonEmptyAcceptance() { return specRequireNonEmptyAcceptance; }
 
     public String[] requiredEvidence(String actionKey) {
         String[] evidence = requiredEvidenceByAction.get(actionKey);

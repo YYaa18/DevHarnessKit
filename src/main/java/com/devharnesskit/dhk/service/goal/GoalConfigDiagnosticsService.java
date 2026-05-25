@@ -26,7 +26,8 @@ public final class GoalConfigDiagnosticsService {
     private static final Pattern ACTION_PATTERN = Pattern.compile("[a-z][a-z0-9_]*");
     private static final Set<String> PROFILE_FIELDS = set("profile_key", "workflow_key", "requires_spec",
             "default_mode", "actions", "required_checks", "completion_require_fresh_checks",
-            "completion_allow_skipped_checks", "completion_require_checkpoint");
+            "completion_allow_skipped_checks", "completion_require_checkpoint",
+            "spec_require_non_empty_tasks", "spec_require_non_empty_acceptance");
     private static final Set<String> POLICY_FIELDS = set("required_checks", "compile_command", "test_command",
             "fail_pending_hard_gates", "accepted_compile_statuses", "accepted_test_statuses",
             "accepted_sensitive_statuses", "accepted_spec_statuses", "accepted_workflow_statuses");
@@ -115,6 +116,7 @@ public final class GoalConfigDiagnosticsService {
                     false, diagnostics);
         }
         diagnoseCompletionBooleans(file, raw, diagnostics);
+        diagnoseSpecBooleans(file, raw, diagnostics);
         diagnoseRequiredEvidence(file, raw, actions, diagnostics);
         diagnoseActionMappings(file, raw, workflowKey, actions, diagnostics);
     }
@@ -168,6 +170,11 @@ public final class GoalConfigDiagnosticsService {
         diagnoseBoolean(file, raw, "completion_require_fresh_checks", diagnostics);
         diagnoseBoolean(file, raw, "completion_allow_skipped_checks", diagnostics);
         diagnoseBoolean(file, raw, "completion_require_checkpoint", diagnostics);
+    }
+
+    private void diagnoseSpecBooleans(Path file, Map<String, String> raw, List<Diagnostic> diagnostics) {
+        diagnoseBoolean(file, raw, "spec_require_non_empty_tasks", diagnostics);
+        diagnoseBoolean(file, raw, "spec_require_non_empty_acceptance", diagnostics);
     }
 
     private void diagnoseBoolean(Path file, Map<String, String> raw, String field,

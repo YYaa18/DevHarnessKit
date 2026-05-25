@@ -204,6 +204,7 @@ stale_count
 stale_checks
 next_action
 next_command
+context_path
 ```
 
 `goal verify` runs required checks before evaluating readiness. `failed_checks` lists checks with `failed` status; skipped-disallowed checks are reported through `missing`.

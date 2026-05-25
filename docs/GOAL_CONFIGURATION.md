@@ -23,16 +23,22 @@ Example:
   "completion_require_fresh_checks": "true",
   "completion_allow_skipped_checks": "false",
   "completion_require_checkpoint": "true",
+  "spec_require_non_empty_tasks": "true",
+  "spec_require_non_empty_acceptance": "true",
   "required_evidence.inspect_existing_code": "existing_controller,existing_service,existing_mapper,existing_tests",
   "required_evidence.create_change_plan": "impacted_files,risk_points,verification_plan",
   "required_evidence.implement_minimal_change": "changed_files,implementation_summary",
   "required_evidence.verify": "compile_result,test_result,sensitive_result",
   "mapping.inspect_existing_code.workflow_phase": "inspect_existing_code",
+  "mapping.inspect_existing_code.spec_task": "inspect_existing_code",
   "mapping.create_change_plan.workflow_phase": "create_change_plan",
   "mapping.create_change_plan.required_gates": "impacted_files_listed,verification_plan_ready",
+  "mapping.create_change_plan.spec_task": "create_change_plan",
+  "mapping.implement_minimal_change.workflow_phase": "implement_minimal_change",
+  "mapping.implement_minimal_change.spec_task": "implement_minimal_change",
   "mapping.verify.workflow_phase": "verify_tests",
-  "mapping.verify.required_gates": "tests_recorded",
-  "mapping.verify.spec_acceptance_update": "manual"
+  "mapping.verify.spec_task": "verify",
+  "mapping.verify.spec_acceptance_update": "auto_pass"
 }
 ```
 
@@ -64,6 +70,8 @@ Supported profile fields:
 | `completion_require_fresh_checks` | If true, checks become stale after later goal steps. |
 | `completion_allow_skipped_checks` | If false, skipped checks are not accepted unless policy explicitly allows them. |
 | `completion_require_checkpoint` | Declares that completion should create a checkpoint. Current `goal complete` always creates one. |
+| `spec_require_non_empty_tasks` | If true and `requires_spec` is true, the spec check fails when the spec has no tasks. Defaults to `requires_spec`. |
+| `spec_require_non_empty_acceptance` | If true and `requires_spec` is true, the spec check fails when the spec has no acceptance criteria. Defaults to `requires_spec`. |
 
 Per-action evidence fields use:
 
@@ -80,9 +88,24 @@ mapping.<action_key>.spec_task: "<spec_task_key>"
 mapping.<action_key>.spec_acceptance_update: "manual|auto_pass|disabled"
 ```
 
-Mappings are alpha metadata for making the goal profile a formal process definition. They are validated by `dhk doctor` and are intended to drive stronger workflow/spec synchronization in later releases.
+Mappings are alpha process definitions. `goal step`, `goal check`, `goal verify`, and `goal complete` use them to synchronize deterministic workflow/spec state:
+
+- mapped workflow phases are marked passed after the corresponding goal step is accepted;
+- mapped required gates are marked passed when the goal step provides the required evidence;
+- mapped spec tasks are created automatically and marked done after the corresponding goal step;
+- `spec_acceptance_update=auto_pass` creates a goal acceptance item and passes it only after all non-spec required checks are accepted;
+- completion creates the checkpoint, passes the `checkpoint_created` gate, and marks the workflow completed when all phases are closed.
+
+Mappings remain alpha and are validated by `dhk doctor`.
 
 Built-in Java profiles (`java-api-change` and `java-mvc-change`) now express their own required evidence, required checks, strict completion policy, and action mappings through this same model.
+
+Built-in Java profiles are strict by default:
+
+- `compile`, `test`, `sensitive`, required `spec`, and `workflow` checks must pass.
+- A missing `pom.xml` makes compile/test checks `skipped`, which is not accepted.
+- Required specs must contain at least one task and one acceptance item, and those items must be closed.
+- Pending hard workflow gates fail the workflow check unless mapped goal actions or accepted checks close them. The `checkpoint_created` gate is a completion gate and is closed by `goal complete`.
 
 Minimal custom profile:
 
@@ -112,7 +135,7 @@ Example:
   "required_checks": "compile,test,sensitive,spec,workflow",
   "compile_command": "mvn -q -DskipTests compile",
   "test_command": "mvn -q test",
-  "fail_pending_hard_gates": "false",
+  "fail_pending_hard_gates": "true",
   "accepted_compile_statuses": "passed",
   "accepted_test_statuses": "passed",
   "accepted_sensitive_statuses": "passed",
@@ -142,6 +165,15 @@ If a non-Maven flow still needs a compile placeholder, explicitly allow `skipped
 
 Built-in Java profiles (`java-api-change` and `java-mvc-change`) default to strict accepted statuses for `compile`, `test`, `sensitive`, and spec-required `spec`: those checks must be `passed`. This prevents a missing `pom.xml` from silently satisfying completion through skipped compile/test checks. Use project policy to deliberately relax non-Maven or transitional flows.
 
+For strict profiles, pending hard workflow gates fail by default after goal/action sync runs. Set `fail_pending_hard_gates` explicitly when a project needs a different alpha policy:
+
+```json
+{
+  "required_checks": "compile,test,sensitive,spec,workflow",
+  "fail_pending_hard_gates": "false"
+}
+```
+
 The command parser is intentionally simple and splits `compile_command` and `test_command` by whitespace. Use wrapper scripts when commands need quoting or shell features.
 
 ## Doctor Diagnostics
@@ -155,6 +187,7 @@ The command parser is intentionally simple and splits `compile_command` and `tes
 - action mappings that reference actions not listed in `actions`;
 - action mappings that reference unknown workflow phases or gates for built-in workflows;
 - unsupported `spec_acceptance_update` policies;
+- invalid `spec_require_non_empty_tasks` or `spec_require_non_empty_acceptance` values;
 - empty `required_checks`;
 - unsupported check names;
 - unsupported accepted check statuses;

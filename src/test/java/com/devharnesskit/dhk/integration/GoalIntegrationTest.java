@@ -48,6 +48,8 @@ final class GoalIntegrationTest {
         Path root = tempDir.resolve("demo");
         Path goalContext = PathUtil.goalContext(root);
         String goalKey = firstValue(start.stdout(), "goal_key: ");
+        String workflowRun = firstValue(start.stdout(), "workflow_run: ");
+        String specChange = firstValue(start.stdout(), "spec_change: ");
 
         assertEquals(ExitCodes.SUCCESS, startExit);
         assertTrue(goalKey.length() > 0);
@@ -198,6 +200,7 @@ final class GoalIntegrationTest {
         assertTrue(verifyReady.stdout().contains("compile: passed"));
         assertTrue(verifyReady.stdout().contains("failed_checks:"));
         assertTrue(verifyReady.stdout().contains("next_command: dhk goal complete --goal " + goalKey));
+        assertTrue(verifyReady.stdout().contains("context_path: " + goalContext));
 
         Harness complete = new Harness(tempDir);
         int completeExit = new CommandRouter().run(new String[]{
@@ -590,6 +593,7 @@ final class GoalIntegrationTest {
 
     @Test
     void javaGoalCannotCompleteWithSkippedCompileOrTestChecks() throws Exception {
+        Path root = tempDir.resolve("demo");
         Harness start = new Harness(tempDir);
         int startExit = new CommandRouter().run(new String[]{
                 "goal", "start",
@@ -630,9 +634,11 @@ final class GoalIntegrationTest {
         assertTrue(verify.stdout().contains("\"command\": \"goal verify\""));
         assertTrue(verify.stdout().contains("\"decision\": \"not_ready\""));
         assertTrue(verify.stdout().contains("\"ready_to_complete\": false"));
-        assertTrue(verify.stdout().contains("\"missing_count\": 2"));
+        assertTrue(verify.stdout().contains("\"missing_count\": 3"));
         assertTrue(verify.stdout().contains("check compile is skipped; accepted_statuses=passed"));
         assertTrue(verify.stdout().contains("check test is skipped; accepted_statuses=passed"));
+        assertTrue(verify.stdout().contains("check spec is failed; accepted_statuses=passed"));
+        assertTrue(verify.stdout().contains("\"context_path\": "));
 
         Harness complete = new Harness(tempDir);
         int completeExit = new CommandRouter().run(new String[]{
@@ -641,6 +647,115 @@ final class GoalIntegrationTest {
         assertEquals(ExitCodes.VALIDATION_ERROR, completeExit);
         assertTrue(complete.stdout().contains("decision: not_ready"));
         assertTrue(complete.stdout().contains("check compile is skipped; accepted_statuses=passed"));
+    }
+
+    @Test
+    void customSpecRequiredGoalRejectsEmptySpecTasksAndAcceptance() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Files.createDirectories(PathUtil.goalProfilesDirectory(root));
+        Files.write(PathUtil.goalProfile(root, "custom-empty-spec"), ("{\n"
+                + "  \"workflow_key\": \"api-change\",\n"
+                + "  \"requires_spec\": \"true\",\n"
+                + "  \"default_mode\": \"api\",\n"
+                + "  \"actions\": \"inspect,verify\",\n"
+                + "  \"required_checks\": \"spec\",\n"
+                + "  \"spec_require_non_empty_tasks\": \"true\",\n"
+                + "  \"spec_require_non_empty_acceptance\": \"true\"\n"
+                + "}\n").getBytes("UTF-8"));
+        Files.write(PathUtil.goalCheckPolicy(root), ("{\n"
+                + "  \"required_checks\": \"spec\",\n"
+                + "  \"accepted_spec_statuses\": \"passed\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "custom-empty-spec",
+                "--task", "Empty spec guard",
+                "--module", "goal",
+                "--mode", "api"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        Harness inspect = new Harness(tempDir);
+        int inspectExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Inspection complete",
+                "--evidence", "evidence=inspection"
+        }, inspect.context());
+        assertEquals(ExitCodes.SUCCESS, inspectExit);
+
+        Harness verifyStep = new Harness(tempDir);
+        int verifyStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Verification complete",
+                "--evidence", "compile_result=not required; test_result=not required; sensitive_result=not required"
+        }, verifyStep.context());
+        assertEquals(ExitCodes.SUCCESS, verifyStepExit);
+
+        Harness check = new Harness(tempDir);
+        int checkExit = new CommandRouter().run(new String[]{
+                "goal", "check", "--project-root", "demo", "--goal", goalKey, "--all"
+        }, check.context());
+        assertEquals(ExitCodes.SUCCESS, checkExit);
+        assertTrue(check.stdout().contains("check_key: spec"));
+        assertTrue(check.stdout().contains("status: failed"));
+        assertTrue(check.stdout().contains("spec has no tasks"));
+        assertTrue(check.stdout().contains("spec has no acceptance criteria"));
+
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, verify.context());
+        assertEquals(ExitCodes.SUCCESS, verifyExit);
+        assertTrue(verify.stdout().contains("\"decision\": \"not_ready\""));
+        assertTrue(verify.stdout().contains("check spec is failed; accepted_statuses=passed"));
+        assertTrue(verify.stdout().contains("\"next_command\": \"dhk goal check --goal " + goalKey
+                + " --check spec\""));
+        assertTrue(verify.stdout().contains("\"context_path\": "));
+    }
+
+    @Test
+    void javaGoalSyncsMappedWorkflowGatesByDefault() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "java-api-change",
+                "--task", "Default strict workflow guard",
+                "--module", "goal",
+                "--mode", "api"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        recordJavaGoalSteps(goalKey);
+        writeMinimalPom(root);
+
+        Harness check = new Harness(tempDir);
+        int checkExit = new CommandRouter().run(new String[]{
+                "goal", "check", "--project-root", "demo", "--goal", goalKey, "--all"
+        }, check.context());
+        assertEquals(ExitCodes.SUCCESS, checkExit);
+        assertTrue(check.stdout().contains("check_key: workflow"));
+        assertTrue(check.stdout().contains("status: passed"));
+        assertTrue(check.stdout().contains("pending_hard_gates=0"));
+
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "demo", "--goal", goalKey
+        }, verify.context());
+        assertEquals(ExitCodes.SUCCESS, verifyExit);
+        assertTrue(verify.stdout().contains("decision: ready_to_complete"));
+        assertTrue(verify.stdout().contains("workflow: passed"));
+        assertTrue(verify.stdout().contains("context_path: " + PathUtil.goalContext(root)));
     }
 
     @Test
@@ -657,6 +772,7 @@ final class GoalIntegrationTest {
         }, start.context());
         assertEquals(ExitCodes.SUCCESS, startExit);
         String goalKey = firstValue(start.stdout(), "goal_key: ");
+        String specChange = firstValue(start.stdout(), "spec_change: ");
 
         recordJavaGoalSteps(goalKey);
         writeMinimalPom(root);
@@ -1271,6 +1387,66 @@ final class GoalIntegrationTest {
                 + "</project>\n").getBytes("UTF-8"));
     }
 
+    private void closeSpec(Path root, String specChange) {
+        String projectRoot = tempDir.relativize(root).toString();
+        Harness taskAdd = new Harness(tempDir);
+        int taskAddExit = new CommandRouter().run(new String[]{
+                "spec", "task", "add",
+                "--project-root", projectRoot,
+                "--change", specChange,
+                "--task", "T001",
+                "--title", "Complete goal implementation",
+                "--description", "Implementation task must be closed before completion",
+                "--phase", "verify"
+        }, taskAdd.context());
+        assertEquals(ExitCodes.SUCCESS, taskAddExit);
+
+        Harness taskDone = new Harness(tempDir);
+        int taskDoneExit = new CommandRouter().run(new String[]{
+                "spec", "task", "update",
+                "--project-root", projectRoot,
+                "--change", specChange,
+                "--task", "T001",
+                "--status", "done",
+                "--evidence", "Goal integration test closed task"
+        }, taskDone.context());
+        assertEquals(ExitCodes.SUCCESS, taskDoneExit);
+
+        Harness acceptanceAdd = new Harness(tempDir);
+        int acceptanceAddExit = new CommandRouter().run(new String[]{
+                "spec", "acceptance", "add",
+                "--project-root", projectRoot,
+                "--change", specChange,
+                "--acceptance", "A001",
+                "--description", "Goal can complete only after checks pass",
+                "--expected", "Spec acceptance is passed"
+        }, acceptanceAdd.context());
+        assertEquals(ExitCodes.SUCCESS, acceptanceAddExit);
+
+        Harness acceptancePassed = new Harness(tempDir);
+        int acceptancePassedExit = new CommandRouter().run(new String[]{
+                "spec", "acceptance", "update",
+                "--project-root", projectRoot,
+                "--change", specChange,
+                "--acceptance", "A001",
+                "--status", "passed",
+                "--evidence", "Goal integration test passed acceptance"
+        }, acceptancePassed.context());
+        assertEquals(ExitCodes.SUCCESS, acceptancePassedExit);
+    }
+
+    private void passHardWorkflowGates(Path root, String workflowRun) throws Exception {
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(root));
+             Statement statement = connection.createStatement()) {
+            int updated = statement.executeUpdate("UPDATE workflow_gate_run "
+                    + "SET status = 'passed', result_summary = 'Passed by goal integration test', "
+                    + "evidence = 'integration-test', checked_at = '2026-01-01T00:00:00Z', "
+                    + "updated_at = '2026-01-01T00:00:00Z' "
+                    + "WHERE run_key = '" + workflowRun + "' AND severity = 'hard'");
+            assertTrue(updated > 0);
+        }
+    }
+
     private void assertGoalRows(Path root, String goalKey) throws Exception {
         try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(root));
              Statement statement = connection.createStatement()) {
@@ -1294,6 +1470,8 @@ final class GoalIntegrationTest {
                     + "' AND step_count_at_check = 4"));
             assertEquals(1, count(statement, "SELECT COUNT(*) FROM checkpoint"));
             assertEquals(1, count(statement, "SELECT COUNT(*) FROM goal_run WHERE goal_key = '" + goalKey + "' AND status = 'completed'"));
+            assertEquals(1, count(statement, "SELECT COUNT(*) FROM workflow_run WHERE status = 'completed'"));
+            assertEquals(1, count(statement, "SELECT COUNT(*) FROM spec_change WHERE status = 'verified'"));
             assertTrue(count(statement, "SELECT COUNT(*) FROM goal_artifact WHERE goal_key = '" + goalKey + "'") >= 3);
             assertEquals(1, count(statement, "SELECT COUNT(*) FROM workflow_checkpoint_binding "
                     + "WHERE binding_type = 'created'"));

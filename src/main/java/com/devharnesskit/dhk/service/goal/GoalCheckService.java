@@ -1,6 +1,7 @@
 package com.devharnesskit.dhk.service.goal;
 
 import com.devharnesskit.dhk.model.goal.GoalCheck;
+import com.devharnesskit.dhk.model.goal.GoalProfile;
 import com.devharnesskit.dhk.model.goal.GoalRun;
 import com.devharnesskit.dhk.model.spec.SpecAcceptance;
 import com.devharnesskit.dhk.model.spec.SpecTask;
@@ -67,6 +68,7 @@ public final class GoalCheckService {
 
     public GoalCheck run(Connection connection, Path projectRoot, GoalRun goal,
                          String checkKey, String now, GoalCheckPolicy policy) throws Exception {
+        GoalProfile profile = profileService.find(projectRoot, goal.profileKey());
         if ("compile".equals(checkKey)) {
             return runMavenCheck(connection, projectRoot, goal, checkKey, policy.compileCommand(), now);
         }
@@ -77,10 +79,10 @@ public final class GoalCheckService {
             return runSensitiveCheck(connection, projectRoot, goal, now);
         }
         if ("spec".equals(checkKey)) {
-            return runSpecCheck(connection, goal, now);
+            return runSpecCheck(connection, goal, profile, now);
         }
         if ("workflow".equals(checkKey)) {
-            return runWorkflowCheck(connection, goal, now, policy);
+            return runWorkflowCheck(connection, goal, now, policy, profile);
         }
         throw new IllegalArgumentException("Unknown goal check: " + checkKey);
     }
@@ -148,32 +150,46 @@ public final class GoalCheckService {
         return save(connection, goal, "sensitive", "sensitive", "", status, summary, log, now);
     }
 
-    private GoalCheck runSpecCheck(Connection connection, GoalRun goal, String now) throws Exception {
+    private GoalCheck runSpecCheck(Connection connection, GoalRun goal, GoalProfile profile,
+                                   String now) throws Exception {
         Path log = null;
         if (goal.specChangeKey().length() == 0) {
+            if (profile != null && profile.specRequired()) {
+                return save(connection, goal, "spec", "spec", "", "failed",
+                        "spec required but goal has no spec change", log, now);
+            }
             return save(connection, goal, "spec", "spec", "", "skipped",
                     "goal has no spec change", log, now);
         }
         List<String> missing = new ArrayList<String>();
-        for (SpecTask task : taskRepository.listByChange(connection, goal.specChangeKey())) {
+        List<SpecTask> tasks = taskRepository.listByChange(connection, goal.specChangeKey());
+        List<SpecAcceptance> acceptances = acceptanceRepository.listByChange(connection, goal.specChangeKey());
+        if (profile != null && profile.specRequired() && profile.specRequireNonEmptyTasks() && tasks.isEmpty()) {
+            missing.add("spec has no tasks");
+        }
+        if (profile != null && profile.specRequired() && profile.specRequireNonEmptyAcceptance()
+                && acceptances.isEmpty()) {
+            missing.add("spec has no acceptance criteria");
+        }
+        for (SpecTask task : tasks) {
             if (!"done".equals(task.status()) && !"skipped".equals(task.status())) {
                 missing.add("task " + task.taskKey() + " is " + task.status());
             }
         }
-        for (SpecAcceptance acceptance : acceptanceRepository.listByChange(connection, goal.specChangeKey())) {
+        for (SpecAcceptance acceptance : acceptances) {
             if (!"passed".equals(acceptance.status()) && !"waived".equals(acceptance.status())) {
                 missing.add("acceptance " + acceptance.acceptanceKey() + " is " + acceptance.status());
             }
         }
         String status = missing.isEmpty() ? "passed" : "failed";
         String summary = missing.isEmpty()
-                ? "spec tasks and acceptance are closed or empty"
+                ? "spec tasks and acceptance are closed"
                 : "spec incomplete: " + missing;
         return save(connection, goal, "spec", "spec", "", status, summary, log, now);
     }
 
     private GoalCheck runWorkflowCheck(Connection connection, GoalRun goal, String now,
-                                      GoalCheckPolicy policy) throws Exception {
+                                       GoalCheckPolicy policy, GoalProfile profile) throws Exception {
         if (goal.workflowRunKey().length() == 0) {
             return save(connection, goal, "workflow", "workflow", "", "skipped",
                     "goal has no workflow run", null, now);
@@ -189,11 +205,17 @@ public final class GoalCheckService {
         }
         int failedHard = 0;
         int pendingHard = 0;
+        int pendingCompletionHard = 0;
         for (WorkflowGateRun gate : gateRunRepository.listByRun(connection, run.runKey())) {
             if ("hard".equals(gate.severity()) && "failed".equals(gate.status())) {
                 failedHard++;
             }
             if ("hard".equals(gate.severity()) && "pending".equals(gate.status())) {
+                if (profile != null && profile.completionRequireCheckpoint()
+                        && "checkpoint_created".equals(gate.gateKey())) {
+                    pendingCompletionHard++;
+                    continue;
+                }
                 pendingHard++;
             }
         }
@@ -201,12 +223,13 @@ public final class GoalCheckService {
             return save(connection, goal, "workflow", "workflow", "", "failed",
                     "workflow has failed hard gates: " + failedHard, null, now);
         }
-        if (policy.failPendingHardGates() && pendingHard > 0) {
+        if (policy.failPendingHardGates(profile) && pendingHard > 0) {
             return save(connection, goal, "workflow", "workflow", "", "failed",
                     "workflow has pending hard gates: " + pendingHard, null, now);
         }
         return save(connection, goal, "workflow", "workflow", "", "passed",
-                "workflow run is active; pending_hard_gates=" + pendingHard, null, now);
+                "workflow run is active; pending_hard_gates=" + pendingHard
+                        + " pending_completion_gates=" + pendingCompletionHard, null, now);
     }
 
     private GoalCheck save(Connection connection, GoalRun goal, String checkKey, String checkType,

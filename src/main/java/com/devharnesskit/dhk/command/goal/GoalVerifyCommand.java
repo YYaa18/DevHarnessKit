@@ -9,6 +9,7 @@ import com.devharnesskit.dhk.model.goal.GoalEvaluation;
 import com.devharnesskit.dhk.model.goal.GoalRun;
 import com.devharnesskit.dhk.service.goal.GoalOrchestrator;
 import com.devharnesskit.dhk.util.JsonOutput;
+import com.devharnesskit.dhk.util.PathUtil;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -24,9 +25,9 @@ public final class GoalVerifyCommand implements Command {
             List<GoalCheck> checks = orchestrator.runCheck(context, projectRoot, goal.goalKey(), "", true);
             GoalEvaluation evaluation = orchestrator.evaluate(context, projectRoot, goal.goalKey());
             if (JsonOutput.enabled(args)) {
-                printJson(context, goal, checks, evaluation);
+                printJson(context, projectRoot, goal, checks, evaluation);
             } else {
-                printText(context, goal, checks, evaluation);
+                printText(context, projectRoot, goal, checks, evaluation);
             }
             return ExitCodes.SUCCESS;
         } catch (IllegalArgumentException ex) {
@@ -38,7 +39,7 @@ public final class GoalVerifyCommand implements Command {
         }
     }
 
-    private void printText(CommandContext context, GoalRun goal, List<GoalCheck> checks,
+    private void printText(CommandContext context, Path projectRoot, GoalRun goal, List<GoalCheck> checks,
                            GoalEvaluation evaluation) {
         context.out().println("goal_key: " + goal.goalKey());
         context.out().println("decision: " + evaluation.decision());
@@ -56,9 +57,10 @@ public final class GoalVerifyCommand implements Command {
         printArray(context, evaluation.staleChecks());
         context.out().println("next_action: " + evaluation.nextAction());
         context.out().println("next_command: " + evaluation.nextCommand());
+        context.out().println("context_path: " + PathUtil.goalContext(projectRoot));
     }
 
-    private void printJson(CommandContext context, GoalRun goal, List<GoalCheck> checks,
+    private void printJson(CommandContext context, Path projectRoot, GoalRun goal, List<GoalCheck> checks,
                            GoalEvaluation evaluation) {
         List<String> rawChecks = new ArrayList<String>();
         for (GoalCheck check : checks) {
@@ -84,7 +86,8 @@ public final class GoalVerifyCommand implements Command {
                 JsonOutput.numberField("stale_count", evaluation.staleChecks().length),
                 JsonOutput.rawField("stale_checks", JsonOutput.stringArray(evaluation.staleChecks())),
                 JsonOutput.stringField("next_action", evaluation.nextAction()),
-                JsonOutput.stringField("next_command", evaluation.nextCommand())
+                JsonOutput.stringField("next_command", evaluation.nextCommand()),
+                JsonOutput.stringField("context_path", PathUtil.goalContext(projectRoot).toString())
         ));
     }
 

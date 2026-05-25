@@ -14,6 +14,7 @@ public final class GoalCheckPolicy {
     private final String[] compileCommand;
     private final String[] testCommand;
     private final boolean failPendingHardGates;
+    private final boolean failPendingHardGatesConfigured;
     private final String[] acceptedCompileStatuses;
     private final String[] acceptedTestStatuses;
     private final String[] acceptedSensitiveStatuses;
@@ -22,7 +23,7 @@ public final class GoalCheckPolicy {
 
     public GoalCheckPolicy(String[] requiredChecks, String[] compileCommand,
                            String[] testCommand, boolean failPendingHardGates) {
-        this(requiredChecks, false, compileCommand, testCommand, failPendingHardGates,
+        this(requiredChecks, false, compileCommand, testCommand, failPendingHardGates, true,
                 new String[0], new String[0], new String[0], new String[0], new String[0]);
     }
 
@@ -31,13 +32,24 @@ public final class GoalCheckPolicy {
                            String[] acceptedCompileStatuses, String[] acceptedTestStatuses,
                            String[] acceptedSensitiveStatuses, String[] acceptedSpecStatuses,
                            String[] acceptedWorkflowStatuses) {
-        this(requiredChecks, false, compileCommand, testCommand, failPendingHardGates,
+        this(requiredChecks, false, compileCommand, testCommand, failPendingHardGates, true,
                 acceptedCompileStatuses, acceptedTestStatuses, acceptedSensitiveStatuses,
                 acceptedSpecStatuses, acceptedWorkflowStatuses);
     }
 
     public GoalCheckPolicy(String[] requiredChecks, boolean requiredChecksConfigured,
                            String[] compileCommand, String[] testCommand, boolean failPendingHardGates,
+                           String[] acceptedCompileStatuses, String[] acceptedTestStatuses,
+                           String[] acceptedSensitiveStatuses, String[] acceptedSpecStatuses,
+                           String[] acceptedWorkflowStatuses) {
+        this(requiredChecks, requiredChecksConfigured, compileCommand, testCommand, failPendingHardGates, true,
+                acceptedCompileStatuses, acceptedTestStatuses, acceptedSensitiveStatuses,
+                acceptedSpecStatuses, acceptedWorkflowStatuses);
+    }
+
+    public GoalCheckPolicy(String[] requiredChecks, boolean requiredChecksConfigured,
+                           String[] compileCommand, String[] testCommand, boolean failPendingHardGates,
+                           boolean failPendingHardGatesConfigured,
                            String[] acceptedCompileStatuses, String[] acceptedTestStatuses,
                            String[] acceptedSensitiveStatuses, String[] acceptedSpecStatuses,
                            String[] acceptedWorkflowStatuses) {
@@ -52,6 +64,7 @@ public final class GoalCheckPolicy {
                 ? new String[]{"mvn", "-q", "test"}
                 : testCommand;
         this.failPendingHardGates = failPendingHardGates;
+        this.failPendingHardGatesConfigured = failPendingHardGatesConfigured;
         this.acceptedCompileStatuses = acceptedCompileStatuses == null ? new String[0] : acceptedCompileStatuses;
         this.acceptedTestStatuses = acceptedTestStatuses == null ? new String[0] : acceptedTestStatuses;
         this.acceptedSensitiveStatuses = acceptedSensitiveStatuses == null ? new String[0] : acceptedSensitiveStatuses;
@@ -60,9 +73,10 @@ public final class GoalCheckPolicy {
     }
 
     public static GoalCheckPolicy defaults() {
-        return new GoalCheckPolicy(DEFAULT_REQUIRED_CHECKS,
+        return new GoalCheckPolicy(DEFAULT_REQUIRED_CHECKS, false,
                 new String[]{"mvn", "-q", "-DskipTests", "compile"},
-                new String[]{"mvn", "-q", "test"}, false);
+                new String[]{"mvn", "-q", "test"}, false, false,
+                new String[0], new String[0], new String[0], new String[0], new String[0]);
     }
 
     public String[] requiredChecks() {
@@ -89,6 +103,16 @@ public final class GoalCheckPolicy {
 
     public boolean failPendingHardGates() {
         return failPendingHardGates;
+    }
+
+    public boolean failPendingHardGates(GoalProfile profile) {
+        if (failPendingHardGatesConfigured) {
+            return failPendingHardGates;
+        }
+        if (isBuiltInJavaProfile(profile)) {
+            return true;
+        }
+        return profile != null && !profile.completionAllowSkippedChecks();
     }
 
     public boolean accepts(String checkKey, String status, GoalProfile profile) {

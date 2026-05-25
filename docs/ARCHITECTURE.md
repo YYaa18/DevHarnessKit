@@ -56,7 +56,7 @@ Goal MVP persists:
 - `GOAL_CONTEXT.md`;
 - `GOAL_SUMMARY.md`.
 
-Goal is not an autonomous workflow engine. It records state, renders the next deterministic action for an agent to perform, and requires recorded checks before completion. Completion creates a memory checkpoint and a summary export.
+Goal is not an autonomous workflow engine. It records state, renders the next deterministic action for an agent to perform, synchronizes deterministic workflow/spec state from profile action mappings, and requires recorded checks before completion. Completion creates a memory checkpoint, closes the checkpoint workflow gate, marks the workflow completed when all phases are closed, and writes a summary export.
 
 `GOAL_CONTEXT.md` and `GOAL_SUMMARY.md` are generated Markdown exports. They are stable enough for alpha agents and scripts to read, but SQLite goal/workflow/spec rows and the completion checkpoint remain the source of truth. Regenerate exports with the matching CLI instead of hand-editing them.
 

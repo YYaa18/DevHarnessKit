@@ -49,6 +49,7 @@ Alpha:
 - `dhk goal export`
 - `dhk goal check`
 - `dhk goal evaluate`
+- `dhk goal verify`
 - `dhk goal complete`
 - `dhk workflow ...`
 - `dhk spec ...`

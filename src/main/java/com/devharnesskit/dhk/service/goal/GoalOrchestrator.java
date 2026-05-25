@@ -87,6 +87,7 @@ public final class GoalOrchestrator {
     private final GoalCheckService checkService = new GoalCheckService();
     private final GoalCheckPolicyService checkPolicyService = new GoalCheckPolicyService();
     private final GoalCompletionEvaluator completionEvaluator = new GoalCompletionEvaluator();
+    private final GoalActionSyncService actionSyncService = new GoalActionSyncService();
     private final GoalSummaryRenderer summaryRenderer = new GoalSummaryRenderer();
     private final SensitiveDataGuard sensitiveDataGuard = new SensitiveDataGuard();
     private final PolicyHookService policyHookService = new PolicyHookService();
@@ -137,6 +138,8 @@ public final class GoalOrchestrator {
                     });
             Path contextPath = exportGoalContext(connection, projectRoot, project, result.goal(),
                     result.workflowRun(), result.specChange(), "context_ready", now);
+            GoalRun exportedGoal = goalRunRepository.findByKey(connection, result.goal().goalKey());
+            actionSyncService.syncAfterContextExport(connection, projectRoot, project, exportedGoal, profile, now);
             GoalRun readyGoal = goalRunRepository.findByKey(connection, result.goal().goalKey());
             return new GoalStartResult(readyGoal, result.workflowRun(), result.specChange(), contextPath);
         }
@@ -192,8 +195,12 @@ public final class GoalOrchestrator {
             String now = context.clock().now().toString();
             int nextIndex = goal.stepCount() + 1;
             String action = goal.currentAction();
-            long stepId = goalStepRepository.insert(connection, new GoalStep(0L, goal.goalKey(), nextIndex,
-                    action, summary, changedFiles, evidence, "accepted", now));
+            GoalStep recordedStep = new GoalStep(0L, goal.goalKey(), nextIndex,
+                    action, summary, changedFiles, evidence, "accepted", now);
+            long stepId = goalStepRepository.insert(connection, recordedStep);
+            recordedStep = new GoalStep(stepId, recordedStep.goalKey(), recordedStep.stepIndex(),
+                    recordedStep.actionKey(), recordedStep.summary(), recordedStep.changedFiles(),
+                    recordedStep.evidence(), recordedStep.status(), recordedStep.createdAt());
             String nextAction = planner.nextAction(profile, action);
             String status = planner.statusForAction(nextAction);
             goalRunRepository.updateProgress(connection, goal.goalKey(), "context_exporting", nextAction, nextIndex, now);
@@ -201,6 +208,7 @@ public final class GoalOrchestrator {
                     "info", "Goal step recorded", action, now));
             GoalRun updated = goalRunRepository.findByKey(connection, goal.goalKey());
             Project project = projectService.readProject(PathUtil.projectJson(projectRoot));
+            actionSyncService.syncAfterStep(connection, projectRoot, project, updated, profile, recordedStep, now);
             WorkflowRun workflowRun = workflowRunRepository.findByKey(connection, updated.workflowRunKey());
             SpecChange specChange = updated.specChangeKey().length() == 0
                     ? null : specChangeRepository.findByKey(connection, updated.specChangeKey());
@@ -244,9 +252,18 @@ public final class GoalOrchestrator {
                 throw new IllegalStateException("Goal not found: " + goalKey);
             }
             String now = context.clock().now().toString();
-            List<GoalCheck> checks = all
-                    ? checkService.runAll(connection, projectRoot, goal, now)
-                    : single(checkService.run(connection, projectRoot, goal, checkKey, now));
+            GoalProfile profile = requireProfile(projectRoot, goal.profileKey());
+            GoalCheckPolicy policy = checkPolicyService.load(projectRoot);
+            Project project = projectService.readProject(PathUtil.projectJson(projectRoot));
+            List<GoalCheck> checks;
+            if (all) {
+                checks = runAllChecks(connection, projectRoot, project, goal, profile, policy, now);
+            } else {
+                List<GoalCheck> before = new ArrayList<GoalCheck>();
+                actionSyncService.syncBeforeCheck(connection, projectRoot, project, goal, profile, policy,
+                        checkKey, before, now);
+                checks = single(checkService.run(connection, projectRoot, goal, checkKey, now, policy));
+            }
             for (GoalCheck check : checks) {
                 if (check.evidencePath().length() > 0) {
                     goalArtifactRepository.insert(connection, new GoalArtifact(0L, goal.goalKey(),
@@ -267,7 +284,7 @@ public final class GoalOrchestrator {
             if (goal == null) {
                 throw new IllegalStateException("Goal not found: " + goalKey);
             }
-            return evaluate(connection, projectRoot, goal);
+            return evaluate(connection, projectRoot, goal, context.clock().now().toString());
         }
     }
 
@@ -278,14 +295,16 @@ public final class GoalOrchestrator {
             if (goal == null) {
                 throw new IllegalStateException("Goal not found: " + goalKey);
             }
-            GoalEvaluation evaluation = evaluate(connection, projectRoot, goal);
+            final String now = context.clock().now().toString();
+            GoalEvaluation evaluation = evaluate(connection, projectRoot, goal, now);
             if (!evaluation.readyToComplete()) {
                 throw new GoalNotReadyException(evaluation);
             }
-            final String now = context.clock().now().toString();
             final List<GoalStep> steps = goalStepRepository.listByGoal(connection, goal.goalKey());
             final List<GoalCheck> checks = goalCheckRepository.listByGoal(connection, goal.goalKey());
             final Project project = projectService.readProject(PathUtil.projectJson(projectRoot));
+            final GoalProfile profile = requireProfile(projectRoot, goal.profileKey());
+            final GoalCheckPolicy policy = checkPolicyService.load(projectRoot);
             policyHookService.requireGoalCompleteAllowed(projectRoot, steps);
             GoalCompleteResult result = transactionTemplate.execute(connection,
                     new TransactionTemplate.Work<GoalCompleteResult>() {
@@ -309,6 +328,8 @@ public final class GoalOrchestrator {
                             goalArtifactRepository.insert(connection, new GoalArtifact(0L, goal.goalKey(),
                                     "checkpoint", "Completion checkpoint", "", "",
                                     "checkpoint_id=" + checkpointId, now));
+                            actionSyncService.syncOnComplete(connection, project, goal, profile, policy,
+                                    checks, checkpointId, now);
                             bindWorkflowCompletion(connection, project, goal, checkpointId, summaryPath, now);
                             goalRunRepository.complete(connection, goal.goalKey(), now, now);
                             goalEventRepository.insert(connection, new GoalEvent(0L, goal.goalKey(), "goal_completed",
@@ -379,10 +400,27 @@ public final class GoalOrchestrator {
                 goal.completedAt());
     }
 
-    private GoalEvaluation evaluate(Connection connection, Path projectRoot, GoalRun goal) throws Exception {
+    private GoalEvaluation evaluate(Connection connection, Path projectRoot, GoalRun goal,
+                                    String now) throws Exception {
+        Project project = projectService.readProject(PathUtil.projectJson(projectRoot));
+        GoalProfile profile = requireProfile(projectRoot, goal.profileKey());
+        GoalCheckPolicy policy = checkPolicyService.load(projectRoot);
+        actionSyncService.syncBeforeEvaluate(connection, projectRoot, project, goal, profile, policy, now);
         return completionEvaluator.evaluate(goal, goalCheckRepository.listByGoal(connection, goal.goalKey()),
-                checkPolicyService.load(projectRoot), requireProfile(projectRoot, goal.profileKey()),
+                policy, profile,
                 goalStepRepository.listByGoal(connection, goal.goalKey()));
+    }
+
+    private List<GoalCheck> runAllChecks(Connection connection, Path projectRoot, Project project,
+                                         GoalRun goal, GoalProfile profile, GoalCheckPolicy policy,
+                                         String now) throws Exception {
+        List<GoalCheck> checks = new ArrayList<GoalCheck>();
+        for (String key : policy.requiredChecks(profile)) {
+            actionSyncService.syncBeforeCheck(connection, projectRoot, project, goal, profile, policy,
+                    key, checks, now);
+            checks.add(checkService.run(connection, projectRoot, goal, key, now, policy));
+        }
+        return checks;
     }
 
     private List<GoalCheck> single(GoalCheck check) {

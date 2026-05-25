@@ -149,8 +149,26 @@ final class SpecIntegrationTest {
         String specMarkdown = new String(Files.readAllBytes(PathUtil.specContext(tempDir.resolve("demo"))), "UTF-8");
         assertEquals(ExitCodes.SUCCESS, specExportExit);
         assertTrue(specMarkdown.contains("# SPEC_CONTEXT"));
+        assertSectionOrder(specMarkdown, "# SPEC_CONTEXT", "<generated-at>", "<spec-change>",
+                "<design>", "<notes>", "<proposal>", "<tasks>", "<acceptance>",
+                "<bound-workflows>", "<agent-instructions>");
+        assertTrue(specMarkdown.contains("change_key: order-query-api"));
+        assertTrue(specMarkdown.contains("title: 新增订单查询接口"));
+        assertTrue(specMarkdown.contains("status: draft"));
+        assertTrue(specMarkdown.contains("module: order"));
+        assertTrue(specMarkdown.contains("mode: api"));
+        assertTrue(specMarkdown.contains("summary: 为前端提供订单分页查询接口"));
         assertTrue(specMarkdown.contains("<design>"));
+        assertTrue(specMarkdown.contains("status: confirmed v2"));
+        assertTrue(specMarkdown.contains("<notes>"));
         assertTrue(specMarkdown.contains("T001 新增请求 DTO"));
+        assertTrue(specMarkdown.contains("[pending] T001 新增请求 DTO"));
+        assertTrue(specMarkdown.contains("description: 包含分页参数和筛选条件"));
+        assertTrue(specMarkdown.contains("phase: implement_minimal_change"));
+        assertTrue(specMarkdown.contains("[pending] A001 分页查询返回统一结果"));
+        assertTrue(specMarkdown.contains("expected: 接口返回 ApiResult<PageResult<OrderVO>>"));
+        assertTrue(specMarkdown.contains("- " + runKey + " implements"));
+        assertTrue(specMarkdown.contains("Treat this spec as the task contract."));
         assertTrue(specMarkdown.length() < 20 * 1024);
 
         Harness memoryExport = new Harness(tempDir);
@@ -270,6 +288,15 @@ final class SpecIntegrationTest {
             }
         }
         return "";
+    }
+
+    private void assertSectionOrder(String text, String... markers) {
+        int previous = -1;
+        for (String marker : markers) {
+            int current = text.indexOf(marker);
+            assertTrue(current > previous, "Expected marker in order: " + marker);
+            previous = current;
+        }
     }
 
     private static final class Harness {

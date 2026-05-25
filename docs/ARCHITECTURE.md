@@ -74,6 +74,8 @@ Workflow records development process state:
 
 Workflow is not a workflow engine. It persists audit state and renders short context for agents.
 
+The alpha `WORKFLOW_CONTEXT.md` export shape is documented in [EXPORT_CONTRACTS.md](EXPORT_CONTRACTS.md).
+
 ## Spec
 
 Spec records change state:
@@ -85,6 +87,8 @@ Spec records change state:
 - workflow bindings.
 
 Spec Markdown exports are context artifacts. SQLite remains source of truth.
+
+The alpha `SPEC_CONTEXT.md` export shape is documented in [EXPORT_CONTRACTS.md](EXPORT_CONTRACTS.md).
 
 ## Agent Packaging
 

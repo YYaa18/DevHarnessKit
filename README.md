@@ -66,7 +66,8 @@ RECOVERY_CONTEXT.md / SQL_RESULT.md / SPEC_CONTEXT.md / WORKFLOW_CONTEXT.md
 Agent reads short Markdown context
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for module boundaries.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for module boundaries and
+[docs/EXPORT_CONTRACTS.md](docs/EXPORT_CONTRACTS.md) for alpha Markdown export shapes.
 
 ## Requirements
 

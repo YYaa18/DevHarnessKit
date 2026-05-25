@@ -132,7 +132,23 @@ final class WorkflowIntegrationTest {
         String workflowMarkdown = new String(Files.readAllBytes(workflowContext), "UTF-8");
         assertEquals(ExitCodes.SUCCESS, exportExit);
         assertTrue(workflowMarkdown.contains("# WORKFLOW_CONTEXT"));
+        assertSectionOrder(workflowMarkdown, "# WORKFLOW_CONTEXT", "<generated-at>", "<workflow-run>",
+                "<current-phase>", "<phases>", "<pending-hard-gates>", "<agent-instructions>");
+        assertTrue(workflowMarkdown.contains("run_key: " + runKey));
+        assertTrue(workflowMarkdown.contains("workflow: api-change"));
+        assertTrue(workflowMarkdown.contains("task: 新增订单查询接口"));
+        assertTrue(workflowMarkdown.contains("module: order"));
+        assertTrue(workflowMarkdown.contains("mode: api"));
+        assertTrue(workflowMarkdown.contains("status: running"));
         assertTrue(workflowMarkdown.contains("current_phase: inspect_existing_code"));
+        assertTrue(workflowMarkdown.contains("- key: inspect_existing_code"));
+        assertTrue(workflowMarkdown.contains("- status: pending"));
+        assertTrue(workflowMarkdown.contains("Read existing endpoint/service/data-access code before editing."));
+        assertTrue(workflowMarkdown.contains("[passed] export_context"));
+        assertTrue(workflowMarkdown.contains("[pending] create_change_plan"));
+        assertTrue(workflowMarkdown.contains("- impacted_files_listed (phase: create_change_plan)"));
+        assertTrue(workflowMarkdown.contains("- user_approval_before_implementation (phase: user_approval)"));
+        assertTrue(workflowMarkdown.contains("Continue from current_phase; do not skip pending hard gates."));
         assertTrue(workflowMarkdown.length() < 12 * 1024);
 
         Harness memoryExport = new Harness(tempDir);
@@ -501,6 +517,15 @@ final class WorkflowIntegrationTest {
                      "SELECT COUNT(*) FROM " + tableName + " WHERE " + where)) {
             resultSet.next();
             return resultSet.getInt(1);
+        }
+    }
+
+    private void assertSectionOrder(String text, String... markers) {
+        int previous = -1;
+        for (String marker : markers) {
+            int current = text.indexOf(marker);
+            assertTrue(current > previous, "Expected marker in order: " + marker);
+            previous = current;
         }
     }
 

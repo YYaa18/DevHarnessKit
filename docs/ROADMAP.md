@@ -53,6 +53,25 @@ Focus: Spec alpha hardening.
 - Improve task and acceptance reporting.
 - Add fixture-based migration tests for spec schema.
 
+## 0.6.x
+
+Focus: Policy / hook alpha.
+
+- Keep project policy local-only and deny-by-default only where a policy declares restrictions.
+- Add hook coverage for goal completion, DB SQL, and context export.
+- Keep hook failures clear and recoverable.
+- Avoid treating policy as a sandbox or operating-system permission boundary.
+
+## 0.7.x
+
+Focus: Routine / metrics alpha.
+
+- Use [GOAL_METRICS_REPLAY.md](GOAL_METRICS_REPLAY.md) as the per-goal derived model.
+- Use [ROUTINE_LOCAL_CI_EXPORT.md](ROUTINE_LOCAL_CI_EXPORT.md) as the local and CI export plan.
+- Start with local/offline report generation only.
+- Keep CI exports free of raw task text, evidence, SQL results, and context Markdown by default.
+- Defer dashboards, schedulers, and model scoring until routine export contracts are stable.
+
 ## 1.0
 
 Focus: stable CLI and schema compatibility.

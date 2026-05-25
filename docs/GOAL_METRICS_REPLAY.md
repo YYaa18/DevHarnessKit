@@ -104,3 +104,5 @@ Future routine reporting can consume this model to answer questions such as:
 - what happened in a goal run without reading chat history.
 
 The first routine implementation should export derived reports under `.agents/memory/exports/` and include the schema version in every artifact.
+
+Routine local and CI export planning is documented in [ROUTINE_LOCAL_CI_EXPORT.md](ROUTINE_LOCAL_CI_EXPORT.md).

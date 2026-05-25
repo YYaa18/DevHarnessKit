@@ -62,6 +62,10 @@ Goal is not an autonomous workflow engine. It records state, renders the next de
 
 Goal metrics and replay are alpha derived models documented in [GOAL_METRICS_REPLAY.md](GOAL_METRICS_REPLAY.md). They summarize existing goal rows for future routine reporting without adding a new source of truth or public CLI surface.
 
+## Routine Reporting (Planned Alpha)
+
+Routine reporting is a planned local-only layer for summarizing repeated goal runs and CI-safe outcome artifacts. The scope and privacy boundary are documented in [ROUTINE_LOCAL_CI_EXPORT.md](ROUTINE_LOCAL_CI_EXPORT.md). There is no public `routine` command yet.
+
 ## Workflow
 
 Workflow records development process state:

@@ -16,6 +16,7 @@ Initial developer-preview release.
 - Workflow/spec export contract docs and tests for required Markdown sections, audit-state boundaries, gates, tasks, acceptance items, and workflow bindings.
 - Migration fixture coverage for v2 workflow state and richer v4 spec state, plus archive-state tests for blocked/failed versus skipped/waived spec closure.
 - Compatibility contract docs for stable-ish alpha, beta, and alpha CLI/schema/JSON/export surfaces, including downgrade and deprecation policy.
+- Module split and installer strategy decision record: keep one shaded alpha jar plus release archives in `0.1.x`, revisit memory-only/DB artifacts before promoting DB readonly or installers.
 - Sensitive-data guard for persisted and exported content paths.
 - `dhk version`.
 - File/stdin input for memory content, checkpoint summaries, SQL, and spec documents.

@@ -28,4 +28,4 @@ The repository license is MIT, but the shaded jar is a combined binary distribut
 - the shaded jar includes MySQL Connector/J 5.1.49 under GPL v2 with FOSS exception;
 - users who do not need MySQL inspection should still review the dependency notice before redistributing the shaded jar.
 
-Future releases may split the project into `dhk-core` and optional DB artifacts so memory-only users can avoid bundling MySQL Connector/J.
+Future releases may split the project into `dhk-core` and optional DB artifacts so memory-only users can avoid bundling MySQL Connector/J. The current decision is documented in [docs/decisions/0001-module-split-and-installer-strategy.md](docs/decisions/0001-module-split-and-installer-strategy.md): keep one shaded alpha jar for `0.1.x`, then revisit the split before DB readonly or installer distribution is promoted.

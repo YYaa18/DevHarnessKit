@@ -94,6 +94,79 @@ final class MemoryInitDoctorIntegrationTest {
     }
 
     @Test
+    void doctorReportsGoalConfigDiagnostics() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Harness initHarness = new Harness(tempDir);
+        new CommandRouter().run(new String[]{"memory", "init", "--project-root", "demo"}, initHarness.context());
+
+        Files.createDirectories(PathUtil.goalProfilesDirectory(root));
+        Files.write(PathUtil.goalProfile(root, "custom-api"), ("{\n"
+                + "  \"workflow_key\": \"missing-workflow\",\n"
+                + "  \"requires_spec\": \"maybe\",\n"
+                + "  \"default_mode\": \"api\",\n"
+                + "  \"actions\": \"inspect_existing_code,bad-action,verify,verify\",\n"
+                + "  \"unexpected\": \"value\"\n"
+                + "}\n").getBytes("UTF-8"));
+        Files.write(PathUtil.goalCheckPolicy(root), ("{\n"
+                + "  \"required_checks\": \"\",\n"
+                + "  \"fail_pending_hard_gates\": \"maybe\",\n"
+                + "  \"extra\": \"value\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness doctorHarness = new Harness(tempDir);
+        int exitCode = new CommandRouter().run(new String[]{
+                "doctor", "--project-root", root.toString()
+        }, doctorHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, exitCode);
+        assertTrue(doctorHarness.stderr().contains("WARNING goal_config"));
+        assertTrue(doctorHarness.stderr().contains("unknown fields: unexpected"));
+        assertTrue(doctorHarness.stderr().contains("workflow template not found: missing-workflow"));
+        assertTrue(doctorHarness.stderr().contains("actions contains invalid item: bad-action"));
+        assertTrue(doctorHarness.stderr().contains("actions contains duplicate item: verify"));
+        assertTrue(doctorHarness.stderr().contains("required_checks is empty"));
+        assertTrue(doctorHarness.stderr().contains("fail_pending_hard_gates should be true/false"));
+
+        Harness jsonDoctorHarness = new Harness(tempDir);
+        int jsonExitCode = new CommandRouter().run(new String[]{
+                "doctor", "--project-root", root.toString(), "--json"
+        }, jsonDoctorHarness.context());
+        assertEquals(ExitCodes.SUCCESS, jsonExitCode);
+        assertTrue(jsonDoctorHarness.stdout().contains("\"goal_config_warnings\": ["));
+        assertTrue(jsonDoctorHarness.stdout().contains("workflow template not found: missing-workflow"));
+    }
+
+    @Test
+    void doctorAcceptsValidGoalConfig() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Harness initHarness = new Harness(tempDir);
+        new CommandRouter().run(new String[]{"memory", "init", "--project-root", "demo"}, initHarness.context());
+
+        Files.createDirectories(PathUtil.goalProfilesDirectory(root));
+        Files.write(PathUtil.goalProfile(root, "financial-api"), ("{\n"
+                + "  \"workflow_key\": \"api-change\",\n"
+                + "  \"requires_spec\": \"true\",\n"
+                + "  \"default_mode\": \"api\",\n"
+                + "  \"actions\": \"inspect_existing_code,create_change_plan,implement_minimal_change,verify\"\n"
+                + "}\n").getBytes("UTF-8"));
+        Files.write(PathUtil.goalCheckPolicy(root), ("{\n"
+                + "  \"required_checks\": \"compile,test,sensitive,spec,workflow\",\n"
+                + "  \"compile_command\": \"mvn -q -DskipTests compile\",\n"
+                + "  \"test_command\": \"mvn -q test\",\n"
+                + "  \"fail_pending_hard_gates\": \"false\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness doctorHarness = new Harness(tempDir);
+        int exitCode = new CommandRouter().run(new String[]{
+                "doctor", "--project-root", root.toString()
+        }, doctorHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, exitCode);
+        assertTrue(doctorHarness.stdout().contains("goal_config: ok"));
+        assertEquals("", doctorHarness.stderr());
+    }
+
+    @Test
     void memoryBackupCreatesZipArchive() throws Exception {
         Path root = tempDir.resolve("demo");
         Harness initHarness = new Harness(tempDir);
@@ -136,6 +209,10 @@ final class MemoryInitDoctorIntegrationTest {
 
         private String stdout() {
             return out.toString();
+        }
+
+        private String stderr() {
+            return err.toString();
         }
     }
 

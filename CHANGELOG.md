@@ -11,6 +11,7 @@ Initial developer-preview release.
 - Goal orchestration alpha MVP: `goal start`, `goal resume`, `goal next`, `goal step`, `goal status`, `goal export`, `goal check`, `goal evaluate`, `goal complete`, schema v5, `GOAL_CONTEXT.md`, and `GOAL_SUMMARY.md`.
 - Goal evidence hardening: `goal step` validates required evidence for the current action and `goal evaluate` refuses completion until configured actions are recorded.
 - Goal-first skill hardening: wrapper project-root behavior and protocol reference docs are covered by packaging tests.
+- Goal config diagnostics: `dhk doctor` warns about invalid project-level goal profiles and check policies, including unknown fields, invalid actions, empty required checks, and missing workflow templates.
 - Sensitive-data guard for persisted and exported content paths.
 - `dhk version`.
 - File/stdin input for memory content, checkpoint summaries, SQL, and spec documents.

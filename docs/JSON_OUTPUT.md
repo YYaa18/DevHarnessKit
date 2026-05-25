@@ -51,6 +51,7 @@ memory_draft
 memory_confirmed
 checkpoint_total
 export_warnings
+goal_config_warnings
 ```
 
 `memory search`:

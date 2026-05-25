@@ -12,6 +12,7 @@ import com.devharnesskit.dhk.repository.MemoryRepository;
 import com.devharnesskit.dhk.repository.ProjectRepository;
 import com.devharnesskit.dhk.service.ProjectService;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
+import com.devharnesskit.dhk.service.goal.GoalConfigDiagnosticsService;
 import com.devharnesskit.dhk.util.JsonOutput;
 import com.devharnesskit.dhk.util.PathUtil;
 
@@ -31,21 +32,25 @@ public final class DoctorCommand implements Command {
     private final MemoryRepository memoryRepository;
     private final CheckpointRepository checkpointRepository;
     private final SensitiveDataGuard sensitiveDataGuard;
+    private final GoalConfigDiagnosticsService goalConfigDiagnosticsService;
 
     public DoctorCommand() {
         this(new DbConnectionFactory(), new ProjectService(), new ProjectRepository(),
-                new MemoryRepository(), new CheckpointRepository(), new SensitiveDataGuard());
+                new MemoryRepository(), new CheckpointRepository(), new SensitiveDataGuard(),
+                new GoalConfigDiagnosticsService());
     }
 
     DoctorCommand(DbConnectionFactory connectionFactory, ProjectService projectService,
                   ProjectRepository projectRepository, MemoryRepository memoryRepository,
-                  CheckpointRepository checkpointRepository, SensitiveDataGuard sensitiveDataGuard) {
+                  CheckpointRepository checkpointRepository, SensitiveDataGuard sensitiveDataGuard,
+                  GoalConfigDiagnosticsService goalConfigDiagnosticsService) {
         this.connectionFactory = connectionFactory;
         this.projectService = projectService;
         this.projectRepository = projectRepository;
         this.memoryRepository = memoryRepository;
         this.checkpointRepository = checkpointRepository;
         this.sensitiveDataGuard = sensitiveDataGuard;
+        this.goalConfigDiagnosticsService = goalConfigDiagnosticsService;
     }
 
     public int run(CommandContext context, Args args) {
@@ -97,13 +102,17 @@ public final class DoctorCommand implements Command {
         long memoryDraft = -1L;
         long memoryConfirmed = -1L;
         long checkpointTotal = -1L;
+        List<GoalConfigDiagnosticsService.Diagnostic> goalConfigDiagnostics;
         List<String> exportWarnings;
         if (!Files.isRegularFile(dbPath)) {
+            goalConfigDiagnostics = goalConfigDiagnosticsService.diagnose(projectRoot, null);
+            printGoalConfigDiagnostics(context, json, goalConfigDiagnostics);
             exportWarnings = scanExports(context, exportsDir, json);
             if (json) {
                 printJson(context, projectRoot, memoryDirOk, memoryDbOk, projectJsonOk, exportsDirOk,
                         sensitivePolicyStatus, mysqlDriverLoaded, schemaVersion, fts, projectRecord,
-                        memoryTotal, memoryDraft, memoryConfirmed, checkpointTotal, exportWarnings);
+                        memoryTotal, memoryDraft, memoryConfirmed, checkpointTotal, exportWarnings,
+                        goalConfigDiagnostics);
             }
             return ExitCodes.NOT_FOUND;
         }
@@ -141,26 +150,34 @@ public final class DoctorCommand implements Command {
                     context.out().println("checkpoint_total: " + checkpointTotal);
                 }
             }
+            goalConfigDiagnostics = goalConfigDiagnosticsService.diagnose(projectRoot, connection);
+            printGoalConfigDiagnostics(context, json, goalConfigDiagnostics);
         } catch (SQLException ex) {
             if (!json) {
                 context.err().println("ERROR sqlite: " + ex.getMessage());
             }
+            goalConfigDiagnostics = goalConfigDiagnosticsService.diagnose(projectRoot, null);
+            printGoalConfigDiagnostics(context, json, goalConfigDiagnostics);
             exportWarnings = scanExports(context, exportsDir, json);
             if (json) {
                 printJson(context, projectRoot, memoryDirOk, memoryDbOk, projectJsonOk, exportsDirOk,
                         sensitivePolicyStatus, mysqlDriverLoaded, schemaVersion, fts, projectRecord,
-                        memoryTotal, memoryDraft, memoryConfirmed, checkpointTotal, exportWarnings);
+                        memoryTotal, memoryDraft, memoryConfirmed, checkpointTotal, exportWarnings,
+                        goalConfigDiagnostics);
             }
             return ExitCodes.RUNTIME_ERROR;
         } catch (RuntimeException ex) {
             if (!json) {
                 context.err().println("ERROR project: " + ex.getMessage());
             }
+            goalConfigDiagnostics = goalConfigDiagnosticsService.diagnose(projectRoot, null);
+            printGoalConfigDiagnostics(context, json, goalConfigDiagnostics);
             exportWarnings = scanExports(context, exportsDir, json);
             if (json) {
                 printJson(context, projectRoot, memoryDirOk, memoryDbOk, projectJsonOk, exportsDirOk,
                         sensitivePolicyStatus, mysqlDriverLoaded, schemaVersion, fts, projectRecord,
-                        memoryTotal, memoryDraft, memoryConfirmed, checkpointTotal, exportWarnings);
+                        memoryTotal, memoryDraft, memoryConfirmed, checkpointTotal, exportWarnings,
+                        goalConfigDiagnostics);
             }
             return ExitCodes.RUNTIME_ERROR;
         }
@@ -169,7 +186,8 @@ public final class DoctorCommand implements Command {
         if (json) {
             printJson(context, projectRoot, memoryDirOk, memoryDbOk, projectJsonOk, exportsDirOk,
                     sensitivePolicyStatus, mysqlDriverLoaded, schemaVersion, fts, projectRecord,
-                    memoryTotal, memoryDraft, memoryConfirmed, checkpointTotal, exportWarnings);
+                    memoryTotal, memoryDraft, memoryConfirmed, checkpointTotal, exportWarnings,
+                    goalConfigDiagnostics);
         }
         if (!mysqlDriverLoaded) {
             return ExitCodes.RUNTIME_ERROR;
@@ -213,14 +231,33 @@ public final class DoctorCommand implements Command {
         return warnings;
     }
 
+    private void printGoalConfigDiagnostics(CommandContext context, boolean json,
+                                            List<GoalConfigDiagnosticsService.Diagnostic> diagnostics) {
+        if (json) {
+            return;
+        }
+        if (diagnostics.isEmpty()) {
+            context.out().println("goal_config: ok");
+            return;
+        }
+        for (GoalConfigDiagnosticsService.Diagnostic diagnostic : diagnostics) {
+            context.err().println("WARNING goal_config: " + diagnostic.format());
+        }
+    }
+
     private void printJson(CommandContext context, Path projectRoot, boolean memoryDirOk, boolean memoryDbOk,
                            boolean projectJsonOk, boolean exportsDirOk, String sensitivePolicyStatus,
                            boolean mysqlDriverLoaded, int schemaVersion, String fts, String projectRecord,
                            long memoryTotal, long memoryDraft, long memoryConfirmed, long checkpointTotal,
-                           List<String> exportWarnings) {
+                           List<String> exportWarnings,
+                           List<GoalConfigDiagnosticsService.Diagnostic> goalConfigDiagnostics) {
         List<String> warningJson = new ArrayList<String>();
         for (String warning : exportWarnings) {
             warningJson.add(JsonOutput.quote(warning));
+        }
+        List<String> goalConfigWarningJson = new ArrayList<String>();
+        for (GoalConfigDiagnosticsService.Diagnostic diagnostic : goalConfigDiagnostics) {
+            goalConfigWarningJson.add(JsonOutput.quote(diagnostic.format()));
         }
         context.out().print(JsonOutput.object(
                 JsonOutput.stringField("command", "doctor"),
@@ -239,7 +276,8 @@ public final class DoctorCommand implements Command {
                 JsonOutput.numberField("memory_draft", memoryDraft),
                 JsonOutput.numberField("memory_confirmed", memoryConfirmed),
                 JsonOutput.numberField("checkpoint_total", checkpointTotal),
-                JsonOutput.rawField("export_warnings", JsonOutput.array(warningJson))
+                JsonOutput.rawField("export_warnings", JsonOutput.array(warningJson)),
+                JsonOutput.rawField("goal_config_warnings", JsonOutput.array(goalConfigWarningJson))
         ));
     }
 }

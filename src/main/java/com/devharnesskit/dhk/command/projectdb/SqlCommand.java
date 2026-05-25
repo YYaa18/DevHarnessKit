@@ -14,6 +14,7 @@ import com.devharnesskit.dhk.sql.SqlExecutionRequest;
 import com.devharnesskit.dhk.sql.SqlExecutionResult;
 import com.devharnesskit.dhk.sql.SqlSafetyResult;
 import com.devharnesskit.dhk.util.InputUtil;
+import com.devharnesskit.dhk.util.JsonOutput;
 import com.devharnesskit.dhk.util.PathUtil;
 
 import java.nio.file.Files;
@@ -42,6 +43,7 @@ public final class SqlCommand implements Command {
     }
 
     public int run(CommandContext context, Args args) {
+        boolean json = args.hasFlag("json");
         String sql;
         try {
             sql = InputUtil.readExclusiveText(context, args, "sql", "sql-file", "sql-stdin", false).trim();
@@ -57,12 +59,31 @@ public final class SqlCommand implements Command {
         boolean dryRun = args.hasFlag("dry-run");
         SqlSafetyResult safety = safetyGuard.validate(sql, explain);
         if (!safety.allowed()) {
-            context.err().println("SQL rejected: " + safety.reason());
+            if (json) {
+                context.out().print(JsonOutput.object(
+                        JsonOutput.stringField("command", "db sql"),
+                        JsonOutput.stringField("status", "rejected"),
+                        JsonOutput.booleanField("dry_run", dryRun),
+                        JsonOutput.stringField("reason", safety.reason())
+                ));
+            } else {
+                context.err().println("SQL rejected: " + safety.reason());
+            }
             return ExitCodes.VALIDATION_ERROR;
         }
         if (dryRun) {
-            context.out().println("sql_safety: ok");
-            context.out().println("sql: " + sensitiveDataGuard.redact(safety.executableSql()));
+            if (json) {
+                context.out().print(JsonOutput.object(
+                        JsonOutput.stringField("command", "db sql"),
+                        JsonOutput.stringField("status", "ok"),
+                        JsonOutput.booleanField("dry_run", true),
+                        JsonOutput.booleanField("explain", explain),
+                        JsonOutput.stringField("sql", sensitiveDataGuard.redact(safety.executableSql()))
+                ));
+            } else {
+                context.out().println("sql_safety: ok");
+                context.out().println("sql: " + sensitiveDataGuard.redact(safety.executableSql()));
+            }
             return ExitCodes.SUCCESS;
         }
 
@@ -71,10 +92,11 @@ public final class SqlCommand implements Command {
             context.err().println(connectionRequest.error());
             return ExitCodes.USAGE_ERROR;
         }
+        DbRiskNotice.print(context, args);
         SqlExecutionRequest executionRequest = SqlExecutionRequest.fromArgs(safety.executableSql(), args);
         try {
             SqlExecutionResult result = executionService.execute(connectionService, connectionRequest, executionRequest);
-            String format = args.option("format", "table");
+            String format = args.hasFlag("json") && !args.hasOption("format") ? "json" : args.option("format", "table");
             String output = renderer.render(result, format, executionRequest.maxOutputBytes());
             output = sensitiveDataGuard.redact(output);
             if (sensitiveDataGuard.containsSensitiveData(output)) {
@@ -89,12 +111,37 @@ public final class SqlCommand implements Command {
             } else {
                 context.out().print(output);
             }
-            context.out().println("rows: " + result.rows().size());
-            context.out().println("truncated: " + result.truncated());
+            if (!"json".equals(format)) {
+                context.out().println("rows: " + result.rows().size());
+                context.out().println("truncated: " + result.truncated());
+            }
             return ExitCodes.SUCCESS;
         } catch (Exception ex) {
-            context.err().println("ERROR db sql failed: " + ex.getMessage());
+            String hint = connectionService.compatibilityHint(ex);
+            if (json) {
+                context.out().print(JsonOutput.object(
+                        JsonOutput.stringField("command", "db sql"),
+                        JsonOutput.stringField("status", "error"),
+                        JsonOutput.booleanField("dry_run", false),
+                        JsonOutput.stringField("error", message(ex)),
+                        JsonOutput.stringField("compatibility_hint", hint),
+                        JsonOutput.stringField("risk_warning", DbRiskNotice.text())
+                ));
+            } else {
+                context.err().println("ERROR db sql failed: " + message(ex));
+                if (hint.length() > 0) {
+                    context.err().println("compatibility_hint: " + hint);
+                }
+            }
             return ExitCodes.RUNTIME_ERROR;
         }
+    }
+
+    private String message(Exception ex) {
+        String message = ex.getMessage();
+        if (message == null) {
+            message = ex.getClass().getSimpleName();
+        }
+        return message.replaceAll("(?i)jdbc:mysql://\\S+", "[REDACTED_JDBC_URL]");
     }
 }

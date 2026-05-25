@@ -41,6 +41,8 @@ See [docs/SENSITIVE_POLICY.md](docs/SENSITIVE_POLICY.md) for the policy format.
 
 `dhk db sql` applies fail-closed SQL text checks and asks JDBC to use a read-only connection where supported.
 
+`dhk db test` and non-dry-run `dhk db sql` print a risk notice unless `--json` is used or the caller explicitly passes `--i-understand-db-readonly-risk`.
+
 These checks are guardrails only:
 
 - SQL text validation cannot prove that a database operation has no side effects.

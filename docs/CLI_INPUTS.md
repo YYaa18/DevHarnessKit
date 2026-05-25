@@ -34,6 +34,25 @@ cat query.sql | dhk db sql --dry-run --sql-stdin
 
 `--sql-file` and `--sql-stdin` still pass through the same SQL safety guard as `--sql`.
 
+When using `--host` and `--database` instead of an explicit `--jdbc-url`, DevHarness Kit builds a Connector/J 5.1-compatible MySQL URL. Optional compatibility parameters include:
+
+```bash
+dhk db test \
+  --host 127.0.0.1 \
+  --database demo \
+  --server-timezone Asia/Shanghai \
+  --allow-public-key-retrieval \
+  --jdbc-params "tinyInt1isBit=false"
+```
+
+Use explicit `--jdbc-url` for production or any environment that needs audited connection parameters.
+
+Real DB connections print a readonly risk notice to stderr. Scripts that already enforce readonly credentials can suppress the human notice with:
+
+```bash
+--i-understand-db-readonly-risk
+```
+
 ## Spec Documents
 
 Use exactly one document source:
@@ -72,6 +91,9 @@ Use `--json` for machine-readable output:
 dhk doctor --json
 dhk memory search --q gateway --json
 dhk memory export --task "Order API" --module order --json
+dhk db test --jdbc-url <url> --user <user> --password-env <env> --json
+dhk db sql --dry-run --sql "SELECT 1" --json
+dhk db sql --sql "SELECT 1" --format json --jdbc-url <url> --user <user> --password-env <env>
 dhk goal status --goal <goal-key> --json
 dhk goal check --goal <goal-key> --all --json
 dhk goal evaluate --goal <goal-key> --json
@@ -79,6 +101,8 @@ dhk goal complete --goal <goal-key> --json
 ```
 
 JSON output is intended for scripts and agents. It is still alpha and may expand before 1.0, but existing field names should be changed conservatively. See [JSON_OUTPUT.md](JSON_OUTPUT.md) for required fields and not-ready behavior.
+
+For `dhk db sql --format json`, `output_truncated: true` means the row data was omitted to keep stdout valid JSON within the configured output limit.
 
 ## Backup
 

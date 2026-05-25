@@ -51,6 +51,36 @@ final class DbSqlDryRunIntegrationTest {
     }
 
     @Test
+    void dryRunCanReturnJson() {
+        Harness harness = new Harness(tempDir);
+
+        int exitCode = new CommandRouter().run(new String[]{
+                "db", "sql", "--dry-run", "--json", "--sql", "SELECT 1"
+        }, harness.context());
+
+        assertEquals(ExitCodes.SUCCESS, exitCode);
+        assertTrue(harness.stdout().contains("\"command\": \"db sql\""));
+        assertTrue(harness.stdout().contains("\"status\": \"ok\""));
+        assertTrue(harness.stdout().contains("\"dry_run\": true"));
+        assertTrue(harness.stdout().contains("\"sql\": \"SELECT 1\""));
+    }
+
+    @Test
+    void dryRunJsonReportsRejectedSql() {
+        Harness harness = new Harness(tempDir);
+
+        int exitCode = new CommandRouter().run(new String[]{
+                "db", "sql", "--dry-run", "--json", "--sql", "DELETE FROM t_order"
+        }, harness.context());
+
+        assertEquals(ExitCodes.VALIDATION_ERROR, exitCode);
+        assertTrue(harness.stdout().contains("\"command\": \"db sql\""));
+        assertTrue(harness.stdout().contains("\"status\": \"rejected\""));
+        assertTrue(harness.stdout().contains("\"reason\": \"high risk SQL pattern is not allowed\""));
+        assertEquals("", harness.stderr());
+    }
+
+    @Test
     void dryRunKeepsSqlExecutableButRedactsPolicyOutput() throws Exception {
         Path projectRoot = tempDir.resolve("demo");
         Files.createDirectories(PathUtil.devharnessDirectory(projectRoot));

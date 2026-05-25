@@ -2,8 +2,10 @@ package com.devharnesskit.dhk.export;
 
 import com.devharnesskit.dhk.sql.SqlColumn;
 import com.devharnesskit.dhk.sql.SqlExecutionResult;
+import com.devharnesskit.dhk.util.JsonOutput;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 
 public final class SqlResultRenderer {
@@ -15,12 +17,36 @@ public final class SqlResultRenderer {
 
     public String render(SqlExecutionResult result, String format, int maxOutputBytes) {
         String output;
-        if ("md".equals(format)) {
+        if ("json".equals(format)) {
+            return jsonWithinLimit(result, maxOutputBytes);
+        } else if ("md".equals(format)) {
             output = markdown(result);
         } else {
             output = table(result);
         }
         return limitUtf8(output, maxOutputBytes);
+    }
+
+    private String json(SqlExecutionResult result, boolean outputTruncated) {
+        return JsonOutput.object(
+                JsonOutput.stringField("command", "db sql"),
+                JsonOutput.stringField("status", "ok"),
+                JsonOutput.numberField("rows", result.rows().size()),
+                JsonOutput.booleanField("truncated", result.truncated() || outputTruncated),
+                JsonOutput.booleanField("output_truncated", outputTruncated),
+                JsonOutput.rawField("columns", jsonColumns(result.columns())),
+                JsonOutput.rawField("data", outputTruncated ? "[]" : jsonRows(result.rows())),
+                JsonOutput.stringField("risk_warning", "SQL guard and JDBC read-only mode are not database "
+                        + "permission boundaries; use a database account with read-only privileges.")
+        );
+    }
+
+    private String jsonWithinLimit(SqlExecutionResult result, int maxOutputBytes) {
+        String output = json(result, false);
+        if (output.getBytes(StandardCharsets.UTF_8).length <= Math.max(1, maxOutputBytes)) {
+            return output;
+        }
+        return json(result, true);
     }
 
     private String markdown(SqlExecutionResult result) {
@@ -67,6 +93,29 @@ public final class SqlResultRenderer {
 
     private String escapeMarkdown(String value) {
         return value == null ? "" : value.replace("|", "\\|").replace("\n", " ");
+    }
+
+    private String jsonColumns(List<SqlColumn> columns) {
+        List<String> values = new ArrayList<String>();
+        for (SqlColumn column : columns) {
+            values.add(JsonOutput.object(
+                    JsonOutput.stringField("name", column.name()),
+                    JsonOutput.stringField("type", column.type())
+            ).trim());
+        }
+        return JsonOutput.array(values);
+    }
+
+    private String jsonRows(List<List<String>> rows) {
+        List<String> values = new ArrayList<String>();
+        for (List<String> row : rows) {
+            List<String> cells = new ArrayList<String>();
+            for (String cell : row) {
+                cells.add(JsonOutput.quote(cell == null ? "" : cell));
+            }
+            values.add(JsonOutput.array(cells));
+        }
+        return JsonOutput.array(values);
     }
 
     private String limitUtf8(String output, int maxOutputBytes) {

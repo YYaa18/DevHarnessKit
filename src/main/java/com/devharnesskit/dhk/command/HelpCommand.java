@@ -22,6 +22,7 @@ public final class HelpCommand implements Command {
         context.out().println("  dhk memory recover --latest");
         context.out().println("  dhk memory backup [--out <path>]");
         context.out().println("  dhk db test --jdbc-url <url> --user <user> --password-env <env>");
+        context.out().println("  dhk db test --host <host> --database <db> [--server-timezone <zone>]");
         context.out().println("  dhk db sql --sql <sql>|--sql-file <path>|--sql-stdin --password-env <env>");
         context.out().println("  dhk goal start --profile <profile> --task <task> [--module <module>] [--mode <mode>]");
         context.out().println("  dhk goal resume [--goal <goal-key>]");
@@ -60,6 +61,7 @@ public final class HelpCommand implements Command {
         context.out().println("  .agents/devharness/goal-check-policy.json can configure required goal checks.");
         context.out().println("Machine-readable output:");
         context.out().println("  Supported commands accept --json for alpha JSON output.");
+        context.out().println("  dhk db sql also supports --format json for query results.");
         context.out().println();
         context.out().println("Exit codes:");
         context.out().println("  0 success");

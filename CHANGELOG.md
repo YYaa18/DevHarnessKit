@@ -14,6 +14,7 @@ Initial developer-preview release.
 - File/stdin input for memory content, checkpoint summaries, SQL, and spec documents.
 - `memory search --explain`.
 - `--json` output for doctor, memory search/export, and goal status/check/evaluate/complete.
+- DB readonly beta hardening: MySQL URL compatibility flags, DB risk notice, `db test --json`, `db sql --dry-run --json`, and `db sql --format json`.
 - `memory backup`.
 - Automatic pre-migration memory backups with old-db fixture coverage.
 - Section-budgeted `CURRENT_CONTEXT.md` with a truncation report.

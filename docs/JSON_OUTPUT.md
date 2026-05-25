@@ -4,12 +4,7 @@ DevHarness Kit supports alpha JSON output for scripts and agents.
 
 JSON output is an alpha contract in `0.1.x`: supported commands and existing field names should change conservatively, but fields may be added before 1.0.
 
-Use either:
-
-```bash
---json
---format json
-```
+Use `--json` for command status output. Use `--format json` only where a command explicitly documents JSON data output, such as `dhk db sql` query results.
 
 ## Supported Commands
 
@@ -17,6 +12,9 @@ Use either:
 dhk doctor --json
 dhk memory search --q gateway --json
 dhk memory export --task "Order API" --module order --json
+dhk db test --jdbc-url <url> --user <user> --password-env <env> --json
+dhk db sql --dry-run --sql "SELECT 1" --json
+dhk db sql --sql "SELECT 1" --format json --jdbc-url <url> --user <user> --password-env <env>
 dhk goal status --goal <goal-key> --json
 dhk goal check --goal <goal-key> --all --json
 dhk goal evaluate --goal <goal-key> --json
@@ -95,6 +93,48 @@ module
 mode
 workflow_run
 spec_change
+```
+
+`db test`:
+
+```text
+command
+status
+probe_select_1_ok
+probes
+risk_warning
+```
+
+`db sql --dry-run --json` success:
+
+```text
+command
+status
+dry_run
+explain
+sql
+```
+
+`db sql --dry-run --json` rejected:
+
+```text
+command
+status
+dry_run
+reason
+```
+
+`db sql --format json` query result:
+
+```text
+command
+status
+rows
+truncated
+output_truncated
+columns
+data
+risk_warning
 ```
 
 `goal status`:

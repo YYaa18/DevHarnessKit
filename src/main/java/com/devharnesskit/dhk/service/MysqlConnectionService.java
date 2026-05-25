@@ -8,6 +8,8 @@ import java.io.InputStreamReader;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
 
@@ -21,9 +23,8 @@ public final class MysqlConnectionService {
                 return DbConnectionRequest.invalid("Missing connection parameters: use --jdbc-url or --host --database");
             }
             String port = args.option("port", "3306").trim();
-            jdbcUrl = "jdbc:mysql://" + host + ":" + port + "/" + database
-                    + "?useUnicode=true&characterEncoding=utf8&useSSL=false"
-                    + "&zeroDateTimeBehavior=convertToNull";
+            jdbcUrl = "jdbc:mysql://" + host + ":" + port + "/" + database + "?"
+                    + connectionParameters(args);
         }
         if (!jdbcUrl.toLowerCase(Locale.ROOT).startsWith("jdbc:mysql://")) {
             return DbConnectionRequest.invalid("Only jdbc:mysql:// URLs are allowed");
@@ -54,6 +55,50 @@ public final class MysqlConnectionService {
         int connectTimeoutMs = parseInt(args.option("connect-timeout-ms", "5000"), 5000);
         int socketTimeoutMs = parseInt(args.option("socket-timeout-ms", "30000"), 30000);
         return new DbConnectionRequest(true, "", jdbcUrl, user, password, connectTimeoutMs, socketTimeoutMs);
+    }
+
+    private String connectionParameters(Args args) {
+        List<String> params = new ArrayList<String>();
+        params.add("useUnicode=true");
+        params.add("characterEncoding=" + option(args, "character-encoding", "utf8"));
+        params.add("useSSL=" + option(args, "use-ssl", "false"));
+        params.add("zeroDateTimeBehavior=" + option(args, "zero-date-time-behavior", "convertToNull"));
+        if (args.hasOption("server-timezone")) {
+            params.add("serverTimezone=" + args.option("server-timezone").trim());
+        }
+        if (args.hasFlag("allow-public-key-retrieval")) {
+            params.add("allowPublicKeyRetrieval=true");
+        }
+        if (args.hasOption("jdbc-params")) {
+            appendRawParams(params, args.option("jdbc-params"));
+        }
+        return join(params, "&");
+    }
+
+    private String option(Args args, String key, String defaultValue) {
+        String value = args.option(key, defaultValue).trim();
+        return value.length() == 0 ? defaultValue : value;
+    }
+
+    private void appendRawParams(List<String> params, String rawParams) {
+        String normalized = rawParams == null ? "" : rawParams.trim();
+        while (normalized.startsWith("?") || normalized.startsWith("&")) {
+            normalized = normalized.substring(1);
+        }
+        if (normalized.length() > 0) {
+            params.add(normalized);
+        }
+    }
+
+    private String join(List<String> values, String separator) {
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < values.size(); i++) {
+            if (i > 0) {
+                builder.append(separator);
+            }
+            builder.append(values.get(i));
+        }
+        return builder.toString();
     }
 
     public Connection open(DbConnectionRequest request) throws SQLException, ClassNotFoundException {

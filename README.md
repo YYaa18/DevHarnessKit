@@ -154,7 +154,7 @@ java -jar target/dhk-cli-0.1.0-alpha-all.jar memory export \
   --keywords "gateway,mybatis,mysql"
 ```
 
-Use `--json` for machine-readable output on supported commands such as `doctor`, `memory search`, `memory export`, `goal status`, `goal check`, `goal evaluate`, and `goal complete`.
+Use `--json` for machine-readable output on supported commands such as `doctor`, `memory search`, `memory export`, `db test`, `db sql --dry-run`, `goal status`, `goal check`, `goal evaluate`, and `goal complete`. Use `dhk db sql --format json` for JSON query results.
 
 Seed workflow templates and start a run:
 

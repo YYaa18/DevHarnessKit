@@ -17,9 +17,10 @@ Focus: Memory core readiness.
 
 Focus: DB readonly as an optional beta module.
 
-- Move toward modern MySQL Connector/J support.
+- Keep Connector/J 5.1 as the default while the production floor is MySQL 5.1; add compatibility flags for local MySQL 8.
 - Make DB risk warnings and docs more visible.
 - Add `--sql-file` and `--sql-stdin`.
+- Add machine-readable DB probe and dry-run output.
 - Consider separating memory-only and DB-enabled artifacts.
 
 ## 0.3.x

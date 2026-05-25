@@ -62,6 +62,41 @@ dhk db test \
 
 Only add `allowPublicKeyRetrieval=true` for local or disposable test databases, not production.
 
+If you prefer `--host` and `--database` over a full JDBC URL, the CLI builds this conservative baseline:
+
+```text
+useUnicode=true
+characterEncoding=utf8
+useSSL=false
+zeroDateTimeBehavior=convertToNull
+```
+
+Optional compatibility flags:
+
+```bash
+dhk db test \
+  --host 127.0.0.1 \
+  --database your_db \
+  --user dhk_readonly \
+  --password-env DHK_DB_PASSWORD \
+  --server-timezone Asia/Shanghai \
+  --allow-public-key-retrieval \
+  --jdbc-params "tinyInt1isBit=false"
+```
+
+Supported URL-building options:
+
+```text
+--server-timezone <zone>          appends serverTimezone=<zone>
+--use-ssl <true|false>           overrides the default useSSL=false
+--character-encoding <encoding>  overrides the default characterEncoding=utf8
+--zero-date-time-behavior <mode> overrides the default zeroDateTimeBehavior=convertToNull
+--allow-public-key-retrieval     appends allowPublicKeyRetrieval=true
+--jdbc-params <query-string>     appends additional raw JDBC query parameters
+```
+
+For production, prefer an explicit `--jdbc-url` that has been reviewed by your DBA or platform team.
+
 ## `dhk db test` Output
 
 `dhk db test` prints connection and capability diagnostics:
@@ -84,6 +119,8 @@ server_version_comment: ...
 ```
 
 Treat failed optional probes as compatibility information, not always as fatal errors. `probe_select_1` should be `ok` before using `dhk db sql`.
+
+`dhk db test --json` emits the same probe lines as a `probes` array for scripts.
 
 ## Common Failures
 

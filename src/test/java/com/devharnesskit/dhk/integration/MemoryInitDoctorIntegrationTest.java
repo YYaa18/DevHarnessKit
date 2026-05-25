@@ -109,6 +109,7 @@ final class MemoryInitDoctorIntegrationTest {
                 + "}\n").getBytes("UTF-8"));
         Files.write(PathUtil.goalCheckPolicy(root), ("{\n"
                 + "  \"required_checks\": \"\",\n"
+                + "  \"accepted_compile_statuses\": \"passed,unknown\",\n"
                 + "  \"fail_pending_hard_gates\": \"maybe\",\n"
                 + "  \"extra\": \"value\"\n"
                 + "}\n").getBytes("UTF-8"));
@@ -125,6 +126,7 @@ final class MemoryInitDoctorIntegrationTest {
         assertTrue(doctorHarness.stderr().contains("actions contains invalid item: bad-action"));
         assertTrue(doctorHarness.stderr().contains("actions contains duplicate item: verify"));
         assertTrue(doctorHarness.stderr().contains("required_checks is empty"));
+        assertTrue(doctorHarness.stderr().contains("accepted_compile_statuses contains unsupported item: unknown"));
         assertTrue(doctorHarness.stderr().contains("fail_pending_hard_gates should be true/false"));
 
         Harness jsonDoctorHarness = new Harness(tempDir);
@@ -153,7 +155,12 @@ final class MemoryInitDoctorIntegrationTest {
                 + "  \"required_checks\": \"compile,test,sensitive,spec,workflow\",\n"
                 + "  \"compile_command\": \"mvn -q -DskipTests compile\",\n"
                 + "  \"test_command\": \"mvn -q test\",\n"
-                + "  \"fail_pending_hard_gates\": \"false\"\n"
+                + "  \"fail_pending_hard_gates\": \"false\",\n"
+                + "  \"accepted_compile_statuses\": \"passed\",\n"
+                + "  \"accepted_test_statuses\": \"passed\",\n"
+                + "  \"accepted_sensitive_statuses\": \"passed\",\n"
+                + "  \"accepted_spec_statuses\": \"passed\",\n"
+                + "  \"accepted_workflow_statuses\": \"passed,skipped,waived\"\n"
                 + "}\n").getBytes("UTF-8"));
 
         Harness doctorHarness = new Harness(tempDir);

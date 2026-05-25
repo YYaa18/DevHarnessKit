@@ -57,7 +57,12 @@ Example:
   "required_checks": "compile,test,sensitive,spec,workflow",
   "compile_command": "mvn -q -DskipTests compile",
   "test_command": "mvn -q test",
-  "fail_pending_hard_gates": "false"
+  "fail_pending_hard_gates": "false",
+  "accepted_compile_statuses": "passed",
+  "accepted_test_statuses": "passed",
+  "accepted_sensitive_statuses": "passed",
+  "accepted_spec_statuses": "passed",
+  "accepted_workflow_statuses": "passed,skipped,waived"
 }
 ```
 
@@ -70,6 +75,18 @@ For a non-Maven project or a controlled internal flow, narrow the required check
 }
 ```
 
+If a non-Maven flow still needs a compile placeholder, explicitly allow `skipped`:
+
+```json
+{
+  "required_checks": "compile,sensitive",
+  "accepted_compile_statuses": "passed,skipped",
+  "accepted_sensitive_statuses": "passed"
+}
+```
+
+Built-in Java profiles (`java-api-change` and `java-mvc-change`) default to strict accepted statuses for `compile`, `test`, `sensitive`, and spec-required `spec`: those checks must be `passed`. This prevents a missing `pom.xml` from silently satisfying completion through skipped compile/test checks. Use project policy to deliberately relax non-Maven or transitional flows.
+
 The command parser is intentionally simple and splits `compile_command` and `test_command` by whitespace. Use wrapper scripts when commands need quoting or shell features.
 
 ## Doctor Diagnostics
@@ -80,6 +97,7 @@ The command parser is intentionally simple and splits `compile_command` and `tes
 - invalid or empty action lists;
 - empty `required_checks`;
 - unsupported check names;
+- unsupported accepted check statuses;
 - invalid boolean values;
 - profile `workflow_key` values that do not match known workflow templates.
 
@@ -94,7 +112,11 @@ Financial projects often need email, phone, and ID-card values in legitimate doc
   "required_checks": "compile,test,sensitive,spec,workflow",
   "compile_command": "mvn -q -DskipTests compile",
   "test_command": "mvn -q test",
-  "fail_pending_hard_gates": "true"
+  "fail_pending_hard_gates": "true",
+  "accepted_compile_statuses": "passed",
+  "accepted_test_statuses": "passed",
+  "accepted_sensitive_statuses": "passed",
+  "accepted_spec_statuses": "passed"
 }
 ```
 

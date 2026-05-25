@@ -227,7 +227,7 @@ java -jar target/dhk-cli-0.1.0-alpha-all.jar goal complete --project-root . --go
 
 For agent-facing usage, `.agents/skills/devharness-goal-development/` provides goal-first wrapper scripts such as `goal-start.sh`, `goal-next.sh`, `goal-step.sh`, `goal-check.sh`, `goal-evaluate.sh`, and `goal-complete.sh`.
 
-Projects can customize goal profiles and required checks with `.agents/devharness/goal-profiles/*.json` and `.agents/devharness/goal-check-policy.json`.
+Projects can customize goal profiles, required checks, and accepted check statuses with `.agents/devharness/goal-profiles/*.json` and `.agents/devharness/goal-check-policy.json`.
 
 ## Safety Model
 

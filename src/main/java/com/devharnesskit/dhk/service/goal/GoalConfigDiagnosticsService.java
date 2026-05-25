@@ -24,8 +24,10 @@ public final class GoalConfigDiagnosticsService {
     private static final Pattern ACTION_PATTERN = Pattern.compile("[a-z][a-z0-9_]*");
     private static final Set<String> PROFILE_FIELDS = set("workflow_key", "requires_spec", "default_mode", "actions");
     private static final Set<String> POLICY_FIELDS = set("required_checks", "compile_command", "test_command",
-            "fail_pending_hard_gates");
+            "fail_pending_hard_gates", "accepted_compile_statuses", "accepted_test_statuses",
+            "accepted_sensitive_statuses", "accepted_spec_statuses", "accepted_workflow_statuses");
     private static final Set<String> CHECK_KEYS = set("compile", "test", "sensitive", "spec", "workflow");
+    private static final Set<String> CHECK_STATUSES = set("passed", "skipped", "waived");
     private static final Set<String> BUILT_IN_WORKFLOW_KEYS = set("api-change", "mvc-change",
             "systematic-debugging", "safe-refactor", "sql-review", "code-review");
 
@@ -124,6 +126,20 @@ public final class GoalConfigDiagnosticsService {
             diagnostics.add(warning(file.toString(),
                     "fail_pending_hard_gates should be true/false, yes/no, or 1/0"));
         }
+        diagnoseAcceptedStatuses(file, raw, diagnostics);
+    }
+
+    private void diagnoseAcceptedStatuses(Path file, Map<String, String> raw, List<Diagnostic> diagnostics) {
+        diagnoseList(file, "accepted_compile_statuses", raw.get("accepted_compile_statuses"),
+                KEY_PATTERN, CHECK_STATUSES, false, diagnostics);
+        diagnoseList(file, "accepted_test_statuses", raw.get("accepted_test_statuses"),
+                KEY_PATTERN, CHECK_STATUSES, false, diagnostics);
+        diagnoseList(file, "accepted_sensitive_statuses", raw.get("accepted_sensitive_statuses"),
+                KEY_PATTERN, CHECK_STATUSES, false, diagnostics);
+        diagnoseList(file, "accepted_spec_statuses", raw.get("accepted_spec_statuses"),
+                KEY_PATTERN, CHECK_STATUSES, false, diagnostics);
+        diagnoseList(file, "accepted_workflow_statuses", raw.get("accepted_workflow_statuses"),
+                KEY_PATTERN, CHECK_STATUSES, false, diagnostics);
     }
 
     private void diagnoseList(Path file, String field, String value, Pattern format,
@@ -136,9 +152,14 @@ public final class GoalConfigDiagnosticsService {
         }
         String text = value.trim();
         if (text.length() == 0) {
-            String fallback = "required_checks".equals(field)
-                    ? "; default checks will be used"
-                    : "; configured profile will be ignored";
+            String fallback;
+            if ("required_checks".equals(field)) {
+                fallback = "; default checks will be used";
+            } else if (field.startsWith("accepted_")) {
+                fallback = "; default accepted statuses will be used";
+            } else {
+                fallback = "; configured profile will be ignored";
+            }
             diagnostics.add(warning(file.toString(), field + " is empty" + fallback));
             return;
         }

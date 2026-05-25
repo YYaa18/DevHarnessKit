@@ -1,16 +1,35 @@
 package com.devharnesskit.dhk.service.goal;
 
+import com.devharnesskit.dhk.model.goal.GoalProfile;
+
 public final class GoalCheckPolicy {
     public static final String[] DEFAULT_REQUIRED_CHECKS =
             new String[]{"compile", "test", "sensitive", "spec", "workflow"};
+    private static final String[] DEFAULT_ACCEPTED_STATUSES =
+            new String[]{"passed", "skipped", "waived"};
+    private static final String[] PASSED_ONLY = new String[]{"passed"};
 
     private final String[] requiredChecks;
     private final String[] compileCommand;
     private final String[] testCommand;
     private final boolean failPendingHardGates;
+    private final String[] acceptedCompileStatuses;
+    private final String[] acceptedTestStatuses;
+    private final String[] acceptedSensitiveStatuses;
+    private final String[] acceptedSpecStatuses;
+    private final String[] acceptedWorkflowStatuses;
 
     public GoalCheckPolicy(String[] requiredChecks, String[] compileCommand,
                            String[] testCommand, boolean failPendingHardGates) {
+        this(requiredChecks, compileCommand, testCommand, failPendingHardGates,
+                new String[0], new String[0], new String[0], new String[0], new String[0]);
+    }
+
+    public GoalCheckPolicy(String[] requiredChecks, String[] compileCommand,
+                           String[] testCommand, boolean failPendingHardGates,
+                           String[] acceptedCompileStatuses, String[] acceptedTestStatuses,
+                           String[] acceptedSensitiveStatuses, String[] acceptedSpecStatuses,
+                           String[] acceptedWorkflowStatuses) {
         this.requiredChecks = requiredChecks == null || requiredChecks.length == 0
                 ? DEFAULT_REQUIRED_CHECKS
                 : requiredChecks;
@@ -21,6 +40,11 @@ public final class GoalCheckPolicy {
                 ? new String[]{"mvn", "-q", "test"}
                 : testCommand;
         this.failPendingHardGates = failPendingHardGates;
+        this.acceptedCompileStatuses = acceptedCompileStatuses == null ? new String[0] : acceptedCompileStatuses;
+        this.acceptedTestStatuses = acceptedTestStatuses == null ? new String[0] : acceptedTestStatuses;
+        this.acceptedSensitiveStatuses = acceptedSensitiveStatuses == null ? new String[0] : acceptedSensitiveStatuses;
+        this.acceptedSpecStatuses = acceptedSpecStatuses == null ? new String[0] : acceptedSpecStatuses;
+        this.acceptedWorkflowStatuses = acceptedWorkflowStatuses == null ? new String[0] : acceptedWorkflowStatuses;
     }
 
     public static GoalCheckPolicy defaults() {
@@ -43,5 +67,72 @@ public final class GoalCheckPolicy {
 
     public boolean failPendingHardGates() {
         return failPendingHardGates;
+    }
+
+    public boolean accepts(String checkKey, String status, GoalProfile profile) {
+        String[] accepted = acceptedStatuses(checkKey, profile);
+        for (String value : accepted) {
+            if (value.equals(status)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public String acceptedStatusesText(String checkKey, GoalProfile profile) {
+        return join(acceptedStatuses(checkKey, profile));
+    }
+
+    public String[] acceptedStatuses(String checkKey, GoalProfile profile) {
+        String[] configured = configuredAcceptedStatuses(checkKey);
+        if (configured.length > 0) {
+            return configured;
+        }
+        if (isBuiltInJavaProfile(profile)) {
+            if ("compile".equals(checkKey) || "test".equals(checkKey) || "sensitive".equals(checkKey)) {
+                return PASSED_ONLY;
+            }
+            if ("spec".equals(checkKey) && profile.specRequired()) {
+                return PASSED_ONLY;
+            }
+        }
+        return DEFAULT_ACCEPTED_STATUSES;
+    }
+
+    private String[] configuredAcceptedStatuses(String checkKey) {
+        if ("compile".equals(checkKey)) {
+            return acceptedCompileStatuses;
+        }
+        if ("test".equals(checkKey)) {
+            return acceptedTestStatuses;
+        }
+        if ("sensitive".equals(checkKey)) {
+            return acceptedSensitiveStatuses;
+        }
+        if ("spec".equals(checkKey)) {
+            return acceptedSpecStatuses;
+        }
+        if ("workflow".equals(checkKey)) {
+            return acceptedWorkflowStatuses;
+        }
+        return new String[0];
+    }
+
+    private boolean isBuiltInJavaProfile(GoalProfile profile) {
+        if (profile == null) {
+            return false;
+        }
+        return "java-api-change".equals(profile.profileKey()) || "java-mvc-change".equals(profile.profileKey());
+    }
+
+    private String join(String[] values) {
+        StringBuilder builder = new StringBuilder();
+        for (String value : values) {
+            if (builder.length() > 0) {
+                builder.append(',');
+            }
+            builder.append(value);
+        }
+        return builder.toString();
     }
 }

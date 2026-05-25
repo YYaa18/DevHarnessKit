@@ -143,18 +143,19 @@ final class GoalIntegrationTest {
                 "--project-root", "demo",
                 "--goal", goalKey,
                 "--summary", "Recorded verification evidence",
-                "--evidence", "compile_result=skipped; test_result=goal integration; sensitive_result=ok"
+                "--evidence", "compile_result=will run; test_result=goal integration; sensitive_result=ok"
         }, verifyStep.context());
         assertEquals(ExitCodes.SUCCESS, verifyStepExit);
         assertTrue(verifyStep.stdout().contains("current_action: verify"));
 
+        writeMinimalPom(root);
         Harness check = new Harness(tempDir);
         int checkExit = new CommandRouter().run(new String[]{
                 "goal", "check", "--project-root", "demo", "--goal", goalKey, "--all"
         }, check.context());
         assertEquals(ExitCodes.SUCCESS, checkExit);
         assertTrue(check.stdout().contains("check_key: compile"));
-        assertTrue(check.stdout().contains("status: skipped"));
+        assertTrue(check.stdout().contains("status: passed"));
         assertTrue(check.stdout().contains("step_count_at_check: 4"));
         assertTrue(check.stdout().contains("check_key: sensitive"));
         assertTrue(Files.isRegularFile(PathUtil.goalCheckArtifactsDirectory(root, goalKey).resolve("compile.log")));
@@ -327,6 +328,113 @@ final class GoalIntegrationTest {
         assertTrue(complete.stdout().contains("decision: not_ready"));
         assertTrue(complete.stdout().contains("check sensitive is failed"));
         assertFalse(complete.stdout().contains(rawSecret));
+    }
+
+    @Test
+    void javaGoalCannotCompleteWithSkippedCompileOrTestChecks() throws Exception {
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "java-api-change",
+                "--task", "Java no pom guard",
+                "--module", "goal",
+                "--mode", "api"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        recordJavaGoalSteps(goalKey);
+
+        Harness check = new Harness(tempDir);
+        int checkExit = new CommandRouter().run(new String[]{
+                "goal", "check", "--project-root", "demo", "--goal", goalKey, "--all"
+        }, check.context());
+        assertEquals(ExitCodes.SUCCESS, checkExit);
+        assertTrue(check.stdout().contains("check_key: compile"));
+        assertTrue(check.stdout().contains("status: skipped"));
+        assertTrue(check.stdout().contains("check_key: test"));
+
+        Harness evaluate = new Harness(tempDir);
+        int evaluateExit = new CommandRouter().run(new String[]{
+                "goal", "evaluate", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, evaluate.context());
+        assertEquals(ExitCodes.SUCCESS, evaluateExit);
+        assertTrue(evaluate.stdout().contains("\"decision\": \"not_ready\""));
+        assertTrue(evaluate.stdout().contains("check compile is skipped; accepted_statuses=passed"));
+        assertTrue(evaluate.stdout().contains("check test is skipped; accepted_statuses=passed"));
+
+        Harness complete = new Harness(tempDir);
+        int completeExit = new CommandRouter().run(new String[]{
+                "goal", "complete", "--project-root", "demo", "--goal", goalKey
+        }, complete.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, completeExit);
+        assertTrue(complete.stdout().contains("decision: not_ready"));
+        assertTrue(complete.stdout().contains("check compile is skipped; accepted_statuses=passed"));
+    }
+
+    @Test
+    void customPolicyCanAcceptSkippedCompileForNonMavenFlow() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Files.createDirectories(PathUtil.goalProfilesDirectory(root));
+        Files.write(PathUtil.goalProfile(root, "custom-non-maven"), ("{\n"
+                + "  \"workflow_key\": \"api-change\",\n"
+                + "  \"requires_spec\": \"false\",\n"
+                + "  \"default_mode\": \"api\",\n"
+                + "  \"actions\": \"inspect,verify\"\n"
+                + "}\n").getBytes("UTF-8"));
+        Files.write(PathUtil.goalCheckPolicy(root), ("{\n"
+                + "  \"required_checks\": \"compile,sensitive\",\n"
+                + "  \"accepted_compile_statuses\": \"passed,skipped\",\n"
+                + "  \"accepted_sensitive_statuses\": \"passed\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "custom-non-maven",
+                "--task", "Non Maven accepted skipped compile",
+                "--module", "goal"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        Harness inspectStep = new Harness(tempDir);
+        int inspectStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Inspection complete",
+                "--evidence", "evidence=inspection"
+        }, inspectStep.context());
+        assertEquals(ExitCodes.SUCCESS, inspectStepExit);
+
+        Harness verifyStep = new Harness(tempDir);
+        int verifyStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Verification complete",
+                "--evidence", "compile_result=skipped by policy; test_result=not required; sensitive_result=ok"
+        }, verifyStep.context());
+        assertEquals(ExitCodes.SUCCESS, verifyStepExit);
+
+        Harness check = new Harness(tempDir);
+        int checkExit = new CommandRouter().run(new String[]{
+                "goal", "check", "--project-root", "demo", "--goal", goalKey, "--all"
+        }, check.context());
+        assertEquals(ExitCodes.SUCCESS, checkExit);
+        assertTrue(check.stdout().contains("check_key: compile"));
+        assertTrue(check.stdout().contains("status: skipped"));
+        assertTrue(check.stdout().contains("step_count_at_check: 2"));
+
+        Harness evaluate = new Harness(tempDir);
+        int evaluateExit = new CommandRouter().run(new String[]{
+                "goal", "evaluate", "--project-root", "demo", "--goal", goalKey
+        }, evaluate.context());
+        assertEquals(ExitCodes.SUCCESS, evaluateExit);
+        assertTrue(evaluate.stdout().contains("decision: ready_to_complete"));
     }
 
     @Test
@@ -528,6 +636,62 @@ final class GoalIntegrationTest {
         assertTrue(completeJson.stdout().contains("\"command\": \"goal complete\""));
         assertTrue(completeJson.stdout().contains("\"status\": \"completed\""));
         assertTrue(completeJson.stdout().contains("\"summary_path\": "));
+    }
+
+    private void recordJavaGoalSteps(String goalKey) {
+        Harness inspectStep = new Harness(tempDir);
+        int inspectStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Inspected existing controller/service/mapper/tests",
+                "--changed-files", "",
+                "--evidence", "existing_controller,existing_service,existing_mapper,existing_tests"
+        }, inspectStep.context());
+        assertEquals(ExitCodes.SUCCESS, inspectStepExit);
+
+        Harness planStep = new Harness(tempDir);
+        int planStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Planned impacted files, risks, and verification",
+                "--evidence", "impacted_files=GoalIntegrationTest; risk_points=check policy; verification_plan=goal tests"
+        }, planStep.context());
+        assertEquals(ExitCodes.SUCCESS, planStepExit);
+
+        Harness implementStep = new Harness(tempDir);
+        int implementStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Implemented minimal goal policy changes",
+                "--changed-files", "src/main/java/com/devharnesskit/dhk/service/goal/GoalCheckPolicy.java",
+                "--evidence", "implementation_summary=goal check policy accepts statuses"
+        }, implementStep.context());
+        assertEquals(ExitCodes.SUCCESS, implementStepExit);
+
+        Harness verifyStep = new Harness(tempDir);
+        int verifyStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Recorded verification evidence",
+                "--evidence", "compile_result=pending; test_result=pending; sensitive_result=ok"
+        }, verifyStep.context());
+        assertEquals(ExitCodes.SUCCESS, verifyStepExit);
+    }
+
+    private void writeMinimalPom(Path root) throws Exception {
+        Files.write(root.resolve("pom.xml"), ("<project xmlns=\"http://maven.apache.org/POM/4.0.0\"\n"
+                + "         xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n"
+                + "         xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 "
+                + "https://maven.apache.org/xsd/maven-4.0.0.xsd\">\n"
+                + "  <modelVersion>4.0.0</modelVersion>\n"
+                + "  <groupId>demo</groupId>\n"
+                + "  <artifactId>demo</artifactId>\n"
+                + "  <version>1.0.0</version>\n"
+                + "</project>\n").getBytes("UTF-8"));
     }
 
     private void assertGoalRows(Path root, String goalKey) throws Exception {

@@ -25,7 +25,12 @@ public final class GoalCheckPolicyService {
             String[] compileCommand = splitCommand(raw.get("compile_command"));
             String[] testCommand = splitCommand(raw.get("test_command"));
             boolean failPendingHardGates = parseBoolean(raw.get("fail_pending_hard_gates"), false);
-            return new GoalCheckPolicy(requiredChecks, compileCommand, testCommand, failPendingHardGates);
+            return new GoalCheckPolicy(requiredChecks, compileCommand, testCommand, failPendingHardGates,
+                    splitList(raw.get("accepted_compile_statuses")),
+                    splitList(raw.get("accepted_test_statuses")),
+                    splitList(raw.get("accepted_sensitive_statuses")),
+                    splitList(raw.get("accepted_spec_statuses")),
+                    splitList(raw.get("accepted_workflow_statuses")));
         } catch (Exception ex) {
             return GoalCheckPolicy.defaults();
         }

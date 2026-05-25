@@ -36,8 +36,9 @@ public final class GoalCompletionEvaluator {
                 missing.add("check " + required + " is pending");
                 continue;
             }
-            if (!isAccepted(check.status())) {
-                missing.add("check " + required + " is " + check.status());
+            if (!policy.accepts(required, check.status(), profile)) {
+                missing.add("check " + required + " is " + check.status()
+                        + "; accepted_statuses=" + policy.acceptedStatusesText(required, profile));
                 continue;
             }
             if (check.stepCountAtCheck() < recordedSteps) {
@@ -67,10 +68,6 @@ public final class GoalCompletionEvaluator {
         return new GoalEvaluation("not_ready", missing.toArray(new String[missing.size()]),
                 staleChecks.toArray(new String[staleChecks.size()]),
                 nextAction, nextCommand);
-    }
-
-    private boolean isAccepted(String status) {
-        return "passed".equals(status) || "skipped".equals(status) || "waived".equals(status);
     }
 
     private GoalCheck find(List<GoalCheck> checks, String key) {

@@ -22,6 +22,14 @@ public final class GoalSummaryRenderer {
         builder.append("- checkpoint_id: ").append(checkpointId).append('\n');
         builder.append("</goal>\n\n");
 
+        builder.append("<completion-bindings>\n");
+        builder.append("- workflow_run: ").append(emptyValue(goal.workflowRunKey())).append('\n');
+        builder.append("- spec_change: ").append(emptyValue(goal.specChangeKey())).append('\n');
+        builder.append("- checkpoint_id: ").append(checkpointId).append('\n');
+        builder.append("- workflow_checkpoint_binding: created\n");
+        builder.append("- workflow_artifact: GOAL_SUMMARY.md\n");
+        builder.append("</completion-bindings>\n\n");
+
         builder.append("<steps>\n");
         for (GoalStep step : steps) {
             builder.append("- #").append(step.stepIndex()).append(' ')
@@ -57,5 +65,9 @@ public final class GoalSummaryRenderer {
         builder.append("- Do not treat generated summary text as confirmed long-term memory unless it is added as draft and confirmed separately.\n");
         builder.append("</agent-instructions>\n");
         return builder.toString();
+    }
+
+    private String emptyValue(String value) {
+        return value == null || value.length() == 0 ? "none" : value;
     }
 }

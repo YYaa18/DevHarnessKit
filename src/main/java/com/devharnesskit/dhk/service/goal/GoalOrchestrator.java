@@ -16,6 +16,8 @@ import com.devharnesskit.dhk.model.goal.GoalProfile;
 import com.devharnesskit.dhk.model.goal.GoalRun;
 import com.devharnesskit.dhk.model.goal.GoalStep;
 import com.devharnesskit.dhk.model.spec.SpecChange;
+import com.devharnesskit.dhk.model.workflow.WorkflowArtifact;
+import com.devharnesskit.dhk.model.workflow.WorkflowCheckpointBinding;
 import com.devharnesskit.dhk.model.workflow.WorkflowRun;
 import com.devharnesskit.dhk.model.workflow.WorkflowTemplate;
 import com.devharnesskit.dhk.repository.ProjectRepository;
@@ -29,6 +31,8 @@ import com.devharnesskit.dhk.repository.spec.SpecChangeRepository;
 import com.devharnesskit.dhk.repository.spec.SpecDocumentRepository;
 import com.devharnesskit.dhk.repository.spec.SpecEventRepository;
 import com.devharnesskit.dhk.repository.spec.WorkflowSpecBindingRepository;
+import com.devharnesskit.dhk.repository.workflow.WorkflowArtifactRepository;
+import com.devharnesskit.dhk.repository.workflow.WorkflowCheckpointBindingRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowEventRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowGateRunRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowGateTemplateRepository;
@@ -72,6 +76,9 @@ public final class GoalOrchestrator {
     private final GoalCheckRepository goalCheckRepository = new GoalCheckRepository();
     private final GoalArtifactRepository goalArtifactRepository = new GoalArtifactRepository();
     private final CheckpointRepository checkpointRepository = new CheckpointRepository();
+    private final WorkflowArtifactRepository workflowArtifactRepository = new WorkflowArtifactRepository();
+    private final WorkflowCheckpointBindingRepository workflowCheckpointBindingRepository =
+            new WorkflowCheckpointBindingRepository();
     private final GoalProfileService profileService = new GoalProfileService();
     private final GoalPlanner planner = new GoalPlanner();
     private final GoalKeyGenerator keyGenerator = new GoalKeyGenerator();
@@ -299,6 +306,7 @@ public final class GoalOrchestrator {
                             goalArtifactRepository.insert(connection, new GoalArtifact(0L, goal.goalKey(),
                                     "checkpoint", "Completion checkpoint", "", "",
                                     "checkpoint_id=" + checkpointId, now));
+                            bindWorkflowCompletion(connection, project, goal, checkpointId, summaryPath, now);
                             goalRunRepository.complete(connection, goal.goalKey(), now, now);
                             goalEventRepository.insert(connection, new GoalEvent(0L, goal.goalKey(), "goal_completed",
                                     "info", "Goal completed", "checkpoint_id=" + checkpointId, now));
@@ -312,6 +320,19 @@ public final class GoalOrchestrator {
             contextService.export(connection, projectRoot, project, result.goal(), workflowRun, specChange, now);
             return result;
         }
+    }
+
+    private void bindWorkflowCompletion(Connection connection, Project project, GoalRun goal,
+                                        long checkpointId, Path summaryPath, String now) throws Exception {
+        if (goal.workflowRunKey().length() == 0) {
+            return;
+        }
+        workflowCheckpointBindingRepository.insert(connection, new WorkflowCheckpointBinding(0L,
+                goal.workflowRunKey(), checkpointId, "created", now));
+        workflowArtifactRepository.insert(connection, new WorkflowArtifact(0L, project.projectKey(),
+                goal.workflowRunKey(), "custom", "GOAL_SUMMARY.md", summaryPath.toString(), "",
+                "confirmed", "goal_complete", "Goal summary exported for goal " + goal.goalKey(),
+                "goal,completion", now, now));
     }
 
     private Path exportGoalContext(Connection connection, Path projectRoot, Project project, GoalRun goal,

@@ -180,8 +180,12 @@ final class GoalIntegrationTest {
         assertTrue(summary.contains("# GOAL_SUMMARY"));
         assertTrue(summary.contains("checkpoint_id: 1"));
         assertSectionOrder(summary, "# GOAL_SUMMARY", "<generated-at>", "<goal>",
-                "<steps>", "<checks>", "<agent-instructions>");
+                "<completion-bindings>", "<steps>", "<checks>", "<agent-instructions>");
         assertTrue(summary.contains("- status: completed"));
+        assertTrue(summary.contains("- workflow_run:"));
+        assertTrue(summary.contains("- spec_change:"));
+        assertTrue(summary.contains("- workflow_checkpoint_binding: created"));
+        assertTrue(summary.contains("- workflow_artifact: GOAL_SUMMARY.md"));
         assertTrue(summary.contains("- #1 inspect_existing_code: Inspected existing controller/service/mapper/tests"));
         assertTrue(summary.contains("- [passed] sensitive: sensitive scan passed"));
         assertTrue(summary.contains("evidence_path:"));
@@ -471,6 +475,71 @@ final class GoalIntegrationTest {
         assertEquals(ExitCodes.VALIDATION_ERROR, completeExit);
         assertTrue(complete.stdout().contains("decision: not_ready"));
         assertTrue(complete.stdout().contains("check compile is skipped; accepted_statuses=passed"));
+    }
+
+    @Test
+    void goalCompleteFailsWhenWorkflowCheckReportsPendingHardGates() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Files.createDirectories(PathUtil.goalProfilesDirectory(root));
+        Files.write(PathUtil.goalProfile(root, "custom-workflow-strict"), ("{\n"
+                + "  \"workflow_key\": \"api-change\",\n"
+                + "  \"requires_spec\": \"false\",\n"
+                + "  \"default_mode\": \"api\",\n"
+                + "  \"actions\": \"inspect,verify\"\n"
+                + "}\n").getBytes("UTF-8"));
+        Files.write(PathUtil.goalCheckPolicy(root), ("{\n"
+                + "  \"required_checks\": \"workflow\",\n"
+                + "  \"accepted_workflow_statuses\": \"passed\",\n"
+                + "  \"fail_pending_hard_gates\": \"true\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "custom-workflow-strict",
+                "--task", "Strict workflow pending gates",
+                "--module", "goal"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        Harness inspectStep = new Harness(tempDir);
+        int inspectStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Inspection complete",
+                "--evidence", "evidence=inspection"
+        }, inspectStep.context());
+        assertEquals(ExitCodes.SUCCESS, inspectStepExit);
+
+        Harness verifyStep = new Harness(tempDir);
+        int verifyStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Verification complete",
+                "--evidence", "compile_result=not required; test_result=not required; sensitive_result=not required"
+        }, verifyStep.context());
+        assertEquals(ExitCodes.SUCCESS, verifyStepExit);
+
+        Harness check = new Harness(tempDir);
+        int checkExit = new CommandRouter().run(new String[]{
+                "goal", "check", "--project-root", "demo", "--goal", goalKey, "--all"
+        }, check.context());
+        assertEquals(ExitCodes.SUCCESS, checkExit);
+        assertTrue(check.stdout().contains("check_key: workflow"));
+        assertTrue(check.stdout().contains("status: failed"));
+        assertTrue(check.stdout().contains("workflow has pending hard gates"));
+
+        Harness complete = new Harness(tempDir);
+        int completeExit = new CommandRouter().run(new String[]{
+                "goal", "complete", "--project-root", "demo", "--goal", goalKey
+        }, complete.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, completeExit);
+        assertTrue(complete.stdout().contains("decision: not_ready"));
+        assertTrue(complete.stdout().contains("check workflow is failed; accepted_statuses=passed"));
     }
 
     @Test
@@ -818,6 +887,11 @@ final class GoalIntegrationTest {
             assertEquals(1, count(statement, "SELECT COUNT(*) FROM checkpoint"));
             assertEquals(1, count(statement, "SELECT COUNT(*) FROM goal_run WHERE goal_key = '" + goalKey + "' AND status = 'completed'"));
             assertTrue(count(statement, "SELECT COUNT(*) FROM goal_artifact WHERE goal_key = '" + goalKey + "'") >= 3);
+            assertEquals(1, count(statement, "SELECT COUNT(*) FROM workflow_checkpoint_binding "
+                    + "WHERE binding_type = 'created'"));
+            assertEquals(1, count(statement, "SELECT COUNT(*) FROM workflow_artifact "
+                    + "WHERE artifact_type = 'custom' AND produced_by_phase = 'goal_complete' "
+                    + "AND title = 'GOAL_SUMMARY.md'"));
         }
     }
 

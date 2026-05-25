@@ -67,7 +67,6 @@ If you prefer `--host` and `--database` over a full JDBC URL, the CLI builds thi
 ```text
 useUnicode=true
 characterEncoding=utf8
-useSSL=false
 zeroDateTimeBehavior=convertToNull
 ```
 
@@ -80,6 +79,7 @@ dhk db test \
   --user dhk_readonly \
   --password-env DHK_DB_PASSWORD \
   --server-timezone Asia/Shanghai \
+  --use-ssl false \
   --allow-public-key-retrieval \
   --jdbc-params "tinyInt1isBit=false"
 ```
@@ -88,7 +88,7 @@ Supported URL-building options:
 
 ```text
 --server-timezone <zone>          appends serverTimezone=<zone>
---use-ssl <true|false>           overrides the default useSSL=false
+--use-ssl <true|false>           appends useSSL=<value>
 --character-encoding <encoding>  overrides the default characterEncoding=utf8
 --zero-date-time-behavior <mode> overrides the default zeroDateTimeBehavior=convertToNull
 --allow-public-key-retrieval     appends allowPublicKeyRetrieval=true

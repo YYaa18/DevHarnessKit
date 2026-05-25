@@ -61,8 +61,10 @@ public final class MysqlConnectionService {
         List<String> params = new ArrayList<String>();
         params.add("useUnicode=true");
         params.add("characterEncoding=" + option(args, "character-encoding", "utf8"));
-        params.add("useSSL=" + option(args, "use-ssl", "false"));
         params.add("zeroDateTimeBehavior=" + option(args, "zero-date-time-behavior", "convertToNull"));
+        if (args.hasOption("use-ssl")) {
+            params.add("useSSL=" + option(args, "use-ssl", "false"));
+        }
         if (args.hasOption("server-timezone")) {
             params.add("serverTimezone=" + args.option("server-timezone").trim());
         }

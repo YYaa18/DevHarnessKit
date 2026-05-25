@@ -41,6 +41,7 @@ dhk db test \
   --host 127.0.0.1 \
   --database demo \
   --server-timezone Asia/Shanghai \
+  --use-ssl false \
   --allow-public-key-retrieval \
   --jdbc-params "tinyInt1isBit=false"
 ```

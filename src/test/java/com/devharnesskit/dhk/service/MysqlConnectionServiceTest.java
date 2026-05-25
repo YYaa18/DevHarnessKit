@@ -18,7 +18,7 @@ final class MysqlConnectionServiceTest {
 
         assertTrue(request.valid());
         assertEquals("jdbc:mysql://127.0.0.1:3306/demo"
-                + "?useUnicode=true&characterEncoding=utf8&useSSL=false&zeroDateTimeBehavior=convertToNull",
+                + "?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull",
                 request.jdbcUrl());
     }
 
@@ -30,13 +30,14 @@ final class MysqlConnectionServiceTest {
                 "--port", "3307",
                 "--database", "demo",
                 "--server-timezone", "Asia/Shanghai",
+                "--use-ssl", "false",
                 "--allow-public-key-retrieval",
                 "--jdbc-params", "tinyInt1isBit=false"
         }), true);
 
         assertTrue(request.valid());
         assertEquals("jdbc:mysql://localhost:3307/demo"
-                + "?useUnicode=true&characterEncoding=utf8&useSSL=false&zeroDateTimeBehavior=convertToNull"
+                + "?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false"
                 + "&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&tinyInt1isBit=false",
                 request.jdbcUrl());
     }

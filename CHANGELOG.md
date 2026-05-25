@@ -15,6 +15,7 @@ Initial developer-preview release.
 - Goal export contract tests: `GOAL_CONTEXT.md` and `GOAL_SUMMARY.md` required sections, next command, forbidden actions, checkpoint reference, and truncation behavior are covered by tests.
 - Workflow/spec export contract docs and tests for required Markdown sections, audit-state boundaries, gates, tasks, acceptance items, and workflow bindings.
 - Migration fixture coverage for v2 workflow state and richer v4 spec state, plus archive-state tests for blocked/failed versus skipped/waived spec closure.
+- Compatibility contract docs for stable-ish alpha, beta, and alpha CLI/schema/JSON/export surfaces, including downgrade and deprecation policy.
 - Sensitive-data guard for persisted and exported content paths.
 - `dhk version`.
 - File/stdin input for memory content, checkpoint summaries, SQL, and spec documents.

@@ -2,6 +2,9 @@
 
 DevHarness Kit supports inline text for short values and file/stdin input for longer content.
 
+See [COMPATIBILITY.md](COMPATIBILITY.md) for the `0.1.x` CLI parser and output
+stability policy.
+
 ## Memory Content
 
 Use exactly one content source:

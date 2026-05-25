@@ -71,6 +71,8 @@ Current release channel: `alpha / developer preview`.
    grep -n "0.1.0-alpha" README.md
    grep -n "developer preview" README.md RELEASE.md
    grep -n "not.*stable\\|Do not publish.*stable" README.md
+   grep -n "stable-ish alpha" docs/COMPATIBILITY.md
+   grep -n "downgrade" docs/COMPATIBILITY.md docs/MIGRATIONS.md
    ```
 
 9. Generate checksums:
@@ -94,7 +96,9 @@ The release workflow runs on `workflow_dispatch` and tags matching `v*`. Tag-tri
 Release notes must state:
 
 - DevHarness Kit is alpha/developer preview.
+- The current CLI, JSON, export, and schema compatibility contract is in `docs/COMPATIBILITY.md`.
 - Memory core is usable but schema compatibility is not stable.
 - DB readonly is beta and requires read-only database credentials.
 - Workflow/spec are experimental alpha surfaces.
+- Downgrade migrations are unsupported unless release notes explicitly say otherwise.
 - The shaded jar includes third-party dependencies listed in `THIRD_PARTY_NOTICES.md`.

@@ -11,6 +11,7 @@ Focus: Memory core readiness.
 - Keep `doctor` dependable across platforms.
 - Keep sensitive-data checks fail-closed where persistence or export is involved.
 - Keep automatic pre-migration backups covered by fixture tests.
+- Treat [COMPATIBILITY.md](COMPATIBILITY.md) as the source for stable-ish alpha, beta, and alpha contract wording.
 - Publish alpha releases with third-party notices, security notes, checksums, and release archives.
 
 ## 0.2.x
@@ -56,6 +57,7 @@ Focus: stable CLI and schema compatibility.
 
 - Document supported schema migration paths.
 - Provide release checksums and reproducible packaging instructions.
-- Define stable command/output contracts.
+- Promote the `0.1.x` compatibility contract into a stricter stable command/output/schema contract.
+- Define post-1.0 semantic versioning and deprecation windows before claiming stability.
 - Add coverage thresholds after the JaCoCo report baseline is reviewed.
 - Split optional modules if dependency and licensing boundaries require it.

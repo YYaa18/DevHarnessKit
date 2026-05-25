@@ -67,7 +67,8 @@ Agent reads short Markdown context
 ```
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for module boundaries and
-[docs/EXPORT_CONTRACTS.md](docs/EXPORT_CONTRACTS.md) for alpha Markdown export shapes.
+[docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) for the current CLI, schema,
+JSON, and export compatibility contract.
 
 ## Requirements
 
@@ -251,6 +252,7 @@ Read [SECURITY.md](SECURITY.md) before using DB readonly features.
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): current architecture and module boundaries.
 - [docs/CLI_INPUTS.md](docs/CLI_INPUTS.md): file/stdin input, search explain, and backup command usage.
+- [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md): stable-ish alpha, beta, and alpha CLI/schema/output contract.
 - [docs/DB_COMPATIBILITY.md](docs/DB_COMPATIBILITY.md): MySQL 5.1 production and MySQL 8 local compatibility guidance.
 - [docs/DEVHARNESS_GOAL_CLI_ORCHESTRATION_PLAN.md](docs/DEVHARNESS_GOAL_CLI_ORCHESTRATION_PLAN.md): V0.4 goal orchestration plan.
 - [docs/DEVHARNESS_SKILLS_REDESIGN_PLAN.md](docs/DEVHARNESS_SKILLS_REDESIGN_PLAN.md): goal-first skill redesign plan.

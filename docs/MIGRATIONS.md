@@ -21,6 +21,7 @@ Current schema version: `5`.
 ## Alpha Compatibility Policy
 
 `0.1.0-alpha` initializes and migrates project databases in place. The schema is not yet a stable public contract.
+See [COMPATIBILITY.md](COMPATIBILITY.md) for the overall CLI, schema, JSON, and export contract.
 
 When an existing non-empty database is below the current schema version, DevHarness Kit creates an automatic pre-migration backup under:
 
@@ -89,6 +90,16 @@ Future schema changes should follow these rules before a stable release:
 - old database fixtures are tested in CI;
 - migrations are forward-compatible within supported minor versions;
 - downgrades are documented as unsupported unless explicitly implemented.
+
+## Downgrade Stance
+
+Downgrade migrations are not supported in `0.1.x`. If a newer CLI migrates a
+database and you need to return to an older CLI, restore the automatic
+`pre-migration-*` backup or a manual `memory backup` archive created before the
+upgrade.
+
+Do not rely on direct table edits to downgrade a database. Table and column
+details are not public API before 1.0.
 
 ## Export Compatibility
 

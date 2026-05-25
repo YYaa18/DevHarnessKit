@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 public final class GoalCheckService {
-    public static final String[] REQUIRED_CHECKS = new String[]{"compile", "test", "sensitive", "spec", "workflow"};
+    public static final String[] REQUIRED_CHECKS = GoalCheckPolicy.DEFAULT_REQUIRED_CHECKS;
 
     private final GoalCheckRepository checkRepository;
     private final SpecTaskRepository taskRepository;
@@ -32,34 +32,41 @@ public final class GoalCheckService {
     private final WorkflowRunRepository workflowRunRepository;
     private final WorkflowGateRunRepository gateRunRepository;
     private final SensitiveDataGuard sensitiveDataGuard;
+    private final GoalCheckPolicyService policyService;
 
     public GoalCheckService() {
         this(new GoalCheckRepository(), new SpecTaskRepository(), new SpecAcceptanceRepository(),
-                new WorkflowRunRepository(), new WorkflowGateRunRepository(), new SensitiveDataGuard());
+                new WorkflowRunRepository(), new WorkflowGateRunRepository(), new SensitiveDataGuard(),
+                new GoalCheckPolicyService());
     }
 
     GoalCheckService(GoalCheckRepository checkRepository, SpecTaskRepository taskRepository,
                      SpecAcceptanceRepository acceptanceRepository,
                      WorkflowRunRepository workflowRunRepository,
                      WorkflowGateRunRepository gateRunRepository,
-                     SensitiveDataGuard sensitiveDataGuard) {
+                     SensitiveDataGuard sensitiveDataGuard,
+                     GoalCheckPolicyService policyService) {
         this.checkRepository = checkRepository;
         this.taskRepository = taskRepository;
         this.acceptanceRepository = acceptanceRepository;
         this.workflowRunRepository = workflowRunRepository;
         this.gateRunRepository = gateRunRepository;
         this.sensitiveDataGuard = sensitiveDataGuard;
+        this.policyService = policyService;
     }
 
     public GoalCheck run(Connection connection, Path projectRoot, GoalRun goal,
                          String checkKey, String now) throws Exception {
+        return run(connection, projectRoot, goal, checkKey, now, policyService.load(projectRoot));
+    }
+
+    public GoalCheck run(Connection connection, Path projectRoot, GoalRun goal,
+                         String checkKey, String now, GoalCheckPolicy policy) throws Exception {
         if ("compile".equals(checkKey)) {
-            return runMavenCheck(connection, projectRoot, goal, checkKey,
-                    new String[]{"mvn", "-q", "-DskipTests", "compile"}, now);
+            return runMavenCheck(connection, projectRoot, goal, checkKey, policy.compileCommand(), now);
         }
         if ("test".equals(checkKey)) {
-            return runMavenCheck(connection, projectRoot, goal, checkKey,
-                    new String[]{"mvn", "-q", "test"}, now);
+            return runMavenCheck(connection, projectRoot, goal, checkKey, policy.testCommand(), now);
         }
         if ("sensitive".equals(checkKey)) {
             return runSensitiveCheck(connection, projectRoot, goal, now);
@@ -68,16 +75,17 @@ public final class GoalCheckService {
             return runSpecCheck(connection, goal, now);
         }
         if ("workflow".equals(checkKey)) {
-            return runWorkflowCheck(connection, goal, now);
+            return runWorkflowCheck(connection, goal, now, policy);
         }
         throw new IllegalArgumentException("Unknown goal check: " + checkKey);
     }
 
     public List<GoalCheck> runAll(Connection connection, Path projectRoot, GoalRun goal,
                                   String now) throws Exception {
+        GoalCheckPolicy policy = policyService.load(projectRoot);
         List<GoalCheck> results = new ArrayList<GoalCheck>();
-        for (String check : REQUIRED_CHECKS) {
-            results.add(run(connection, projectRoot, goal, check, now));
+        for (String check : policy.requiredChecks()) {
+            results.add(run(connection, projectRoot, goal, check, now, policy));
         }
         return results;
     }
@@ -157,7 +165,8 @@ public final class GoalCheckService {
         return save(connection, goal, "spec", "spec", "", status, summary, log, now);
     }
 
-    private GoalCheck runWorkflowCheck(Connection connection, GoalRun goal, String now) throws Exception {
+    private GoalCheck runWorkflowCheck(Connection connection, GoalRun goal, String now,
+                                      GoalCheckPolicy policy) throws Exception {
         if (goal.workflowRunKey().length() == 0) {
             return save(connection, goal, "workflow", "workflow", "", "skipped",
                     "goal has no workflow run", null, now);
@@ -184,6 +193,10 @@ public final class GoalCheckService {
         if (failedHard > 0) {
             return save(connection, goal, "workflow", "workflow", "", "failed",
                     "workflow has failed hard gates: " + failedHard, null, now);
+        }
+        if (policy.failPendingHardGates() && pendingHard > 0) {
+            return save(connection, goal, "workflow", "workflow", "", "failed",
+                    "workflow has pending hard gates: " + pendingHard, null, now);
         }
         return save(connection, goal, "workflow", "workflow", "", "passed",
                 "workflow run is active; pending_hard_gates=" + pendingHard, null, now);

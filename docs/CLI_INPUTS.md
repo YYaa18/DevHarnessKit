@@ -56,6 +56,22 @@ dhk memory search --q gateway --explain
 
 The score is a ranking aid, not a stable public API.
 
+## JSON Output
+
+Use `--json` for machine-readable output:
+
+```bash
+dhk doctor --json
+dhk memory search --q gateway --json
+dhk memory export --task "Order API" --module order --json
+dhk goal status --goal <goal-key> --json
+dhk goal check --goal <goal-key> --all --json
+dhk goal evaluate --goal <goal-key> --json
+dhk goal complete --goal <goal-key> --json
+```
+
+JSON output is intended for scripts and agents. It is still alpha and may expand before 1.0, but existing field names should be changed conservatively.
+
 ## Backup
 
 Before risky upgrades or migrations, create a memory backup:
@@ -66,6 +82,19 @@ dhk memory backup --project-root . --out /tmp/dhk-memory.zip
 ```
 
 The backup zip includes `project.json`, `memory.db`, and files directly under `exports/`.
+
+Commands that migrate an existing older `memory.db` also create a pre-migration backup automatically under `.agents/memory/backups/`.
+
+## Goal Configuration
+
+Goal profiles and checks can be configured per project:
+
+```text
+.agents/devharness/goal-profiles/<profile>.json
+.agents/devharness/goal-check-policy.json
+```
+
+See [GOAL_CONFIGURATION.md](GOAL_CONFIGURATION.md) for the supported fields.
 
 ## Sensitive Policy
 

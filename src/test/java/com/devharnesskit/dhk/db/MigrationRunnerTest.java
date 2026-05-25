@@ -7,6 +7,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.Instant;
@@ -78,6 +79,27 @@ final class MigrationRunnerTest {
             assertTrue(indexExists(connection, "idx_goal_event_goal_created"));
             assertTrue(indexExists(connection, "idx_goal_check_goal_status"));
             assertTrue(indexExists(connection, "idx_goal_artifact_goal_type"));
+        }
+    }
+
+    @Test
+    void migrationBacksUpExistingOldDatabaseBeforeUpgrade() throws Exception {
+        PathUtil.createMemoryDirectories(tempDir);
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(tempDir));
+             Statement statement = connection.createStatement()) {
+            statement.execute("CREATE TABLE schema_version (version INTEGER PRIMARY KEY, description TEXT NOT NULL, applied_at TEXT NOT NULL)");
+            statement.execute("INSERT INTO schema_version(version, description, applied_at) VALUES (1, 'old v1', 'old')");
+            statement.execute("CREATE TABLE project (project_key TEXT PRIMARY KEY, project_name TEXT NOT NULL)");
+            statement.execute("INSERT INTO project(project_key, project_name) VALUES ('demo', 'Demo')");
+        }
+
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(tempDir))) {
+            MigrationResult result = new MigrationRunner().migrate(connection, new FixedClock());
+
+            assertEquals(MigrationRunner.V5, result.schemaVersion());
+            assertTrue(result.backupPath().contains("pre-migration-v1-to-v5"));
+            assertTrue(java.nio.file.Files.isRegularFile(java.nio.file.Paths.get(result.backupPath())));
+            assertTrue(MigrationRunner.hasTable(connection, "goal_check"));
         }
     }
 

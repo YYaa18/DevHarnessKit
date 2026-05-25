@@ -77,6 +77,7 @@ public final class GoalOrchestrator {
     private final GoalKeyGenerator keyGenerator = new GoalKeyGenerator();
     private final GoalContextService contextService = new GoalContextService();
     private final GoalCheckService checkService = new GoalCheckService();
+    private final GoalCheckPolicyService checkPolicyService = new GoalCheckPolicyService();
     private final GoalCompletionEvaluator completionEvaluator = new GoalCompletionEvaluator();
     private final GoalSummaryRenderer summaryRenderer = new GoalSummaryRenderer();
     private final SensitiveDataGuard sensitiveDataGuard = new SensitiveDataGuard();
@@ -85,7 +86,7 @@ public final class GoalOrchestrator {
     public GoalStartResult start(CommandContext context, Path projectRoot, String profileKey,
                                  String task, String module, String mode, String condition)
             throws Exception {
-        final GoalProfile profile = requireProfile(profileKey);
+        final GoalProfile profile = requireProfile(projectRoot, profileKey);
         final String selectedMode = mode.length() == 0 || "auto".equals(mode) ? profile.defaultMode() : mode;
         rejectSensitive("goal start", profileKey, task, module, selectedMode, condition);
         PathUtil.createMemoryDirectories(projectRoot);
@@ -158,6 +159,10 @@ public final class GoalOrchestrator {
         return planner.plan(goal, requireProfile(goal.profileKey()));
     }
 
+    public GoalPlan plan(Path projectRoot, GoalRun goal) {
+        return planner.plan(goal, requireProfile(projectRoot, goal.profileKey()));
+    }
+
     public GoalStepResult step(CommandContext context, Path projectRoot, String goalKey,
                                String summary, String changedFiles, String evidence) throws Exception {
         rejectSensitive("goal step", summary, changedFiles, evidence);
@@ -167,7 +172,7 @@ public final class GoalOrchestrator {
             if (goal == null) {
                 throw new IllegalStateException("Goal not found: " + goalKey);
             }
-            GoalProfile profile = requireProfile(goal.profileKey());
+            GoalProfile profile = requireProfile(projectRoot, goal.profileKey());
             String now = context.clock().now().toString();
             int nextIndex = goal.stepCount() + 1;
             String action = goal.currentAction();
@@ -244,7 +249,7 @@ public final class GoalOrchestrator {
             if (goal == null) {
                 throw new IllegalStateException("Goal not found: " + goalKey);
             }
-            return evaluate(connection, goal);
+            return evaluate(connection, projectRoot, goal);
         }
     }
 
@@ -255,7 +260,7 @@ public final class GoalOrchestrator {
             if (goal == null) {
                 throw new IllegalStateException("Goal not found: " + goalKey);
             }
-            GoalEvaluation evaluation = evaluate(connection, goal);
+            GoalEvaluation evaluation = evaluate(connection, projectRoot, goal);
             if (!evaluation.readyToComplete()) {
                 throw new GoalNotReadyException(evaluation);
             }
@@ -300,8 +305,9 @@ public final class GoalOrchestrator {
         }
     }
 
-    private GoalEvaluation evaluate(Connection connection, GoalRun goal) throws Exception {
-        return completionEvaluator.evaluate(goal, goalCheckRepository.listByGoal(connection, goal.goalKey()));
+    private GoalEvaluation evaluate(Connection connection, Path projectRoot, GoalRun goal) throws Exception {
+        return completionEvaluator.evaluate(goal, goalCheckRepository.listByGoal(connection, goal.goalKey()),
+                checkPolicyService.load(projectRoot));
     }
 
     private List<GoalCheck> single(GoalCheck check) {
@@ -326,6 +332,14 @@ public final class GoalOrchestrator {
 
     private GoalProfile requireProfile(String profileKey) {
         GoalProfile profile = profileService.find(profileKey);
+        if (profile == null) {
+            throw new IllegalArgumentException("Unknown goal profile: " + profileKey);
+        }
+        return profile;
+    }
+
+    private GoalProfile requireProfile(Path projectRoot, String profileKey) {
+        GoalProfile profile = profileService.find(projectRoot, profileKey);
         if (profile == null) {
             throw new IllegalArgumentException("Unknown goal profile: " + profileKey);
         }

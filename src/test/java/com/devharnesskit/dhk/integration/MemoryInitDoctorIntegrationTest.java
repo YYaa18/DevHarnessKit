@@ -73,6 +73,15 @@ final class MemoryInitDoctorIntegrationTest {
         assertTrue(doctorHarness.stdout().contains("sensitive_policy: default"));
         assertTrue(doctorHarness.stdout().contains("memory_total: 0"));
         assertTrue(doctorHarness.stdout().contains("checkpoint_total: 0"));
+
+        Harness jsonDoctorHarness = new Harness(tempDir);
+        int jsonExitCode = new CommandRouter().run(new String[]{
+                "doctor", "--project-root", root.toString(), "--json"
+        }, jsonDoctorHarness.context());
+        assertEquals(ExitCodes.SUCCESS, jsonExitCode);
+        assertTrue(jsonDoctorHarness.stdout().contains("\"command\": \"doctor\""));
+        assertTrue(jsonDoctorHarness.stdout().contains("\"schema_version\": 5"));
+        assertTrue(jsonDoctorHarness.stdout().contains("\"mysql_driver_loaded\": true"));
     }
 
     @Test

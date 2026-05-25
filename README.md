@@ -80,6 +80,12 @@ mvn clean test
 mvn -DskipTests package
 ```
 
+`mvn test` also generates a JaCoCo coverage report at:
+
+```text
+target/site/jacoco/index.html
+```
+
 The shaded CLI jar is generated as:
 
 ```text
@@ -147,6 +153,8 @@ java -jar target/dhk-cli-0.1.0-alpha-all.jar memory export \
   --mode api \
   --keywords "gateway,mybatis,mysql"
 ```
+
+Use `--json` for machine-readable output on supported commands such as `doctor`, `memory search`, `memory export`, `goal status`, `goal check`, `goal evaluate`, and `goal complete`.
 
 Seed workflow templates and start a run:
 
@@ -217,6 +225,8 @@ java -jar target/dhk-cli-0.1.0-alpha-all.jar goal complete --project-root . --go
 
 For agent-facing usage, `.agents/skills/devharness-goal-development/` provides goal-first wrapper scripts such as `goal-start.sh`, `goal-next.sh`, `goal-step.sh`, `goal-check.sh`, `goal-evaluate.sh`, and `goal-complete.sh`.
 
+Projects can customize goal profiles and required checks with `.agents/devharness/goal-profiles/*.json` and `.agents/devharness/goal-check-policy.json`.
+
 ## Safety Model
 
 - `memory add` writes draft memory only.
@@ -243,6 +253,7 @@ Read [SECURITY.md](SECURITY.md) before using DB readonly features.
 - [docs/DB_COMPATIBILITY.md](docs/DB_COMPATIBILITY.md): MySQL 5.1 production and MySQL 8 local compatibility guidance.
 - [docs/DEVHARNESS_GOAL_CLI_ORCHESTRATION_PLAN.md](docs/DEVHARNESS_GOAL_CLI_ORCHESTRATION_PLAN.md): V0.4 goal orchestration plan.
 - [docs/DEVHARNESS_SKILLS_REDESIGN_PLAN.md](docs/DEVHARNESS_SKILLS_REDESIGN_PLAN.md): goal-first skill redesign plan.
+- [docs/GOAL_CONFIGURATION.md](docs/GOAL_CONFIGURATION.md): project-level goal profile and check policy configuration.
 - [docs/MIGRATIONS.md](docs/MIGRATIONS.md): SQLite schema compatibility and recovery policy.
 - [docs/ROADMAP.md](docs/ROADMAP.md): release maturity plan.
 - [docs/SENSITIVE_POLICY.md](docs/SENSITIVE_POLICY.md): project-level sensitive-data reject/redact/allow policy.

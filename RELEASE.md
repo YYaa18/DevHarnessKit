@@ -18,6 +18,8 @@ Current release channel: `alpha / developer preview`.
    java -jar target/dhk-cli-0.1.0-alpha-all.jar version
    ```
 
+   `mvn test` and `mvn package` generate the JaCoCo report under `target/site/jacoco/`.
+
 4. Confirm release artifacts exist:
 
    ```text

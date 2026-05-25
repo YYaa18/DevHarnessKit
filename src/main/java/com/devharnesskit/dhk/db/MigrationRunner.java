@@ -1,7 +1,13 @@
 package com.devharnesskit.dhk.db;
 
+import com.devharnesskit.dhk.service.MemoryBackupService;
 import com.devharnesskit.dhk.util.Clock;
+import com.devharnesskit.dhk.util.PathUtil;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -15,6 +21,7 @@ public final class MigrationRunner {
     public static final int V5 = 5;
 
     public MigrationResult migrate(Connection connection, Clock clock) throws SQLException {
+        String backupPath = backupBeforeUpgrade(connection, clock);
         try (Statement statement = connection.createStatement()) {
             statement.execute("CREATE TABLE IF NOT EXISTS schema_version ("
                     + "version INTEGER PRIMARY KEY,"
@@ -103,7 +110,54 @@ public final class MigrationRunner {
             ftsAvailable = false;
             ftsError = ex.getMessage();
         }
-        return new MigrationResult(currentSchemaVersion(connection), ftsAvailable, ftsError);
+        return new MigrationResult(currentSchemaVersion(connection), ftsAvailable, ftsError, backupPath);
+    }
+
+    private String backupBeforeUpgrade(Connection connection, Clock clock) throws SQLException {
+        Path dbPath = databasePath(connection);
+        if (dbPath == null || !Files.isRegularFile(dbPath)) {
+            return "";
+        }
+        int currentVersion = currentSchemaVersion(connection);
+        if (currentVersion >= V5) {
+            return "";
+        }
+        try {
+            if (Files.size(dbPath) <= 0L) {
+                return "";
+            }
+            Path memoryDir = dbPath.getParent();
+            if (memoryDir == null) {
+                return "";
+            }
+            Path projectRoot = memoryDir.getParent() == null ? null : memoryDir.getParent().getParent();
+            if (projectRoot == null) {
+                return "";
+            }
+            MemoryBackupService backupService = new MemoryBackupService();
+            Path out = backupService.defaultBackupPath(projectRoot, clock.now().toString(),
+                    "pre-migration-v" + currentVersion + "-to-v" + V5);
+            backupService.writeBackup(PathUtil.memoryDirectory(projectRoot), out);
+            return out.toString();
+        } catch (IOException ex) {
+            throw new SQLException("Failed to create pre-migration backup: " + ex.getMessage(), ex);
+        }
+    }
+
+    private Path databasePath(Connection connection) throws SQLException {
+        try (Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery("PRAGMA database_list")) {
+            while (resultSet.next()) {
+                String name = resultSet.getString("name");
+                if ("main".equals(name)) {
+                    String file = resultSet.getString("file");
+                    if (file != null && file.length() > 0) {
+                        return Paths.get(file);
+                    }
+                }
+            }
+            return null;
+        }
     }
 
     private void migrateV2(Connection connection, Clock clock) throws SQLException {

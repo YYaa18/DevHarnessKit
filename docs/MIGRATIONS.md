@@ -22,6 +22,14 @@ Current schema version: `5`.
 
 `0.1.0-alpha` initializes and migrates project databases in place. The schema is not yet a stable public contract.
 
+When an existing non-empty database is below the current schema version, DevHarness Kit creates an automatic pre-migration backup under:
+
+```text
+.agents/memory/backups/
+```
+
+The backup filename includes the old and new schema versions, for example `pre-migration-v1-to-v5`.
+
 Before using DevHarness Kit on important project data:
 
 1. Commit or back up `.agents/memory/`.

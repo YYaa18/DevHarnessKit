@@ -13,7 +13,12 @@ Initial developer-preview release.
 - `dhk version`.
 - File/stdin input for memory content, checkpoint summaries, SQL, and spec documents.
 - `memory search --explain`.
+- `--json` output for doctor, memory search/export, and goal status/check/evaluate/complete.
 - `memory backup`.
+- Automatic pre-migration memory backups with old-db fixture coverage.
+- Section-budgeted `CURRENT_CONTEXT.md` with a truncation report.
+- Project-level goal profile and check policy configuration.
+- JaCoCo coverage report generation during `mvn test`.
 - Project-level sensitive policy with `reject`, `redact`, and `allow` actions.
 - Java/OS CI matrix.
 - Release archives with third-party notices and checksums.

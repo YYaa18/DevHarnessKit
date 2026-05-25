@@ -7,9 +7,10 @@ DevHarness Kit should stabilize by narrowing the open-source surface before addi
 Focus: Memory core readiness.
 
 - Stabilize `memory init/add/confirm/search/export/checkpoint/recover`.
-- Keep file/stdin inputs and `memory backup` compatible across patch releases.
+- Keep file/stdin inputs, JSON output, section-budgeted context export, and `memory backup` compatible across patch releases.
 - Keep `doctor` dependable across platforms.
 - Keep sensitive-data checks fail-closed where persistence or export is involved.
+- Keep automatic pre-migration backups covered by fixture tests.
 - Publish alpha releases with third-party notices, security notes, checksums, and release archives.
 
 ## 0.2.x
@@ -34,10 +35,10 @@ Focus: Workflow alpha hardening.
 Focus: goal-oriented orchestration.
 
 - Harden `dhk goal start/resume/next/step/status/export/check/evaluate/complete`.
-- Improve check policy configuration and evidence quality.
+- Improve configured check policy validation and evidence quality.
 - Keep `GOAL_SUMMARY.md` and completion checkpoint output stable enough for alpha users.
 - Migrate the default agent workflow from memory-first prompts to the goal-first protocol.
-- Add profile configuration after the built-in profiles stabilize.
+- Harden project-level goal profile configuration after the built-in profiles stabilize.
 
 ## 0.5.x
 
@@ -54,4 +55,5 @@ Focus: stable CLI and schema compatibility.
 - Document supported schema migration paths.
 - Provide release checksums and reproducible packaging instructions.
 - Define stable command/output contracts.
+- Add coverage thresholds after the JaCoCo report baseline is reviewed.
 - Split optional modules if dependency and licensing boundaries require it.

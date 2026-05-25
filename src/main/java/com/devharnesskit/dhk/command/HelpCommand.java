@@ -55,6 +55,11 @@ public final class HelpCommand implements Command {
         context.out().println();
         context.out().println("Sensitive policy:");
         context.out().println("  .agents/devharness/sensitive-policy.json can set pattern actions to reject, redact, or allow.");
+        context.out().println("Goal configuration:");
+        context.out().println("  .agents/devharness/goal-profiles/*.json can override or add goal profiles.");
+        context.out().println("  .agents/devharness/goal-check-policy.json can configure required goal checks.");
+        context.out().println("Machine-readable output:");
+        context.out().println("  Supported commands accept --json for alpha JSON output.");
         context.out().println();
         context.out().println("Exit codes:");
         context.out().println("  0 success");

@@ -49,6 +49,21 @@ final class MemoryExportRecoverIntegrationTest {
         assertFalse(markdown.contains("Draft only"));
         assertTrue(export.stdout().contains("memory_exported: 1"));
 
+        Harness exportJson = new Harness(tempDir);
+        int exportJsonExit = new CommandRouter().run(new String[]{
+                "memory", "export",
+                "--project-root", "demo",
+                "--task", "新增订单查询接口",
+                "--module", "global",
+                "--mode", "api",
+                "--keywords", "gateway,mybatis",
+                "--json"
+        }, exportJson.context());
+        assertEquals(ExitCodes.SUCCESS, exportJsonExit);
+        assertTrue(exportJson.stdout().contains("\"command\": \"memory export\""));
+        assertTrue(exportJson.stdout().contains("\"memory_exported\": 1"));
+        assertTrue(markdown.contains("<truncation-report>"));
+
         Harness search = new Harness(tempDir);
         new CommandRouter().run(new String[]{
                 "memory", "search", "--project-root", "demo", "--q", "gateway", "--status", "confirmed"

@@ -79,6 +79,16 @@ final class MemoryAddConfirmSearchIntegrationTest {
         assertEquals(ExitCodes.SUCCESS, searchConfirmedAfterExit);
         assertTrue(searchConfirmedAfter.stdout().contains("[1] User identity from gateway"));
         assertTrue(searchConfirmedAfter.stdout().contains("status: confirmed"));
+
+        Harness searchJson = new Harness(tempDir);
+        int searchJsonExit = new CommandRouter().run(new String[]{
+                "memory", "search", "--project-root", "demo", "--q", "gateway user-id",
+                "--status", "confirmed", "--json"
+        }, searchJson.context());
+        assertEquals(ExitCodes.SUCCESS, searchJsonExit);
+        assertTrue(searchJson.stdout().contains("\"command\": \"memory search\""));
+        assertTrue(searchJson.stdout().contains("\"count\": 1"));
+        assertTrue(searchJson.stdout().contains("\"title\": \"User identity from gateway\""));
     }
 
     @Test

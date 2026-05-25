@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.model.goal.GoalEvaluation;
 import com.devharnesskit.dhk.model.goal.GoalRun;
 import com.devharnesskit.dhk.service.goal.GoalOrchestrator;
+import com.devharnesskit.dhk.util.JsonOutput;
 
 import java.nio.file.Path;
 
@@ -18,7 +19,7 @@ public final class GoalEvaluateCommand implements Command {
         try {
             GoalRun goal = GoalCommandSupport.goal(orchestrator, context, args, projectRoot);
             GoalEvaluation evaluation = orchestrator.evaluate(context, projectRoot, goal.goalKey());
-            print(context, evaluation);
+            print(context, args, evaluation);
             return ExitCodes.SUCCESS;
         } catch (Exception ex) {
             context.err().println("ERROR goal evaluate failed: " + ex.getMessage());
@@ -26,7 +27,17 @@ public final class GoalEvaluateCommand implements Command {
         }
     }
 
-    static void print(CommandContext context, GoalEvaluation evaluation) {
+    static void print(CommandContext context, Args args, GoalEvaluation evaluation) {
+        if (JsonOutput.enabled(args)) {
+            context.out().print(JsonOutput.object(
+                    JsonOutput.stringField("command", "goal evaluate"),
+                    JsonOutput.stringField("decision", evaluation.decision()),
+                    JsonOutput.rawField("missing", JsonOutput.stringArray(evaluation.missing())),
+                    JsonOutput.stringField("next_action", evaluation.nextAction()),
+                    JsonOutput.stringField("next_command", evaluation.nextCommand())
+            ));
+            return;
+        }
         context.out().println("decision: " + evaluation.decision());
         context.out().println("missing:");
         if (evaluation.missing().length == 0) {

@@ -33,6 +33,7 @@ Important constraints:
 - `memory add` creates draft memory.
 - `memory confirm` is required before a fact enters default export.
 - `memory export` selects confirmed memory with sufficient confidence.
+- `CURRENT_CONTEXT.md` uses section budgets and emits a truncation report.
 - Markdown exports are generated artifacts, not source of truth.
 
 ## DB Readonly

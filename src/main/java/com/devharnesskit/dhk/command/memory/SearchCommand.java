@@ -12,11 +12,13 @@ import com.devharnesskit.dhk.repository.MemoryRepository;
 import com.devharnesskit.dhk.service.MemorySearchService;
 import com.devharnesskit.dhk.service.MemoryStatus;
 import com.devharnesskit.dhk.service.ProjectService;
+import com.devharnesskit.dhk.util.JsonOutput;
 import com.devharnesskit.dhk.util.PathUtil;
 
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 
 public final class SearchCommand implements Command {
@@ -52,6 +54,7 @@ public final class SearchCommand implements Command {
             return ExitCodes.VALIDATION_ERROR;
         }
         boolean explain = args.hasFlag("explain");
+        boolean json = JsonOutput.enabled(args);
 
         Path projectRoot = PathUtil.resolveProjectRoot(args, context.workingDirectory());
         try (Connection connection = connectionFactory.open(projectRoot)) {
@@ -60,6 +63,10 @@ public final class SearchCommand implements Command {
                 return ExitCodes.NOT_FOUND;
             }
             List<SearchResult> results = searchService.search(connection, project.projectKey(), query, module, status, limit);
+            if (json) {
+                printJson(context, query, module, status, explain, results);
+                return ExitCodes.SUCCESS;
+            }
             if (results.isEmpty()) {
                 context.out().println("No memory found.");
                 return ExitCodes.SUCCESS;
@@ -87,6 +94,34 @@ public final class SearchCommand implements Command {
             context.err().println("ERROR memory search failed: " + ex.getMessage());
             return ExitCodes.RUNTIME_ERROR;
         }
+    }
+
+    private void printJson(CommandContext context, String query, String module, String status,
+                           boolean explain, List<SearchResult> results) {
+        List<String> rawResults = new ArrayList<String>();
+        for (SearchResult result : results) {
+            rawResults.add(JsonOutput.object(
+                    JsonOutput.numberField("id", result.item().id()),
+                    JsonOutput.stringField("title", result.item().title()),
+                    JsonOutput.stringField("status", result.item().status()),
+                    JsonOutput.numberField("confidence", result.item().confidence()),
+                    JsonOutput.stringField("module", result.item().moduleName()),
+                    JsonOutput.stringField("type", result.item().memoryType()),
+                    JsonOutput.stringField("tags", result.item().tags()),
+                    JsonOutput.stringField("content", result.item().summary(160)),
+                    JsonOutput.stringField("match", result.match()),
+                    JsonOutput.numberField("score", result.score())
+            ).trim());
+        }
+        context.out().print(JsonOutput.object(
+                JsonOutput.stringField("command", "memory search"),
+                JsonOutput.stringField("query", query),
+                JsonOutput.stringField("module", module),
+                JsonOutput.stringField("status", status),
+                JsonOutput.booleanField("explain", explain),
+                JsonOutput.numberField("count", results.size()),
+                JsonOutput.rawField("results", JsonOutput.array(rawResults))
+        ));
     }
 
     private int parseLimit(CommandContext context, String rawValue) {

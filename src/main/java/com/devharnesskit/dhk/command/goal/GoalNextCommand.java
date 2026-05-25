@@ -17,7 +17,7 @@ public final class GoalNextCommand implements Command {
         Path projectRoot = GoalCommandSupport.projectRoot(args, context);
         try {
             GoalRun goal = GoalCommandSupport.goal(orchestrator, context, args, projectRoot);
-            GoalPlan plan = orchestrator.plan(goal);
+            GoalPlan plan = orchestrator.plan(projectRoot, goal);
             GoalCommandSupport.printPlan(context, projectRoot, goal, plan);
             return ExitCodes.SUCCESS;
         } catch (Exception ex) {

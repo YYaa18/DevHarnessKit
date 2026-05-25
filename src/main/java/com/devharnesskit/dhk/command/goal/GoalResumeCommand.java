@@ -18,7 +18,7 @@ public final class GoalResumeCommand implements Command {
         try {
             GoalRun goal = GoalCommandSupport.goal(orchestrator, context, args, projectRoot);
             orchestrator.export(context, projectRoot, goal.goalKey());
-            GoalPlan plan = orchestrator.plan(goal);
+            GoalPlan plan = orchestrator.plan(projectRoot, goal);
             GoalCommandSupport.printPlan(context, projectRoot, goal, plan);
             return ExitCodes.SUCCESS;
         } catch (Exception ex) {

@@ -58,6 +58,9 @@ public final class InitCommand implements Command {
             context.out().println("memory_db: " + PathUtil.memoryDb(projectRoot));
             context.out().println("exports_dir: " + PathUtil.exportsDirectory(projectRoot));
             context.out().println("sensitive_policy: " + PathUtil.sensitivePolicy(projectRoot));
+            if (migrationResult.backupPath().length() > 0) {
+                context.out().println("migration_backup: " + migrationResult.backupPath());
+            }
             context.out().println("fts: " + (migrationResult.ftsAvailable() ? "available" : "fallback"));
             if (!migrationResult.ftsAvailable() && migrationResult.ftsError().length() > 0) {
                 context.out().println("fts_reason: " + migrationResult.ftsError());

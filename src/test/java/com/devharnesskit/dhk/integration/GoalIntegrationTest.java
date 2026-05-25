@@ -134,6 +134,58 @@ final class GoalIntegrationTest {
         assertCompletedRows(root, goalKey);
     }
 
+    @Test
+    void goalUsesConfiguredProfileCheckPolicyAndJsonOutput() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Files.createDirectories(PathUtil.goalProfilesDirectory(root));
+        Files.write(PathUtil.goalProfile(root, "custom-api"), ("{\n"
+                + "  \"workflow_key\": \"api-change\",\n"
+                + "  \"requires_spec\": \"false\",\n"
+                + "  \"default_mode\": \"api\",\n"
+                + "  \"actions\": \"custom_inspect,verify\"\n"
+                + "}\n").getBytes("UTF-8"));
+        Files.write(PathUtil.goalCheckPolicy(root), ("{\n"
+                + "  \"required_checks\": \"sensitive\",\n"
+                + "  \"fail_pending_hard_gates\": \"true\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "custom-api",
+                "--task", "Configured goal",
+                "--module", "order"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+        assertTrue(start.stdout().contains("spec_change: "));
+        assertTrue(start.stdout().contains("current_action: custom_inspect"));
+
+        Harness statusJson = new Harness(tempDir);
+        int statusExit = new CommandRouter().run(new String[]{
+                "goal", "status", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, statusJson.context());
+        assertEquals(ExitCodes.SUCCESS, statusExit);
+        assertTrue(statusJson.stdout().contains("\"command\": \"goal status\""));
+        assertTrue(statusJson.stdout().contains("\"current_action\": \"custom_inspect\""));
+
+        Harness checkJson = new Harness(tempDir);
+        int checkExit = new CommandRouter().run(new String[]{
+                "goal", "check", "--project-root", "demo", "--goal", goalKey, "--all", "--json"
+        }, checkJson.context());
+        assertEquals(ExitCodes.SUCCESS, checkExit);
+        assertTrue(checkJson.stdout().contains("\"count\": 1"));
+        assertTrue(checkJson.stdout().contains("\"check_key\": \"sensitive\""));
+
+        Harness evaluateJson = new Harness(tempDir);
+        int evaluateExit = new CommandRouter().run(new String[]{
+                "goal", "evaluate", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, evaluateJson.context());
+        assertEquals(ExitCodes.SUCCESS, evaluateExit);
+        assertTrue(evaluateJson.stdout().contains("\"decision\": \"ready_to_complete\""));
+    }
+
     private void assertGoalRows(Path root, String goalKey) throws Exception {
         try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(root));
              Statement statement = connection.createStatement()) {

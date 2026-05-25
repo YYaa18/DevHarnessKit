@@ -39,6 +39,8 @@ final class PathUtilTest {
         assertEquals(root.resolve(".agents/memory"), PathUtil.memoryDirectory(root));
         assertEquals(root.resolve(".agents/devharness"), PathUtil.devharnessDirectory(root));
         assertEquals(root.resolve(".agents/devharness/sensitive-policy.json"), PathUtil.sensitivePolicy(root));
+        assertEquals(root.resolve(".agents/devharness/goal-check-policy.json"), PathUtil.goalCheckPolicy(root));
+        assertEquals(root.resolve(".agents/devharness/goal-profiles/java-api-change.json"), PathUtil.goalProfile(root, "java-api-change"));
         assertEquals(root.resolve(".agents/memory/exports"), PathUtil.exportsDirectory(root));
         assertEquals(root.resolve(".agents/memory/artifacts"), PathUtil.artifactsDirectory(root));
         assertEquals(root.resolve(".agents/memory/artifacts/goals/goal-1/checks"), PathUtil.goalCheckArtifactsDirectory(root, "goal-1"));

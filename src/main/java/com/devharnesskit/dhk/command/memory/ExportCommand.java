@@ -35,6 +35,7 @@ import com.devharnesskit.dhk.service.SensitiveDataGuard;
 import com.devharnesskit.dhk.service.spec.SpecExportService;
 import com.devharnesskit.dhk.service.workflow.WorkflowArtifactService;
 import com.devharnesskit.dhk.service.workflow.WorkflowExportService;
+import com.devharnesskit.dhk.util.JsonOutput;
 import com.devharnesskit.dhk.util.PathUtil;
 
 import java.nio.file.Files;
@@ -108,6 +109,7 @@ public final class ExportCommand implements Command {
         if (limit <= 0) {
             return ExitCodes.VALIDATION_ERROR;
         }
+        boolean json = JsonOutput.enabled(args);
 
         Path projectRoot = PathUtil.resolveProjectRoot(args, context.workingDirectory());
         Path out = args.hasOption("out")
@@ -147,8 +149,21 @@ public final class ExportCommand implements Command {
                 workflowArtifactService.recordExportedMemory(connection, workflowRun, exportItems,
                         "memory export --include-workflow", now);
             }
-            context.out().println("export_path: " + out);
-            context.out().println("memory_exported: " + exportItems.size());
+            if (json) {
+                context.out().print(JsonOutput.object(
+                        JsonOutput.stringField("command", "memory export"),
+                        JsonOutput.stringField("export_path", out.toString()),
+                        JsonOutput.numberField("memory_exported", exportItems.size()),
+                        JsonOutput.stringField("task", task),
+                        JsonOutput.stringField("module", module),
+                        JsonOutput.stringField("mode", args.option("mode", "auto")),
+                        JsonOutput.stringField("workflow_run", workflowRun == null ? "" : workflowRun.runKey()),
+                        JsonOutput.stringField("spec_change", specChange == null ? "" : specChange.changeKey())
+                ));
+            } else {
+                context.out().println("export_path: " + out);
+                context.out().println("memory_exported: " + exportItems.size());
+            }
             return ExitCodes.SUCCESS;
         } catch (SQLException ex) {
             context.err().println("ERROR memory export failed: " + ex.getMessage());

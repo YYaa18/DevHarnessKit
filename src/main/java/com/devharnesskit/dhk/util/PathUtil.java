@@ -23,6 +23,8 @@ public final class PathUtil {
     public static final String GOAL_CONTEXT = "GOAL_CONTEXT.md";
     public static final String GOAL_SUMMARY = "GOAL_SUMMARY.md";
     public static final String SENSITIVE_POLICY_JSON = "sensitive-policy.json";
+    public static final String GOAL_PROFILES_DIRECTORY = "goal-profiles";
+    public static final String GOAL_CHECK_POLICY_JSON = "goal-check-policy.json";
 
     private PathUtil() {
     }
@@ -53,6 +55,18 @@ public final class PathUtil {
 
     public static Path sensitivePolicy(Path projectRoot) {
         return devharnessDirectory(projectRoot).resolve(SENSITIVE_POLICY_JSON);
+    }
+
+    public static Path goalProfilesDirectory(Path projectRoot) {
+        return devharnessDirectory(projectRoot).resolve(GOAL_PROFILES_DIRECTORY);
+    }
+
+    public static Path goalProfile(Path projectRoot, String profileKey) {
+        return goalProfilesDirectory(projectRoot).resolve(profileKey + ".json");
+    }
+
+    public static Path goalCheckPolicy(Path projectRoot) {
+        return devharnessDirectory(projectRoot).resolve(GOAL_CHECK_POLICY_JSON);
     }
 
     public static Path exportsDirectory(Path projectRoot) {

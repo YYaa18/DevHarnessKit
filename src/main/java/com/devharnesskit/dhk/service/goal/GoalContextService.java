@@ -98,7 +98,7 @@ public final class GoalContextService {
                 goal.mode(), goal.profileKey(), generatedAt, memory, checkpoint, inlineWorkflow, inlineSpec);
         write(PathUtil.currentContext(projectRoot), current);
 
-        GoalProfile profile = profileService.find(goal.profileKey());
+        GoalProfile profile = profileService.find(projectRoot, goal.profileKey());
         GoalPlan plan = planner.plan(goal, profile);
         String goalContext = goalContextRenderer.render(goal, plan, generatedAt);
         return writePath(PathUtil.goalContext(projectRoot), goalContext);

@@ -9,11 +9,15 @@ import java.util.List;
 
 public final class GoalCompletionEvaluator {
     public GoalEvaluation evaluate(GoalRun goal, List<GoalCheck> checks) {
+        return evaluate(goal, checks, GoalCheckPolicy.defaults());
+    }
+
+    public GoalEvaluation evaluate(GoalRun goal, List<GoalCheck> checks, GoalCheckPolicy policy) {
         List<String> missing = new ArrayList<String>();
         if ("failed".equals(goal.status()) || "abandoned".equals(goal.status())) {
             missing.add("goal status is " + goal.status());
         }
-        for (String required : GoalCheckService.REQUIRED_CHECKS) {
+        for (String required : policy.requiredChecks()) {
             GoalCheck check = find(checks, required);
             if (check == null) {
                 missing.add("check " + required + " is pending");

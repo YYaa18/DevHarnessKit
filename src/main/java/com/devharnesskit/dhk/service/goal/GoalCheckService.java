@@ -123,8 +123,8 @@ public final class GoalCheckService {
                 continue;
             }
             scanned++;
-            String content = sensitiveDataGuard.redact(new String(Files.readAllBytes(file), "UTF-8"));
-            List<String> matches = sensitiveDataGuard.findMatches(content);
+            String original = new String(Files.readAllBytes(file), "UTF-8");
+            List<String> matches = sensitiveDataGuard.findMatches(original);
             output.append(file).append(": ").append(matches.isEmpty() ? "ok" : matches.toString()).append('\n');
             if (!matches.isEmpty()) {
                 failures.add(file.getFileName() + " " + matches);

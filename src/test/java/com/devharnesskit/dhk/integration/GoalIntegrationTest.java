@@ -12,6 +12,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -241,6 +242,90 @@ final class GoalIntegrationTest {
         assertEquals(ExitCodes.VALIDATION_ERROR, stepExit);
         assertTrue(step.stderr().contains("Sensitive data rejected in goal step"));
         assertFalse(Files.isRegularFile(PathUtil.goalSummary(tempDir.resolve("demo"))));
+    }
+
+    @Test
+    void goalSensitiveCheckScansOriginalContextAndKeepsLogsRedacted() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Files.createDirectories(PathUtil.goalProfilesDirectory(root));
+        Files.write(PathUtil.goalProfile(root, "custom-sensitive"), ("{\n"
+                + "  \"workflow_key\": \"api-change\",\n"
+                + "  \"requires_spec\": \"false\",\n"
+                + "  \"default_mode\": \"api\",\n"
+                + "  \"actions\": \"inspect,verify\"\n"
+                + "}\n").getBytes("UTF-8"));
+        Files.write(PathUtil.goalCheckPolicy(root), ("{\n"
+                + "  \"required_checks\": \"sensitive\",\n"
+                + "  \"fail_pending_hard_gates\": \"true\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "custom-sensitive",
+                "--task", "Sensitive check original context",
+                "--module", "goal"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        Harness inspectStep = new Harness(tempDir);
+        int inspectStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Inspection complete",
+                "--evidence", "evidence=inspection"
+        }, inspectStep.context());
+        assertEquals(ExitCodes.SUCCESS, inspectStepExit);
+
+        Harness verifyStep = new Harness(tempDir);
+        int verifyStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Verification complete",
+                "--evidence", "compile_result=not required; test_result=not required; sensitive_result=pending"
+        }, verifyStep.context());
+        assertEquals(ExitCodes.SUCCESS, verifyStepExit);
+
+        String rawSecret = "pass" + "word=sample-value";
+        Files.write(PathUtil.goalContext(root), ("\n" + rawSecret + "\n").getBytes("UTF-8"),
+                StandardOpenOption.APPEND);
+
+        Harness check = new Harness(tempDir);
+        int checkExit = new CommandRouter().run(new String[]{
+                "goal", "check", "--project-root", "demo", "--goal", goalKey, "--all"
+        }, check.context());
+        assertEquals(ExitCodes.SUCCESS, checkExit);
+        assertTrue(check.stdout().contains("check_key: sensitive"));
+        assertTrue(check.stdout().contains("status: failed"));
+        assertTrue(check.stdout().contains("sensitive scan failed"));
+
+        Path log = PathUtil.goalCheckArtifactsDirectory(root, goalKey).resolve("sensitive.log");
+        assertTrue(Files.isRegularFile(log));
+        String logContent = new String(Files.readAllBytes(log), "UTF-8");
+        assertTrue(logContent.contains("GOAL_CONTEXT.md"));
+        assertFalse(logContent.contains(rawSecret));
+        assertFalse(check.stdout().contains(rawSecret));
+
+        Harness evaluate = new Harness(tempDir);
+        int evaluateExit = new CommandRouter().run(new String[]{
+                "goal", "evaluate", "--project-root", "demo", "--goal", goalKey
+        }, evaluate.context());
+        assertEquals(ExitCodes.SUCCESS, evaluateExit);
+        assertTrue(evaluate.stdout().contains("decision: not_ready"));
+        assertTrue(evaluate.stdout().contains("check sensitive is failed"));
+
+        Harness complete = new Harness(tempDir);
+        int completeExit = new CommandRouter().run(new String[]{
+                "goal", "complete", "--project-root", "demo", "--goal", goalKey
+        }, complete.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, completeExit);
+        assertTrue(complete.stdout().contains("decision: not_ready"));
+        assertTrue(complete.stdout().contains("check sensitive is failed"));
+        assertFalse(complete.stdout().contains(rawSecret));
     }
 
     @Test

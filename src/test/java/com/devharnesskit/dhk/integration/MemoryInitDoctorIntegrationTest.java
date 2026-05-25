@@ -101,11 +101,26 @@ final class MemoryInitDoctorIntegrationTest {
 
         Files.createDirectories(PathUtil.goalProfilesDirectory(root));
         Files.write(PathUtil.goalProfile(root, "custom-api"), ("{\n"
+                + "  \"profile_key\": \"wrong-key\",\n"
                 + "  \"workflow_key\": \"missing-workflow\",\n"
                 + "  \"requires_spec\": \"maybe\",\n"
                 + "  \"default_mode\": \"api\",\n"
                 + "  \"actions\": \"inspect_existing_code,bad-action,verify,verify\",\n"
+                + "  \"required_checks\": \"compile,custom\",\n"
+                + "  \"completion_allow_skipped_checks\": \"maybe\",\n"
+                + "  \"required_evidence.verify\": \"compile_result,,sensitive_result\",\n"
+                + "  \"required_evidence.ghost\": \"ghost_evidence\",\n"
                 + "  \"unexpected\": \"value\"\n"
+                + "}\n").getBytes("UTF-8"));
+        Files.write(PathUtil.goalProfile(root, "mapping-bad"), ("{\n"
+                + "  \"workflow_key\": \"api-change\",\n"
+                + "  \"requires_spec\": \"true\",\n"
+                + "  \"default_mode\": \"api\",\n"
+                + "  \"actions\": \"verify\",\n"
+                + "  \"mapping.verify.workflow_phase\": \"missing_phase\",\n"
+                + "  \"mapping.verify.required_gates\": \"missing_gate\",\n"
+                + "  \"mapping.verify.spec_acceptance_update\": \"robot\",\n"
+                + "  \"mapping.ghost.workflow_phase\": \"verify_tests\"\n"
                 + "}\n").getBytes("UTF-8"));
         Files.write(PathUtil.goalCheckPolicy(root), ("{\n"
                 + "  \"required_checks\": \"\",\n"
@@ -121,10 +136,19 @@ final class MemoryInitDoctorIntegrationTest {
 
         assertEquals(ExitCodes.SUCCESS, exitCode);
         assertTrue(doctorHarness.stderr().contains("WARNING goal_config"));
+        assertTrue(doctorHarness.stderr().contains("profile_key does not match filename"));
         assertTrue(doctorHarness.stderr().contains("unknown fields: unexpected"));
         assertTrue(doctorHarness.stderr().contains("workflow template not found: missing-workflow"));
         assertTrue(doctorHarness.stderr().contains("actions contains invalid item: bad-action"));
         assertTrue(doctorHarness.stderr().contains("actions contains duplicate item: verify"));
+        assertTrue(doctorHarness.stderr().contains("required_checks contains unsupported item: custom"));
+        assertTrue(doctorHarness.stderr().contains("completion_allow_skipped_checks should be true/false"));
+        assertTrue(doctorHarness.stderr().contains("required_evidence.verify contains an empty item"));
+        assertTrue(doctorHarness.stderr().contains("required_evidence.ghost references action not listed in actions"));
+        assertTrue(doctorHarness.stderr().contains("mapping.verify.workflow_phase references unknown workflow phase: missing_phase"));
+        assertTrue(doctorHarness.stderr().contains("mapping.verify.required_gates contains unsupported item: missing_gate"));
+        assertTrue(doctorHarness.stderr().contains("mapping.verify.spec_acceptance_update should be one of"));
+        assertTrue(doctorHarness.stderr().contains("mapping.ghost.workflow_phase references action not listed in actions"));
         assertTrue(doctorHarness.stderr().contains("required_checks is empty"));
         assertTrue(doctorHarness.stderr().contains("accepted_compile_statuses contains unsupported item: unknown"));
         assertTrue(doctorHarness.stderr().contains("fail_pending_hard_gates should be true/false"));
@@ -146,10 +170,23 @@ final class MemoryInitDoctorIntegrationTest {
 
         Files.createDirectories(PathUtil.goalProfilesDirectory(root));
         Files.write(PathUtil.goalProfile(root, "financial-api"), ("{\n"
+                + "  \"profile_key\": \"financial-api\",\n"
                 + "  \"workflow_key\": \"api-change\",\n"
                 + "  \"requires_spec\": \"true\",\n"
                 + "  \"default_mode\": \"api\",\n"
-                + "  \"actions\": \"inspect_existing_code,create_change_plan,implement_minimal_change,verify\"\n"
+                + "  \"actions\": \"inspect_existing_code,create_change_plan,implement_minimal_change,verify\",\n"
+                + "  \"required_checks\": \"compile,test,sensitive,spec,workflow\",\n"
+                + "  \"completion_require_fresh_checks\": \"true\",\n"
+                + "  \"completion_allow_skipped_checks\": \"false\",\n"
+                + "  \"completion_require_checkpoint\": \"true\",\n"
+                + "  \"required_evidence.inspect_existing_code\": \"existing_controller,existing_service,existing_mapper,existing_tests\",\n"
+                + "  \"required_evidence.create_change_plan\": \"impacted_files,risk_points,verification_plan\",\n"
+                + "  \"mapping.inspect_existing_code.workflow_phase\": \"inspect_existing_code\",\n"
+                + "  \"mapping.create_change_plan.workflow_phase\": \"create_change_plan\",\n"
+                + "  \"mapping.create_change_plan.required_gates\": \"impacted_files_listed,verification_plan_ready\",\n"
+                + "  \"mapping.verify.workflow_phase\": \"verify_tests\",\n"
+                + "  \"mapping.verify.required_gates\": \"tests_recorded\",\n"
+                + "  \"mapping.verify.spec_acceptance_update\": \"manual\"\n"
                 + "}\n").getBytes("UTF-8"));
         Files.write(PathUtil.goalCheckPolicy(root), ("{\n"
                 + "  \"required_checks\": \"compile,test,sensitive,spec,workflow\",\n"

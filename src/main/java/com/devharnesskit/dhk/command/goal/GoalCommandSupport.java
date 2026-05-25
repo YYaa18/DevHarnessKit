@@ -3,15 +3,18 @@ package com.devharnesskit.dhk.command.goal;
 import com.devharnesskit.dhk.cli.Args;
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.model.goal.GoalPlan;
+import com.devharnesskit.dhk.model.goal.GoalProfile;
 import com.devharnesskit.dhk.model.goal.GoalRun;
 import com.devharnesskit.dhk.service.goal.GoalCheckPolicyService;
 import com.devharnesskit.dhk.service.goal.GoalOrchestrator;
+import com.devharnesskit.dhk.service.goal.GoalProfileService;
 import com.devharnesskit.dhk.util.PathUtil;
 
 import java.nio.file.Path;
 
 final class GoalCommandSupport {
     private static final GoalCheckPolicyService CHECK_POLICY_SERVICE = new GoalCheckPolicyService();
+    private static final GoalProfileService PROFILE_SERVICE = new GoalProfileService();
     private static final String[] ALLOWED_ACTIONS = new String[]{
             "perform_current_action_only",
             "record_goal_step_after_work",
@@ -69,7 +72,8 @@ final class GoalCommandSupport {
             context.out().println("  - " + action);
         }
         context.out().println("required_checks:");
-        for (String check : CHECK_POLICY_SERVICE.load(projectRoot).requiredChecks()) {
+        GoalProfile profile = PROFILE_SERVICE.find(projectRoot, goal.profileKey());
+        for (String check : CHECK_POLICY_SERVICE.load(projectRoot).requiredChecks(profile)) {
             context.out().println("  - " + check);
         }
         context.out().println("context_files:");

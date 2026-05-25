@@ -119,7 +119,7 @@ public final class GoalContextService {
         String[] completionBlockers = completionEvaluator.evaluate(goal,
                 goalCheckRepository.listByGoal(connection, goal.goalKey()), policy, profile,
                 goalStepRepository.listByGoal(connection, goal.goalKey())).missing();
-        String goalContext = goalContextRenderer.render(goal, plan, policy.requiredChecks(),
+        String goalContext = goalContextRenderer.render(goal, plan, policy.requiredChecks(profile),
                 completionBlockers, generatedAt);
         return writePath(PathUtil.goalContext(projectRoot), goalContext);
     }

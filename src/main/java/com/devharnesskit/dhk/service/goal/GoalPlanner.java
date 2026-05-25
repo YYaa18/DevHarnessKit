@@ -24,7 +24,7 @@ public final class GoalPlanner {
         if (action.length() == 0 && profile.actions().length > 0) {
             action = profile.actions()[0];
         }
-        return new GoalPlan(action, instruction(action), requiredEvidence(action), FORBIDDEN,
+        return new GoalPlan(action, instruction(action), requiredEvidence(profile, action), FORBIDDEN,
                 "dhk goal step --goal " + goal.goalKey()
                         + " --summary \"<summary>\" --evidence \"<evidence>\"");
     }
@@ -118,7 +118,13 @@ public final class GoalPlanner {
         return "Perform the current goal action and record concrete evidence.";
     }
 
-    private String[] requiredEvidence(String action) {
+    private String[] requiredEvidence(GoalProfile profile, String action) {
+        if (profile != null) {
+            String[] configured = profile.requiredEvidence(action);
+            if (configured.length > 0) {
+                return configured;
+            }
+        }
         if ("inspect_existing_code".equals(action)) {
             return new String[]{"existing_controller", "existing_service", "existing_mapper", "existing_tests"};
         }

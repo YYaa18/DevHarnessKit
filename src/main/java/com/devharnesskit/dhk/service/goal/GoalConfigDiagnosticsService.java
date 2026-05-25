@@ -12,6 +12,8 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -22,14 +24,21 @@ import java.util.regex.Pattern;
 public final class GoalConfigDiagnosticsService {
     private static final Pattern KEY_PATTERN = Pattern.compile("[a-z0-9][a-z0-9_-]*");
     private static final Pattern ACTION_PATTERN = Pattern.compile("[a-z][a-z0-9_]*");
-    private static final Set<String> PROFILE_FIELDS = set("workflow_key", "requires_spec", "default_mode", "actions");
+    private static final Set<String> PROFILE_FIELDS = set("profile_key", "workflow_key", "requires_spec",
+            "default_mode", "actions", "required_checks", "completion_require_fresh_checks",
+            "completion_allow_skipped_checks", "completion_require_checkpoint");
     private static final Set<String> POLICY_FIELDS = set("required_checks", "compile_command", "test_command",
             "fail_pending_hard_gates", "accepted_compile_statuses", "accepted_test_statuses",
             "accepted_sensitive_statuses", "accepted_spec_statuses", "accepted_workflow_statuses");
     private static final Set<String> CHECK_KEYS = set("compile", "test", "sensitive", "spec", "workflow");
     private static final Set<String> CHECK_STATUSES = set("passed", "skipped", "waived");
+    private static final Set<String> MAPPING_FIELDS = set("workflow_phase", "required_gates",
+            "spec_task", "spec_acceptance_update");
+    private static final Set<String> SPEC_ACCEPTANCE_UPDATE_POLICIES = set("manual", "auto_pass", "disabled");
     private static final Set<String> BUILT_IN_WORKFLOW_KEYS = set("api-change", "mvc-change",
             "systematic-debugging", "safe-refactor", "sql-review", "code-review");
+    private static final Map<String, Set<String>> BUILT_IN_WORKFLOW_PHASES = workflowPhases();
+    private static final Map<String, Set<String>> BUILT_IN_WORKFLOW_GATES = workflowGates();
 
     public List<Diagnostic> diagnose(Path projectRoot, Connection connection) {
         List<Diagnostic> diagnostics = new ArrayList<Diagnostic>();
@@ -69,7 +78,12 @@ public final class GoalConfigDiagnosticsService {
             return;
         }
 
-        warnUnknownFields(file, raw, PROFILE_FIELDS, diagnostics);
+        warnUnknownProfileFields(file, raw, diagnostics);
+        String declaredProfileKey = trim(raw.get("profile_key"));
+        if (declaredProfileKey.length() > 0 && !profileKey.equals(declaredProfileKey)) {
+            diagnostics.add(warning(file.toString(), "profile_key does not match filename: "
+                    + declaredProfileKey + " != " + profileKey + "; configured profile will be ignored"));
+        }
         String workflowKey = trim(raw.get("workflow_key"));
         if (workflowKey.length() == 0) {
             diagnostics.add(warning(file.toString(), "workflow_key is required; configured profile will be ignored"));
@@ -95,6 +109,14 @@ public final class GoalConfigDiagnosticsService {
             }
         }
         diagnoseList(file, "actions", raw.get("actions"), ACTION_PATTERN, null, true, diagnostics);
+        Set<String> actions = splitSet(raw.get("actions"));
+        if (raw.containsKey("required_checks")) {
+            diagnoseList(file, "required_checks", raw.get("required_checks"), KEY_PATTERN, CHECK_KEYS,
+                    false, diagnostics);
+        }
+        diagnoseCompletionBooleans(file, raw, diagnostics);
+        diagnoseRequiredEvidence(file, raw, actions, diagnostics);
+        diagnoseActionMappings(file, raw, workflowKey, actions, diagnostics);
     }
 
     private void diagnoseCheckPolicy(Path projectRoot, List<Diagnostic> diagnostics) {
@@ -142,6 +164,96 @@ public final class GoalConfigDiagnosticsService {
                 KEY_PATTERN, CHECK_STATUSES, false, diagnostics);
     }
 
+    private void diagnoseCompletionBooleans(Path file, Map<String, String> raw, List<Diagnostic> diagnostics) {
+        diagnoseBoolean(file, raw, "completion_require_fresh_checks", diagnostics);
+        diagnoseBoolean(file, raw, "completion_allow_skipped_checks", diagnostics);
+        diagnoseBoolean(file, raw, "completion_require_checkpoint", diagnostics);
+    }
+
+    private void diagnoseBoolean(Path file, Map<String, String> raw, String field,
+                                 List<Diagnostic> diagnostics) {
+        if (raw.containsKey(field) && !validBoolean(raw.get(field))) {
+            diagnostics.add(warning(file.toString(), field + " should be true/false, yes/no, or 1/0"));
+        }
+    }
+
+    private void diagnoseRequiredEvidence(Path file, Map<String, String> raw, Set<String> actions,
+                                          List<Diagnostic> diagnostics) {
+        for (Map.Entry<String, String> entry : raw.entrySet()) {
+            String key = entry.getKey();
+            if (!key.startsWith("required_evidence.")) {
+                continue;
+            }
+            String action = key.substring("required_evidence.".length());
+            if (!ACTION_PATTERN.matcher(action).matches()) {
+                diagnostics.add(warning(file.toString(), key + " has invalid action key: " + action));
+            } else if (!actions.contains(action)) {
+                diagnostics.add(warning(file.toString(), key + " references action not listed in actions: " + action));
+            }
+            diagnoseList(file, key, entry.getValue(), ACTION_PATTERN, null, true, diagnostics);
+        }
+    }
+
+    private void diagnoseActionMappings(Path file, Map<String, String> raw, String workflowKey,
+                                        Set<String> actions, List<Diagnostic> diagnostics) {
+        Set<String> workflowPhases = knownWorkflowPhases(workflowKey);
+        Set<String> workflowGates = knownWorkflowGates(workflowKey);
+        for (Map.Entry<String, String> entry : raw.entrySet()) {
+            String key = entry.getKey();
+            if (!key.startsWith("mapping.")) {
+                continue;
+            }
+            String[] parts = key.split("\\.", -1);
+            if (parts.length != 3) {
+                diagnostics.add(warning(file.toString(), key + " should use mapping.<action>.<field>"));
+                continue;
+            }
+            String action = parts[1];
+            String field = parts[2];
+            if (!ACTION_PATTERN.matcher(action).matches()) {
+                diagnostics.add(warning(file.toString(), key + " has invalid action key: " + action));
+            } else if (!actions.contains(action)) {
+                diagnostics.add(warning(file.toString(), key + " references action not listed in actions: " + action));
+            }
+            if (!MAPPING_FIELDS.contains(field)) {
+                diagnostics.add(warning(file.toString(), key + " contains unsupported mapping field: " + field));
+                continue;
+            }
+            diagnoseMappingField(file, key, field, entry.getValue(), workflowPhases, workflowGates, diagnostics);
+        }
+    }
+
+    private void diagnoseMappingField(Path file, String key, String field, String value,
+                                      Set<String> workflowPhases, Set<String> workflowGates,
+                                      List<Diagnostic> diagnostics) {
+        if ("workflow_phase".equals(field)) {
+            String phase = trim(value);
+            if (phase.length() == 0) {
+                diagnostics.add(warning(file.toString(), key + " is empty"));
+            } else if (!ACTION_PATTERN.matcher(phase).matches()) {
+                diagnostics.add(warning(file.toString(), key + " contains invalid workflow phase: " + phase));
+            } else if (!workflowPhases.isEmpty() && !workflowPhases.contains(phase)) {
+                diagnostics.add(warning(file.toString(), key + " references unknown workflow phase: " + phase));
+            }
+        } else if ("required_gates".equals(field)) {
+            diagnoseList(file, key, value, ACTION_PATTERN, workflowGates.isEmpty() ? null : workflowGates,
+                    false, diagnostics);
+        } else if ("spec_task".equals(field)) {
+            String specTask = trim(value);
+            if (specTask.length() == 0) {
+                diagnostics.add(warning(file.toString(), key + " is empty"));
+            } else if (!KEY_PATTERN.matcher(specTask.toLowerCase(Locale.ROOT)).matches()) {
+                diagnostics.add(warning(file.toString(), key + " contains invalid spec task key: " + specTask));
+            }
+        } else if ("spec_acceptance_update".equals(field)) {
+            String policy = trim(value);
+            if (!SPEC_ACCEPTANCE_UPDATE_POLICIES.contains(policy)) {
+                diagnostics.add(warning(file.toString(), key + " should be one of: "
+                        + join(new ArrayList<String>(SPEC_ACCEPTANCE_UPDATE_POLICIES))));
+            }
+        }
+    }
+
     private void diagnoseList(Path file, String field, String value, Pattern format,
                               Set<String> allowedValues, boolean required, List<Diagnostic> diagnostics) {
         if (value == null) {
@@ -184,6 +296,32 @@ public final class GoalConfigDiagnosticsService {
         }
     }
 
+    private void warnUnknownProfileFields(Path file, Map<String, String> raw, List<Diagnostic> diagnostics) {
+        List<String> unknown = new ArrayList<String>();
+        for (String key : raw.keySet()) {
+            if (!isAllowedProfileField(key)) {
+                unknown.add(key);
+            }
+        }
+        if (!unknown.isEmpty()) {
+            diagnostics.add(warning(file.toString(), "unknown fields: " + join(unknown)));
+        }
+    }
+
+    private boolean isAllowedProfileField(String key) {
+        if (PROFILE_FIELDS.contains(key)) {
+            return true;
+        }
+        if (key.startsWith("required_evidence.")) {
+            return key.length() > "required_evidence.".length();
+        }
+        if (!key.startsWith("mapping.")) {
+            return false;
+        }
+        String[] parts = key.split("\\.", -1);
+        return parts.length == 3 && parts[1].length() > 0 && MAPPING_FIELDS.contains(parts[2]);
+    }
+
     private void warnUnknownFields(Path file, Map<String, String> raw, Set<String> allowed,
                                    List<Diagnostic> diagnostics) {
         List<String> unknown = new ArrayList<String>();
@@ -216,6 +354,31 @@ public final class GoalConfigDiagnosticsService {
             return keys;
         }
         return keys;
+    }
+
+    private Set<String> splitSet(String value) {
+        if (value == null || value.trim().length() == 0) {
+            return Collections.emptySet();
+        }
+        Set<String> result = new LinkedHashSet<String>();
+        String[] parts = value.split(",");
+        for (String part : parts) {
+            String item = part.trim();
+            if (item.length() > 0) {
+                result.add(item);
+            }
+        }
+        return result;
+    }
+
+    private Set<String> knownWorkflowPhases(String workflowKey) {
+        Set<String> phases = BUILT_IN_WORKFLOW_PHASES.get(workflowKey);
+        return phases == null ? Collections.<String>emptySet() : phases;
+    }
+
+    private Set<String> knownWorkflowGates(String workflowKey) {
+        Set<String> gates = BUILT_IN_WORKFLOW_GATES.get(workflowKey);
+        return gates == null ? Collections.<String>emptySet() : gates;
     }
 
     private Diagnostic warning(String location, String message) {
@@ -254,6 +417,36 @@ public final class GoalConfigDiagnosticsService {
             builder.append(value);
         }
         return builder.toString();
+    }
+
+    private static Map<String, Set<String>> workflowPhases() {
+        Map<String, Set<String>> values = new LinkedHashMap<String, Set<String>>();
+        values.put("api-change", set("export_context", "inspect_existing_code", "create_change_plan",
+                "user_approval", "implement_minimal_change", "verify_compile", "verify_tests",
+                "create_checkpoint", "suggest_memory_updates"));
+        values.put("mvc-change", set("export_context", "inspect_existing_code", "create_change_plan",
+                "user_approval", "implement_minimal_change", "verify_compile", "verify_view_flow",
+                "create_checkpoint", "suggest_memory_updates"));
+        values.put("systematic-debugging", set("export_context", "collect_error",
+                "identify_first_business_stack", "list_hypotheses", "verify_hypothesis",
+                "minimal_fix_plan", "implement_fix", "verify_regression", "create_checkpoint"));
+        values.put("safe-refactor", set("export_context", "identify_behavior_boundary",
+                "create_refactor_plan", "user_approval", "apply_small_refactor", "verify_compile",
+                "verify_tests", "create_checkpoint"));
+        return values;
+    }
+
+    private static Map<String, Set<String>> workflowGates() {
+        Map<String, Set<String>> values = new LinkedHashMap<String, Set<String>>();
+        values.put("api-change", set("current_context_exists", "confirmed_memory_only",
+                "impacted_files_listed", "verification_plan_ready", "user_approval_before_implementation",
+                "tests_recorded", "checkpoint_created", "memory_suggestions_recorded"));
+        values.put("mvc-change", set("mvc_confirmed", "view_name_checked", "model_fields_checked",
+                "form_validation_checked", "checkpoint_created"));
+        values.put("systematic-debugging", set("error_evidence_collected",
+                "first_business_stack_identified", "hypothesis_has_evidence", "fix_has_verification"));
+        values.put("safe-refactor", set("behavior_preservation_stated", "rollback_plan_ready"));
+        return values;
     }
 
     public static final class Diagnostic {

@@ -35,11 +35,12 @@ public final class GoalCheckService {
     private final WorkflowGateRunRepository gateRunRepository;
     private final SensitiveDataGuard sensitiveDataGuard;
     private final GoalCheckPolicyService policyService;
+    private final GoalProfileService profileService;
 
     public GoalCheckService() {
         this(new GoalCheckRepository(), new SpecTaskRepository(), new SpecAcceptanceRepository(),
                 new WorkflowRunRepository(), new WorkflowGateRunRepository(), new SensitiveDataGuard(),
-                new GoalCheckPolicyService());
+                new GoalCheckPolicyService(), new GoalProfileService());
     }
 
     GoalCheckService(GoalCheckRepository checkRepository, SpecTaskRepository taskRepository,
@@ -47,7 +48,8 @@ public final class GoalCheckService {
                      WorkflowRunRepository workflowRunRepository,
                      WorkflowGateRunRepository gateRunRepository,
                      SensitiveDataGuard sensitiveDataGuard,
-                     GoalCheckPolicyService policyService) {
+                     GoalCheckPolicyService policyService,
+                     GoalProfileService profileService) {
         this.checkRepository = checkRepository;
         this.taskRepository = taskRepository;
         this.acceptanceRepository = acceptanceRepository;
@@ -55,6 +57,7 @@ public final class GoalCheckService {
         this.gateRunRepository = gateRunRepository;
         this.sensitiveDataGuard = sensitiveDataGuard;
         this.policyService = policyService;
+        this.profileService = profileService;
     }
 
     public GoalCheck run(Connection connection, Path projectRoot, GoalRun goal,
@@ -86,7 +89,7 @@ public final class GoalCheckService {
                                   String now) throws Exception {
         GoalCheckPolicy policy = policyService.load(projectRoot);
         List<GoalCheck> results = new ArrayList<GoalCheck>();
-        for (String check : policy.requiredChecks()) {
+        for (String check : policy.requiredChecks(profileService.find(projectRoot, goal.profileKey()))) {
             results.add(run(connection, projectRoot, goal, check, now, policy));
         }
         return results;

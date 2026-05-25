@@ -14,10 +14,25 @@ Example:
 
 ```json
 {
+  "profile_key": "java-api-change",
   "workflow_key": "api-change",
   "requires_spec": "true",
   "default_mode": "api",
-  "actions": "inspect_existing_code,create_change_plan,implement_minimal_change,verify"
+  "actions": "inspect_existing_code,create_change_plan,implement_minimal_change,verify",
+  "required_checks": "compile,test,sensitive,spec,workflow",
+  "completion_require_fresh_checks": "true",
+  "completion_allow_skipped_checks": "false",
+  "completion_require_checkpoint": "true",
+  "required_evidence.inspect_existing_code": "existing_controller,existing_service,existing_mapper,existing_tests",
+  "required_evidence.create_change_plan": "impacted_files,risk_points,verification_plan",
+  "required_evidence.implement_minimal_change": "changed_files,implementation_summary",
+  "required_evidence.verify": "compile_result,test_result,sensitive_result",
+  "mapping.inspect_existing_code.workflow_phase": "inspect_existing_code",
+  "mapping.create_change_plan.workflow_phase": "create_change_plan",
+  "mapping.create_change_plan.required_gates": "impacted_files_listed,verification_plan_ready",
+  "mapping.verify.workflow_phase": "verify_tests",
+  "mapping.verify.required_gates": "tests_recorded",
+  "mapping.verify.spec_acceptance_update": "manual"
 }
 ```
 
@@ -26,10 +41,48 @@ Notes:
 - Values are strings because DevHarness Kit intentionally uses a minimal JSON parser.
 - `actions` is a comma-separated list.
 - `workflow_key` must match a seeded workflow template.
+- `profile_key` is optional, but when present it must match the profile filename.
 - If the profile file is invalid, the built-in profile with the same key is used when available.
 - If a custom-only profile is invalid, `goal start --profile <key>` will fail because there is no built-in fallback.
 - A goal is not ready to complete until every configured action has a recorded `goal step`.
-- `goal step` validates the current action's required evidence. Built-in action evidence keys should appear in `--evidence`, while `changed_files` may be satisfied by `--changed-files`.
+- `goal step` validates the current action's required evidence. Built-in and configured action evidence keys should appear in `--evidence`, while `changed_files` may be satisfied by `--changed-files`.
+
+## Profile Schema Alpha
+
+The alpha schema is deliberately flat so it can be parsed by the current minimal JSON parser. Nested objects and arrays are not supported yet.
+
+Supported profile fields:
+
+| Field | Meaning |
+| --- | --- |
+| `profile_key` | Optional self-check. If present, it must match `<profile>.json`. |
+| `workflow_key` | Workflow template key used when `goal start` creates the workflow run. |
+| `requires_spec` | Whether `goal start` creates a spec change. |
+| `default_mode` | Mode used when `goal start --mode` is omitted or `auto`. |
+| `actions` | Comma-separated ordered action keys. Every action requires a `goal step`. |
+| `required_checks` | Profile-level checks used when no global `goal-check-policy.json` overrides them. |
+| `completion_require_fresh_checks` | If true, checks become stale after later goal steps. |
+| `completion_allow_skipped_checks` | If false, skipped checks are not accepted unless policy explicitly allows them. |
+| `completion_require_checkpoint` | Declares that completion should create a checkpoint. Current `goal complete` always creates one. |
+
+Per-action evidence fields use:
+
+```text
+required_evidence.<action_key>: "evidence_key_1,evidence_key_2"
+```
+
+Action mapping fields use:
+
+```text
+mapping.<action_key>.workflow_phase: "<workflow_phase_key>"
+mapping.<action_key>.required_gates: "gate_1,gate_2"
+mapping.<action_key>.spec_task: "<spec_task_key>"
+mapping.<action_key>.spec_acceptance_update: "manual|auto_pass|disabled"
+```
+
+Mappings are alpha metadata for making the goal profile a formal process definition. They are validated by `dhk doctor` and are intended to drive stronger workflow/spec synchronization in later releases.
+
+Built-in Java profiles (`java-api-change` and `java-mvc-change`) now express their own required evidence, required checks, strict completion policy, and action mappings through this same model.
 
 Minimal custom profile:
 
@@ -38,7 +91,9 @@ Minimal custom profile:
   "workflow_key": "api-change",
   "requires_spec": "false",
   "default_mode": "api",
-  "actions": "inspect_existing_code,create_change_plan,implement_minimal_change,verify"
+  "actions": "inspect_existing_code,create_change_plan,implement_minimal_change,verify",
+  "required_checks": "sensitive,workflow",
+  "required_evidence.inspect_existing_code": "existing_controller,existing_service,existing_tests"
 }
 ```
 
@@ -95,6 +150,11 @@ The command parser is intentionally simple and splits `compile_command` and `tes
 
 - unknown fields in profile or policy JSON files;
 - invalid or empty action lists;
+- profile `profile_key` values that do not match the filename;
+- per-action evidence fields that reference actions not listed in `actions`;
+- action mappings that reference actions not listed in `actions`;
+- action mappings that reference unknown workflow phases or gates for built-in workflows;
+- unsupported `spec_acceptance_update` policies;
 - empty `required_checks`;
 - unsupported check names;
 - unsupported accepted check statuses;

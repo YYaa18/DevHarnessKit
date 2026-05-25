@@ -33,7 +33,7 @@ public final class GoalCompletionEvaluator {
         if (requiredSteps > 0 && recordedSteps < requiredSteps) {
             missing.add("goal steps incomplete: expected " + requiredSteps + " actions, recorded " + recordedSteps);
         }
-        for (String required : policy.requiredChecks()) {
+        for (String required : policy.requiredChecks(profile)) {
             GoalCheck check = find(checks, required);
             if (check == null) {
                 missing.add("check " + required + " is pending");
@@ -44,7 +44,8 @@ public final class GoalCompletionEvaluator {
                         + "; accepted_statuses=" + policy.acceptedStatusesText(required, profile));
                 continue;
             }
-            if (check.stepCountAtCheck() < recordedSteps) {
+            if ((profile == null || profile.completionRequireFreshChecks())
+                    && check.stepCountAtCheck() < recordedSteps) {
                 missing.add("check " + required + " is stale: checked_at_step="
                         + check.stepCountAtCheck() + " current_step=" + recordedSteps);
                 staleChecks.add(required);

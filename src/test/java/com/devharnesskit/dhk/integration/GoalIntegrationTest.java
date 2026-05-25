@@ -969,6 +969,102 @@ final class GoalIntegrationTest {
     }
 
     @Test
+    void goalUsesFormalProfileSchemaForEvidenceChecksAndMappings() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Files.createDirectories(PathUtil.goalProfilesDirectory(root));
+        Files.write(PathUtil.goalProfile(root, "custom-formal"), ("{\n"
+                + "  \"profile_key\": \"custom-formal\",\n"
+                + "  \"workflow_key\": \"api-change\",\n"
+                + "  \"requires_spec\": \"false\",\n"
+                + "  \"default_mode\": \"api\",\n"
+                + "  \"actions\": \"custom_inspect,verify\",\n"
+                + "  \"required_checks\": \"sensitive\",\n"
+                + "  \"completion_require_fresh_checks\": \"true\",\n"
+                + "  \"completion_allow_skipped_checks\": \"false\",\n"
+                + "  \"completion_require_checkpoint\": \"true\",\n"
+                + "  \"required_evidence.custom_inspect\": \"custom_read,custom_pattern_summary\",\n"
+                + "  \"required_evidence.verify\": \"compile_result,test_result,sensitive_result\",\n"
+                + "  \"mapping.custom_inspect.workflow_phase\": \"inspect_existing_code\",\n"
+                + "  \"mapping.verify.workflow_phase\": \"verify_tests\",\n"
+                + "  \"mapping.verify.required_gates\": \"tests_recorded\",\n"
+                + "  \"mapping.verify.spec_acceptance_update\": \"manual\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "custom-formal",
+                "--task", "Formal custom profile",
+                "--module", "goal"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+        assertTrue(start.stdout().contains("current_action: custom_inspect"));
+
+        Harness next = new Harness(tempDir);
+        int nextExit = new CommandRouter().run(new String[]{
+                "goal", "next", "--project-root", "demo", "--goal", goalKey
+        }, next.context());
+        assertEquals(ExitCodes.SUCCESS, nextExit);
+        assertTrue(next.stdout().contains("custom_read"));
+        assertTrue(next.stdout().contains("custom_pattern_summary"));
+        assertTrue(next.stdout().contains("required_checks:"));
+        assertTrue(next.stdout().contains("  - sensitive"));
+        assertFalse(next.stdout().contains("  - compile"));
+
+        Harness missingEvidence = new Harness(tempDir);
+        int missingEvidenceExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Custom inspect incomplete",
+                "--evidence", "custom_read=GoalProfileService"
+        }, missingEvidence.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, missingEvidenceExit);
+        assertTrue(missingEvidence.stderr().contains("custom_pattern_summary"));
+
+        Harness inspectStep = new Harness(tempDir);
+        int inspectStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Custom inspect complete",
+                "--evidence", "custom_read=GoalProfileService; custom_pattern_summary=formal schema"
+        }, inspectStep.context());
+        assertEquals(ExitCodes.SUCCESS, inspectStepExit);
+        assertTrue(inspectStep.stdout().contains("current_action: verify"));
+
+        Harness verifyStep = new Harness(tempDir);
+        int verifyStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Custom verification evidence recorded",
+                "--evidence", "compile_result=not required; test_result=not required; sensitive_result=pending"
+        }, verifyStep.context());
+        assertEquals(ExitCodes.SUCCESS, verifyStepExit);
+
+        Harness check = new Harness(tempDir);
+        int checkExit = new CommandRouter().run(new String[]{
+                "goal", "check", "--project-root", "demo", "--goal", goalKey, "--all", "--json"
+        }, check.context());
+        assertEquals(ExitCodes.SUCCESS, checkExit);
+        assertTrue(check.stdout().contains("\"count\": 1"));
+        assertTrue(check.stdout().contains("\"check_key\": \"sensitive\""));
+        assertTrue(check.stdout().contains("\"step_count_at_check\": 2"));
+        assertFalse(check.stdout().contains("\"check_key\": \"compile\""));
+
+        Harness evaluate = new Harness(tempDir);
+        int evaluateExit = new CommandRouter().run(new String[]{
+                "goal", "evaluate", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, evaluate.context());
+        assertEquals(ExitCodes.SUCCESS, evaluateExit);
+        assertTrue(evaluate.stdout().contains("\"decision\": \"ready_to_complete\""));
+        assertTrue(evaluate.stdout().contains("\"missing_count\": 0"));
+    }
+
+    @Test
     void goalUsesConfiguredProfileCheckPolicyAndJsonOutput() throws Exception {
         Path root = tempDir.resolve("demo");
         Files.createDirectories(PathUtil.goalProfilesDirectory(root));

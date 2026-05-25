@@ -10,6 +10,7 @@ public final class GoalCheckPolicy {
     private static final String[] PASSED_ONLY = new String[]{"passed"};
 
     private final String[] requiredChecks;
+    private final boolean requiredChecksConfigured;
     private final String[] compileCommand;
     private final String[] testCommand;
     private final boolean failPendingHardGates;
@@ -21,7 +22,7 @@ public final class GoalCheckPolicy {
 
     public GoalCheckPolicy(String[] requiredChecks, String[] compileCommand,
                            String[] testCommand, boolean failPendingHardGates) {
-        this(requiredChecks, compileCommand, testCommand, failPendingHardGates,
+        this(requiredChecks, false, compileCommand, testCommand, failPendingHardGates,
                 new String[0], new String[0], new String[0], new String[0], new String[0]);
     }
 
@@ -30,9 +31,20 @@ public final class GoalCheckPolicy {
                            String[] acceptedCompileStatuses, String[] acceptedTestStatuses,
                            String[] acceptedSensitiveStatuses, String[] acceptedSpecStatuses,
                            String[] acceptedWorkflowStatuses) {
+        this(requiredChecks, false, compileCommand, testCommand, failPendingHardGates,
+                acceptedCompileStatuses, acceptedTestStatuses, acceptedSensitiveStatuses,
+                acceptedSpecStatuses, acceptedWorkflowStatuses);
+    }
+
+    public GoalCheckPolicy(String[] requiredChecks, boolean requiredChecksConfigured,
+                           String[] compileCommand, String[] testCommand, boolean failPendingHardGates,
+                           String[] acceptedCompileStatuses, String[] acceptedTestStatuses,
+                           String[] acceptedSensitiveStatuses, String[] acceptedSpecStatuses,
+                           String[] acceptedWorkflowStatuses) {
         this.requiredChecks = requiredChecks == null || requiredChecks.length == 0
                 ? DEFAULT_REQUIRED_CHECKS
                 : requiredChecks;
+        this.requiredChecksConfigured = requiredChecksConfigured && requiredChecks != null && requiredChecks.length > 0;
         this.compileCommand = compileCommand == null || compileCommand.length == 0
                 ? new String[]{"mvn", "-q", "-DskipTests", "compile"}
                 : compileCommand;
@@ -54,6 +66,16 @@ public final class GoalCheckPolicy {
     }
 
     public String[] requiredChecks() {
+        return requiredChecks;
+    }
+
+    public String[] requiredChecks(GoalProfile profile) {
+        if (requiredChecksConfigured) {
+            return requiredChecks;
+        }
+        if (profile != null && profile.requiredChecks().length > 0) {
+            return profile.requiredChecks();
+        }
         return requiredChecks;
     }
 
@@ -87,6 +109,9 @@ public final class GoalCheckPolicy {
         String[] configured = configuredAcceptedStatuses(checkKey);
         if (configured.length > 0) {
             return configured;
+        }
+        if (profile != null && !profile.completionAllowSkippedChecks()) {
+            return PASSED_ONLY;
         }
         if (isBuiltInJavaProfile(profile)) {
             if ("compile".equals(checkKey) || "test".equals(checkKey) || "sensitive".equals(checkKey)) {

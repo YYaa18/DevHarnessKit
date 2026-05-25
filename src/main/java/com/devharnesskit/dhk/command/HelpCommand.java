@@ -60,6 +60,7 @@ public final class HelpCommand implements Command {
         context.out().println("Goal configuration:");
         context.out().println("  .agents/devharness/goal-profiles/*.json can override or add goal profiles.");
         context.out().println("  .agents/devharness/goal-check-policy.json can configure required goal checks.");
+        context.out().println("  .agents/devharness/policy.json can declare alpha project safety policy.");
         context.out().println("Machine-readable output:");
         context.out().println("  Supported commands accept --json for alpha JSON output.");
         context.out().println("  dhk db sql also supports --format json for query results.");

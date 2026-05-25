@@ -80,6 +80,7 @@ final class MemoryInitDoctorIntegrationTest {
         assertTrue(doctorHarness.stdout().contains("schema_version: ok (7)"));
         assertTrue(doctorHarness.stdout().contains("mysql_driver: ok"));
         assertTrue(doctorHarness.stdout().contains("sensitive_policy: default"));
+        assertTrue(doctorHarness.stdout().contains("devharness_policy: default"));
         assertTrue(doctorHarness.stdout().contains("memory_total: 0"));
         assertTrue(doctorHarness.stdout().contains("checkpoint_total: 0"));
 
@@ -91,6 +92,7 @@ final class MemoryInitDoctorIntegrationTest {
         assertTrue(jsonDoctorHarness.stdout().contains("\"command\": \"doctor\""));
         assertTrue(jsonDoctorHarness.stdout().contains("\"schema_version\": 7"));
         assertTrue(jsonDoctorHarness.stdout().contains("\"mysql_driver_loaded\": true"));
+        assertTrue(jsonDoctorHarness.stdout().contains("\"devharness_policy\": \"default\""));
     }
 
     @Test
@@ -206,6 +208,93 @@ final class MemoryInitDoctorIntegrationTest {
         }, doctorHarness.context());
 
         assertEquals(ExitCodes.SUCCESS, exitCode);
+        assertTrue(doctorHarness.stdout().contains("goal_config: ok"));
+        assertEquals("", doctorHarness.stderr());
+    }
+
+    @Test
+    void doctorReportsDevHarnessPolicyDiagnostics() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Harness initHarness = new Harness(tempDir);
+        new CommandRouter().run(new String[]{"memory", "init", "--project-root", "demo"}, initHarness.context());
+
+        Files.write(PathUtil.devharnessPolicy(root), ("{\n"
+                + "  \"mode\": \"experimental\",\n"
+                + "  \"allowed_dhk_commands\": \"goal start,goal start,Goal Bad\",\n"
+                + "  \"forbidden_dhk_commands\": \"\",\n"
+                + "  \"protected_files\": \"/etc/passwd,../secrets.env\",\n"
+                + "  \"allowed_write_paths\": \"src/**,,docs/**\",\n"
+                + "  \"db_sql_requires_explicit_request\": \"maybe\",\n"
+                + "  \"db_require_readonly_credentials\": \"sometimes\",\n"
+                + "  \"db_allowed_environments\": \"dev,QA!\",\n"
+                + "  \"context_export_require_sensitive_scan\": \"maybe\",\n"
+                + "  \"context_export_block_on_sensitive\": \"maybe\",\n"
+                + "  \"context_export_allowed_files\": \"CURRENT_CONTEXT.md\",\n"
+                + "  \"context_export_forbidden_files\": \"../raw.sql\",\n"
+                + "  \"extra\": \"value\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness doctorHarness = new Harness(tempDir);
+        int exitCode = new CommandRouter().run(new String[]{
+                "doctor", "--project-root", root.toString()
+        }, doctorHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, exitCode);
+        assertTrue(doctorHarness.stdout().contains("devharness_policy: configured"));
+        assertTrue(doctorHarness.stderr().contains("WARNING devharness_policy"));
+        assertTrue(doctorHarness.stderr().contains("unknown fields: extra"));
+        assertTrue(doctorHarness.stderr().contains("mode should be one of: strict,guided,expert"));
+        assertTrue(doctorHarness.stderr().contains("allowed_dhk_commands contains duplicate item: goal start"));
+        assertTrue(doctorHarness.stderr().contains("allowed_dhk_commands contains invalid command pattern: Goal Bad"));
+        assertTrue(doctorHarness.stderr().contains("forbidden_dhk_commands is empty"));
+        assertTrue(doctorHarness.stderr().contains("protected_files should contain project-relative safe globs only: /etc/passwd"));
+        assertTrue(doctorHarness.stderr().contains("protected_files should contain project-relative safe globs only: ../secrets.env"));
+        assertTrue(doctorHarness.stderr().contains("allowed_write_paths contains an empty item"));
+        assertTrue(doctorHarness.stderr().contains("db_sql_requires_explicit_request should be true/false"));
+        assertTrue(doctorHarness.stderr().contains("db_require_readonly_credentials should be true/false"));
+        assertTrue(doctorHarness.stderr().contains("db_allowed_environments contains invalid environment key: QA!"));
+        assertTrue(doctorHarness.stderr().contains("context_export_require_sensitive_scan should be true/false"));
+        assertTrue(doctorHarness.stderr().contains("context_export_block_on_sensitive should be true/false"));
+        assertTrue(doctorHarness.stderr().contains("context_export_forbidden_files should contain project-relative safe globs only: ../raw.sql"));
+
+        Harness jsonDoctorHarness = new Harness(tempDir);
+        int jsonExitCode = new CommandRouter().run(new String[]{
+                "doctor", "--project-root", root.toString(), "--json"
+        }, jsonDoctorHarness.context());
+        assertEquals(ExitCodes.SUCCESS, jsonExitCode);
+        assertTrue(jsonDoctorHarness.stdout().contains("\"devharness_policy\": \"configured\""));
+        assertTrue(jsonDoctorHarness.stdout().contains("\"policy_warnings\": ["));
+        assertTrue(jsonDoctorHarness.stdout().contains("mode should be one of"));
+    }
+
+    @Test
+    void doctorAcceptsValidDevHarnessPolicy() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Harness initHarness = new Harness(tempDir);
+        new CommandRouter().run(new String[]{"memory", "init", "--project-root", "demo"}, initHarness.context());
+
+        Files.write(PathUtil.devharnessPolicy(root), ("{\n"
+                + "  \"mode\": \"strict\",\n"
+                + "  \"allowed_dhk_commands\": \"goal start,goal resume,goal next,goal step,goal verify,goal complete\",\n"
+                + "  \"forbidden_dhk_commands\": \"workflow gate waive,spec archive,memory confirm,db sql\",\n"
+                + "  \"protected_files\": \".env,application-prod.yml,deploy/**\",\n"
+                + "  \"allowed_write_paths\": \"src/**,docs/**,README.md\",\n"
+                + "  \"db_sql_requires_explicit_request\": \"true\",\n"
+                + "  \"db_require_readonly_credentials\": \"true\",\n"
+                + "  \"db_allowed_environments\": \"dev,test,readonly\",\n"
+                + "  \"context_export_require_sensitive_scan\": \"true\",\n"
+                + "  \"context_export_block_on_sensitive\": \"true\",\n"
+                + "  \"context_export_allowed_files\": \".agents/memory/exports/*.md\",\n"
+                + "  \"context_export_forbidden_files\": \".env,application-prod.yml\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness doctorHarness = new Harness(tempDir);
+        int exitCode = new CommandRouter().run(new String[]{
+                "doctor", "--project-root", root.toString()
+        }, doctorHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, exitCode);
+        assertTrue(doctorHarness.stdout().contains("devharness_policy: configured"));
         assertTrue(doctorHarness.stdout().contains("goal_config: ok"));
         assertEquals("", doctorHarness.stderr());
     }

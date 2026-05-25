@@ -130,9 +130,10 @@ Goal profiles and checks can be configured per project:
 ```text
 .agents/devharness/goal-profiles/<profile>.json
 .agents/devharness/goal-check-policy.json
+.agents/devharness/policy.json
 ```
 
-See [GOAL_CONFIGURATION.md](GOAL_CONFIGURATION.md) for the supported fields.
+See [GOAL_CONFIGURATION.md](GOAL_CONFIGURATION.md) for goal profile/check fields and [POLICY.md](POLICY.md) for project safety policy fields.
 
 ## Sensitive Policy
 

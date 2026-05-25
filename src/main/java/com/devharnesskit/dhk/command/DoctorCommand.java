@@ -13,6 +13,7 @@ import com.devharnesskit.dhk.repository.ProjectRepository;
 import com.devharnesskit.dhk.service.ProjectService;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
 import com.devharnesskit.dhk.service.goal.GoalConfigDiagnosticsService;
+import com.devharnesskit.dhk.service.policy.DevHarnessPolicyService;
 import com.devharnesskit.dhk.util.JsonOutput;
 import com.devharnesskit.dhk.util.PathUtil;
 
@@ -33,17 +34,19 @@ public final class DoctorCommand implements Command {
     private final CheckpointRepository checkpointRepository;
     private final SensitiveDataGuard sensitiveDataGuard;
     private final GoalConfigDiagnosticsService goalConfigDiagnosticsService;
+    private final DevHarnessPolicyService policyService;
 
     public DoctorCommand() {
         this(new DbConnectionFactory(), new ProjectService(), new ProjectRepository(),
                 new MemoryRepository(), new CheckpointRepository(), new SensitiveDataGuard(),
-                new GoalConfigDiagnosticsService());
+                new GoalConfigDiagnosticsService(), new DevHarnessPolicyService());
     }
 
     DoctorCommand(DbConnectionFactory connectionFactory, ProjectService projectService,
                   ProjectRepository projectRepository, MemoryRepository memoryRepository,
                   CheckpointRepository checkpointRepository, SensitiveDataGuard sensitiveDataGuard,
-                  GoalConfigDiagnosticsService goalConfigDiagnosticsService) {
+                  GoalConfigDiagnosticsService goalConfigDiagnosticsService,
+                  DevHarnessPolicyService policyService) {
         this.connectionFactory = connectionFactory;
         this.projectService = projectService;
         this.projectRepository = projectRepository;
@@ -51,6 +54,7 @@ public final class DoctorCommand implements Command {
         this.checkpointRepository = checkpointRepository;
         this.sensitiveDataGuard = sensitiveDataGuard;
         this.goalConfigDiagnosticsService = goalConfigDiagnosticsService;
+        this.policyService = policyService;
     }
 
     public int run(CommandContext context, Args args) {
@@ -61,6 +65,7 @@ public final class DoctorCommand implements Command {
         Path projectJson = PathUtil.projectJson(projectRoot);
         Path exportsDir = PathUtil.exportsDirectory(projectRoot);
         Path sensitivePolicy = PathUtil.sensitivePolicy(projectRoot);
+        Path policyJson = PathUtil.devharnessPolicy(projectRoot);
 
         if (!json) {
             context.out().println("DevHarness Kit doctor");
@@ -78,8 +83,10 @@ public final class DoctorCommand implements Command {
         missing = printCheck(context, json, "project_json", projectJsonOk, projectJson.toString()) || missing;
         missing = printCheck(context, json, "exports_dir", exportsDirOk, exportsDir.toString()) || missing;
         String sensitivePolicyStatus = Files.isRegularFile(sensitivePolicy) ? "configured" : "default";
+        String policyStatus = Files.isRegularFile(policyJson) ? "configured" : "default";
         if (!json) {
             context.out().println("sensitive_policy: " + sensitivePolicyStatus + " (" + sensitivePolicy + ")");
+            context.out().println("devharness_policy: " + policyStatus + " (" + policyJson + ")");
         }
 
         boolean mysqlDriverLoaded = false;
@@ -103,16 +110,19 @@ public final class DoctorCommand implements Command {
         long memoryConfirmed = -1L;
         long checkpointTotal = -1L;
         List<GoalConfigDiagnosticsService.Diagnostic> goalConfigDiagnostics;
+        List<DevHarnessPolicyService.Diagnostic> policyDiagnostics;
         List<String> exportWarnings;
         if (!Files.isRegularFile(dbPath)) {
             goalConfigDiagnostics = goalConfigDiagnosticsService.diagnose(projectRoot, null);
+            policyDiagnostics = policyService.diagnose(projectRoot);
             printGoalConfigDiagnostics(context, json, goalConfigDiagnostics);
+            printPolicyDiagnostics(context, json, policyDiagnostics);
             exportWarnings = scanExports(context, exportsDir, json);
             if (json) {
                 printJson(context, projectRoot, memoryDirOk, memoryDbOk, projectJsonOk, exportsDirOk,
-                        sensitivePolicyStatus, mysqlDriverLoaded, schemaVersion, fts, projectRecord,
+                        sensitivePolicyStatus, policyStatus, mysqlDriverLoaded, schemaVersion, fts, projectRecord,
                         memoryTotal, memoryDraft, memoryConfirmed, checkpointTotal, exportWarnings,
-                        goalConfigDiagnostics);
+                        goalConfigDiagnostics, policyDiagnostics);
             }
             return ExitCodes.NOT_FOUND;
         }
@@ -151,19 +161,23 @@ public final class DoctorCommand implements Command {
                 }
             }
             goalConfigDiagnostics = goalConfigDiagnosticsService.diagnose(projectRoot, connection);
+            policyDiagnostics = policyService.diagnose(projectRoot);
             printGoalConfigDiagnostics(context, json, goalConfigDiagnostics);
+            printPolicyDiagnostics(context, json, policyDiagnostics);
         } catch (SQLException ex) {
             if (!json) {
                 context.err().println("ERROR sqlite: " + ex.getMessage());
             }
             goalConfigDiagnostics = goalConfigDiagnosticsService.diagnose(projectRoot, null);
+            policyDiagnostics = policyService.diagnose(projectRoot);
             printGoalConfigDiagnostics(context, json, goalConfigDiagnostics);
+            printPolicyDiagnostics(context, json, policyDiagnostics);
             exportWarnings = scanExports(context, exportsDir, json);
             if (json) {
                 printJson(context, projectRoot, memoryDirOk, memoryDbOk, projectJsonOk, exportsDirOk,
-                        sensitivePolicyStatus, mysqlDriverLoaded, schemaVersion, fts, projectRecord,
+                        sensitivePolicyStatus, policyStatus, mysqlDriverLoaded, schemaVersion, fts, projectRecord,
                         memoryTotal, memoryDraft, memoryConfirmed, checkpointTotal, exportWarnings,
-                        goalConfigDiagnostics);
+                        goalConfigDiagnostics, policyDiagnostics);
             }
             return ExitCodes.RUNTIME_ERROR;
         } catch (RuntimeException ex) {
@@ -171,13 +185,15 @@ public final class DoctorCommand implements Command {
                 context.err().println("ERROR project: " + ex.getMessage());
             }
             goalConfigDiagnostics = goalConfigDiagnosticsService.diagnose(projectRoot, null);
+            policyDiagnostics = policyService.diagnose(projectRoot);
             printGoalConfigDiagnostics(context, json, goalConfigDiagnostics);
+            printPolicyDiagnostics(context, json, policyDiagnostics);
             exportWarnings = scanExports(context, exportsDir, json);
             if (json) {
                 printJson(context, projectRoot, memoryDirOk, memoryDbOk, projectJsonOk, exportsDirOk,
-                        sensitivePolicyStatus, mysqlDriverLoaded, schemaVersion, fts, projectRecord,
+                        sensitivePolicyStatus, policyStatus, mysqlDriverLoaded, schemaVersion, fts, projectRecord,
                         memoryTotal, memoryDraft, memoryConfirmed, checkpointTotal, exportWarnings,
-                        goalConfigDiagnostics);
+                        goalConfigDiagnostics, policyDiagnostics);
             }
             return ExitCodes.RUNTIME_ERROR;
         }
@@ -185,9 +201,9 @@ public final class DoctorCommand implements Command {
         exportWarnings = scanExports(context, exportsDir, json);
         if (json) {
             printJson(context, projectRoot, memoryDirOk, memoryDbOk, projectJsonOk, exportsDirOk,
-                    sensitivePolicyStatus, mysqlDriverLoaded, schemaVersion, fts, projectRecord,
+                    sensitivePolicyStatus, policyStatus, mysqlDriverLoaded, schemaVersion, fts, projectRecord,
                     memoryTotal, memoryDraft, memoryConfirmed, checkpointTotal, exportWarnings,
-                    goalConfigDiagnostics);
+                    goalConfigDiagnostics, policyDiagnostics);
         }
         if (!mysqlDriverLoaded) {
             return ExitCodes.RUNTIME_ERROR;
@@ -245,12 +261,27 @@ public final class DoctorCommand implements Command {
         }
     }
 
+    private void printPolicyDiagnostics(CommandContext context, boolean json,
+                                        List<DevHarnessPolicyService.Diagnostic> diagnostics) {
+        if (json) {
+            return;
+        }
+        if (diagnostics.isEmpty()) {
+            return;
+        }
+        for (DevHarnessPolicyService.Diagnostic diagnostic : diagnostics) {
+            context.err().println("WARNING devharness_policy: " + diagnostic.format());
+        }
+    }
+
     private void printJson(CommandContext context, Path projectRoot, boolean memoryDirOk, boolean memoryDbOk,
                            boolean projectJsonOk, boolean exportsDirOk, String sensitivePolicyStatus,
+                           String policyStatus,
                            boolean mysqlDriverLoaded, int schemaVersion, String fts, String projectRecord,
                            long memoryTotal, long memoryDraft, long memoryConfirmed, long checkpointTotal,
                            List<String> exportWarnings,
-                           List<GoalConfigDiagnosticsService.Diagnostic> goalConfigDiagnostics) {
+                           List<GoalConfigDiagnosticsService.Diagnostic> goalConfigDiagnostics,
+                           List<DevHarnessPolicyService.Diagnostic> policyDiagnostics) {
         List<String> warningJson = new ArrayList<String>();
         for (String warning : exportWarnings) {
             warningJson.add(JsonOutput.quote(warning));
@@ -258,6 +289,10 @@ public final class DoctorCommand implements Command {
         List<String> goalConfigWarningJson = new ArrayList<String>();
         for (GoalConfigDiagnosticsService.Diagnostic diagnostic : goalConfigDiagnostics) {
             goalConfigWarningJson.add(JsonOutput.quote(diagnostic.format()));
+        }
+        List<String> policyWarningJson = new ArrayList<String>();
+        for (DevHarnessPolicyService.Diagnostic diagnostic : policyDiagnostics) {
+            policyWarningJson.add(JsonOutput.quote(diagnostic.format()));
         }
         context.out().print(JsonOutput.object(
                 JsonOutput.stringField("command", "doctor"),
@@ -268,6 +303,7 @@ public final class DoctorCommand implements Command {
                 JsonOutput.booleanField("project_json_ok", projectJsonOk),
                 JsonOutput.booleanField("exports_dir_ok", exportsDirOk),
                 JsonOutput.stringField("sensitive_policy", sensitivePolicyStatus),
+                JsonOutput.stringField("devharness_policy", policyStatus),
                 JsonOutput.booleanField("mysql_driver_loaded", mysqlDriverLoaded),
                 JsonOutput.numberField("schema_version", schemaVersion),
                 JsonOutput.stringField("fts", fts),
@@ -277,7 +313,8 @@ public final class DoctorCommand implements Command {
                 JsonOutput.numberField("memory_confirmed", memoryConfirmed),
                 JsonOutput.numberField("checkpoint_total", checkpointTotal),
                 JsonOutput.rawField("export_warnings", JsonOutput.array(warningJson)),
-                JsonOutput.rawField("goal_config_warnings", JsonOutput.array(goalConfigWarningJson))
+                JsonOutput.rawField("goal_config_warnings", JsonOutput.array(goalConfigWarningJson)),
+                JsonOutput.rawField("policy_warnings", JsonOutput.array(policyWarningJson))
         ));
     }
 }

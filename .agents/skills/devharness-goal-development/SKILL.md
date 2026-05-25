@@ -15,10 +15,12 @@ Use this skill for code changes in repositories that include DevHarnessKit.
 4. Read `.agents/memory/exports/GOAL_CONTEXT.md`.
 5. Perform only the `current_action` from GOAL_CONTEXT.
 6. Do not use lower-level `memory`, `workflow`, `spec`, or `db` commands unless GOAL_CONTEXT explicitly allows it.
-7. After investigation or code edits, run `scripts/goal-step.sh` with summary, changed files, and evidence.
+7. After investigation or code edits, run `scripts/goal-step.sh` with summary, changed files, and the required evidence keys from GOAL_CONTEXT.
 8. Before claiming completion, run `scripts/goal-check.sh --all`.
 9. Then run `scripts/goal-evaluate.sh`.
 10. Only run `scripts/goal-complete.sh` when evaluation returns `ready_to_complete`.
+
+Use the wrapper scripts instead of composing raw `dhk goal ...` commands; the wrappers pass the repository root even when invoked from a subdirectory.
 
 ## Forbidden By Default
 

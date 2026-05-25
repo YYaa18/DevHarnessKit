@@ -30,14 +30,56 @@ final class GoalSkillPackagingTest {
         assertScriptPair(skillRoot, "goal-status");
         assertScriptPair(skillRoot, "goal-export");
 
-        String skill = new String(Files.readAllBytes(skillRoot.resolve("SKILL.md")), "UTF-8");
+        String skill = read(skillRoot.resolve("SKILL.md"));
         assertTrue(skill.contains("goal-check.sh --all"));
         assertTrue(skill.contains("goal-evaluate.sh"));
         assertTrue(skill.contains("goal-complete.sh"));
+        assertTrue(skill.contains("required evidence keys from GOAL_CONTEXT"));
+
+        assertProjectRootInjection(skillRoot);
+        assertGoalWrapper(skillRoot, "goal-start", "start");
+        assertGoalWrapper(skillRoot, "goal-resume", "resume");
+        assertGoalWrapper(skillRoot, "goal-next", "next");
+        assertGoalWrapper(skillRoot, "goal-step", "step");
+        assertGoalWrapper(skillRoot, "goal-check", "check");
+        assertGoalWrapper(skillRoot, "goal-evaluate", "evaluate");
+        assertGoalWrapper(skillRoot, "goal-complete", "complete");
+        assertGoalWrapper(skillRoot, "goal-status", "status");
+        assertGoalWrapper(skillRoot, "goal-export", "export");
+
+        String protocol = read(skillRoot.resolve("references/goal-protocol.md"));
+        String evidence = read(skillRoot.resolve("references/evidence-format.md"));
+        String forbidden = read(skillRoot.resolve("references/forbidden-actions.md"));
+        String selfCheck = read(skillRoot.resolve("references/self-check-format.md"));
+        assertTrue(protocol.contains("Use wrapper scripts under `scripts/`"));
+        assertTrue(evidence.contains("Mirror required evidence keys exactly"));
+        assertTrue(forbidden.contains("direct lower-level `dhk memory ...`"));
+        assertTrue(forbidden.contains("`db sql`"));
+        assertTrue(selfCheck.contains("goal evaluate"));
     }
 
     private void assertScriptPair(Path skillRoot, String name) {
         assertTrue(Files.isRegularFile(skillRoot.resolve("scripts/" + name + ".sh")));
         assertTrue(Files.isRegularFile(skillRoot.resolve("scripts/" + name + ".bat")));
+    }
+
+    private void assertProjectRootInjection(Path skillRoot) throws Exception {
+        String dhkSh = read(skillRoot.resolve("scripts/dhk.sh"));
+        String dhkBat = read(skillRoot.resolve("scripts/dhk.bat"));
+        assertTrue(dhkSh.contains("PROJECT_ROOT=$(CDPATH= cd -- \"$SCRIPT_DIR/../../../..\" && pwd)"));
+        assertTrue(dhkSh.contains("--project-root \"$PROJECT_ROOT\""));
+        assertTrue(dhkBat.contains("PROJECT_ROOT=%%~fI"));
+        assertTrue(dhkBat.contains("--project-root \"%PROJECT_ROOT%\""));
+    }
+
+    private void assertGoalWrapper(Path skillRoot, String scriptName, String goalCommand) throws Exception {
+        String shell = read(skillRoot.resolve("scripts/" + scriptName + ".sh"));
+        String batch = read(skillRoot.resolve("scripts/" + scriptName + ".bat"));
+        assertTrue(shell.contains("exec \"$SCRIPT_DIR/dhk.sh\" goal " + goalCommand + " \"$@\""));
+        assertTrue(batch.contains("dhk.bat\" goal " + goalCommand + " %*"));
+    }
+
+    private String read(Path path) throws Exception {
+        return new String(Files.readAllBytes(path), "UTF-8");
     }
 }

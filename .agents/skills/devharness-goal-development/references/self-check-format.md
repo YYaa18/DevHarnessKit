@@ -12,3 +12,4 @@ DevHarness self-check:
 ```
 
 Do not write `completed` unless `goal complete` succeeded.
+Use `not-ready` when `goal evaluate` has not run or returned missing items.

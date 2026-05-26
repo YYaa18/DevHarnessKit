@@ -53,14 +53,15 @@ Alpha:
 - `dhk goal complete`
 - `dhk graph init`
 - `dhk graph status`
+- `dhk graph index`
 - `dhk workflow ...`
 - `dhk spec ...`
 - agent skill/rule packaging under `.agents/` and `.comate/`
 
 Internal/experimental:
 
-- Graph Lite SQLite tables, `.agents/graph/config.json`, and generated graph
-  exports beyond `GRAPH_INDEX_REPORT.md`.
+- Graph Lite SQLite tables, `.agents/graph/config.json`, snapshot rows, and
+  generated graph exports beyond `GRAPH_INDEX_REPORT.md`.
 
 Human-readable stdout is intended for people and examples. Do not parse it as a
 stable API unless a document explicitly names the fields and command as a

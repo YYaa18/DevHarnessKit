@@ -5,6 +5,7 @@ import com.devharnesskit.dhk.cli.Command;
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.model.graph.GraphScanReport;
+import com.devharnesskit.dhk.model.graph.GraphSnapshot;
 import com.devharnesskit.dhk.service.graph.GraphService;
 import com.devharnesskit.dhk.util.JsonOutput;
 import com.devharnesskit.dhk.util.PathUtil;
@@ -27,6 +28,7 @@ public final class GraphStatusCommand implements Command {
         Path projectRoot = PathUtil.resolveProjectRoot(args, context.workingDirectory());
         try {
             GraphScanReport report = graphService.status(projectRoot, context.clock());
+            GraphSnapshot latest = report.latestSnapshot();
             Path reportPath = PathUtil.graphIndexReport(projectRoot);
             if (JsonOutput.enabled(args)) {
                 context.out().print(JsonOutput.object(
@@ -38,7 +40,11 @@ public final class GraphStatusCommand implements Command {
                         JsonOutput.numberField("skipped_files", report.skippedFiles()),
                         JsonOutput.numberField("graph_nodes", report.parseResult().nodes().size()),
                         JsonOutput.numberField("graph_edges", report.parseResult().edges().size()),
-                        JsonOutput.numberField("parse_errors", report.parseResult().errors().size())
+                        JsonOutput.numberField("parse_errors", report.parseResult().errors().size()),
+                        JsonOutput.stringField("latest_snapshot_key", latest == null ? "" : latest.snapshotKey()),
+                        JsonOutput.stringField("latest_snapshot_status", latest == null ? "" : latest.status()),
+                        JsonOutput.numberField("latest_snapshot_nodes", latest == null ? 0 : latest.nodeCount()),
+                        JsonOutput.numberField("latest_snapshot_edges", latest == null ? 0 : latest.edgeCount())
                 ));
             } else {
                 context.out().println("graph status");
@@ -50,6 +56,14 @@ public final class GraphStatusCommand implements Command {
                 context.out().println("graph_nodes: " + report.parseResult().nodes().size());
                 context.out().println("graph_edges: " + report.parseResult().edges().size());
                 context.out().println("parse_errors: " + report.parseResult().errors().size());
+                if (latest == null) {
+                    context.out().println("latest_snapshot_key: none");
+                } else {
+                    context.out().println("latest_snapshot_key: " + latest.snapshotKey());
+                    context.out().println("latest_snapshot_status: " + latest.status());
+                    context.out().println("latest_snapshot_nodes: " + latest.nodeCount());
+                    context.out().println("latest_snapshot_edges: " + latest.edgeCount());
+                }
             }
             return ExitCodes.SUCCESS;
         } catch (IOException | RuntimeException ex) {

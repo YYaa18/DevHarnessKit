@@ -12,6 +12,7 @@ public final class GraphScanReport {
     private final GraphConfig config;
     private final List<GraphFileEntry> entries;
     private final GraphParseResult parseResult;
+    private final GraphSnapshot latestSnapshot;
 
     public GraphScanReport(Path projectRoot, GraphConfig config, List<GraphFileEntry> entries) {
         this(projectRoot, config, entries, GraphParseResult.empty());
@@ -19,10 +20,16 @@ public final class GraphScanReport {
 
     public GraphScanReport(Path projectRoot, GraphConfig config, List<GraphFileEntry> entries,
                            GraphParseResult parseResult) {
+        this(projectRoot, config, entries, parseResult, null);
+    }
+
+    public GraphScanReport(Path projectRoot, GraphConfig config, List<GraphFileEntry> entries,
+                           GraphParseResult parseResult, GraphSnapshot latestSnapshot) {
         this.projectRoot = projectRoot;
         this.config = config;
         this.entries = Collections.unmodifiableList(new ArrayList<GraphFileEntry>(entries));
         this.parseResult = parseResult == null ? GraphParseResult.empty() : parseResult;
+        this.latestSnapshot = latestSnapshot;
     }
 
     public Path projectRoot() {
@@ -39,6 +46,10 @@ public final class GraphScanReport {
 
     public GraphParseResult parseResult() {
         return parseResult;
+    }
+
+    public GraphSnapshot latestSnapshot() {
+        return latestSnapshot;
     }
 
     public int filesConsidered() {

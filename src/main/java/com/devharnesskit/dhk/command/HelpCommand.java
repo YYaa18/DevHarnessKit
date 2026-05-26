@@ -36,6 +36,7 @@ public final class HelpCommand implements Command {
         context.out().println("  dhk goal export [--goal <goal-key>]");
         context.out().println("  dhk graph init --project-root <path>");
         context.out().println("  dhk graph status --project-root <path>");
+        context.out().println("  dhk graph index --project-root <path>");
         context.out().println("  dhk workflow template seed --project-root <path>");
         context.out().println("  dhk workflow template list --project-root <path>");
         context.out().println("  dhk workflow template show --key <workflow>");
@@ -65,6 +66,7 @@ public final class HelpCommand implements Command {
         context.out().println("  .agents/devharness/policy.json can declare alpha project safety policy.");
         context.out().println("Graph configuration:");
         context.out().println("  .agents/graph/config.json controls alpha Graph Lite file scanning.");
+        context.out().println("  graph index persists snapshot-bound graph facts to local SQLite.");
         context.out().println("Machine-readable output:");
         context.out().println("  Supported commands accept --json for alpha JSON output.");
         context.out().println("  dhk db sql also supports --format json for query results.");

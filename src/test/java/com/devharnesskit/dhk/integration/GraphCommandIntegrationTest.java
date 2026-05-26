@@ -12,6 +12,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -75,10 +79,58 @@ final class GraphCommandIntegrationTest {
         assertTrue(harness.stdout().contains("\"graph_nodes\":"));
     }
 
+    @Test
+    void graphIndexPersistsSnapshotsAndStatusShowsLatestSnapshot() throws Exception {
+        Path root = tempDir.resolve("demo-index");
+        write(root, "src/main/java/com/example/App.java",
+                "package com.example;\npublic class App { public void run() { Helper.call(); } }\n");
+        write(root, "src/main/java/com/example/Helper.java",
+                "package com.example;\npublic class Helper { public static void call() {} }\n");
+        write(root, "src/main/resources/mybatis/Mapper.xml",
+                "<mapper namespace=\"com.example.Mapper\"><select id=\"findAll\">SELECT id FROM example_table</select></mapper>\n");
+        write(root, "src/main/resources/application.properties", "app.route=/demo\n");
+
+        Harness firstHarness = new Harness(tempDir);
+        int firstExit = new CommandRouter().run(new String[]{"graph", "index", "--project-root", "demo-index"},
+                firstHarness.context());
+        Harness secondHarness = new Harness(tempDir);
+        int secondExit = new CommandRouter().run(new String[]{"graph", "index", "--project-root", "demo-index"},
+                secondHarness.context());
+        Harness statusHarness = new Harness(tempDir);
+        int statusExit = new CommandRouter().run(new String[]{"graph", "status", "--project-root", "demo-index"},
+                statusHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, firstExit);
+        assertEquals(ExitCodes.SUCCESS, secondExit);
+        assertEquals(ExitCodes.SUCCESS, statusExit);
+        assertTrue(firstHarness.stdout().contains("graph index complete"));
+        assertTrue(firstHarness.stdout().contains("snapshot_key: graph-"));
+        assertTrue(statusHarness.stdout().contains("latest_snapshot_key: graph-"));
+        assertTrue(statusHarness.stdout().contains("latest_snapshot_status: completed"));
+        assertEquals(2, countRows(root, "code_graph_snapshot"));
+        assertEquals(8, countRows(root, "code_graph_file"));
+        assertTrue(countRows(root, "code_graph_node") > 0);
+        assertTrue(countRows(root, "code_graph_edge") > 0);
+        assertTrue(countRowsWhere(root, "code_graph_node", "node_kind = 'sql_statement'") > 0);
+        assertTrue(countRowsWhere(root, "code_graph_edge", "edge_kind = 'reads'") > 0);
+    }
+
     private void write(Path root, String relativePath, String content) throws Exception {
         Path file = root.resolve(relativePath);
         Files.createDirectories(file.getParent());
         Files.write(file, content.getBytes("UTF-8"));
+    }
+
+    private int countRows(Path root, String table) throws Exception {
+        return countRowsWhere(root, table, "1 = 1");
+    }
+
+    private int countRowsWhere(Path root, String table, String where) throws Exception {
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(root));
+             Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery("SELECT COUNT(*) FROM " + table + " WHERE " + where)) {
+            return resultSet.next() ? resultSet.getInt(1) : 0;
+        }
     }
 
     private static final class Harness {

@@ -24,6 +24,12 @@ public final class GraphIndexReportRenderer {
         builder.append("- graph_nodes: ").append(report.parseResult().nodes().size()).append('\n');
         builder.append("- graph_edges: ").append(report.parseResult().edges().size()).append('\n');
         builder.append("- parse_errors: ").append(report.parseResult().errors().size()).append('\n');
+        if (report.latestSnapshot() != null) {
+            builder.append("- latest_snapshot_key: ").append(report.latestSnapshot().snapshotKey()).append('\n');
+            builder.append("- latest_snapshot_status: ").append(report.latestSnapshot().status()).append('\n');
+            builder.append("- latest_snapshot_nodes: ").append(report.latestSnapshot().nodeCount()).append('\n');
+            builder.append("- latest_snapshot_edges: ").append(report.latestSnapshot().edgeCount()).append('\n');
+        }
         builder.append("- max_file_bytes: ").append(report.config().maxFileBytes()).append('\n');
         builder.append("- max_indexed_files: ").append(report.config().maxIndexedFiles()).append('\n');
         builder.append("</summary>\n\n");

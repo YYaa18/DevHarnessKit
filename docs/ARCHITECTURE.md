@@ -9,6 +9,7 @@ DevHarnessKit
 |-- memory core
 |-- db readonly
 |-- goal
+|-- graph lite
 |-- workflow
 |-- spec
 `-- agent packaging
@@ -61,6 +62,35 @@ Goal is not an autonomous workflow engine. It records state, renders the next de
 `GOAL_CONTEXT.md` and `GOAL_SUMMARY.md` are generated Markdown exports. They are stable enough for alpha agents and scripts to read, but SQLite goal/workflow/spec rows and the completion checkpoint remain the source of truth. Regenerate exports with the matching CLI instead of hand-editing them.
 
 Goal metrics and replay are alpha derived models documented in [GOAL_METRICS_REPLAY.md](GOAL_METRICS_REPLAY.md). They summarize existing goal rows for future routine reporting without adding a new source of truth or public CLI surface.
+
+## Graph Lite
+
+Graph Lite is an alpha, local-only context layer for code relationship snapshots.
+It stores snapshot-bound machine facts in SQLite v9 tables:
+
+- `code_graph_snapshot`;
+- `code_graph_file`;
+- `code_graph_node`;
+- `code_graph_edge`;
+- `code_graph_query_cache`;
+- `goal_graph_binding`.
+
+Graph Lite is not long-term memory. A graph snapshot describes one observed
+workspace state and can become stale after code changes. Agents should consume
+generated graph exports such as `IMPACT_MAP.md` and `GRAPH_CONTEXT.md` when
+available, not directly edit graph rows.
+
+The default project config path is:
+
+```text
+.agents/graph/config.json
+```
+
+Generated exports and caches are local artifacts under `.agents/graph/exports/`,
+`.agents/graph/snapshots/`, and `.agents/graph/cache/`. These generated
+directories are ignored by git.
+
+The schema and config contract are documented in [GRAPH_SCHEMA.md](GRAPH_SCHEMA.md).
 
 ## Routine Reporting (Planned Alpha)
 

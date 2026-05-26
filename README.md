@@ -18,7 +18,7 @@ This repository is `0.1.0-alpha` and should be treated as a developer preview.
 | Workflow | Alpha | Records process state for audit and context export. It is not a workflow engine. |
 | Spec | Alpha | Records change documents, tasks, acceptance, and status. Markdown is export only. |
 | Agent packaging | Alpha | Ships `.agents/skills` and `.comate/rules` helpers for agent workflows. |
-| SQLite schema | Alpha | Current schema version is v8. Compatibility policy is documented, but not yet guaranteed as stable. |
+| SQLite schema | Alpha | Current schema version is v9. Compatibility policy is documented, but not yet guaranteed as stable. |
 
 Do not publish or describe the current build as stable or 1.0-ready.
 

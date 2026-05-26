@@ -6,7 +6,7 @@ DevHarness Kit stores project state in:
 .agents/memory/memory.db
 ```
 
-Current schema version: `8`.
+Current schema version: `9`.
 
 ## Current Schema Versions
 
@@ -20,6 +20,7 @@ Current schema version: `8`.
 | v6 | Goal check freshness metadata with `goal_check.step_count_at_check`. |
 | v7 | Goal context export recovery statuses for resumable failed exports. |
 | v8 | Goal check workspace, context, and check fingerprints for freshness enforcement. |
+| v9 | Graph Lite snapshot, file, node, edge, query cache, and goal binding tables. |
 
 ## Alpha Compatibility Policy
 
@@ -32,7 +33,7 @@ When an existing non-empty database is below the current schema version, DevHarn
 .agents/memory/backups/
 ```
 
-The backup filename includes the old and new schema versions, for example `pre-migration-v1-to-v8`.
+The backup filename includes the old and new schema versions, for example `pre-migration-v1-to-v9`.
 
 Current fixture coverage includes:
 
@@ -45,13 +46,27 @@ v5-goal-before-step-count.sql
                          goal schema before check freshness metadata
 ```
 
-These fixtures verify that old databases are backed up before upgrade, important rows are preserved, and the current v8 schema is created.
+These fixtures verify that old databases are backed up before upgrade, important rows are preserved, and the current v9 schema is created.
 
-The workflow fixture verifies that v2 `workflow_template`, `workflow_run`, `workflow_phase_run`, `workflow_gate_run`, and `workflow_event` rows survive upgrade while v3 artifact binding tables, v4 spec tables, v5 goal tables, v6 check metadata, v7 export recovery state, and v8 fingerprint columns are added.
+The workflow fixture verifies that v2 `workflow_template`, `workflow_run`, `workflow_phase_run`, `workflow_gate_run`, and `workflow_event` rows survive upgrade while v3 artifact binding tables, v4 spec tables, v5 goal tables, v6 check metadata, v7 export recovery state, v8 fingerprint columns, and v9 graph tables are added.
 
-The spec fixture verifies that v4 `spec_change`, `spec_document`, `spec_task`, `spec_acceptance`, `workflow_spec_binding`, and `spec_event` rows survive upgrade while v5 goal tables, v6 check metadata, v7 export recovery state, and v8 fingerprint columns are added.
+The spec fixture verifies that v4 `spec_change`, `spec_document`, `spec_task`, `spec_acceptance`, `workflow_spec_binding`, and `spec_event` rows survive upgrade while v5 goal tables, v6 check metadata, v7 export recovery state, v8 fingerprint columns, and v9 graph tables are added.
 
-The goal fixture verifies that v5 `goal_check` rows survive upgrade, receive a default `step_count_at_check = 0` value, and can be extended with v8 fingerprint metadata without losing rows.
+The goal fixture verifies that v5 `goal_check` rows survive upgrade, receive a default `step_count_at_check = 0` value, can be extended with v8 fingerprint metadata, and receives v9 graph tables without losing rows.
+
+Graph Lite v9 tables are additive. They store snapshot-bound machine facts:
+
+```text
+code_graph_snapshot
+code_graph_file
+code_graph_node
+code_graph_edge
+code_graph_query_cache
+goal_graph_binding
+```
+
+They are not confirmed memory, and they should not be treated as durable human
+facts. See [GRAPH_SCHEMA.md](GRAPH_SCHEMA.md).
 
 For older v1 project tables, migration repairs missing project metadata columns such as `root_path`, `language`, `framework`, and `database_type` with conservative defaults.
 

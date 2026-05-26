@@ -1,0 +1,31 @@
+{
+  "schema_version": "devharness-graph-config/v1-alpha",
+  "provider": "lite",
+  "include": [
+    "src/main/java/**",
+    "src/test/java/**",
+    "src/main/resources/**",
+    "src/main/webapp/**",
+    "pom.xml"
+  ],
+  "exclude": [
+    "target/**",
+    "build/**",
+    ".git/**",
+    ".agents/memory/**",
+    ".agents/graph/exports/**",
+    ".agents/graph/snapshots/**",
+    ".agents/graph/cache/**"
+  ],
+  "limits": {
+    "max_file_bytes": 1048576,
+    "max_indexed_files": 5000,
+    "max_impact_depth": 3,
+    "max_export_nodes": 500
+  },
+  "safety": {
+    "skip_protected_file_content": true,
+    "skip_sensitive_file_content": true,
+    "record_skipped_metadata": true
+  }
+}

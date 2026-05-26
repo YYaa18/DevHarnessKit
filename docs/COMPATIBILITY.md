@@ -55,6 +55,11 @@ Alpha:
 - `dhk spec ...`
 - agent skill/rule packaging under `.agents/` and `.comate/`
 
+Internal/experimental:
+
+- Graph Lite SQLite tables and `.agents/graph/config.json`.
+- Future `dhk graph ...` commands are not part of the current CLI contract yet.
+
 Human-readable stdout is intended for people and examples. Do not parse it as a
 stable API unless a document explicitly names the fields and command as a
 machine-readable contract.
@@ -112,7 +117,7 @@ with the matching CLI version.
 
 ## SQLite Schema Contract
 
-Current schema version: `8`.
+Current schema version: `9`.
 
 Before 1.0, the schema is not a stable public API. Users may rely on these
 operational guarantees:
@@ -122,6 +127,7 @@ operational guarantees:
 - Fixture-tested upgrade paths are documented in [MIGRATIONS.md](MIGRATIONS.md).
 - Commands should fail closed if a required backup cannot be created.
 - Markdown exports can be regenerated from SQLite with the matching CLI.
+- Graph Lite rows are snapshot-bound machine facts, not long-term memory facts.
 
 Unsupported:
 
@@ -129,6 +135,7 @@ Unsupported:
 - downgrade migrations;
 - modifying generated exports and expecting SQLite state to change;
 - relying on table or column details as public API before 1.0.
+- treating graph snapshots as confirmed project memory.
 
 If downgrade support is added later, it must be explicit in release notes and
 migration docs. Until then, recover by restoring a pre-migration backup.

@@ -37,19 +37,22 @@ public final class GraphImpactService {
     private final GraphRepository graphRepository;
     private final GraphImpactRenderer renderer;
     private final GraphConfigService configService;
+    private final GraphCgcAdapterService cgcAdapterService;
 
     public GraphImpactService() {
         this(new DbConnectionFactory(), new ProjectService(), new GraphRepository(), new GraphImpactRenderer(),
-                new GraphConfigService());
+                new GraphConfigService(), new GraphCgcAdapterService());
     }
 
     GraphImpactService(DbConnectionFactory connectionFactory, ProjectService projectService,
-                       GraphRepository graphRepository, GraphImpactRenderer renderer, GraphConfigService configService) {
+                       GraphRepository graphRepository, GraphImpactRenderer renderer, GraphConfigService configService,
+                       GraphCgcAdapterService cgcAdapterService) {
         this.connectionFactory = connectionFactory;
         this.projectService = projectService;
         this.graphRepository = graphRepository;
         this.renderer = renderer;
         this.configService = configService;
+        this.cgcAdapterService = cgcAdapterService;
     }
 
     public GraphImpactResult impact(Path projectRoot, GraphImpactRequest request, Clock clock) throws Exception {
@@ -60,6 +63,13 @@ public final class GraphImpactService {
         GraphImpactRequest effectiveRequest = new GraphImpactRequest(request.queryType(), request.query(),
                 Math.min(Math.max(1, requestedDepth), maxDepth));
         boolean depthLimited = requestedDepth > effectiveRequest.depth();
+        if ("cgc".equalsIgnoreCase(config.provider())) {
+            GraphImpactResult result = cgcAdapterService.impact(projectRoot, config, effectiveRequest, clock,
+                    requestedDepth, maxDepth, depthLimited);
+            Files.write(PathUtil.graphImpactMap(projectRoot),
+                    renderer.render(result, clock.now()).getBytes("UTF-8"));
+            return result;
+        }
         GraphData data = loadData(projectRoot);
         List<GraphNode> startNodes = startNodes(data, effectiveRequest);
         List<GraphNode> candidates = startNodes.isEmpty() ? candidates(data, effectiveRequest.query()) : Collections.<GraphNode>emptyList();

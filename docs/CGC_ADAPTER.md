@@ -55,8 +55,28 @@ process-wide failure.
 
 ## Normalization Contract
 
-Any future CGC adapter must normalize external graph output into the same
-DevHarness graph model used by Lite snapshots:
+The current prototype calls:
+
+```text
+<cgc_command> analyze impact --type <file|symbol|sql-table> --query <query> --depth <n> --format devharness-tsv
+```
+
+It expects tab-separated records:
+
+```text
+start_node<TAB>node_key<TAB>node_kind<TAB>name<TAB>qualified_name<TAB>relative_path<TAB>start_line<TAB>end_line<TAB>language<TAB>confidence<TAB>evidence
+node<TAB>node_key<TAB>node_kind<TAB>name<TAB>qualified_name<TAB>relative_path<TAB>start_line<TAB>end_line<TAB>language<TAB>confidence<TAB>evidence
+risk_node<TAB>node_key<TAB>node_kind<TAB>name<TAB>qualified_name<TAB>relative_path<TAB>start_line<TAB>end_line<TAB>language<TAB>confidence<TAB>evidence
+sql_node<TAB>node_key<TAB>node_kind<TAB>name<TAB>qualified_name<TAB>relative_path<TAB>start_line<TAB>end_line<TAB>language<TAB>confidence<TAB>evidence
+caller<TAB>edge_kind<TAB>source_node_key<TAB>target_node_key<TAB>relative_path<TAB>confidence<TAB>evidence
+callee<TAB>edge_kind<TAB>source_node_key<TAB>target_node_key<TAB>relative_path<TAB>confidence<TAB>evidence
+related_file<TAB>relative_path
+related_test<TAB>relative_path
+missing_related_test<TAB>relative_path
+```
+
+The adapter normalizes these records into the same DevHarness graph model used
+by Lite snapshots:
 
 - `code_graph_file`: relative path, language, kind, hash, indexed/skipped state.
 - `code_graph_node`: node kind, node key, name, qualified name, relative path,
@@ -78,7 +98,9 @@ as Lite graph exports.
 
 ## Alpha Limitations
 
-- DevHarnessKit currently diagnoses the CGC command but does not execute CGC for
-  indexing or impact analysis.
-- `provider=cgc` is a contract placeholder until a concrete adapter is evaluated.
+- DevHarnessKit executes the prototype adapter only for `dhk graph impact` when
+  `provider=cgc` is explicitly configured.
+- `dhk graph index` still uses the built-in Lite indexer.
+- The `devharness-tsv` format is an adapter contract, not a CGC upstream API
+  guarantee.
 - Teams should keep `provider=lite` unless they are actively testing the adapter.

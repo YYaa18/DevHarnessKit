@@ -131,6 +131,45 @@ final class GraphCommandIntegrationTest {
     }
 
     @Test
+    void graphImpactUsesCgcProviderPrototypeOutput() throws Exception {
+        Path root = tempDir.resolve("demo-cgc-impact");
+        Path command = root.resolve("fake-cgc.sh");
+        Files.createDirectories(root);
+        Files.write(command, ("#!/bin/sh\n"
+                + "printf 'start_node\\tnode:com.acme.AccountService\\tclass\\tAccountService\\tcom.acme.AccountService\\tsrc/main/java/com/acme/AccountService.java\\t10\\t20\\tjava\\t93\\tCGC tree root\\n'\n"
+                + "printf 'node\\tnode:com.acme.AccountController.freeze\\tmethod\\tfreeze\\tcom.acme.AccountController.freeze\\tsrc/main/java/com/acme/AccountController.java\\t31\\t36\\tjava\\t88\\tCGC caller\\n'\n"
+                + "printf 'caller\\tcalls\\tnode:com.acme.AccountController.freeze\\tnode:com.acme.AccountService\\tsrc/main/java/com/acme/AccountController.java\\t82\\tCGC callers\\n'\n"
+                + "printf 'risk_node\\tnode:route:POST:/accounts/freeze\\troute\\tPOST:/accounts/freeze\\tPOST:/accounts/freeze\\tsrc/main/java/com/acme/AccountController.java\\t31\\t31\\tjava\\t86\\tpublic route\\n'\n"
+                + "printf 'related_file\\tsrc/main/java/com/acme/AccountService.java\\n'\n"
+                + "printf 'related_test\\tsrc/test/java/com/acme/AccountServiceTest.java\\n'\n").getBytes("UTF-8"));
+        assertTrue(command.toFile().setExecutable(true));
+        write(root, ".agents/graph/config.json",
+                "{\n"
+                        + "  \"schema_version\": \"devharness-graph-config/v1-alpha\",\n"
+                        + "  \"provider\": \"cgc\",\n"
+                        + "  \"cgc_command\": \"" + command.toString().replace("\\", "\\\\") + "\",\n"
+                        + "  \"limits\": { \"max_impact_depth\": 4 }\n"
+                        + "}\n");
+
+        Harness harness = new Harness(tempDir);
+        int exit = new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", "demo-cgc-impact", "--symbol", "com.acme.AccountService"
+        }, harness.context());
+
+        assertEquals(ExitCodes.SUCCESS, exit);
+        assertTrue(harness.stdout().contains("graph impact"));
+        assertTrue(harness.stdout().contains("related_files: 2"));
+        assertTrue(harness.stdout().contains("related_tests: 1"));
+        String impactMap = new String(Files.readAllBytes(PathUtil.graphImpactMap(root)), "UTF-8");
+        assertTrue(impactMap.contains("snapshot_key: cgc-prototype-"));
+        assertTrue(impactMap.contains("source=cgc"));
+        assertTrue(impactMap.contains("src/main/java/com/acme/AccountService.java"));
+        assertTrue(impactMap.contains("src/main/java/com/acme/AccountController.java"));
+        assertTrue(impactMap.contains("src/test/java/com/acme/AccountServiceTest.java"));
+        assertTrue(impactMap.contains("POST:/accounts/freeze"));
+    }
+
+    @Test
     void graphReportsLimitsTruncationAndProtectedFileSkips() throws Exception {
         Path root = tempDir.resolve("demo-limits");
         write(root, "src/main/java/com/example/App.java",

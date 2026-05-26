@@ -9,6 +9,7 @@ import com.devharnesskit.dhk.model.graph.GraphConfig;
 import com.devharnesskit.dhk.model.graph.GraphIndexResult;
 import com.devharnesskit.dhk.model.graph.GraphInitResult;
 import com.devharnesskit.dhk.model.graph.GraphParseResult;
+import com.devharnesskit.dhk.model.graph.GraphPruneResult;
 import com.devharnesskit.dhk.model.graph.GraphScanReport;
 import com.devharnesskit.dhk.model.graph.GraphSnapshot;
 import com.devharnesskit.dhk.repository.ProjectRepository;
@@ -119,6 +120,24 @@ public final class GraphService {
         Files.write(PathUtil.graphIndexReport(projectRoot),
                 renderer.render(report, clock.now()).getBytes("UTF-8"));
         return report;
+    }
+
+    public GraphPruneResult prune(Path projectRoot, int keep, Clock clock) throws Exception {
+        if (keep < 1) {
+            throw new IllegalArgumentException("--keep must be >= 1");
+        }
+        PathUtil.createMemoryDirectories(projectRoot);
+        PathUtil.createGraphDirectories(projectRoot);
+        Project project = projectService.ensureProject(projectRoot, clock);
+        try (Connection connection = connectionFactory.open(projectRoot)) {
+            migrationRunner.migrate(connection, clock);
+            projectRepository.upsert(connection, project);
+            return transactionTemplate.execute(connection, new TransactionTemplate.Work<GraphPruneResult>() {
+                public GraphPruneResult execute() throws Exception {
+                    return graphRepository.pruneCompletedSnapshots(connection, project.projectKey(), keep);
+                }
+            });
+        }
     }
 
     private GraphScanReport scan(Path projectRoot, GraphConfig config, GraphSnapshot latestSnapshot) {

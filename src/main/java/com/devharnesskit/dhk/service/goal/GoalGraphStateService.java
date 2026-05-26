@@ -16,7 +16,10 @@ import java.util.regex.Pattern;
 
 public final class GoalGraphStateService {
     private static final Pattern SNAPSHOT_KEY = Pattern.compile("\"snapshot_key\"\\s*:\\s*\"([^\"]*)\"");
+    private static final Pattern SNAPSHOT_WORKSPACE_FINGERPRINT =
+            Pattern.compile("\"workspace_fingerprint\"\\s*:\\s*\"([^\"]*)\"");
     private final DevHarnessPolicyService policyService = new DevHarnessPolicyService();
+    private final WorkspaceFingerprintService fingerprintService = new WorkspaceFingerprintService();
 
     public GoalGraphState inspect(Path projectRoot, GoalProfile profile, GoalPlan plan) {
         if (profile == null || !profile.graphRequired()) {
@@ -28,18 +31,29 @@ public final class GoalGraphStateService {
         boolean snapshotExists = Files.isRegularFile(snapshotPath);
         boolean graphContextExists = Files.isRegularFile(graphContextPath);
         boolean impactMapExists = Files.isRegularFile(impactMapPath);
+        String snapshotText = snapshotText(snapshotPath);
+        String snapshotKey = jsonString(snapshotText, SNAPSHOT_KEY);
+        String snapshotFingerprint = jsonString(snapshotText, SNAPSHOT_WORKSPACE_FINGERPRINT);
+        String currentFingerprint = currentWorkspaceFingerprint(projectRoot);
+        boolean snapshotStale = snapshotStale(snapshotExists, snapshotFingerprint, currentFingerprint);
+        String freshnessStatus = freshnessStatus(snapshotExists, graphContextExists, snapshotFingerprint,
+                currentFingerprint, snapshotStale);
         String required = requiredGraphAction(profile, plan.currentAction(), snapshotExists, graphContextExists,
-                impactMapExists);
+                impactMapExists, snapshotStale);
         return new GoalGraphState(true, profile.graphProvider(), profile.graphRequireFreshSnapshot(),
                 profile.graphRequireImpactMap(), profile.graphMaxStalenessMinutes(),
-                snapshotPath.toString(), snapshotExists, snapshotKey(snapshotPath),
+                snapshotPath.toString(), snapshotExists, snapshotKey,
+                snapshotFingerprint, currentFingerprint, snapshotStale, freshnessStatus,
                 graphContextPath.toString(), graphContextExists, impactMapPath.toString(), impactMapExists,
                 required, graphCommand(projectRoot, required), protectedImpactFiles(projectRoot, impactMapPath));
     }
 
     private String requiredGraphAction(GoalProfile profile, String currentAction, boolean snapshotExists,
-                                       boolean graphContextExists, boolean impactMapExists) {
+                                       boolean graphContextExists, boolean impactMapExists, boolean snapshotStale) {
         if (!snapshotExists || !graphContextExists) {
+            return "graph_index_export";
+        }
+        if (profile.graphRequireFreshSnapshot() && snapshotStale) {
             return "graph_index_export";
         }
         if (("graph_impact_analysis".equals(currentAction) || "graph_reimpact".equals(currentAction))
@@ -77,16 +91,52 @@ public final class GoalGraphStateService {
         return "";
     }
 
-    private String snapshotKey(Path snapshotPath) {
+    private String snapshotText(Path snapshotPath) {
         if (!Files.isRegularFile(snapshotPath)) {
             return "";
         }
         try {
-            Matcher matcher = SNAPSHOT_KEY.matcher(new String(Files.readAllBytes(snapshotPath), "UTF-8"));
-            return matcher.find() ? matcher.group(1) : "";
+            return new String(Files.readAllBytes(snapshotPath), "UTF-8");
         } catch (Exception ex) {
             return "";
         }
+    }
+
+    private String jsonString(String text, Pattern pattern) {
+        if (text == null || text.length() == 0) {
+            return "";
+        }
+        Matcher matcher = pattern.matcher(text);
+        return matcher.find() ? matcher.group(1) : "";
+    }
+
+    private String currentWorkspaceFingerprint(Path projectRoot) {
+        try {
+            return fingerprintService.workspaceFingerprint(projectRoot);
+        } catch (RuntimeException ex) {
+            return "";
+        }
+    }
+
+    private boolean snapshotStale(boolean snapshotExists, String snapshotFingerprint, String currentFingerprint) {
+        return snapshotExists
+                && snapshotFingerprint.length() > 0
+                && currentFingerprint.length() > 0
+                && !snapshotFingerprint.equals(currentFingerprint);
+    }
+
+    private String freshnessStatus(boolean snapshotExists, boolean graphContextExists, String snapshotFingerprint,
+                                   String currentFingerprint, boolean snapshotStale) {
+        if (!snapshotExists) {
+            return "missing_snapshot";
+        }
+        if (!graphContextExists) {
+            return "missing_graph_context";
+        }
+        if (snapshotFingerprint.length() == 0 || currentFingerprint.length() == 0) {
+            return "unknown";
+        }
+        return snapshotStale ? "stale" : "fresh";
     }
 
     private String[] protectedImpactFiles(Path projectRoot, Path impactMapPath) {

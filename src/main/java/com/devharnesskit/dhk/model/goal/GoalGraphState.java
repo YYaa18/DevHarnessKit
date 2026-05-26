@@ -9,6 +9,10 @@ public final class GoalGraphState {
     private final String snapshotPath;
     private final boolean snapshotExists;
     private final String snapshotKey;
+    private final String snapshotWorkspaceFingerprint;
+    private final String currentWorkspaceFingerprint;
+    private final boolean snapshotStale;
+    private final String freshnessStatus;
     private final String graphContextPath;
     private final boolean graphContextExists;
     private final String impactMapPath;
@@ -35,6 +39,21 @@ public final class GoalGraphState {
                           String impactMapPath, boolean impactMapExists,
                           String requiredGraphAction, String graphNextCommand,
                           String[] protectedImpactFiles) {
+        this(enabled, provider, requireFreshSnapshot, requireImpactMap, maxStalenessMinutes,
+                snapshotPath, snapshotExists, snapshotKey, "", "", false, "",
+                graphContextPath, graphContextExists, impactMapPath, impactMapExists,
+                requiredGraphAction, graphNextCommand, protectedImpactFiles);
+    }
+
+    public GoalGraphState(boolean enabled, String provider, boolean requireFreshSnapshot,
+                          boolean requireImpactMap, int maxStalenessMinutes,
+                          String snapshotPath, boolean snapshotExists, String snapshotKey,
+                          String snapshotWorkspaceFingerprint, String currentWorkspaceFingerprint,
+                          boolean snapshotStale, String freshnessStatus,
+                          String graphContextPath, boolean graphContextExists,
+                          String impactMapPath, boolean impactMapExists,
+                          String requiredGraphAction, String graphNextCommand,
+                          String[] protectedImpactFiles) {
         this.enabled = enabled;
         this.provider = provider == null ? "" : provider;
         this.requireFreshSnapshot = requireFreshSnapshot;
@@ -43,6 +62,10 @@ public final class GoalGraphState {
         this.snapshotPath = snapshotPath == null ? "" : snapshotPath;
         this.snapshotExists = snapshotExists;
         this.snapshotKey = snapshotKey == null ? "" : snapshotKey;
+        this.snapshotWorkspaceFingerprint = snapshotWorkspaceFingerprint == null ? "" : snapshotWorkspaceFingerprint;
+        this.currentWorkspaceFingerprint = currentWorkspaceFingerprint == null ? "" : currentWorkspaceFingerprint;
+        this.snapshotStale = snapshotStale;
+        this.freshnessStatus = freshnessStatus == null ? "" : freshnessStatus;
         this.graphContextPath = graphContextPath == null ? "" : graphContextPath;
         this.graphContextExists = graphContextExists;
         this.impactMapPath = impactMapPath == null ? "" : impactMapPath;
@@ -65,6 +88,10 @@ public final class GoalGraphState {
     public String snapshotPath() { return snapshotPath; }
     public boolean snapshotExists() { return snapshotExists; }
     public String snapshotKey() { return snapshotKey; }
+    public String snapshotWorkspaceFingerprint() { return snapshotWorkspaceFingerprint; }
+    public String currentWorkspaceFingerprint() { return currentWorkspaceFingerprint; }
+    public boolean snapshotStale() { return snapshotStale; }
+    public String freshnessStatus() { return freshnessStatus; }
     public String graphContextPath() { return graphContextPath; }
     public boolean graphContextExists() { return graphContextExists; }
     public String impactMapPath() { return impactMapPath; }

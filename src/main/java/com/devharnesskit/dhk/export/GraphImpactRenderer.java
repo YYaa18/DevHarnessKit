@@ -41,6 +41,7 @@ public final class GraphImpactRenderer {
         builder.append("</summary>\n\n");
 
         appendSnapshotFreshness(builder, result);
+        appendGraphConfidence(builder, result);
         appendNodes(builder, "start-nodes", result.startNodes());
         appendEdges(builder, "direct-callers", result.directCallers());
         appendEdges(builder, "direct-callees", result.directCallees());
@@ -80,6 +81,18 @@ public final class GraphImpactRenderer {
             builder.append("- next_command: dhk graph index\n");
         }
         builder.append("</snapshot-freshness>\n\n");
+    }
+
+    private void appendGraphConfidence(StringBuilder builder, GraphImpactResult result) {
+        builder.append("<graph-confidence>\n");
+        builder.append("- provider: ").append(result.snapshot() == null ? "unknown" : result.snapshot().provider()).append('\n');
+        builder.append("- precision: heuristic\n");
+        builder.append("- confidence: advisory\n");
+        builder.append("- snapshot_freshness: ").append(freshnessStatus(result)).append('\n');
+        builder.append("- must_verify_with_tests: true\n");
+        builder.append("- do_not_skip_manual_review: true\n");
+        builder.append("- do_not_treat_as_correctness_proof: true\n");
+        builder.append("</graph-confidence>\n\n");
     }
 
     private String freshnessStatus(GraphImpactResult result) {

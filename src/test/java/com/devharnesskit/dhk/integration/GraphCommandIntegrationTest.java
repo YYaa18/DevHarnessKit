@@ -258,6 +258,47 @@ final class GraphCommandIntegrationTest {
     }
 
     @Test
+    void graphPruneKeepsLatestCompletedSnapshotsAndDeletesSnapshotChildren() throws Exception {
+        Path root = tempDir.resolve("demo-prune");
+        write(root, "src/main/java/com/example/App.java",
+                "package com.example;\npublic class App { public void run() {} }\n");
+
+        for (int i = 0; i < 20; i++) {
+            Harness indexHarness = new Harness(tempDir);
+            int indexExit = new CommandRouter().run(new String[]{
+                    "graph", "index", "--project-root", "demo-prune"
+            }, indexHarness.context());
+            assertEquals(ExitCodes.SUCCESS, indexExit);
+        }
+        int filesBefore = countRows(root, "code_graph_file");
+        int nodesBefore = countRows(root, "code_graph_node");
+        int edgesBefore = countRows(root, "code_graph_edge");
+
+        Harness pruneHarness = new Harness(tempDir);
+        int pruneExit = new CommandRouter().run(new String[]{
+                "graph", "prune", "--project-root", "demo-prune", "--keep", "10"
+        }, pruneHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, pruneExit);
+        assertTrue(pruneHarness.stdout().contains("graph prune complete"));
+        assertTrue(pruneHarness.stdout().contains("keep: 10"));
+        assertTrue(pruneHarness.stdout().contains("deleted_snapshots: 10"));
+        assertTrue(pruneHarness.stdout().contains("remaining_snapshots: 10"));
+        assertEquals(10, countRows(root, "code_graph_snapshot"));
+        assertTrue(countRows(root, "code_graph_file") < filesBefore);
+        assertTrue(countRows(root, "code_graph_node") < nodesBefore);
+        assertTrue(countRows(root, "code_graph_edge") < edgesBefore);
+        assertEquals(0, countRowsWhere(root, "code_graph_file",
+                "snapshot_id NOT IN (SELECT id FROM code_graph_snapshot)"));
+        assertEquals(0, countRowsWhere(root, "code_graph_node",
+                "snapshot_id NOT IN (SELECT id FROM code_graph_snapshot)"));
+        assertEquals(0, countRowsWhere(root, "code_graph_edge",
+                "snapshot_id NOT IN (SELECT id FROM code_graph_snapshot)"));
+        assertEquals(0, countRowsWhere(root, "goal_graph_binding",
+                "snapshot_id NOT IN (SELECT id FROM code_graph_snapshot)"));
+    }
+
+    @Test
     void graphImpactRejectsStaleSnapshotUnlessAllowed() throws Exception {
         Path root = tempDir.resolve("demo-stale-impact");
         write(root, "src/main/java/com/example/App.java",
@@ -304,6 +345,9 @@ final class GraphCommandIntegrationTest {
         assertTrue(impactMap.contains("<snapshot-freshness>"));
         assertTrue(impactMap.contains("- status: stale_allowed"));
         assertTrue(impactMap.contains("- warning: STALE_GRAPH_SNAPSHOT"));
+        assertTrue(impactMap.contains("<graph-confidence>"));
+        assertTrue(impactMap.contains("- precision: heuristic"));
+        assertTrue(impactMap.contains("- do_not_treat_as_correctness_proof: true"));
     }
 
     @Test
@@ -330,6 +374,10 @@ final class GraphCommandIntegrationTest {
         String context = new String(Files.readAllBytes(PathUtil.graphContext(root)), "UTF-8");
         String snapshot = new String(Files.readAllBytes(PathUtil.graphSnapshotJson(root)), "UTF-8");
         assertTrue(context.contains("graph facts are snapshot-bound machine facts"));
+        assertTrue(context.contains("<graph-confidence>"));
+        assertTrue(context.contains("- provider: lite"));
+        assertTrue(context.contains("- confidence: advisory"));
+        assertTrue(context.contains("- must_verify_with_tests: true"));
         assertTrue(context.contains("<file-hashes>"));
         assertTrue(context.contains("<agent-instructions>"));
         assertTrue(snapshot.contains("\"schema_version\": \"devharness-graph-snapshot/v1\""));

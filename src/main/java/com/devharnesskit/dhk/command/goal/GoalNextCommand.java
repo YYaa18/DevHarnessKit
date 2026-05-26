@@ -18,6 +18,10 @@ public final class GoalNextCommand implements Command {
         Path projectRoot = GoalCommandSupport.projectRoot(args, context);
         try {
             GoalRun goal = GoalCommandSupport.goal(orchestrator, context, args, projectRoot);
+            if (!isContextExportIncomplete(goal.status())) {
+                orchestrator.export(context, projectRoot, goal.goalKey());
+                goal = GoalCommandSupport.goal(orchestrator, context, args, projectRoot);
+            }
             GoalPlan plan = orchestrator.plan(projectRoot, goal);
             GoalEvaluation evaluation = orchestrator.evaluate(context, projectRoot, goal.goalKey());
             GoalCommandSupport.printPlan(context, projectRoot, goal, plan, evaluation.missing());
@@ -26,5 +30,9 @@ public final class GoalNextCommand implements Command {
             context.err().println("ERROR goal next failed: " + ex.getMessage());
             return ExitCodes.RUNTIME_ERROR;
         }
+    }
+
+    private boolean isContextExportIncomplete(String status) {
+        return "context_export_failed".equals(status) || "context_exporting".equals(status);
     }
 }

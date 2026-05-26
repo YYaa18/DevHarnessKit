@@ -150,13 +150,33 @@ public final class GoalContextRenderer {
         builder.append("- require_fresh_snapshot: ").append(graph.requireFreshSnapshot()).append('\n');
         builder.append("- require_impact_map: ").append(graph.requireImpactMap()).append('\n');
         builder.append("- max_staleness_minutes: ").append(graph.maxStalenessMinutes()).append('\n');
+        builder.append("- graph_precision: heuristic\n");
+        builder.append("- graph_usage: advisory_preflight_not_completion_proof\n");
         builder.append("</graph-profile>\n\n");
 
         builder.append("<graph-snapshot>\n");
         builder.append("- path: ").append(graph.snapshotPath()).append('\n');
         builder.append("- exists: ").append(graph.snapshotExists()).append('\n');
         builder.append("- snapshot_key: ").append(graph.snapshotKey().length() == 0 ? "none" : graph.snapshotKey()).append('\n');
+        builder.append("- snapshot_workspace_fingerprint: ")
+                .append(valueOrNone(graph.snapshotWorkspaceFingerprint())).append('\n');
+        builder.append("- current_workspace_fingerprint: ")
+                .append(valueOrNone(graph.currentWorkspaceFingerprint())).append('\n');
+        builder.append("- graph_stale: ").append(graph.snapshotStale()).append('\n');
+        builder.append("- freshness_status: ")
+                .append(graph.freshnessStatus().length() == 0 ? "unknown" : graph.freshnessStatus()).append('\n');
         builder.append("</graph-snapshot>\n\n");
+
+        builder.append("<graph-confidence>\n");
+        builder.append("- provider: ").append(graph.provider()).append('\n');
+        builder.append("- precision: heuristic\n");
+        builder.append("- confidence: advisory\n");
+        builder.append("- must_verify_with_tests: true\n");
+        builder.append("- do_not_treat_as_correctness_proof: true\n");
+        if (graph.snapshotStale()) {
+            builder.append("- warning: STALE_GRAPH_SNAPSHOT\n");
+        }
+        builder.append("</graph-confidence>\n\n");
 
         builder.append("<graph-context>\n");
         builder.append("- path: ").append(graph.graphContextPath()).append('\n');
@@ -171,6 +191,9 @@ public final class GoalContextRenderer {
             builder.append("- next_command: ").append(graph.graphNextCommand()).append('\n');
         }
         builder.append("- rule: graph_required profiles must not skip required graph actions\n");
+        if (graph.snapshotStale()) {
+            builder.append("- stale_rule: fresh graph snapshot required before graph impact or completion\n");
+        }
         builder.append("</required-graph-action>\n\n");
 
         if (graph.protectedImpactFiles().length > 0) {
@@ -181,6 +204,10 @@ public final class GoalContextRenderer {
             builder.append("- rule: legacy graph profiles require manual confirmation before completion\n");
             builder.append("</protected-impact-risk>\n\n");
         }
+    }
+
+    private String valueOrNone(String value) {
+        return value == null || value.length() == 0 ? "none" : value;
     }
 
     private String nextCommand(GoalPlan plan, GoalGraphState graph) {

@@ -29,6 +29,7 @@ dhk graph status --project-root <path>
 dhk graph index --project-root <path>
 dhk graph impact --file <path>|--symbol <name>|--sql-table <table> --project-root <path>
 dhk graph export --project-root <path>
+dhk graph prune --keep 10 --project-root <path>
 ```
 
 `graph init` creates `.agents/graph/config.json` and generated artifact
@@ -53,14 +54,23 @@ GRAPH_CONTEXT.md
 GRAPH_SNAPSHOT.json
 ```
 
+`graph prune` deletes older completed snapshots beyond the requested retention
+count. It also removes associated `code_graph_file`, `code_graph_node`,
+`code_graph_edge`, `code_graph_query_cache`, and `goal_graph_binding` rows so
+SQLite does not accumulate orphan graph data. It never deletes the latest
+completed snapshots kept by `--keep`.
+
 `GRAPH_CONTEXT.md` section order:
 
 ```text
 boundary
+graph-confidence
 snapshot
+limits
 file-hashes
 node-kinds
 risk-nodes
+truncation-report
 agent-instructions
 ```
 

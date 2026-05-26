@@ -1853,6 +1853,66 @@ final class GoalIntegrationTest {
     }
 
     @Test
+    void graphAwareGoalNextRequiresGraphRefreshWhenSnapshotIsStale() throws Exception {
+        Path root = tempDir.resolve("demo-stale-preflight");
+        Path source = root.resolve("src/main/java/com/example/App.java");
+        Files.createDirectories(source.getParent());
+        Files.write(source, "package com.example;\npublic class App { public void run() {} }\n".getBytes("UTF-8"));
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo-stale-preflight",
+                "--profile", "java-api-change-with-graph",
+                "--task", "Graph stale preflight",
+                "--module", "order"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "index", "--project-root", "demo-stale-preflight"
+        }, new Harness(tempDir).context()));
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "export", "--project-root", "demo-stale-preflight"
+        }, new Harness(tempDir).context()));
+
+        Harness graphStep = new Harness(tempDir);
+        int graphStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo-stale-preflight",
+                "--goal", goalKey,
+                "--summary", "Graph snapshot ready",
+                "--evidence", "graph_snapshot=GRAPH_SNAPSHOT.json; graph_context=GRAPH_CONTEXT.md"
+        }, graphStep.context());
+        assertEquals(ExitCodes.SUCCESS, graphStepExit);
+
+        Files.write(source, "\n// changed after graph snapshot\n".getBytes("UTF-8"), StandardOpenOption.APPEND);
+
+        Harness next = new Harness(tempDir);
+        int nextExit = new CommandRouter().run(new String[]{
+                "goal", "next", "--project-root", "demo-stale-preflight", "--goal", goalKey
+        }, next.context());
+
+        assertEquals(ExitCodes.SUCCESS, nextExit);
+        assertTrue(next.stdout().contains("current_action: graph_impact_analysis"));
+        assertTrue(next.stdout().contains("graph_stale: true"));
+        assertTrue(next.stdout().contains("freshness_status: stale"));
+        assertTrue(next.stdout().contains("snapshot_workspace_fingerprint: fallback:"));
+        assertTrue(next.stdout().contains("current_workspace_fingerprint: fallback:"));
+        assertTrue(next.stdout().contains("required_graph_action: graph_index_export"));
+        assertTrue(next.stdout().contains("graph_next_command: dhk graph index --project-root"));
+
+        String context = new String(Files.readAllBytes(PathUtil.goalContext(root)), "UTF-8");
+        assertTrue(context.contains("- graph_stale: true"));
+        assertTrue(context.contains("- freshness_status: stale"));
+        assertTrue(context.contains("- action: graph_index_export"));
+        assertTrue(context.contains("- warning: STALE_GRAPH_SNAPSHOT"));
+        assertTrue(context.contains("- precision: heuristic"));
+        assertTrue(context.contains("- graph_usage: advisory_preflight_not_completion_proof"));
+    }
+
+    @Test
     void graphAwareGoalVerifyFailsWhenImpactMapIsMissing() throws Exception {
         Path root = tempDir.resolve("demo-missing-impact");
         writeSource(root, "src/main/java/com/example/App.java",

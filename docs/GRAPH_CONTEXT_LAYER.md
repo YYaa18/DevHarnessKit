@@ -23,6 +23,9 @@ Rules:
 - Graph facts are snapshot-bound machine facts. They must not be promoted to
   confirmed memory without human review.
 - Regenerate graph exports after code changes.
+- Graph Lite output is heuristic advisory context. It can recommend files,
+  tests, and risk nodes, but it is not a correctness proof and must not replace
+  compile, tests, or manual review.
 - `IMPACT_MAP.md` can include `related-tests` and `missing-related-tests`.
   Missing tests are inferred from Java path conventions and should be treated as
   review prompts.
@@ -56,6 +59,11 @@ rerun graph index/export/impact when files changed
 
 Graph output should guide impact analysis, not replace compile, test, sensitive,
 workflow, or spec checks.
+
+`GRAPH_CONTEXT.md`, `IMPACT_MAP.md`, and graph-aware `GOAL_CONTEXT.md` include
+`graph-confidence` metadata with provider, heuristic precision, freshness, and
+test/manual-review reminders. Stale graph snapshots must be refreshed before a
+graph-required goal continues impact analysis.
 
 For `safe-refactor-with-graph`, rerunning impact after the change is mandatory.
 If the post-change impact is wider than the pre-change impact, record explicit

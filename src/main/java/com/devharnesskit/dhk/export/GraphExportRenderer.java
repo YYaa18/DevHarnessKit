@@ -26,6 +26,15 @@ public final class GraphExportRenderer {
         builder.append("- graph facts are not confirmed long-term memory\n");
         builder.append("- regenerate graph exports after code changes\n");
         builder.append("</boundary>\n\n");
+        builder.append("<graph-confidence>\n");
+        builder.append("- provider: ").append(snapshot.provider()).append('\n');
+        builder.append("- precision: heuristic\n");
+        builder.append("- confidence: advisory\n");
+        builder.append("- snapshot_bound: true\n");
+        builder.append("- must_verify_with_tests: true\n");
+        builder.append("- do_not_skip_manual_review: true\n");
+        builder.append("- do_not_treat_as_correctness_proof: true\n");
+        builder.append("</graph-confidence>\n\n");
         builder.append("<snapshot>\n");
         builder.append("- snapshot_id: ").append(snapshot.id()).append('\n');
         builder.append("- snapshot_key: ").append(snapshot.snapshotKey()).append('\n');

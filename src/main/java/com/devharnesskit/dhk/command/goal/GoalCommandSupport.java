@@ -107,6 +107,13 @@ final class GoalCommandSupport {
         context.out().println("  path: " + graph.snapshotPath());
         context.out().println("  exists: " + graph.snapshotExists());
         context.out().println("  snapshot_key: " + (graph.snapshotKey().length() == 0 ? "none" : graph.snapshotKey()));
+        context.out().println("  snapshot_workspace_fingerprint: "
+                + (graph.snapshotWorkspaceFingerprint().length() == 0 ? "none" : graph.snapshotWorkspaceFingerprint()));
+        context.out().println("  current_workspace_fingerprint: "
+                + (graph.currentWorkspaceFingerprint().length() == 0 ? "none" : graph.currentWorkspaceFingerprint()));
+        context.out().println("  graph_stale: " + graph.snapshotStale());
+        context.out().println("  freshness_status: "
+                + (graph.freshnessStatus().length() == 0 ? "unknown" : graph.freshnessStatus()));
         context.out().println("graph_context:");
         context.out().println("  path: " + graph.graphContextPath());
         context.out().println("  exists: " + graph.graphContextExists());

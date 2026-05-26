@@ -114,6 +114,13 @@ covered by the impact map. The impact map also reports related tests and
 `missing-related-tests` using Java file conventions. This is an alpha heuristic:
 it is meant to surface likely test gaps, not to prove test sufficiency.
 
+`goal next` and `GOAL_CONTEXT.md` surface graph preflight fields when graph is
+required: `snapshot_workspace_fingerprint`, `current_workspace_fingerprint`,
+`graph_stale`, `freshness_status`, and the required graph action. If a fresh
+snapshot is required and the snapshot is stale, the next command points back to
+`dhk graph index` + `dhk graph export` before graph impact analysis can
+continue.
+
 Built-in graph-aware Java profiles also require the alpha `architecture` check.
 It reads `.agents/graph/architecture.json` when present, otherwise uses default
 controller/service/repository path rules:

@@ -5,6 +5,7 @@ import com.devharnesskit.dhk.model.graph.GraphData;
 import com.devharnesskit.dhk.model.graph.GraphEdge;
 import com.devharnesskit.dhk.model.graph.GraphFileEntry;
 import com.devharnesskit.dhk.model.graph.GraphNode;
+import com.devharnesskit.dhk.model.graph.GraphPruneResult;
 import com.devharnesskit.dhk.model.graph.GraphScanReport;
 import com.devharnesskit.dhk.model.graph.GraphSnapshot;
 import com.devharnesskit.dhk.util.JsonUtil;
@@ -56,9 +57,75 @@ public final class GraphRepository {
         }
     }
 
+    public GraphPruneResult pruneCompletedSnapshots(Connection connection, String projectKey, int keep)
+            throws SQLException {
+        List<Long> snapshotIds = completedSnapshotIdsBeyondKeep(connection, projectKey, keep);
+        int deletedBindings = 0;
+        int deletedCacheRows = 0;
+        int deletedEdges = 0;
+        int deletedNodes = 0;
+        int deletedFiles = 0;
+        int deletedSnapshots = 0;
+        for (Long snapshotId : snapshotIds) {
+            long id = snapshotId.longValue();
+            deletedBindings += deleteBySnapshotId(connection,
+                    "DELETE FROM goal_graph_binding WHERE snapshot_id = ?", id);
+            deletedCacheRows += deleteBySnapshotId(connection,
+                    "DELETE FROM code_graph_query_cache WHERE snapshot_id = ?", id);
+            deletedEdges += deleteBySnapshotId(connection,
+                    "DELETE FROM code_graph_edge WHERE snapshot_id = ?", id);
+            deletedNodes += deleteBySnapshotId(connection,
+                    "DELETE FROM code_graph_node WHERE snapshot_id = ?", id);
+            deletedFiles += deleteBySnapshotId(connection,
+                    "DELETE FROM code_graph_file WHERE snapshot_id = ?", id);
+            deletedSnapshots += deleteBySnapshotId(connection,
+                    "DELETE FROM code_graph_snapshot WHERE id = ?", id);
+        }
+        return new GraphPruneResult(keep, deletedSnapshots, completedSnapshotCount(connection, projectKey),
+                deletedFiles, deletedNodes, deletedEdges, deletedCacheRows, deletedBindings);
+    }
+
     public GraphData loadGraphData(Connection connection, GraphSnapshot snapshot) throws SQLException {
         return new GraphData(snapshot, listFiles(connection, snapshot.id()), listNodes(connection, snapshot.id()),
                 listEdges(connection, snapshot.id()));
+    }
+
+    private List<Long> completedSnapshotIdsBeyondKeep(Connection connection, String projectKey, int keep)
+            throws SQLException {
+        List<Long> ids = new ArrayList<Long>();
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT id FROM code_graph_snapshot WHERE project_key = ? AND status = 'completed' "
+                        + "ORDER BY id DESC")) {
+            statement.setString(1, projectKey);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                int index = 0;
+                while (resultSet.next()) {
+                    long id = resultSet.getLong("id");
+                    if (index >= keep) {
+                        ids.add(Long.valueOf(id));
+                    }
+                    index++;
+                }
+            }
+        }
+        return ids;
+    }
+
+    private int completedSnapshotCount(Connection connection, String projectKey) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT COUNT(*) FROM code_graph_snapshot WHERE project_key = ? AND status = 'completed'")) {
+            statement.setString(1, projectKey);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next() ? resultSet.getInt(1) : 0;
+            }
+        }
+    }
+
+    private int deleteBySnapshotId(Connection connection, String sql, long snapshotId) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, snapshotId);
+            return statement.executeUpdate();
+        }
     }
 
     private List<GraphFileEntry> listFiles(Connection connection, long snapshotId) throws SQLException {

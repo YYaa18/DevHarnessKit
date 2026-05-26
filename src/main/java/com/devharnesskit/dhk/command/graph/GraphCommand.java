@@ -16,6 +16,7 @@ public final class GraphCommand implements Command {
         commands.put("status", new GraphStatusCommand());
         commands.put("index", new GraphIndexCommand());
         commands.put("impact", new GraphImpactCommand());
+        commands.put("export", new GraphExportCommand());
     }
 
     public int run(CommandContext context, Args args) {

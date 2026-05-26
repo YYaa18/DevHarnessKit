@@ -24,6 +24,7 @@ import java.sql.Statement;
 import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class GraphCommandIntegrationTest {
@@ -118,6 +119,43 @@ final class GraphCommandIntegrationTest {
         assertTrue(countRows(root, "code_graph_edge") > 0);
         assertTrue(countRowsWhere(root, "code_graph_node", "node_kind = 'sql_statement'") > 0);
         assertTrue(countRowsWhere(root, "code_graph_edge", "edge_kind = 'reads'") > 0);
+    }
+
+    @Test
+    void graphExportWritesContextAndSnapshotContractsWithoutSensitiveValues() throws Exception {
+        Path root = tempDir.resolve("demo-export");
+        write(root, "src/main/java/com/example/App.java",
+                "package com.example;\npublic class App { public void run() {} }\n");
+        write(root, "src/main/resources/application.properties", "app.name=demo\n");
+        write(root, "src/main/resources/secret.properties", "token=top-secret-value\n");
+
+        Harness indexHarness = new Harness(tempDir);
+        int indexExit = new CommandRouter().run(new String[]{"graph", "index", "--project-root", "demo-export"},
+                indexHarness.context());
+        Harness exportHarness = new Harness(tempDir);
+        int exportExit = new CommandRouter().run(new String[]{"graph", "export", "--project-root", "demo-export"},
+                exportHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, indexExit);
+        assertEquals(ExitCodes.SUCCESS, exportExit);
+        assertTrue(exportHarness.stdout().contains("graph export complete"));
+        assertTrue(Files.isRegularFile(PathUtil.graphContext(root)));
+        assertTrue(Files.isRegularFile(PathUtil.graphSnapshotJson(root)));
+
+        String context = new String(Files.readAllBytes(PathUtil.graphContext(root)), "UTF-8");
+        String snapshot = new String(Files.readAllBytes(PathUtil.graphSnapshotJson(root)), "UTF-8");
+        assertTrue(context.contains("graph facts are snapshot-bound machine facts"));
+        assertTrue(context.contains("<file-hashes>"));
+        assertTrue(context.contains("<agent-instructions>"));
+        assertTrue(snapshot.contains("\"schema_version\": \"devharness-graph-snapshot/v1\""));
+        assertTrue(snapshot.contains("\"snapshot_id\":"));
+        assertTrue(snapshot.contains("\"git_commit\":"));
+        assertTrue(snapshot.contains("\"git_dirty\":"));
+        assertTrue(snapshot.contains("\"file_hashes\":"));
+        assertTrue(snapshot.contains("\"node_count\":"));
+        assertTrue(snapshot.contains("\"edge_count\":"));
+        assertFalse(context.contains("top-secret-value"));
+        assertFalse(snapshot.contains("top-secret-value"));
     }
 
     @Test

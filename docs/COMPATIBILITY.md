@@ -55,6 +55,7 @@ Alpha:
 - `dhk graph status`
 - `dhk graph index`
 - `dhk graph impact`
+- `dhk graph export`
 - `dhk workflow ...`
 - `dhk spec ...`
 - agent skill/rule packaging under `.agents/` and `.comate/`
@@ -62,7 +63,8 @@ Alpha:
 Internal/experimental:
 
 - Graph Lite SQLite tables, `.agents/graph/config.json`, snapshot rows, and
-  generated graph exports beyond `GRAPH_INDEX_REPORT.md` and `IMPACT_MAP.md`.
+  generated graph exports beyond `GRAPH_INDEX_REPORT.md`, `IMPACT_MAP.md`,
+  `GRAPH_CONTEXT.md`, and `GRAPH_SNAPSHOT.json`.
 
 Human-readable stdout is intended for people and examples. Do not parse it as a
 stable API unless a document explicitly names the fields and command as a

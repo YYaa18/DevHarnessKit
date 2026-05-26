@@ -38,6 +38,7 @@ public final class HelpCommand implements Command {
         context.out().println("  dhk graph status --project-root <path>");
         context.out().println("  dhk graph index --project-root <path>");
         context.out().println("  dhk graph impact --file <path>|--symbol <name>|--sql-table <table> [--depth <n>]");
+        context.out().println("  dhk graph export --project-root <path>");
         context.out().println("  dhk workflow template seed --project-root <path>");
         context.out().println("  dhk workflow template list --project-root <path>");
         context.out().println("  dhk workflow template show --key <workflow>");

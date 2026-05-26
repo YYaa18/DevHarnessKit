@@ -12,7 +12,7 @@ not confirmed project memory and is not a stable public database API before 1.0.
 .agents/graph/exports/GRAPH_INDEX_REPORT.md
 .agents/graph/exports/GRAPH_CONTEXT.md
 .agents/graph/exports/IMPACT_MAP.md
-.agents/graph/exports/GRAPH_SUMMARY.json
+.agents/graph/exports/GRAPH_SNAPSHOT.json
 .agents/graph/snapshots/
 .agents/graph/cache/
 ```
@@ -27,6 +27,7 @@ dhk graph init --project-root <path>
 dhk graph status --project-root <path>
 dhk graph index --project-root <path>
 dhk graph impact --file <path>|--symbol <name>|--sql-table <table> --project-root <path>
+dhk graph export --project-root <path>
 ```
 
 `graph init` creates `.agents/graph/config.json` and generated artifact
@@ -37,6 +38,43 @@ and edge rows into SQLite. Each index run creates a new snapshot; historical
 snapshots are not silently overwritten. `graph impact` reads the latest completed
 snapshot and writes `IMPACT_MAP.md` with related files, SQL nodes, tests, risk
 nodes, recommended reads, and scoring input counts.
+
+`graph export` writes:
+
+```text
+GRAPH_CONTEXT.md
+GRAPH_SNAPSHOT.json
+```
+
+`GRAPH_CONTEXT.md` section order:
+
+```text
+boundary
+snapshot
+file-hashes
+node-kinds
+risk-nodes
+agent-instructions
+```
+
+`GRAPH_SNAPSHOT.json` required fields:
+
+```text
+schema_version
+generated_at
+snapshot_id
+snapshot_key
+provider
+status
+workspace_fingerprint
+config_hash
+git_commit
+git_dirty
+file_count
+node_count
+edge_count
+file_hashes[]
+```
 
 ## Default Config
 

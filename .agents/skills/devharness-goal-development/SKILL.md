@@ -14,6 +14,9 @@ Use this skill for code changes in repositories that include DevHarnessKit. Deve
 3. Run the skill wrapper `scripts/goal-next.sh` before each work step.
 4. Read `.agents/memory/exports/GOAL_CONTEXT.md`.
 5. Perform only the `current_action` from GOAL_CONTEXT, and stay within its `<allowed-commands>`, `<forbidden-actions>`, `<evidence-contract>`, and `<freshness-status>` sections.
+   - If `<required-graph-action>` is present, run the listed graph command first and do not skip to code edits.
+   - `graph_index_export` means run graph index/export, then run `goal next` again.
+   - `graph_impact` means generate `IMPACT_MAP.md`, then run `goal next` again.
 6. Do not use lower-level `memory`, `workflow`, `spec`, or `db` commands unless GOAL_CONTEXT explicitly allows it.
 7. After every investigation, plan, edit, or verification step, run `scripts/goal-step.sh` with summary, structured fields, changed files, and the required evidence keys from GOAL_CONTEXT.
 8. Before claiming completion, run `scripts/goal-verify.sh`; if it is not ready, follow its `next_command`.

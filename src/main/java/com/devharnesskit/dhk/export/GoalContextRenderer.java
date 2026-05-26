@@ -1,6 +1,7 @@
 package com.devharnesskit.dhk.export;
 
 import com.devharnesskit.dhk.model.goal.GoalPlan;
+import com.devharnesskit.dhk.model.goal.GoalGraphState;
 import com.devharnesskit.dhk.model.goal.GoalRun;
 
 public final class GoalContextRenderer {
@@ -27,6 +28,14 @@ public final class GoalContextRenderer {
     public String render(GoalRun goal, GoalPlan plan, String[] requiredChecks,
                          String[] completionBlockers, String[] staleChecks,
                          String freshnessStatus, String generatedAt) {
+        return render(goal, plan, requiredChecks, completionBlockers, staleChecks, freshnessStatus,
+                generatedAt, GoalGraphState.disabled());
+    }
+
+    public String render(GoalRun goal, GoalPlan plan, String[] requiredChecks,
+                         String[] completionBlockers, String[] staleChecks,
+                         String freshnessStatus, String generatedAt, GoalGraphState graphState) {
+        GoalGraphState graph = graphState == null ? GoalGraphState.disabled() : graphState;
         StringBuilder builder = new StringBuilder();
         builder.append("# GOAL_CONTEXT\n\n");
         builder.append("<generated-at>").append(generatedAt).append("</generated-at>\n\n");
@@ -59,6 +68,11 @@ public final class GoalContextRenderer {
         builder.append("- dhk goal next --goal ").append(goal.goalKey()).append('\n');
         builder.append("- dhk goal step --goal ").append(goal.goalKey())
                 .append(" --summary \"<summary>\" --evidence \"<evidence>\"\n");
+        if (graph.enabled()) {
+            builder.append("- dhk graph index --project-root <project-root>\n");
+            builder.append("- dhk graph export --project-root <project-root>\n");
+            builder.append("- dhk graph impact --project-root <project-root> --file|--symbol|--sql-table <query>\n");
+        }
         builder.append("- dhk goal verify --goal ").append(goal.goalKey()).append('\n');
         builder.append("- dhk goal complete --goal ").append(goal.goalKey())
                 .append(" only when ready_to_complete\n");
@@ -94,6 +108,8 @@ public final class GoalContextRenderer {
         appendList(builder, requiredChecks, "none");
         builder.append("</required-checks>\n\n");
 
+        appendGraphSections(builder, graph);
+
         builder.append("<context-files>\n");
         builder.append("- .agents/memory/exports/CURRENT_CONTEXT.md\n");
         builder.append("- .agents/memory/exports/WORKFLOW_CONTEXT.md\n");
@@ -120,8 +136,49 @@ public final class GoalContextRenderer {
         builder.append("- checkpoint must be created before stable completion\n");
         builder.append("</completion-condition>\n\n");
 
-        builder.append("<next-command>\n").append(plan.nextCommand()).append("\n</next-command>\n");
+        builder.append("<next-command>\n").append(nextCommand(plan, graph)).append("\n</next-command>\n");
         return limit(builder.toString());
+    }
+
+    private void appendGraphSections(StringBuilder builder, GoalGraphState graph) {
+        if (!graph.enabled()) {
+            return;
+        }
+        builder.append("<graph-profile>\n");
+        builder.append("- graph_required: true\n");
+        builder.append("- graph_provider: ").append(graph.provider()).append('\n');
+        builder.append("- require_fresh_snapshot: ").append(graph.requireFreshSnapshot()).append('\n');
+        builder.append("- require_impact_map: ").append(graph.requireImpactMap()).append('\n');
+        builder.append("- max_staleness_minutes: ").append(graph.maxStalenessMinutes()).append('\n');
+        builder.append("</graph-profile>\n\n");
+
+        builder.append("<graph-snapshot>\n");
+        builder.append("- path: ").append(graph.snapshotPath()).append('\n');
+        builder.append("- exists: ").append(graph.snapshotExists()).append('\n');
+        builder.append("- snapshot_key: ").append(graph.snapshotKey().length() == 0 ? "none" : graph.snapshotKey()).append('\n');
+        builder.append("</graph-snapshot>\n\n");
+
+        builder.append("<graph-context>\n");
+        builder.append("- path: ").append(graph.graphContextPath()).append('\n');
+        builder.append("- exists: ").append(graph.graphContextExists()).append('\n');
+        builder.append("- impact_map_path: ").append(graph.impactMapPath()).append('\n');
+        builder.append("- impact_map_exists: ").append(graph.impactMapExists()).append('\n');
+        builder.append("</graph-context>\n\n");
+
+        builder.append("<required-graph-action>\n");
+        builder.append("- action: ").append(graph.requiredGraphAction()).append('\n');
+        if (graph.graphNextCommand().length() > 0) {
+            builder.append("- next_command: ").append(graph.graphNextCommand()).append('\n');
+        }
+        builder.append("- rule: graph_required profiles must not skip required graph actions\n");
+        builder.append("</required-graph-action>\n\n");
+    }
+
+    private String nextCommand(GoalPlan plan, GoalGraphState graph) {
+        if (graph.enabled() && graph.graphNextCommand().length() > 0) {
+            return graph.graphNextCommand();
+        }
+        return plan.nextCommand();
     }
 
     private void appendList(StringBuilder builder, String[] values, String emptyValue) {

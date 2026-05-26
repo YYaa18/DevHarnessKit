@@ -1779,9 +1779,68 @@ final class GoalIntegrationTest {
 
         assertEquals(ExitCodes.SUCCESS, nextExit);
         assertTrue(next.stdout().contains("current_action: graph_index_or_refresh"));
+        assertTrue(next.stdout().contains("required_graph_action: graph_index_export"));
+        assertTrue(next.stdout().contains("next_command: dhk graph index --project-root"));
         assertTrue(next.stdout().contains("graph_snapshot"));
         assertTrue(next.stdout().contains("graph_context"));
         assertFalse(next.stdout().contains("current_action: inspect_existing_code"));
+
+        String context = new String(Files.readAllBytes(PathUtil.goalContext(tempDir.resolve("demo"))), "UTF-8");
+        assertTrue(context.contains("<graph-snapshot>"));
+        assertTrue(context.contains("<graph-context>"));
+        assertTrue(context.contains("<required-graph-action>"));
+        assertTrue(context.contains("- action: graph_index_export"));
+    }
+
+    @Test
+    void graphAwareJavaProfileRequestsImpactMapAfterGraphSnapshotStep() throws Exception {
+        Path root = tempDir.resolve("demo-impact");
+        Path source = root.resolve("src/main/java/com/example/App.java");
+        Files.createDirectories(source.getParent());
+        Files.write(source, "package com.example;\npublic class App { public void run() {} }\n".getBytes("UTF-8"));
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo-impact",
+                "--profile", "java-api-change-with-graph",
+                "--task", "Graph impact API change",
+                "--module", "order"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        Harness index = new Harness(tempDir);
+        int indexExit = new CommandRouter().run(new String[]{
+                "graph", "index", "--project-root", "demo-impact"
+        }, index.context());
+        assertEquals(ExitCodes.SUCCESS, indexExit);
+        Harness export = new Harness(tempDir);
+        int exportExit = new CommandRouter().run(new String[]{
+                "graph", "export", "--project-root", "demo-impact"
+        }, export.context());
+        assertEquals(ExitCodes.SUCCESS, exportExit);
+
+        Harness graphStep = new Harness(tempDir);
+        int graphStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo-impact",
+                "--goal", goalKey,
+                "--summary", "Graph snapshot ready",
+                "--evidence", "graph_snapshot=GRAPH_SNAPSHOT.json; graph_context=GRAPH_CONTEXT.md"
+        }, graphStep.context());
+        assertEquals(ExitCodes.SUCCESS, graphStepExit);
+        assertTrue(graphStep.stdout().contains("current_action: graph_impact_analysis"));
+
+        Harness next = new Harness(tempDir);
+        int nextExit = new CommandRouter().run(new String[]{
+                "goal", "next", "--project-root", "demo-impact", "--goal", goalKey
+        }, next.context());
+
+        assertEquals(ExitCodes.SUCCESS, nextExit);
+        assertTrue(next.stdout().contains("current_action: graph_impact_analysis"));
+        assertTrue(next.stdout().contains("required_graph_action: graph_impact"));
+        assertTrue(next.stdout().contains("next_command: dhk graph impact --project-root"));
     }
 
     @Test

@@ -52,6 +52,7 @@ public final class GoalContextService {
     private final SensitiveDataGuard sensitiveDataGuard;
     private final PolicyHookService policyHookService;
     private final WorkspaceFingerprintService fingerprintService;
+    private final GoalGraphStateService graphStateService;
 
     public GoalContextService() {
         this(new ExportSelectionService(new MemoryRepository()), new CheckpointRepository(),
@@ -63,7 +64,7 @@ public final class GoalContextService {
                 new CurrentContextRenderer(), new GoalContextRenderer(), new GoalProfileService(),
                 new GoalPlanner(), new GoalCheckPolicyService(), new GoalCompletionEvaluator(),
                 new GoalCheckRepository(), new GoalStepRepository(), new SensitiveDataGuard(),
-                new PolicyHookService(), new WorkspaceFingerprintService());
+                new PolicyHookService(), new WorkspaceFingerprintService(), new GoalGraphStateService());
     }
 
     GoalContextService(ExportSelectionService exportSelectionService,
@@ -80,7 +81,8 @@ public final class GoalContextService {
                        GoalStepRepository goalStepRepository,
                        SensitiveDataGuard sensitiveDataGuard,
                        PolicyHookService policyHookService,
-                       WorkspaceFingerprintService fingerprintService) {
+                       WorkspaceFingerprintService fingerprintService,
+                       GoalGraphStateService graphStateService) {
         this.exportSelectionService = exportSelectionService;
         this.checkpointRepository = checkpointRepository;
         this.workflowExportService = workflowExportService;
@@ -96,6 +98,7 @@ public final class GoalContextService {
         this.sensitiveDataGuard = sensitiveDataGuard;
         this.policyHookService = policyHookService;
         this.fingerprintService = fingerprintService;
+        this.graphStateService = graphStateService;
     }
 
     public Path export(Connection connection, Path projectRoot, Project project, GoalRun goal,
@@ -131,7 +134,8 @@ public final class GoalContextService {
                 fingerprintService.workspaceFingerprint(projectRoot),
                 fingerprintService.contextFingerprint(projectRoot));
         String goalContext = goalContextRenderer.render(goal, plan, policy.requiredChecks(profile),
-                evaluation.missing(), evaluation.staleChecks(), freshnessStatus(evaluation), generatedAt);
+                evaluation.missing(), evaluation.staleChecks(), freshnessStatus(evaluation), generatedAt,
+                graphStateService.inspect(projectRoot, profile, plan));
         return writePath(projectRoot, PathUtil.goalContext(projectRoot), goalContext);
     }
 

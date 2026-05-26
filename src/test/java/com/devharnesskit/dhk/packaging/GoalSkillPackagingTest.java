@@ -86,15 +86,20 @@ final class GoalSkillPackagingTest {
         assertTrue(skill.contains("IMPACT_MAP.md"));
         assertTrue(skill.contains("ready_to_complete"));
         assertTrue(skill.contains("snapshot-bound generated facts"));
+        assertTrue(skill.contains("legacy-java-small-fix-with-graph"));
+        assertTrue(skill.contains("rollback_plan"));
 
         String protocol = read(skillRoot.resolve("references/graph-protocol.md"));
         String evidence = read(skillRoot.resolve("references/graph-evidence-format.md"));
         String forbidden = read(skillRoot.resolve("references/graph-forbidden-actions.md"));
         assertTrue(protocol.contains("Re-run `graph-impact` after implementation"));
+        assertTrue(protocol.contains("rollback plan artifact"));
         assertTrue(evidence.contains("post_change_impact_map"));
         assertTrue(evidence.contains("changed_files_covered"));
+        assertTrue(evidence.contains("manual_evidence_status=passed"));
         assertTrue(forbidden.contains("editing before graph snapshot and impact map are ready"));
         assertTrue(forbidden.contains("failed or stale `graph` / `impact` checks"));
+        assertTrue(forbidden.contains("protected-impact-risk"));
 
         assertGraphWrapper(skillRoot, "graph-index", "index");
         assertGraphWrapper(skillRoot, "graph-export", "export");

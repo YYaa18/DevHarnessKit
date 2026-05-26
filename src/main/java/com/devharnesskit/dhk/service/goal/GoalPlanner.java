@@ -48,13 +48,14 @@ public final class GoalPlanner {
         }
         if (action.indexOf("inspect") >= 0 || action.indexOf("plan") >= 0
                 || action.indexOf("collect") >= 0 || action.indexOf("review") >= 0
-                || action.indexOf("hypotheses") >= 0 || action.indexOf("summarize") >= 0) {
+                || action.indexOf("hypotheses") >= 0 || action.indexOf("summarize") >= 0
+                || action.indexOf("rollback") >= 0) {
             return "planning";
         }
         if (action.indexOf("implement") >= 0 || action.indexOf("apply") >= 0) {
             return "implementing";
         }
-        if (action.indexOf("verify") >= 0) {
+        if (action.indexOf("verify") >= 0 || action.indexOf("manual_evidence") >= 0) {
             return "verifying";
         }
         return "context_ready";
@@ -72,6 +73,21 @@ public final class GoalPlanner {
         }
         if ("verify".equals(action)) {
             return "Run compile/test/sensitive checks or record why a check is not available.";
+        }
+        if ("graph_index_or_refresh".equals(action)) {
+            return "Generate a fresh graph snapshot and graph context before inspecting code.";
+        }
+        if ("graph_impact_analysis".equals(action)) {
+            return "Generate an impact map for the task target and inspect related files before planning.";
+        }
+        if ("graph_reimpact".equals(action)) {
+            return "Regenerate the impact map after implementation and confirm changed files remain covered.";
+        }
+        if ("create_rollback_plan".equals(action)) {
+            return "Create a rollback plan artifact with exact revert steps and scope.";
+        }
+        if ("record_manual_evidence".equals(action)) {
+            return "Record manual verification evidence for legacy behavior, including path and pass/fail status.";
         }
         if ("collect_error".equals(action)) {
             return "Collect concrete failing symptoms, logs, and reproduction notes.";

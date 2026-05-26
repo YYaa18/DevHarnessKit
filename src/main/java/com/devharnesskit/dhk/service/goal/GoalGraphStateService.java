@@ -3,8 +3,12 @@ package com.devharnesskit.dhk.service.goal;
 import com.devharnesskit.dhk.model.goal.GoalGraphState;
 import com.devharnesskit.dhk.model.goal.GoalPlan;
 import com.devharnesskit.dhk.model.goal.GoalProfile;
+import com.devharnesskit.dhk.model.policy.DevHarnessPolicy;
+import com.devharnesskit.dhk.service.policy.DevHarnessPolicyService;
 import com.devharnesskit.dhk.util.PathUtil;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.regex.Matcher;
@@ -12,6 +16,7 @@ import java.util.regex.Pattern;
 
 public final class GoalGraphStateService {
     private static final Pattern SNAPSHOT_KEY = Pattern.compile("\"snapshot_key\"\\s*:\\s*\"([^\"]*)\"");
+    private final DevHarnessPolicyService policyService = new DevHarnessPolicyService();
 
     public GoalGraphState inspect(Path projectRoot, GoalProfile profile, GoalPlan plan) {
         if (profile == null || !profile.graphRequired()) {
@@ -29,7 +34,7 @@ public final class GoalGraphStateService {
                 profile.graphRequireImpactMap(), profile.graphMaxStalenessMinutes(),
                 snapshotPath.toString(), snapshotExists, snapshotKey(snapshotPath),
                 graphContextPath.toString(), graphContextExists, impactMapPath.toString(), impactMapExists,
-                required, graphCommand(projectRoot, required));
+                required, graphCommand(projectRoot, required), protectedImpactFiles(projectRoot, impactMapPath));
     }
 
     private String requiredGraphAction(GoalProfile profile, String currentAction, boolean snapshotExists,
@@ -82,5 +87,73 @@ public final class GoalGraphStateService {
         } catch (Exception ex) {
             return "";
         }
+    }
+
+    private String[] protectedImpactFiles(Path projectRoot, Path impactMapPath) {
+        if (!Files.isRegularFile(impactMapPath)) {
+            return new String[0];
+        }
+        try {
+            String text = new String(Files.readAllBytes(impactMapPath), "UTF-8");
+            DevHarnessPolicy policy = policyService.load(projectRoot);
+            List<String> result = new ArrayList<String>();
+            String[] lines = text.split("\\r?\\n");
+            for (String line : lines) {
+                String file = relatedFile(line);
+                if (file.length() == 0) {
+                    continue;
+                }
+                if (line.contains("[protected_file]") || matchesAny(file, policy.protectedFiles())) {
+                    result.add(file);
+                }
+            }
+            return result.toArray(new String[result.size()]);
+        } catch (Exception ex) {
+            return new String[0];
+        }
+    }
+
+    private String relatedFile(String line) {
+        String trimmed = line == null ? "" : line.trim();
+        if (!trimmed.startsWith("- ")) {
+            return "";
+        }
+        String value = trimmed.substring(2).trim();
+        int bracket = value.indexOf(" [");
+        if (bracket >= 0) {
+            value = value.substring(0, bracket).trim();
+        }
+        return value.startsWith("src/") || value.startsWith(".agents/") ? value : "";
+    }
+
+    private boolean matchesAny(String value, String[] globs) {
+        for (String glob : globs == null ? new String[0] : globs) {
+            if (globMatches(normalize(value), normalize(glob))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean globMatches(String value, String glob) {
+        StringBuilder regex = new StringBuilder();
+        for (int i = 0; i < glob.length(); i++) {
+            char ch = glob.charAt(i);
+            if (ch == '*') {
+                if (i + 1 < glob.length() && glob.charAt(i + 1) == '*') {
+                    regex.append(".*");
+                    i++;
+                } else {
+                    regex.append("[^/]*");
+                }
+            } else {
+                regex.append(Pattern.quote(String.valueOf(ch)));
+            }
+        }
+        return value.matches(regex.toString());
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.trim().replace('\\', '/');
     }
 }

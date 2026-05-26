@@ -15,6 +15,7 @@ public final class GoalGraphState {
     private final boolean impactMapExists;
     private final String requiredGraphAction;
     private final String graphNextCommand;
+    private final String[] protectedImpactFiles;
 
     public GoalGraphState(boolean enabled, String provider, boolean requireFreshSnapshot,
                           boolean requireImpactMap, int maxStalenessMinutes,
@@ -22,6 +23,18 @@ public final class GoalGraphState {
                           String graphContextPath, boolean graphContextExists,
                           String impactMapPath, boolean impactMapExists,
                           String requiredGraphAction, String graphNextCommand) {
+        this(enabled, provider, requireFreshSnapshot, requireImpactMap, maxStalenessMinutes,
+                snapshotPath, snapshotExists, snapshotKey, graphContextPath, graphContextExists,
+                impactMapPath, impactMapExists, requiredGraphAction, graphNextCommand, new String[0]);
+    }
+
+    public GoalGraphState(boolean enabled, String provider, boolean requireFreshSnapshot,
+                          boolean requireImpactMap, int maxStalenessMinutes,
+                          String snapshotPath, boolean snapshotExists, String snapshotKey,
+                          String graphContextPath, boolean graphContextExists,
+                          String impactMapPath, boolean impactMapExists,
+                          String requiredGraphAction, String graphNextCommand,
+                          String[] protectedImpactFiles) {
         this.enabled = enabled;
         this.provider = provider == null ? "" : provider;
         this.requireFreshSnapshot = requireFreshSnapshot;
@@ -36,6 +49,7 @@ public final class GoalGraphState {
         this.impactMapExists = impactMapExists;
         this.requiredGraphAction = requiredGraphAction == null ? "" : requiredGraphAction;
         this.graphNextCommand = graphNextCommand == null ? "" : graphNextCommand;
+        this.protectedImpactFiles = protectedImpactFiles == null ? new String[0] : protectedImpactFiles;
     }
 
     public static GoalGraphState disabled() {
@@ -57,4 +71,5 @@ public final class GoalGraphState {
     public boolean impactMapExists() { return impactMapExists; }
     public String requiredGraphAction() { return requiredGraphAction; }
     public String graphNextCommand() { return graphNextCommand; }
+    public String[] protectedImpactFiles() { return protectedImpactFiles; }
 }

@@ -26,6 +26,11 @@ public final class GoalProfile {
     private final boolean graphRequireImpactMap;
     private final int graphMaxStalenessMinutes;
     private final String[] graphActions;
+    private final boolean legacyGraphProfile;
+    private final boolean rollbackPlanRequired;
+    private final boolean manualEvidenceRequired;
+    private final boolean protectedImpactRequiresManualEvidence;
+    private final int legacyMaxChangedFiles;
 
     public GoalProfile(String profileKey, String workflowKey, boolean specRequired,
                        String defaultMode, String[] actions) {
@@ -122,6 +127,37 @@ public final class GoalProfile {
                        boolean graphRequireImpactMap,
                        int graphMaxStalenessMinutes,
                        String[] graphActions) {
+        this(profileKey, workflowKey, specRequired, defaultMode, actions, requiredEvidenceByAction,
+                requiredChecks, completionRequireFreshChecks, completionAllowSkippedChecks,
+                completionRequireCheckpoint, strictWorkflowPhaseOrder, specRequireNonEmptyTasks,
+                specRequireNonEmptyAcceptance, actionMappings, acceptanceMappings, graphRequired,
+                graphProvider, graphRequireFreshSnapshot, graphRequireImpactMap, graphMaxStalenessMinutes,
+                graphActions, false, false, false, false, 8);
+    }
+
+    public GoalProfile(String profileKey, String workflowKey, boolean specRequired,
+                       String defaultMode, String[] actions,
+                       Map<String, String[]> requiredEvidenceByAction,
+                       String[] requiredChecks,
+                       boolean completionRequireFreshChecks,
+                       boolean completionAllowSkippedChecks,
+                       boolean completionRequireCheckpoint,
+                       boolean strictWorkflowPhaseOrder,
+                       boolean specRequireNonEmptyTasks,
+                       boolean specRequireNonEmptyAcceptance,
+                       Map<String, GoalActionMapping> actionMappings,
+                       Map<String, GoalAcceptanceMapping> acceptanceMappings,
+                       boolean graphRequired,
+                       String graphProvider,
+                       boolean graphRequireFreshSnapshot,
+                       boolean graphRequireImpactMap,
+                       int graphMaxStalenessMinutes,
+                       String[] graphActions,
+                       boolean legacyGraphProfile,
+                       boolean rollbackPlanRequired,
+                       boolean manualEvidenceRequired,
+                       boolean protectedImpactRequiresManualEvidence,
+                       int legacyMaxChangedFiles) {
         this.profileKey = profileKey;
         this.workflowKey = workflowKey;
         this.specRequired = specRequired;
@@ -143,6 +179,11 @@ public final class GoalProfile {
         this.graphRequireImpactMap = graphRequireImpactMap;
         this.graphMaxStalenessMinutes = graphMaxStalenessMinutes <= 0 ? 60 : graphMaxStalenessMinutes;
         this.graphActions = graphActions == null ? new String[0] : graphActions;
+        this.legacyGraphProfile = legacyGraphProfile;
+        this.rollbackPlanRequired = rollbackPlanRequired;
+        this.manualEvidenceRequired = manualEvidenceRequired;
+        this.protectedImpactRequiresManualEvidence = protectedImpactRequiresManualEvidence;
+        this.legacyMaxChangedFiles = legacyMaxChangedFiles <= 0 ? 8 : legacyMaxChangedFiles;
     }
 
     public String profileKey() { return profileKey; }
@@ -163,6 +204,11 @@ public final class GoalProfile {
     public boolean graphRequireImpactMap() { return graphRequireImpactMap; }
     public int graphMaxStalenessMinutes() { return graphMaxStalenessMinutes; }
     public String[] graphActions() { return graphActions; }
+    public boolean legacyGraphProfile() { return legacyGraphProfile; }
+    public boolean rollbackPlanRequired() { return rollbackPlanRequired; }
+    public boolean manualEvidenceRequired() { return manualEvidenceRequired; }
+    public boolean protectedImpactRequiresManualEvidence() { return protectedImpactRequiresManualEvidence; }
+    public int legacyMaxChangedFiles() { return legacyMaxChangedFiles; }
 
     public String[] requiredEvidence(String actionKey) {
         String[] evidence = requiredEvidenceByAction.get(actionKey);

@@ -19,6 +19,17 @@ impact_delta=changed files remain inside related-files
 changed_files_covered=OrderController.java,OrderService.java
 ```
 
+For legacy graph profiles, record rollback and manual evidence:
+
+```text
+rollback_plan=.agents/memory/artifacts/goals/<goal-key>/ROLLBACK_PLAN.md
+rollback_scope=single JSP/Servlet search flow
+manual_evidence=verified legacy search form in local fixture
+manual_evidence_status=passed
+manual_evidence_path=.agents/memory/artifacts/goals/<goal-key>/MANUAL_EVIDENCE.md
+protected_file_confirmation=approved
+```
+
 For `goal step`, also use structured fields:
 
 ```text

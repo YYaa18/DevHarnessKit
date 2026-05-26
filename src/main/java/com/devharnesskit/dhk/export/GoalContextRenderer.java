@@ -172,6 +172,15 @@ public final class GoalContextRenderer {
         }
         builder.append("- rule: graph_required profiles must not skip required graph actions\n");
         builder.append("</required-graph-action>\n\n");
+
+        if (graph.protectedImpactFiles().length > 0) {
+            builder.append("<protected-impact-risk>\n");
+            for (String file : graph.protectedImpactFiles()) {
+                builder.append("- ").append(file).append('\n');
+            }
+            builder.append("- rule: legacy graph profiles require manual confirmation before completion\n");
+            builder.append("</protected-impact-risk>\n\n");
+        }
     }
 
     private String nextCommand(GoalPlan plan, GoalGraphState graph) {

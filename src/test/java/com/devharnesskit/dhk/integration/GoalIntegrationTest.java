@@ -2042,6 +2042,126 @@ final class GoalIntegrationTest {
     }
 
     @Test
+    void legacyGraphProfileVerifyFailsWithoutRollbackAndManualEvidence() throws Exception {
+        Path root = tempDir.resolve("demo-legacy-missing");
+        writeSource(root, "src/main/java/com/example/App.java",
+                "package com.example;\npublic class App { public void run() {} }\n");
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo-legacy-missing",
+                "--profile", "legacy-java-small-fix-with-graph",
+                "--task", "Legacy graph evidence required",
+                "--module", "legacy"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "index", "--project-root", "demo-legacy-missing"
+        }, new Harness(tempDir).context()));
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "export", "--project-root", "demo-legacy-missing"
+        }, new Harness(tempDir).context()));
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", "demo-legacy-missing",
+                "--file", "src/main/java/com/example/App.java"
+        }, new Harness(tempDir).context()));
+
+        recordLegacyGraphGoalSteps("demo-legacy-missing", goalKey,
+                "src/main/java/com/example/App.java",
+                ".agents/memory/artifacts/goals/" + goalKey + "/ROLLBACK_PLAN.md",
+                "pending",
+                ".agents/memory/artifacts/goals/" + goalKey + "/MANUAL_EVIDENCE.md",
+                "");
+
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "demo-legacy-missing", "--goal", goalKey
+        }, verify.context());
+
+        assertEquals(ExitCodes.SUCCESS, verifyExit);
+        assertTrue(verify.stdout().contains("decision: not_ready"));
+        assertTrue(verify.stdout().contains("legacy: failed - legacy evidence failed"));
+        assertTrue(verify.stdout().contains("rollback plan artifact missing"));
+        assertTrue(verify.stdout().contains("manual evidence is not passed"));
+        assertTrue(verify.stdout().contains("manual evidence artifact missing"));
+    }
+
+    @Test
+    void legacyGraphProfileSurfacesProtectedImpactRiskAndCompletesWithEvidence() throws Exception {
+        Path root = tempDir.resolve("demo-legacy-protected");
+        writeSource(root, "src/main/java/com/example/App.java",
+                "package com.example;\npublic class App { public void run() {} }\n");
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo-legacy-protected",
+                "--profile", "legacy-java-small-fix-with-graph",
+                "--task", "Legacy protected impact",
+                "--module", "legacy"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "index", "--project-root", "demo-legacy-protected"
+        }, new Harness(tempDir).context()));
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "export", "--project-root", "demo-legacy-protected"
+        }, new Harness(tempDir).context()));
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", "demo-legacy-protected",
+                "--file", "src/main/java/com/example/App.java"
+        }, new Harness(tempDir).context()));
+        Files.write(PathUtil.graphImpactMap(root),
+                "\n<related-files>\n- src/main/resources/application-prod.properties [protected_file]\n</related-files>\n"
+                        .getBytes("UTF-8"), StandardOpenOption.APPEND);
+
+        Harness export = new Harness(tempDir);
+        int exportExit = new CommandRouter().run(new String[]{
+                "goal", "export", "--project-root", "demo-legacy-protected", "--goal", goalKey
+        }, export.context());
+        assertEquals(ExitCodes.SUCCESS, exportExit);
+        String context = new String(Files.readAllBytes(PathUtil.goalContext(root)), "UTF-8");
+        assertTrue(context.contains("protected-impact-risk"));
+        assertTrue(context.contains("src/main/resources/application-prod.properties"));
+
+        Path rollback = root.resolve(".agents/memory/artifacts/goals").resolve(goalKey).resolve("ROLLBACK_PLAN.md");
+        Path manual = root.resolve(".agents/memory/artifacts/goals").resolve(goalKey).resolve("MANUAL_EVIDENCE.md");
+        Files.createDirectories(rollback.getParent());
+        Files.write(rollback, "Rollback: revert App.java and redeploy previous package.\n".getBytes("UTF-8"));
+        Files.write(manual, "Manual evidence: legacy path checked and passed.\n".getBytes("UTF-8"));
+
+        recordLegacyGraphGoalSteps("demo-legacy-protected", goalKey,
+                "src/main/java/com/example/App.java",
+                ".agents/memory/artifacts/goals/" + goalKey + "/ROLLBACK_PLAN.md",
+                "passed",
+                ".agents/memory/artifacts/goals/" + goalKey + "/MANUAL_EVIDENCE.md",
+                "approved");
+
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "demo-legacy-protected", "--goal", goalKey
+        }, verify.context());
+        assertEquals(ExitCodes.SUCCESS, verifyExit);
+        assertTrue(verify.stdout().contains("decision: ready_to_complete"));
+
+        Harness complete = new Harness(tempDir);
+        int completeExit = new CommandRouter().run(new String[]{
+                "goal", "complete", "--project-root", "demo-legacy-protected", "--goal", goalKey
+        }, complete.context());
+        assertEquals(ExitCodes.SUCCESS, completeExit);
+        String summary = new String(Files.readAllBytes(PathUtil.goalSummary(root)), "UTF-8");
+        assertTrue(summary.contains("legacy evidence passed"));
+        assertTrue(summary.contains("protected_impact_files=[src/main/resources/application-prod.properties]"));
+        assertTrue(summary.contains("ROLLBACK_PLAN.md"));
+        assertTrue(summary.contains("MANUAL_EVIDENCE.md"));
+    }
+
+    @Test
     void goalUsesConfiguredProfileCheckPolicyAndJsonOutput() throws Exception {
         Path root = tempDir.resolve("demo");
         Files.createDirectories(PathUtil.goalProfilesDirectory(root));
@@ -2286,6 +2406,58 @@ final class GoalIntegrationTest {
                 "--evidence", "compile_result=not required; test_result=not required; sensitive_result=not required"
         }, verifyStep.context());
         assertEquals(ExitCodes.SUCCESS, verifyStepExit);
+    }
+
+    private void recordLegacyGraphGoalSteps(String projectRoot, String goalKey, String changedFile,
+                                            String rollbackPlan, String manualStatus,
+                                            String manualEvidencePath, String protectedConfirmation) {
+        step(projectRoot, goalKey, "Graph snapshot exported", "",
+                "graph_snapshot=GRAPH_SNAPSHOT.json; graph_context=GRAPH_CONTEXT.md");
+        step(projectRoot, goalKey, "Graph impact analysis recorded", "",
+                "impact_map=IMPACT_MAP.md; impacted_files=" + changedFile
+                        + "; risk_nodes=route; recommended_read_files=" + changedFile);
+        step(projectRoot, goalKey, "Inspected legacy entrypoints and tests", "",
+                "existing_entrypoints=App; existing_service=App; existing_data_access=none; existing_tests=manual");
+        step(projectRoot, goalKey, "Planned bounded legacy change", "",
+                "impacted_files=" + changedFile
+                        + "; risk_points=legacy behavior; verification_plan=manual evidence"
+                        + "; rollback_strategy=revert changed file");
+        step(projectRoot, goalKey, "Implemented minimal legacy change", changedFile,
+                "changed_files=" + changedFile
+                        + "; implementation_summary=small change; scope_guard=single impacted file");
+        step(projectRoot, goalKey, "Post-change impact remains covered", "",
+                "post_change_impact_map=IMPACT_MAP.md; impact_delta=changed files remain inside related-files"
+                        + "; changed_files_covered=" + changedFile);
+        step(projectRoot, goalKey, "Rollback plan recorded", "",
+                "rollback_plan=" + rollbackPlan + "; rollback_scope=single impacted file");
+        String confirmation = protectedConfirmation == null || protectedConfirmation.length() == 0
+                ? "" : "; protected_file_confirmation=" + protectedConfirmation;
+        step(projectRoot, goalKey, "Manual legacy evidence recorded", "",
+                "manual_evidence=legacy behavior checked; manual_evidence_status=" + manualStatus
+                        + "; manual_evidence_path=" + manualEvidencePath + confirmation);
+        step(projectRoot, goalKey, "Verification evidence recorded", "",
+                "sensitive_result=pending; graph_result=pending; impact_result=pending; legacy_result=pending");
+    }
+
+    private void step(String projectRoot, String goalKey, String summary, String changedFiles, String evidence) {
+        java.util.List<String> args = new java.util.ArrayList<String>();
+        args.add("goal");
+        args.add("step");
+        args.add("--project-root");
+        args.add(projectRoot);
+        args.add("--goal");
+        args.add(goalKey);
+        args.add("--summary");
+        args.add(summary);
+        if (changedFiles != null && changedFiles.length() > 0) {
+            args.add("--changed-files");
+            args.add(changedFiles);
+        }
+        args.add("--evidence");
+        args.add(evidence);
+        Harness harness = new Harness(tempDir);
+        int exit = new CommandRouter().run(args.toArray(new String[args.size()]), harness.context());
+        assertEquals(ExitCodes.SUCCESS, exit);
     }
 
     private void recordJavaGoalSteps(String goalKey) {

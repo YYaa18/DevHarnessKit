@@ -15,6 +15,8 @@ import com.devharnesskit.dhk.repository.spec.SpecTaskRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowGateRunRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowRunRepository;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
+import com.devharnesskit.dhk.model.policy.DevHarnessPolicy;
+import com.devharnesskit.dhk.service.policy.DevHarnessPolicyService;
 import com.devharnesskit.dhk.util.PathUtil;
 
 import java.io.InputStream;
@@ -46,12 +48,13 @@ public final class GoalCheckService {
     private final GoalProfileService profileService;
     private final WorkspaceFingerprintService fingerprintService;
     private final GoalStepRepository stepRepository;
+    private final DevHarnessPolicyService devHarnessPolicyService;
 
     public GoalCheckService() {
         this(new GoalCheckRepository(), new SpecTaskRepository(), new SpecAcceptanceRepository(),
                 new WorkflowRunRepository(), new WorkflowGateRunRepository(), new SensitiveDataGuard(),
                 new GoalCheckPolicyService(), new GoalProfileService(), new WorkspaceFingerprintService(),
-                new GoalStepRepository());
+                new GoalStepRepository(), new DevHarnessPolicyService());
     }
 
     GoalCheckService(GoalCheckRepository checkRepository, SpecTaskRepository taskRepository,
@@ -62,7 +65,8 @@ public final class GoalCheckService {
                      GoalCheckPolicyService policyService,
                      GoalProfileService profileService,
                      WorkspaceFingerprintService fingerprintService,
-                     GoalStepRepository stepRepository) {
+                     GoalStepRepository stepRepository,
+                     DevHarnessPolicyService devHarnessPolicyService) {
         this.checkRepository = checkRepository;
         this.taskRepository = taskRepository;
         this.acceptanceRepository = acceptanceRepository;
@@ -73,6 +77,7 @@ public final class GoalCheckService {
         this.profileService = profileService;
         this.fingerprintService = fingerprintService;
         this.stepRepository = stepRepository;
+        this.devHarnessPolicyService = devHarnessPolicyService;
     }
 
     public GoalCheck run(Connection connection, Path projectRoot, GoalRun goal,
@@ -103,6 +108,9 @@ public final class GoalCheckService {
         }
         if ("impact".equals(checkKey)) {
             return runImpactCheck(connection, projectRoot, goal, profile, now);
+        }
+        if ("legacy".equals(checkKey)) {
+            return runLegacyCheck(connection, projectRoot, goal, profile, now);
         }
         throw new IllegalArgumentException("Unknown goal check: " + checkKey);
     }
@@ -363,6 +371,189 @@ public final class GoalCheckService {
                 ? "impact map fresh and covers changed files"
                 : "impact freshness failed: " + failures;
         return save(connection, projectRoot, goal, "impact", "impact", command, status, summary, log, now);
+    }
+
+    private GoalCheck runLegacyCheck(Connection connection, Path projectRoot, GoalRun goal, GoalProfile profile,
+                                     String now) throws Exception {
+        Path log = logPath(projectRoot, goal, "legacy");
+        List<String> failures = new ArrayList<String>();
+        StringBuilder output = new StringBuilder();
+        if (profile == null || !profile.legacyGraphProfile()) {
+            String summary = "legacy evidence not required by goal profile";
+            writeLog(log, summary + "\n");
+            return save(connection, projectRoot, goal, "legacy", "legacy", "", "skipped", summary, log, now);
+        }
+
+        List<GoalStep> steps = stepRepository.listByGoal(connection, goal.goalKey());
+        List<String> changed = changedFilesForCoverage(connection, projectRoot, goal);
+        output.append("changed_files_count: ").append(changed.size()).append('\n');
+        output.append("legacy_max_changed_files: ").append(profile.legacyMaxChangedFiles()).append('\n');
+        if (changed.size() > profile.legacyMaxChangedFiles()) {
+            failures.add("legacy changed file limit exceeded: changed_files=" + changed.size()
+                    + " max=" + profile.legacyMaxChangedFiles());
+        }
+        if (containsEvidenceFlag(steps, "large_refactor")
+                || containsEvidenceFlag(steps, "mass_refactor")
+                || containsEvidenceFlag(steps, "format_only")) {
+            failures.add("legacy profile forbids large refactor or format-only evidence flags");
+        }
+
+        String rollbackPlan = evidenceValue(steps, "rollback_plan");
+        output.append("rollback_plan: ").append(rollbackPlan).append('\n');
+        if (profile.rollbackPlanRequired() && !artifactExists(projectRoot, rollbackPlan)) {
+            failures.add("rollback plan artifact missing: rollback_plan=" + empty(rollbackPlan, "none"));
+        }
+
+        String manualEvidence = evidenceValue(steps, "manual_evidence");
+        String manualEvidenceStatus = evidenceValue(steps, "manual_evidence_status");
+        String manualEvidencePath = evidenceValue(steps, "manual_evidence_path");
+        output.append("manual_evidence: ").append(manualEvidence).append('\n');
+        output.append("manual_evidence_status: ").append(manualEvidenceStatus).append('\n');
+        output.append("manual_evidence_path: ").append(manualEvidencePath).append('\n');
+        if (profile.manualEvidenceRequired()) {
+            if (!"passed".equalsIgnoreCase(manualEvidenceStatus)) {
+                failures.add("manual evidence is not passed: manual_evidence_status="
+                        + empty(manualEvidenceStatus, "none"));
+            }
+            if (manualEvidence.length() == 0) {
+                failures.add("manual evidence summary missing: manual_evidence=none");
+            }
+            if (!artifactExists(projectRoot, manualEvidencePath)) {
+                failures.add("manual evidence artifact missing: manual_evidence_path="
+                        + empty(manualEvidencePath, "none"));
+            }
+        }
+
+        List<String> protectedFiles = protectedImpactFiles(projectRoot);
+        output.append("protected_impact_files: ").append(protectedFiles).append('\n');
+        if (!protectedFiles.isEmpty() && profile.protectedImpactRequiresManualEvidence()) {
+            String confirmation = evidenceValue(steps, "protected_file_confirmation");
+            output.append("protected_file_confirmation: ").append(confirmation).append('\n');
+            if (!"approved".equalsIgnoreCase(confirmation) && !"confirmed".equalsIgnoreCase(confirmation)) {
+                failures.add("protected impact files require manual confirmation: " + protectedFiles);
+            }
+        }
+
+        writeLog(log, output.toString());
+        String status = failures.isEmpty() ? "passed" : "failed";
+        String summary = failures.isEmpty()
+                ? "legacy evidence passed; rollback_plan=" + rollbackPlan
+                + " manual_evidence_path=" + manualEvidencePath
+                + " protected_impact_files=" + protectedFiles
+                : "legacy evidence failed: " + failures;
+        return save(connection, projectRoot, goal, "legacy", "legacy", "", status, summary, log, now);
+    }
+
+    private boolean containsEvidenceFlag(List<GoalStep> steps, String key) {
+        return "true".equalsIgnoreCase(evidenceValue(steps, key))
+                || "yes".equalsIgnoreCase(evidenceValue(steps, key));
+    }
+
+    private String evidenceValue(List<GoalStep> steps, String key) {
+        if (steps == null || key == null || key.length() == 0) {
+            return "";
+        }
+        Pattern pattern = Pattern.compile("(?i)(?:^|[;\\n\\r])\\s*" + Pattern.quote(key)
+                + "\\s*=\\s*([^;\\n\\r]+)");
+        for (GoalStep step : steps) {
+            Matcher matcher = pattern.matcher(step.evidence() == null ? "" : step.evidence());
+            String value = "";
+            while (matcher.find()) {
+                value = matcher.group(1).trim();
+            }
+            if (value.length() > 0) {
+                return value;
+            }
+        }
+        return "";
+    }
+
+    private boolean artifactExists(Path projectRoot, String pathText) {
+        if (pathText == null || pathText.trim().length() == 0) {
+            return false;
+        }
+        try {
+            Path raw = projectRoot.getFileSystem().getPath(pathText.trim());
+            Path path = raw.isAbsolute() ? raw.toAbsolutePath().normalize()
+                    : projectRoot.resolve(raw).toAbsolutePath().normalize();
+            Path root = projectRoot.toAbsolutePath().normalize();
+            return path.startsWith(root) && Files.isRegularFile(path);
+        } catch (Exception ex) {
+            return false;
+        }
+    }
+
+    private String empty(String value, String fallback) {
+        return value == null || value.length() == 0 ? fallback : value;
+    }
+
+    private List<String> protectedImpactFiles(Path projectRoot) throws Exception {
+        List<String> result = new ArrayList<String>();
+        Path impact = PathUtil.graphImpactMap(projectRoot);
+        if (!Files.isRegularFile(impact)) {
+            return result;
+        }
+        String impactText = new String(Files.readAllBytes(impact), "UTF-8");
+        DevHarnessPolicy policy = devHarnessPolicyService.load(projectRoot);
+        String[] protectedGlobs = policy.protectedFiles();
+        String[] lines = impactText.split("\\r?\\n");
+        for (String line : lines) {
+            String value = relatedFile(line);
+            if (value.length() == 0) {
+                continue;
+            }
+            if (line.contains("[protected_file]") || matchesAny(value, protectedGlobs)) {
+                result.add(value);
+            }
+        }
+        return result;
+    }
+
+    private String relatedFile(String line) {
+        String trimmed = line == null ? "" : line.trim();
+        if (!trimmed.startsWith("- ")) {
+            return "";
+        }
+        String value = trimmed.substring(2).trim();
+        int bracket = value.indexOf(" [");
+        if (bracket >= 0) {
+            value = value.substring(0, bracket).trim();
+        }
+        if (value.startsWith("src/") || value.startsWith(".agents/") || value.indexOf('/') >= 0) {
+            return value;
+        }
+        return "";
+    }
+
+    private boolean matchesAny(String value, String[] globs) {
+        for (String glob : globs == null ? new String[0] : globs) {
+            if (globMatches(normalizePath(value), normalizePath(glob))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean globMatches(String value, String glob) {
+        StringBuilder regex = new StringBuilder();
+        for (int i = 0; i < glob.length(); i++) {
+            char ch = glob.charAt(i);
+            if (ch == '*') {
+                if (i + 1 < glob.length() && glob.charAt(i + 1) == '*') {
+                    regex.append(".*");
+                    i++;
+                } else {
+                    regex.append("[^/]*");
+                }
+            } else {
+                regex.append(Pattern.quote(String.valueOf(ch)));
+            }
+        }
+        return value.matches(regex.toString());
+    }
+
+    private String normalizePath(String value) {
+        return value == null ? "" : value.trim().replace('\\', '/');
     }
 
     private GoalCheck save(Connection connection, Path projectRoot, GoalRun goal, String checkKey, String checkType,

@@ -20,6 +20,12 @@ It extends the goal-first protocol with mandatory graph evidence.
 8. Run `goal-verify.sh`; graph-required goals must pass `graph` and `impact` checks before completion.
 9. Run `goal-complete.sh` only after `goal verify` returns `ready_to_complete`.
 
+For legacy graph profiles such as `legacy-java-small-fix-with-graph` and
+`legacy-jsp-servlet-change-with-graph`, also create a rollback plan artifact
+and record manual evidence before verification. If GOAL_CONTEXT shows
+`protected-impact-risk`, do not edit or complete until manual confirmation is
+recorded.
+
 Graph facts are snapshot-bound generated facts. They are not confirmed long-term memory and must be regenerated after code changes.
 
 ## Forbidden By Default
@@ -29,6 +35,9 @@ Graph facts are snapshot-bound generated facts. They are not confirmed long-term
 - Do not treat graph output as confirmed memory.
 - Do not complete when graph or impact checks are failed, stale, or missing.
 - Do not use lower-level workflow/spec/db commands unless GOAL_CONTEXT explicitly allows them.
+- Do not perform large refactors, whole-file formatting, or broad cleanup in legacy graph profiles.
+- Do not complete a legacy graph profile without `rollback_plan`, `manual_evidence_status=passed`,
+  and `manual_evidence_path` evidence.
 
 ## Required Final Self-Check
 

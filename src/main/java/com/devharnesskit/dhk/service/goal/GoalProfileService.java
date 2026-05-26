@@ -32,6 +32,12 @@ public final class GoalProfileService {
         if ("java-mvc-change-with-graph".equals(profileKey)) {
             return javaProfile(profileKey, "mvc-change", "mvc", true);
         }
+        if ("legacy-java-small-fix-with-graph".equals(profileKey)) {
+            return legacyGraphProfile(profileKey, "api-change", "api");
+        }
+        if ("legacy-jsp-servlet-change-with-graph".equals(profileKey)) {
+            return legacyGraphProfile(profileKey, "mvc-change", "mvc");
+        }
         if ("bugfix".equals(profileKey)) {
             return new GoalProfile(profileKey, "systematic-debugging", false, "debug",
                     new String[]{"collect_error", "list_hypotheses", "implement_fix",
@@ -91,7 +97,12 @@ public final class GoalProfileService {
                     parseBoolean(value(raw, "graph_require_fresh_snapshot", value(raw, "graph_required", "false"))),
                     parseBoolean(value(raw, "graph_require_impact_map", value(raw, "graph_required", "false"))),
                     parsePositiveInt(value(raw, "graph_max_staleness_minutes", "60"), 60),
-                    split(raw.get("graph_actions")));
+                    split(raw.get("graph_actions")),
+                    parseBoolean(value(raw, "legacy_graph_profile", "false")),
+                    parseBoolean(value(raw, "rollback_plan_required", "false")),
+                    parseBoolean(value(raw, "manual_evidence_required", "false")),
+                    parseBoolean(value(raw, "protected_impact_requires_manual_evidence", "false")),
+                    parsePositiveInt(value(raw, "legacy_max_changed_files", "8"), 8));
         } catch (Exception ex) {
             return null;
         }
@@ -173,6 +184,65 @@ public final class GoalProfileService {
                 graphAware, "lite", true, true, 60,
                 graphAware ? new String[]{"graph_index_or_refresh", "graph_impact_analysis", "graph_reimpact"}
                         : new String[0]);
+    }
+
+    private GoalProfile legacyGraphProfile(String profileKey, String workflowKey, String defaultMode) {
+        String[] actions = new String[]{"graph_index_or_refresh", "graph_impact_analysis",
+                "inspect_existing_code", "create_change_plan", "implement_minimal_change",
+                "graph_reimpact", "create_rollback_plan", "record_manual_evidence", "verify"};
+        Map<String, String[]> evidence = new LinkedHashMap<String, String[]>();
+        evidence.put("graph_index_or_refresh", new String[]{"graph_snapshot", "graph_context"});
+        evidence.put("graph_impact_analysis",
+                new String[]{"impact_map", "impacted_files", "risk_nodes", "recommended_read_files"});
+        evidence.put("inspect_existing_code",
+                new String[]{"existing_entrypoints", "existing_service", "existing_data_access", "existing_tests"});
+        evidence.put("create_change_plan",
+                new String[]{"impacted_files", "risk_points", "verification_plan", "rollback_strategy"});
+        evidence.put("implement_minimal_change",
+                new String[]{"changed_files", "implementation_summary", "scope_guard"});
+        evidence.put("graph_reimpact",
+                new String[]{"post_change_impact_map", "impact_delta", "changed_files_covered"});
+        evidence.put("create_rollback_plan", new String[]{"rollback_plan", "rollback_scope"});
+        evidence.put("record_manual_evidence",
+                new String[]{"manual_evidence", "manual_evidence_status", "manual_evidence_path"});
+        evidence.put("verify",
+                new String[]{"sensitive_result", "graph_result", "impact_result", "legacy_result"});
+
+        Map<String, GoalActionMapping> mappings = new LinkedHashMap<String, GoalActionMapping>();
+        mappings.put("inspect_existing_code", new GoalActionMapping("inspect_existing_code",
+                "inspect_existing_code", "mvc-change".equals(workflowKey) ? new String[]{"mvc_confirmed"} : new String[0],
+                "inspect_existing_code", "", GoalActionMapping.MODE_STEP,
+                "mvc-change".equals(workflowKey) ? GoalActionMapping.MODE_STEP : GoalActionMapping.MODE_NONE,
+                GoalActionMapping.ACCEPTANCE_NONE, new String[0]));
+        mappings.put("create_change_plan", new GoalActionMapping("create_change_plan",
+                "create_change_plan", new String[]{"impacted_files_listed", "verification_plan_ready"},
+                "create_change_plan", "", GoalActionMapping.MODE_STEP, GoalActionMapping.MODE_STEP,
+                GoalActionMapping.ACCEPTANCE_NONE, new String[0]));
+        mappings.put("implement_minimal_change", new GoalActionMapping("implement_minimal_change",
+                "implement_minimal_change", new String[0], "implement_minimal_change", "",
+                GoalActionMapping.MODE_STEP, GoalActionMapping.MODE_NONE,
+                GoalActionMapping.ACCEPTANCE_NONE, new String[0]));
+        mappings.put("verify", new GoalActionMapping("verify",
+                "mvc-change".equals(workflowKey) ? "verify_view_flow" : "verify_tests",
+                "mvc-change".equals(workflowKey)
+                        ? new String[]{"view_name_checked", "model_fields_checked", "form_validation_checked"}
+                        : new String[]{"tests_recorded"},
+                "verify", "auto_pass", GoalActionMapping.MODE_CHECK, GoalActionMapping.MODE_CHECK,
+                GoalActionMapping.ACCEPTANCE_CHECKS,
+                new String[]{"sensitive", "graph", "impact", "legacy"}));
+
+        Map<String, GoalAcceptanceMapping> acceptances = new LinkedHashMap<String, GoalAcceptanceMapping>();
+        acceptances.put("legacy_evidence_ready", new GoalAcceptanceMapping("legacy_evidence_ready",
+                "Legacy rollback and manual evidence are complete",
+                "legacy check is accepted by policy",
+                GoalAcceptanceMapping.SOURCE_CHECKS, new String[]{"legacy"}, ""));
+
+        return new GoalProfile(profileKey, workflowKey, false, defaultMode, actions, evidence,
+                new String[]{"sensitive", "graph", "impact", "legacy", "workflow"},
+                true, false, true, true, false, false, mappings, acceptances,
+                true, "lite", true, true, 60,
+                new String[]{"graph_index_or_refresh", "graph_impact_analysis", "graph_reimpact"},
+                true, true, true, true, 8);
     }
 
     private Map<String, String[]> requiredEvidence(Map<String, String> raw) {

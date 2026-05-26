@@ -161,6 +161,9 @@ public final class GoalCheckPolicy {
         if ("graph".equals(checkKey) || "impact".equals(checkKey)) {
             return PASSED_ONLY;
         }
+        if ("legacy".equals(checkKey)) {
+            return PASSED_ONLY;
+        }
         if (isBuiltInJavaProfile(profile)) {
             if ("compile".equals(checkKey) || "test".equals(checkKey) || "sensitive".equals(checkKey)) {
                 return PASSED_ONLY;
@@ -204,7 +207,8 @@ public final class GoalCheckPolicy {
         return "java-api-change".equals(profile.profileKey())
                 || "java-mvc-change".equals(profile.profileKey())
                 || "java-api-change-with-graph".equals(profile.profileKey())
-                || "java-mvc-change-with-graph".equals(profile.profileKey());
+                || "java-mvc-change-with-graph".equals(profile.profileKey())
+                || profile.legacyGraphProfile();
     }
 
     private String[] withGraphChecks(String[] checks, GoalProfile profile) {

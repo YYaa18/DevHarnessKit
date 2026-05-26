@@ -13,8 +13,9 @@ Use this protocol only inside a goal.
 9. Implement the smallest change covered by the impact map.
 10. Re-run `graph-impact` after implementation for the changed file or symbol.
 11. Record `graph_reimpact` evidence with `post_change_impact_map`, `impact_delta`, and `changed_files_covered`.
-12. Run `goal verify`.
-13. Complete only when verification is ready.
+12. For legacy graph profiles, create the rollback plan artifact and record passed manual evidence.
+13. Run `goal verify`.
+14. Complete only when verification is ready.
 
 Generated graph files:
 
@@ -25,3 +26,7 @@ Generated graph files:
 ```
 
 The graph is a snapshot of code facts at a point in time. Regenerate it after code changes.
+
+Legacy graph profiles are intentionally narrow. They should keep changes inside
+the impact map, avoid broad formatting, include rollback steps, and treat
+protected impact files as requiring manual confirmation.

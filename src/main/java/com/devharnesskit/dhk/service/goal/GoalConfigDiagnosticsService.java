@@ -29,13 +29,15 @@ public final class GoalConfigDiagnosticsService {
             "completion_allow_skipped_checks", "completion_require_checkpoint", "strict_workflow_phase_order",
             "spec_require_non_empty_tasks", "spec_require_non_empty_acceptance",
             "graph_required", "graph_provider", "graph_require_fresh_snapshot",
-            "graph_require_impact_map", "graph_max_staleness_minutes", "graph_actions");
+            "graph_require_impact_map", "graph_max_staleness_minutes", "graph_actions",
+            "legacy_graph_profile", "rollback_plan_required", "manual_evidence_required",
+            "protected_impact_requires_manual_evidence", "legacy_max_changed_files");
     private static final Set<String> POLICY_FIELDS = set("required_checks", "compile_command", "test_command",
             "fail_pending_hard_gates", "accepted_compile_statuses", "accepted_test_statuses",
             "accepted_sensitive_statuses", "accepted_spec_statuses", "accepted_workflow_statuses",
             "accepted_graph_statuses", "accepted_impact_statuses");
     private static final Set<String> CHECK_KEYS = set("compile", "test", "sensitive", "spec", "workflow",
-            "graph", "impact");
+            "graph", "impact", "legacy");
     private static final Set<String> CHECK_STATUSES = set("passed", "skipped", "waived");
     private static final Set<String> MAPPING_FIELDS = set("workflow_phase", "required_gates",
             "spec_task", "spec_acceptance_update", "phase_pass_mode", "gate_pass_mode",
@@ -130,6 +132,7 @@ public final class GoalConfigDiagnosticsService {
         diagnoseBoolean(file, raw, "strict_workflow_phase_order", diagnostics);
         diagnoseSpecBooleans(file, raw, diagnostics);
         diagnoseGraphFields(file, raw, actions, diagnostics);
+        diagnoseLegacyFields(file, raw, diagnostics);
         diagnoseRequiredEvidence(file, raw, actions, diagnostics);
         diagnoseActionMappings(file, raw, workflowKey, actions, diagnostics);
         diagnoseAcceptanceMappings(file, raw, diagnostics);
@@ -220,6 +223,17 @@ public final class GoalConfigDiagnosticsService {
                             "graph_actions references action not listed in actions: " + graphAction));
                 }
             }
+        }
+    }
+
+    private void diagnoseLegacyFields(Path file, Map<String, String> raw, List<Diagnostic> diagnostics) {
+        diagnoseBoolean(file, raw, "legacy_graph_profile", diagnostics);
+        diagnoseBoolean(file, raw, "rollback_plan_required", diagnostics);
+        diagnoseBoolean(file, raw, "manual_evidence_required", diagnostics);
+        diagnoseBoolean(file, raw, "protected_impact_requires_manual_evidence", diagnostics);
+        if (raw.containsKey("legacy_max_changed_files")
+                && !positiveInteger(trim(raw.get("legacy_max_changed_files")))) {
+            diagnostics.add(warning(file.toString(), "legacy_max_changed_files should be a positive integer"));
         }
     }
 

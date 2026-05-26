@@ -32,8 +32,10 @@ public final class GoalConfigDiagnosticsService {
             "graph_require_impact_map", "graph_max_staleness_minutes", "graph_actions");
     private static final Set<String> POLICY_FIELDS = set("required_checks", "compile_command", "test_command",
             "fail_pending_hard_gates", "accepted_compile_statuses", "accepted_test_statuses",
-            "accepted_sensitive_statuses", "accepted_spec_statuses", "accepted_workflow_statuses");
-    private static final Set<String> CHECK_KEYS = set("compile", "test", "sensitive", "spec", "workflow");
+            "accepted_sensitive_statuses", "accepted_spec_statuses", "accepted_workflow_statuses",
+            "accepted_graph_statuses", "accepted_impact_statuses");
+    private static final Set<String> CHECK_KEYS = set("compile", "test", "sensitive", "spec", "workflow",
+            "graph", "impact");
     private static final Set<String> CHECK_STATUSES = set("passed", "skipped", "waived");
     private static final Set<String> MAPPING_FIELDS = set("workflow_phase", "required_gates",
             "spec_task", "spec_acceptance_update", "phase_pass_mode", "gate_pass_mode",
@@ -175,6 +177,10 @@ public final class GoalConfigDiagnosticsService {
         diagnoseList(file, "accepted_spec_statuses", raw.get("accepted_spec_statuses"),
                 KEY_PATTERN, CHECK_STATUSES, false, diagnostics);
         diagnoseList(file, "accepted_workflow_statuses", raw.get("accepted_workflow_statuses"),
+                KEY_PATTERN, CHECK_STATUSES, false, diagnostics);
+        diagnoseList(file, "accepted_graph_statuses", raw.get("accepted_graph_statuses"),
+                KEY_PATTERN, CHECK_STATUSES, false, diagnostics);
+        diagnoseList(file, "accepted_impact_statuses", raw.get("accepted_impact_statuses"),
                 KEY_PATTERN, CHECK_STATUSES, false, diagnostics);
     }
 

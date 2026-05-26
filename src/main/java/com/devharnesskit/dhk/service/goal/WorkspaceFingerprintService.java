@@ -159,7 +159,13 @@ public final class WorkspaceFingerprintService {
         }
         if (".agents".equals(first) && relative.getNameCount() > 1) {
             String second = relative.getName(1).toString();
-            return "memory".equals(second) || "tools".equals(second);
+            if ("memory".equals(second) || "tools".equals(second)) {
+                return true;
+            }
+            if ("graph".equals(second) && relative.getNameCount() > 2) {
+                String third = relative.getName(2).toString();
+                return "exports".equals(third) || "snapshots".equals(third) || "cache".equals(third);
+            }
         }
         return false;
     }

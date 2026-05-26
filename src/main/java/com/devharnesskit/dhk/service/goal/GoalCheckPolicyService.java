@@ -31,7 +31,9 @@ public final class GoalCheckPolicyService {
                     splitList(raw.get("accepted_test_statuses")),
                     splitList(raw.get("accepted_sensitive_statuses")),
                     splitList(raw.get("accepted_spec_statuses")),
-                    splitList(raw.get("accepted_workflow_statuses")));
+                    splitList(raw.get("accepted_workflow_statuses")),
+                    splitList(raw.get("accepted_graph_statuses")),
+                    splitList(raw.get("accepted_impact_statuses")));
         } catch (Exception ex) {
             return GoalCheckPolicy.defaults();
         }

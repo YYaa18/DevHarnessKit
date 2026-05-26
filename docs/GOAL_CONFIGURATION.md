@@ -87,7 +87,7 @@ Supported profile fields:
 | `strict_workflow_phase_order` | If true, mapped phases are not marked passed while earlier workflow phases are still incomplete. |
 | `spec_require_non_empty_tasks` | If true and `requires_spec` is true, the spec check fails when the spec has no tasks. Defaults to `requires_spec`. |
 | `spec_require_non_empty_acceptance` | If true and `requires_spec` is true, the spec check fails when the spec has no acceptance criteria. Defaults to `requires_spec`. |
-| `graph_required` | If true, the profile declares that graph snapshot and impact evidence are part of the goal protocol. AI-60 only records the policy; enforcement is handled by graph-aware goal checks. |
+| `graph_required` | If true, the profile declares that graph snapshot and impact evidence are part of the goal protocol. `goal verify` adds graph-aware checks according to the graph fields below. |
 | `graph_provider` | Graph provider key. Supported alpha values are `lite` and `cgc`; built-in graph-aware profiles default to `lite`. |
 | `graph_require_fresh_snapshot` | If true, graph-aware verification should require a fresh graph snapshot. Defaults to `graph_required`. |
 | `graph_require_impact_map` | If true, graph-aware verification should require `IMPACT_MAP.md`. Defaults to `graph_required`. |
@@ -100,6 +100,16 @@ Built-in graph-aware Java profiles are available as alpha profiles:
 java-api-change-with-graph
 java-mvc-change-with-graph
 ```
+
+Graph-required profiles automatically require `graph` when `graph_require_fresh_snapshot=true`
+and `impact` when `graph_require_impact_map=true`, even if a local
+`goal-check-policy.json` narrows the base check list. The `graph` check requires
+`GRAPH_SNAPSHOT.json` and `GRAPH_CONTEXT.md`, verifies that the snapshot
+workspace fingerprint still matches the current workspace, and applies
+`graph_max_staleness_minutes`. The `impact` check requires `IMPACT_MAP.md`,
+verifies that it was generated from the latest graph snapshot, applies the same
+staleness window, and checks that recorded `changed_files` under `src/` are
+covered by the impact map.
 
 Their action sequence is:
 
@@ -129,7 +139,7 @@ mapping.<action_key>.gate_pass_mode: "none|step|check"
 mapping.<action_key>.spec_task: "<spec_task_key>"
 mapping.<action_key>.spec_acceptance_update: "manual|auto_pass|disabled"
 mapping.<action_key>.acceptance_source: "none|manual|checks"
-mapping.<action_key>.required_checks: "compile,test,sensitive"
+mapping.<action_key>.required_checks: "compile,test,sensitive,graph,impact"
 ```
 
 Mappings are alpha process definitions. `goal step`, `goal check`, `goal verify`, and `goal complete` use them to synchronize deterministic workflow/spec state:
@@ -148,7 +158,7 @@ Business acceptance mappings use:
 acceptance.<acceptance_key>.description: "Human-readable criterion"
 acceptance.<acceptance_key>.expected: "Expected observable result"
 acceptance.<acceptance_key>.source: "checks|test|evidence|manual"
-acceptance.<acceptance_key>.required_checks: "compile,test,sensitive"
+acceptance.<acceptance_key>.required_checks: "compile,test,sensitive,graph,impact"
 acceptance.<acceptance_key>.evidence_key: "business_verified"
 ```
 
@@ -207,7 +217,9 @@ Example:
   "accepted_test_statuses": "passed",
   "accepted_sensitive_statuses": "passed",
   "accepted_spec_statuses": "passed",
-  "accepted_workflow_statuses": "passed,skipped,waived"
+  "accepted_workflow_statuses": "passed,skipped,waived",
+  "accepted_graph_statuses": "passed",
+  "accepted_impact_statuses": "passed"
 }
 ```
 

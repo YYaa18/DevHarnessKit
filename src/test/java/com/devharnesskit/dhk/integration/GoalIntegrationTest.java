@@ -1844,6 +1844,145 @@ final class GoalIntegrationTest {
     }
 
     @Test
+    void graphAwareGoalVerifyFailsWhenImpactMapIsMissing() throws Exception {
+        Path root = tempDir.resolve("demo-missing-impact");
+        writeSource(root, "src/main/java/com/example/App.java",
+                "package com.example;\npublic class App { public void run() {} }\n");
+        writeGraphProfile(root, "custom-graph-impact", true);
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo-missing-impact",
+                "--profile", "custom-graph-impact",
+                "--task", "Graph impact required",
+                "--module", "graph"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "index", "--project-root", "demo-missing-impact"
+        }, new Harness(tempDir).context()));
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "export", "--project-root", "demo-missing-impact"
+        }, new Harness(tempDir).context()));
+        recordCustomGraphGoalSteps("demo-missing-impact", goalKey,
+                "src/main/java/com/example/App.java", false);
+
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "demo-missing-impact", "--goal", goalKey
+        }, verify.context());
+
+        assertEquals(ExitCodes.SUCCESS, verifyExit);
+        assertTrue(verify.stdout().contains("decision: not_ready"));
+        assertTrue(verify.stdout().contains("impact: failed - impact freshness failed"));
+        assertTrue(verify.stdout().contains("IMPACT_MAP.md missing"));
+        assertTrue(verify.stdout().contains("failed_checks:"));
+        assertTrue(verify.stdout().contains("next_command: dhk goal check --goal " + goalKey
+                + " --check impact"));
+
+        Harness complete = new Harness(tempDir);
+        int completeExit = new CommandRouter().run(new String[]{
+                "goal", "complete", "--project-root", "demo-missing-impact", "--goal", goalKey
+        }, complete.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, completeExit);
+        assertTrue(complete.stdout().contains("check impact is failed"));
+    }
+
+    @Test
+    void graphAwareGoalVerifyFailsWhenGraphSnapshotWorkspaceFingerprintChanges() throws Exception {
+        Path root = tempDir.resolve("demo-stale-graph");
+        Path source = writeSource(root, "src/main/java/com/example/App.java",
+                "package com.example;\npublic class App { public void run() {} }\n");
+        writeGraphProfile(root, "custom-graph-only", false);
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo-stale-graph",
+                "--profile", "custom-graph-only",
+                "--task", "Graph snapshot must be fresh",
+                "--module", "graph"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "index", "--project-root", "demo-stale-graph"
+        }, new Harness(tempDir).context()));
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "export", "--project-root", "demo-stale-graph"
+        }, new Harness(tempDir).context()));
+        recordCustomGraphOnlyGoalSteps("demo-stale-graph", goalKey,
+                "src/main/java/com/example/App.java");
+        Files.write(source, "\n// changed after graph snapshot\n".getBytes("UTF-8"), StandardOpenOption.APPEND);
+
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "demo-stale-graph", "--goal", goalKey, "--json"
+        }, verify.context());
+
+        assertEquals(ExitCodes.SUCCESS, verifyExit);
+        assertTrue(verify.stdout().contains("\"decision\": \"not_ready\""));
+        assertTrue(verify.stdout().contains("\"failed_count\": 1"));
+        assertTrue(verify.stdout().contains("graph: graph freshness failed"));
+        assertTrue(verify.stdout().contains("workspace fingerprint changed"));
+        assertTrue(verify.stdout().contains("dhk graph index --project-root"));
+        assertTrue(verify.stdout().contains("\"next_command\": \"dhk goal check --goal " + goalKey
+                + " --check graph\""));
+    }
+
+    @Test
+    void graphAwareGoalVerifyFailsWhenChangedFilesAreOutsideImpactMap() throws Exception {
+        Path root = tempDir.resolve("demo-impact-coverage");
+        writeSource(root, "src/main/java/com/example/App.java",
+                "package com.example;\npublic class App { public void run() {} }\n");
+        writeSource(root, "src/main/java/org/acme/Other.java",
+                "package org.acme;\npublic class Other { public void run() {} }\n");
+        writeGraphProfile(root, "custom-graph-coverage", true);
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo-impact-coverage",
+                "--profile", "custom-graph-coverage",
+                "--task", "Impact map must cover changes",
+                "--module", "graph"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "index", "--project-root", "demo-impact-coverage"
+        }, new Harness(tempDir).context()));
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "export", "--project-root", "demo-impact-coverage"
+        }, new Harness(tempDir).context()));
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", "demo-impact-coverage",
+                "--file", "src/main/java/com/example/App.java"
+        }, new Harness(tempDir).context()));
+        recordCustomGraphGoalSteps("demo-impact-coverage", goalKey,
+                "src/main/java/org/acme/Other.java", true);
+
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "demo-impact-coverage", "--goal", goalKey, "--json"
+        }, verify.context());
+
+        assertEquals(ExitCodes.SUCCESS, verifyExit);
+        assertTrue(verify.stdout().contains("\"decision\": \"not_ready\""));
+        assertTrue(verify.stdout().contains("impact: impact freshness failed"));
+        assertTrue(verify.stdout().contains("changed files not covered by impact map"));
+        assertTrue(verify.stdout().contains("src/main/java/org/acme/Other.java"));
+        assertTrue(verify.stdout().contains("dhk graph impact --project-root"));
+        assertTrue(verify.stdout().contains("\"next_command\": \"dhk goal check --goal " + goalKey
+                + " --check impact\""));
+    }
+
+    @Test
     void goalUsesConfiguredProfileCheckPolicyAndJsonOutput() throws Exception {
         Path root = tempDir.resolve("demo");
         Files.createDirectories(PathUtil.goalProfilesDirectory(root));
@@ -1978,6 +2117,114 @@ final class GoalIntegrationTest {
                 "--summary", "Verification evidence complete",
                 "--evidence", "compile_result=not required; test_result=not required; "
                         + "sensitive_result=not required; " + verifyEvidence
+        }, verifyStep.context());
+        assertEquals(ExitCodes.SUCCESS, verifyStepExit);
+    }
+
+    private Path writeSource(Path root, String relativePath, String content) throws Exception {
+        Path file = root.resolve(relativePath);
+        Files.createDirectories(file.getParent());
+        Files.write(file, content.getBytes("UTF-8"));
+        return file;
+    }
+
+    private void writeGraphProfile(Path root, String profileKey, boolean requireImpactMap) throws Exception {
+        Files.createDirectories(PathUtil.goalProfilesDirectory(root));
+        String actions = requireImpactMap
+                ? "graph_index_or_refresh,graph_impact_analysis,implement_minimal_change,verify"
+                : "graph_index_or_refresh,implement_minimal_change,verify";
+        String graphActions = requireImpactMap
+                ? "graph_index_or_refresh,graph_impact_analysis"
+                : "graph_index_or_refresh";
+        Files.write(PathUtil.goalProfile(root, profileKey), ("{\n"
+                + "  \"workflow_key\": \"api-change\",\n"
+                + "  \"requires_spec\": \"false\",\n"
+                + "  \"default_mode\": \"api\",\n"
+                + "  \"actions\": \"" + actions + "\",\n"
+                + "  \"required_checks\": \"graph\",\n"
+                + "  \"completion_allow_skipped_checks\": \"false\",\n"
+                + "  \"graph_required\": \"true\",\n"
+                + "  \"graph_provider\": \"lite\",\n"
+                + "  \"graph_require_fresh_snapshot\": \"true\",\n"
+                + "  \"graph_require_impact_map\": \"" + requireImpactMap + "\",\n"
+                + "  \"graph_max_staleness_minutes\": \"60\",\n"
+                + "  \"graph_actions\": \"" + graphActions + "\"\n"
+                + "}\n").getBytes("UTF-8"));
+    }
+
+    private void recordCustomGraphOnlyGoalSteps(String projectRoot, String goalKey, String changedFile) {
+        Harness graphStep = new Harness(tempDir);
+        int graphStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", projectRoot,
+                "--goal", goalKey,
+                "--summary", "Graph snapshot exported",
+                "--evidence", "graph_snapshot=GRAPH_SNAPSHOT.json; graph_context=GRAPH_CONTEXT.md"
+        }, graphStep.context());
+        assertEquals(ExitCodes.SUCCESS, graphStepExit);
+
+        Harness implementStep = new Harness(tempDir);
+        int implementStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", projectRoot,
+                "--goal", goalKey,
+                "--summary", "Implementation changed graph indexed file",
+                "--changed-files", changedFile,
+                "--evidence", "implementation_summary=changed graph indexed file"
+        }, implementStep.context());
+        assertEquals(ExitCodes.SUCCESS, implementStepExit);
+
+        Harness verifyStep = new Harness(tempDir);
+        int verifyStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", projectRoot,
+                "--goal", goalKey,
+                "--summary", "Verification evidence recorded",
+                "--evidence", "compile_result=not required; test_result=not required; sensitive_result=not required"
+        }, verifyStep.context());
+        assertEquals(ExitCodes.SUCCESS, verifyStepExit);
+    }
+
+    private void recordCustomGraphGoalSteps(String projectRoot, String goalKey, String changedFile,
+                                            boolean impactMapReady) {
+        Harness graphStep = new Harness(tempDir);
+        int graphStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", projectRoot,
+                "--goal", goalKey,
+                "--summary", "Graph snapshot exported",
+                "--evidence", "graph_snapshot=GRAPH_SNAPSHOT.json; graph_context=GRAPH_CONTEXT.md"
+        }, graphStep.context());
+        assertEquals(ExitCodes.SUCCESS, graphStepExit);
+
+        Harness impactStep = new Harness(tempDir);
+        int impactStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", projectRoot,
+                "--goal", goalKey,
+                "--summary", "Graph impact analysis recorded",
+                "--evidence", "impact_map=" + (impactMapReady ? "IMPACT_MAP.md" : "missing")
+        }, impactStep.context());
+        assertEquals(ExitCodes.SUCCESS, impactStepExit);
+
+        Harness implementStep = new Harness(tempDir);
+        int implementStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", projectRoot,
+                "--goal", goalKey,
+                "--summary", "Implementation changed graph indexed file",
+                "--changed-files", changedFile,
+                "--evidence", "implementation_summary=changed graph indexed file"
+        }, implementStep.context());
+        assertEquals(ExitCodes.SUCCESS, implementStepExit);
+
+        Harness verifyStep = new Harness(tempDir);
+        int verifyStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", projectRoot,
+                "--goal", goalKey,
+                "--summary", "Verification evidence recorded",
+                "--evidence", "compile_result=not required; test_result=not required; sensitive_result=not required"
         }, verifyStep.context());
         assertEquals(ExitCodes.SUCCESS, verifyStepExit);
     }

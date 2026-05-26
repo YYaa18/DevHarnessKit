@@ -20,11 +20,14 @@ public final class GoalCheckPolicy {
     private final String[] acceptedSensitiveStatuses;
     private final String[] acceptedSpecStatuses;
     private final String[] acceptedWorkflowStatuses;
+    private final String[] acceptedGraphStatuses;
+    private final String[] acceptedImpactStatuses;
 
     public GoalCheckPolicy(String[] requiredChecks, String[] compileCommand,
                            String[] testCommand, boolean failPendingHardGates) {
         this(requiredChecks, false, compileCommand, testCommand, failPendingHardGates, true,
-                new String[0], new String[0], new String[0], new String[0], new String[0]);
+                new String[0], new String[0], new String[0], new String[0], new String[0],
+                new String[0], new String[0]);
     }
 
     public GoalCheckPolicy(String[] requiredChecks, String[] compileCommand,
@@ -34,7 +37,7 @@ public final class GoalCheckPolicy {
                            String[] acceptedWorkflowStatuses) {
         this(requiredChecks, false, compileCommand, testCommand, failPendingHardGates, true,
                 acceptedCompileStatuses, acceptedTestStatuses, acceptedSensitiveStatuses,
-                acceptedSpecStatuses, acceptedWorkflowStatuses);
+                acceptedSpecStatuses, acceptedWorkflowStatuses, new String[0], new String[0]);
     }
 
     public GoalCheckPolicy(String[] requiredChecks, boolean requiredChecksConfigured,
@@ -44,7 +47,7 @@ public final class GoalCheckPolicy {
                            String[] acceptedWorkflowStatuses) {
         this(requiredChecks, requiredChecksConfigured, compileCommand, testCommand, failPendingHardGates, true,
                 acceptedCompileStatuses, acceptedTestStatuses, acceptedSensitiveStatuses,
-                acceptedSpecStatuses, acceptedWorkflowStatuses);
+                acceptedSpecStatuses, acceptedWorkflowStatuses, new String[0], new String[0]);
     }
 
     public GoalCheckPolicy(String[] requiredChecks, boolean requiredChecksConfigured,
@@ -52,7 +55,8 @@ public final class GoalCheckPolicy {
                            boolean failPendingHardGatesConfigured,
                            String[] acceptedCompileStatuses, String[] acceptedTestStatuses,
                            String[] acceptedSensitiveStatuses, String[] acceptedSpecStatuses,
-                           String[] acceptedWorkflowStatuses) {
+                           String[] acceptedWorkflowStatuses, String[] acceptedGraphStatuses,
+                           String[] acceptedImpactStatuses) {
         this.requiredChecks = requiredChecks == null || requiredChecks.length == 0
                 ? DEFAULT_REQUIRED_CHECKS
                 : requiredChecks;
@@ -70,13 +74,28 @@ public final class GoalCheckPolicy {
         this.acceptedSensitiveStatuses = acceptedSensitiveStatuses == null ? new String[0] : acceptedSensitiveStatuses;
         this.acceptedSpecStatuses = acceptedSpecStatuses == null ? new String[0] : acceptedSpecStatuses;
         this.acceptedWorkflowStatuses = acceptedWorkflowStatuses == null ? new String[0] : acceptedWorkflowStatuses;
+        this.acceptedGraphStatuses = acceptedGraphStatuses == null ? new String[0] : acceptedGraphStatuses;
+        this.acceptedImpactStatuses = acceptedImpactStatuses == null ? new String[0] : acceptedImpactStatuses;
+    }
+
+    public GoalCheckPolicy(String[] requiredChecks, boolean requiredChecksConfigured,
+                           String[] compileCommand, String[] testCommand, boolean failPendingHardGates,
+                           boolean failPendingHardGatesConfigured,
+                           String[] acceptedCompileStatuses, String[] acceptedTestStatuses,
+                           String[] acceptedSensitiveStatuses, String[] acceptedSpecStatuses,
+                           String[] acceptedWorkflowStatuses) {
+        this(requiredChecks, requiredChecksConfigured, compileCommand, testCommand, failPendingHardGates,
+                failPendingHardGatesConfigured, acceptedCompileStatuses, acceptedTestStatuses,
+                acceptedSensitiveStatuses, acceptedSpecStatuses, acceptedWorkflowStatuses,
+                new String[0], new String[0]);
     }
 
     public static GoalCheckPolicy defaults() {
         return new GoalCheckPolicy(DEFAULT_REQUIRED_CHECKS, false,
                 new String[]{"mvn", "-q", "-DskipTests", "compile"},
                 new String[]{"mvn", "-q", "test"}, false, false,
-                new String[0], new String[0], new String[0], new String[0], new String[0]);
+                new String[0], new String[0], new String[0], new String[0], new String[0],
+                new String[0], new String[0]);
     }
 
     public String[] requiredChecks() {
@@ -84,13 +103,15 @@ public final class GoalCheckPolicy {
     }
 
     public String[] requiredChecks(GoalProfile profile) {
+        String[] selected;
         if (requiredChecksConfigured) {
-            return requiredChecks;
+            selected = requiredChecks;
+        } else if (profile != null && profile.requiredChecks().length > 0) {
+            selected = profile.requiredChecks();
+        } else {
+            selected = requiredChecks;
         }
-        if (profile != null && profile.requiredChecks().length > 0) {
-            return profile.requiredChecks();
-        }
-        return requiredChecks;
+        return withGraphChecks(selected, profile);
     }
 
     public String[] compileCommand() {
@@ -137,6 +158,9 @@ public final class GoalCheckPolicy {
         if (profile != null && !profile.completionAllowSkippedChecks()) {
             return PASSED_ONLY;
         }
+        if ("graph".equals(checkKey) || "impact".equals(checkKey)) {
+            return PASSED_ONLY;
+        }
         if (isBuiltInJavaProfile(profile)) {
             if ("compile".equals(checkKey) || "test".equals(checkKey) || "sensitive".equals(checkKey)) {
                 return PASSED_ONLY;
@@ -164,6 +188,12 @@ public final class GoalCheckPolicy {
         if ("workflow".equals(checkKey)) {
             return acceptedWorkflowStatuses;
         }
+        if ("graph".equals(checkKey)) {
+            return acceptedGraphStatuses;
+        }
+        if ("impact".equals(checkKey)) {
+            return acceptedImpactStatuses;
+        }
         return new String[0];
     }
 
@@ -171,7 +201,29 @@ public final class GoalCheckPolicy {
         if (profile == null) {
             return false;
         }
-        return "java-api-change".equals(profile.profileKey()) || "java-mvc-change".equals(profile.profileKey());
+        return "java-api-change".equals(profile.profileKey())
+                || "java-mvc-change".equals(profile.profileKey())
+                || "java-api-change-with-graph".equals(profile.profileKey())
+                || "java-mvc-change-with-graph".equals(profile.profileKey());
+    }
+
+    private String[] withGraphChecks(String[] checks, GoalProfile profile) {
+        if (profile == null || !profile.graphRequired()) {
+            return checks;
+        }
+        java.util.LinkedHashSet<String> merged = new java.util.LinkedHashSet<String>();
+        for (String check : checks) {
+            if (check != null && check.length() > 0) {
+                merged.add(check);
+            }
+        }
+        if (profile.graphRequireFreshSnapshot()) {
+            merged.add("graph");
+        }
+        if (profile.graphRequireImpactMap()) {
+            merged.add("impact");
+        }
+        return merged.toArray(new String[merged.size()]);
     }
 
     private String join(String[] values) {

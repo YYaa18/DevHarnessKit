@@ -3,6 +3,8 @@ package com.devharnesskit.dhk.service.goal;
 import com.devharnesskit.dhk.model.goal.GoalCheck;
 import com.devharnesskit.dhk.model.goal.GoalProfile;
 import com.devharnesskit.dhk.model.goal.GoalRun;
+import com.devharnesskit.dhk.model.goal.GoalStep;
+import com.devharnesskit.dhk.repository.goal.GoalStepRepository;
 import com.devharnesskit.dhk.model.spec.SpecAcceptance;
 import com.devharnesskit.dhk.model.spec.SpecTask;
 import com.devharnesskit.dhk.model.workflow.WorkflowGateRun;
@@ -20,10 +22,15 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class GoalCheckService {
     public static final String[] REQUIRED_CHECKS = GoalCheckPolicy.DEFAULT_REQUIRED_CHECKS;
@@ -38,11 +45,13 @@ public final class GoalCheckService {
     private final GoalCheckPolicyService policyService;
     private final GoalProfileService profileService;
     private final WorkspaceFingerprintService fingerprintService;
+    private final GoalStepRepository stepRepository;
 
     public GoalCheckService() {
         this(new GoalCheckRepository(), new SpecTaskRepository(), new SpecAcceptanceRepository(),
                 new WorkflowRunRepository(), new WorkflowGateRunRepository(), new SensitiveDataGuard(),
-                new GoalCheckPolicyService(), new GoalProfileService(), new WorkspaceFingerprintService());
+                new GoalCheckPolicyService(), new GoalProfileService(), new WorkspaceFingerprintService(),
+                new GoalStepRepository());
     }
 
     GoalCheckService(GoalCheckRepository checkRepository, SpecTaskRepository taskRepository,
@@ -52,7 +61,8 @@ public final class GoalCheckService {
                      SensitiveDataGuard sensitiveDataGuard,
                      GoalCheckPolicyService policyService,
                      GoalProfileService profileService,
-                     WorkspaceFingerprintService fingerprintService) {
+                     WorkspaceFingerprintService fingerprintService,
+                     GoalStepRepository stepRepository) {
         this.checkRepository = checkRepository;
         this.taskRepository = taskRepository;
         this.acceptanceRepository = acceptanceRepository;
@@ -62,6 +72,7 @@ public final class GoalCheckService {
         this.policyService = policyService;
         this.profileService = profileService;
         this.fingerprintService = fingerprintService;
+        this.stepRepository = stepRepository;
     }
 
     public GoalCheck run(Connection connection, Path projectRoot, GoalRun goal,
@@ -86,6 +97,12 @@ public final class GoalCheckService {
         }
         if ("workflow".equals(checkKey)) {
             return runWorkflowCheck(connection, projectRoot, goal, now, policy, profile);
+        }
+        if ("graph".equals(checkKey)) {
+            return runGraphCheck(connection, projectRoot, goal, profile, now);
+        }
+        if ("impact".equals(checkKey)) {
+            return runImpactCheck(connection, projectRoot, goal, profile, now);
         }
         throw new IllegalArgumentException("Unknown goal check: " + checkKey);
     }
@@ -235,6 +252,119 @@ public final class GoalCheckService {
                         + " pending_completion_gates=" + pendingCompletionHard, null, now);
     }
 
+    private GoalCheck runGraphCheck(Connection connection, Path projectRoot, GoalRun goal, GoalProfile profile,
+                                    String now) throws Exception {
+        Path log = logPath(projectRoot, goal, "graph");
+        String command = graphRefreshCommand(projectRoot);
+        if (profile == null || !profile.graphRequired()) {
+            String summary = "graph not required by goal profile";
+            writeLog(log, summary + "\n");
+            return save(connection, projectRoot, goal, "graph", "graph", command, "skipped", summary, log, now);
+        }
+
+        Path snapshot = PathUtil.graphSnapshotJson(projectRoot);
+        Path context = PathUtil.graphContext(projectRoot);
+        List<String> failures = new ArrayList<String>();
+        StringBuilder output = new StringBuilder();
+        output.append("graph_snapshot: ").append(snapshot).append('\n');
+        output.append("graph_context: ").append(context).append('\n');
+        output.append("next_command: ").append(command).append('\n');
+
+        String snapshotText = "";
+        if (!Files.isRegularFile(snapshot)) {
+            failures.add("GRAPH_SNAPSHOT.json missing; next_command=" + command);
+        } else {
+            snapshotText = new String(Files.readAllBytes(snapshot), "UTF-8");
+            String snapshotKey = jsonString(snapshotText, "snapshot_key");
+            String snapshotFingerprint = jsonString(snapshotText, "workspace_fingerprint");
+            String generatedAt = jsonString(snapshotText, "generated_at");
+            output.append("snapshot_key: ").append(snapshotKey).append('\n');
+            output.append("generated_at: ").append(generatedAt).append('\n');
+            output.append("snapshot_workspace_fingerprint: ").append(snapshotFingerprint).append('\n');
+            if (profile.graphRequireFreshSnapshot()) {
+                String currentFingerprint = fingerprintService.workspaceFingerprint(projectRoot);
+                output.append("current_workspace_fingerprint: ").append(currentFingerprint).append('\n');
+                if (snapshotFingerprint.length() == 0) {
+                    failures.add("graph snapshot stale: workspace fingerprint missing; next_command=" + command);
+                } else if (!snapshotFingerprint.equals(currentFingerprint)) {
+                    failures.add("graph snapshot stale: workspace fingerprint changed; next_command=" + command);
+                }
+                addAgeFailure("graph snapshot", generatedAt, profile.graphMaxStalenessMinutes(),
+                        now, command, failures);
+            }
+        }
+        if (!Files.isRegularFile(context)) {
+            failures.add("GRAPH_CONTEXT.md missing; next_command=" + command);
+        }
+
+        writeLog(log, output.toString());
+        String status = failures.isEmpty() ? "passed" : "failed";
+        String summary = failures.isEmpty()
+                ? "graph snapshot fresh; snapshot_key=" + jsonString(snapshotText, "snapshot_key")
+                : "graph freshness failed: " + failures;
+        return save(connection, projectRoot, goal, "graph", "graph", command, status, summary, log, now);
+    }
+
+    private GoalCheck runImpactCheck(Connection connection, Path projectRoot, GoalRun goal, GoalProfile profile,
+                                     String now) throws Exception {
+        Path log = logPath(projectRoot, goal, "impact");
+        String command = impactRefreshCommand(projectRoot, connection, goal);
+        if (profile == null || !profile.graphRequired() || !profile.graphRequireImpactMap()) {
+            String summary = "impact map not required by goal profile";
+            writeLog(log, summary + "\n");
+            return save(connection, projectRoot, goal, "impact", "impact", command, "skipped", summary, log, now);
+        }
+
+        Path snapshot = PathUtil.graphSnapshotJson(projectRoot);
+        Path impact = PathUtil.graphImpactMap(projectRoot);
+        List<String> failures = new ArrayList<String>();
+        StringBuilder output = new StringBuilder();
+        output.append("graph_snapshot: ").append(snapshot).append('\n');
+        output.append("impact_map: ").append(impact).append('\n');
+        output.append("next_command: ").append(command).append('\n');
+
+        String snapshotText = "";
+        String snapshotKey = "";
+        if (!Files.isRegularFile(snapshot)) {
+            failures.add("GRAPH_SNAPSHOT.json missing; next_command=" + graphRefreshCommand(projectRoot));
+        } else {
+            snapshotText = new String(Files.readAllBytes(snapshot), "UTF-8");
+            snapshotKey = jsonString(snapshotText, "snapshot_key");
+            output.append("snapshot_key: ").append(snapshotKey).append('\n');
+        }
+
+        String impactText = "";
+        if (!Files.isRegularFile(impact)) {
+            failures.add("IMPACT_MAP.md missing; next_command=" + command);
+        } else {
+            impactText = new String(Files.readAllBytes(impact), "UTF-8");
+            String impactSnapshotKey = lineValue(impactText, "- snapshot_key: ");
+            String generatedAt = tagValue(impactText, "generated-at");
+            output.append("impact_snapshot_key: ").append(impactSnapshotKey).append('\n');
+            output.append("generated_at: ").append(generatedAt).append('\n');
+            if (snapshotKey.length() > 0 && !snapshotKey.equals(impactSnapshotKey)) {
+                failures.add("impact map stale: snapshot_key mismatch; next_command=" + command);
+            }
+            if (Files.isRegularFile(snapshot)
+                    && Files.getLastModifiedTime(impact).compareTo(Files.getLastModifiedTime(snapshot)) < 0) {
+                failures.add("impact map stale: generated before latest graph snapshot; next_command=" + command);
+            }
+            addAgeFailure("impact map", generatedAt, profile.graphMaxStalenessMinutes(), now, command, failures);
+            List<String> uncovered = uncoveredChangedFiles(connection, projectRoot, goal, impactText);
+            if (!uncovered.isEmpty()) {
+                failures.add("changed files not covered by impact map: " + uncovered
+                        + "; next_command=" + commandForChangedFile(projectRoot, uncovered.get(0)));
+            }
+        }
+
+        writeLog(log, output.toString());
+        String status = failures.isEmpty() ? "passed" : "failed";
+        String summary = failures.isEmpty()
+                ? "impact map fresh and covers changed files"
+                : "impact freshness failed: " + failures;
+        return save(connection, projectRoot, goal, "impact", "impact", command, status, summary, log, now);
+    }
+
     private GoalCheck save(Connection connection, Path projectRoot, GoalRun goal, String checkKey, String checkType,
                            String command, String status, String summary, Path evidencePath,
                            String now) throws Exception {
@@ -248,6 +378,151 @@ public final class GoalCheckService {
                 checkFingerprint, now, now, now);
         checkRepository.upsert(connection, check);
         return checkRepository.find(connection, goal.goalKey(), checkKey);
+    }
+
+    private void addAgeFailure(String label, String generatedAt, int maxMinutes, String now,
+                               String command, List<String> failures) {
+        if (maxMinutes <= 0 || generatedAt == null || generatedAt.length() == 0) {
+            return;
+        }
+        try {
+            Duration age = Duration.between(Instant.parse(generatedAt), Instant.parse(now));
+            if (age.toMinutes() > maxMinutes) {
+                failures.add(label + " stale: age_minutes=" + age.toMinutes()
+                        + " max_minutes=" + maxMinutes + "; next_command=" + command);
+            }
+        } catch (Exception ex) {
+            failures.add(label + " stale: invalid generated_at; next_command=" + command);
+        }
+    }
+
+    private List<String> uncoveredChangedFiles(Connection connection, Path projectRoot, GoalRun goal,
+                                               String impactText) throws Exception {
+        List<String> changed = changedFilesForCoverage(connection, projectRoot, goal);
+        List<String> uncovered = new ArrayList<String>();
+        for (String file : changed) {
+            if (requiresImpactCoverage(file) && impactText.indexOf(file) < 0) {
+                uncovered.add(file);
+            }
+        }
+        return uncovered;
+    }
+
+    private List<String> changedFilesForCoverage(Connection connection, Path projectRoot, GoalRun goal)
+            throws Exception {
+        Set<String> files = new LinkedHashSet<String>();
+        for (GoalStep step : stepRepository.listByGoal(connection, goal.goalKey())) {
+            addChangedFiles(files, projectRoot, step.changedFiles());
+            addChangedFilesFromEvidence(files, projectRoot, step.evidence());
+        }
+        return new ArrayList<String>(files);
+    }
+
+    private void addChangedFilesFromEvidence(Set<String> files, Path projectRoot, String evidence) {
+        if (evidence == null || evidence.length() == 0) {
+            return;
+        }
+        String[] lines = evidence.split("\\r?\\n");
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (trimmed.startsWith("changed_files=")) {
+                addChangedFiles(files, projectRoot, trimmed.substring("changed_files=".length()));
+            }
+        }
+    }
+
+    private void addChangedFiles(Set<String> files, Path projectRoot, String raw) {
+        if (raw == null || raw.trim().length() == 0 || "none".equalsIgnoreCase(raw.trim())) {
+            return;
+        }
+        String[] parts = raw.split("[,;\\n\\r]+");
+        for (String part : parts) {
+            String normalized = normalizeRelativePath(projectRoot, part);
+            if (normalized.length() > 0) {
+                files.add(normalized);
+            }
+        }
+    }
+
+    private String normalizeRelativePath(Path projectRoot, String value) {
+        String text = value == null ? "" : value.trim().replace('\\', '/');
+        if (text.length() == 0) {
+            return "";
+        }
+        try {
+            Path path = projectRoot.getFileSystem().getPath(text);
+            if (path.isAbsolute()) {
+                text = projectRoot.toAbsolutePath().normalize()
+                        .relativize(path.toAbsolutePath().normalize()).toString().replace('\\', '/');
+            }
+        } catch (Exception ignored) {
+            return text;
+        }
+        while (text.startsWith("./")) {
+            text = text.substring(2);
+        }
+        return text;
+    }
+
+    private boolean requiresImpactCoverage(String file) {
+        return file.startsWith("src/")
+                && (file.endsWith(".java") || file.endsWith(".xml") || file.endsWith(".jsp")
+                || file.endsWith(".jspx") || file.endsWith(".sql") || file.endsWith(".properties")
+                || file.endsWith(".yml") || file.endsWith(".yaml"));
+    }
+
+    private String graphRefreshCommand(Path projectRoot) {
+        String root = projectRoot.toAbsolutePath().normalize().toString();
+        return "dhk graph index --project-root " + root
+                + " && dhk graph export --project-root " + root;
+    }
+
+    private String impactRefreshCommand(Path projectRoot, Connection connection, GoalRun goal) throws Exception {
+        List<String> changed = changedFilesForCoverage(connection, projectRoot, goal);
+        for (String file : changed) {
+            if (requiresImpactCoverage(file)) {
+                return commandForChangedFile(projectRoot, file);
+            }
+        }
+        return "dhk graph impact --project-root " + projectRoot.toAbsolutePath().normalize()
+                + " --file <changed-file>";
+    }
+
+    private String commandForChangedFile(Path projectRoot, String file) {
+        return "dhk graph impact --project-root " + projectRoot.toAbsolutePath().normalize()
+                + " --file " + file;
+    }
+
+    private String jsonString(String json, String key) {
+        if (json == null || json.length() == 0 || key == null || key.length() == 0) {
+            return "";
+        }
+        Pattern pattern = Pattern.compile("\"" + Pattern.quote(key) + "\"\\s*:\\s*\"([^\"]*)\"");
+        Matcher matcher = pattern.matcher(json);
+        return matcher.find() ? matcher.group(1) : "";
+    }
+
+    private String tagValue(String text, String tag) {
+        if (text == null || text.length() == 0 || tag == null || tag.length() == 0) {
+            return "";
+        }
+        Pattern pattern = Pattern.compile("<" + Pattern.quote(tag) + ">([^<]+)</" + Pattern.quote(tag) + ">");
+        Matcher matcher = pattern.matcher(text);
+        return matcher.find() ? matcher.group(1).trim() : "";
+    }
+
+    private String lineValue(String text, String prefix) {
+        if (text == null || text.length() == 0 || prefix == null || prefix.length() == 0) {
+            return "";
+        }
+        String[] lines = text.split("\\r?\\n");
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (trimmed.startsWith(prefix)) {
+                return trimmed.substring(prefix.length()).trim();
+            }
+        }
+        return "";
     }
 
     private Path logPath(Path projectRoot, GoalRun goal, String checkKey) {

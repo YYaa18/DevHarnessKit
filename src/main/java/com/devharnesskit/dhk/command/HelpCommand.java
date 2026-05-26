@@ -34,6 +34,8 @@ public final class HelpCommand implements Command {
         context.out().println("  dhk goal complete [--goal <goal-key>]");
         context.out().println("  dhk goal status [--goal <goal-key>]");
         context.out().println("  dhk goal export [--goal <goal-key>]");
+        context.out().println("  dhk graph init --project-root <path>");
+        context.out().println("  dhk graph status --project-root <path>");
         context.out().println("  dhk workflow template seed --project-root <path>");
         context.out().println("  dhk workflow template list --project-root <path>");
         context.out().println("  dhk workflow template show --key <workflow>");
@@ -61,6 +63,8 @@ public final class HelpCommand implements Command {
         context.out().println("  .agents/devharness/goal-profiles/*.json can override or add goal profiles.");
         context.out().println("  .agents/devharness/goal-check-policy.json can configure required goal checks.");
         context.out().println("  .agents/devharness/policy.json can declare alpha project safety policy.");
+        context.out().println("Graph configuration:");
+        context.out().println("  .agents/graph/config.json controls alpha Graph Lite file scanning.");
         context.out().println("Machine-readable output:");
         context.out().println("  Supported commands accept --json for alpha JSON output.");
         context.out().println("  dhk db sql also supports --format json for query results.");

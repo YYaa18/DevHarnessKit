@@ -9,6 +9,7 @@ not confirmed project memory and is not a stable public database API before 1.0.
 
 ```text
 .agents/graph/config.json
+.agents/graph/exports/GRAPH_INDEX_REPORT.md
 .agents/graph/exports/GRAPH_CONTEXT.md
 .agents/graph/exports/IMPACT_MAP.md
 .agents/graph/exports/GRAPH_SUMMARY.json
@@ -18,6 +19,18 @@ not confirmed project memory and is not a stable public database API before 1.0.
 
 Only `config.json` is intended to be committed. Generated exports, snapshots,
 and cache files are ignored.
+
+## Current Commands
+
+```bash
+dhk graph init --project-root <path>
+dhk graph status --project-root <path>
+```
+
+`graph init` creates `.agents/graph/config.json` and generated artifact
+directories. `graph status` scans configured files and writes
+`GRAPH_INDEX_REPORT.md`. It does not yet write graph rows or produce impact
+maps.
 
 ## Default Config
 

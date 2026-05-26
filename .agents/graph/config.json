@@ -11,11 +11,18 @@
   "exclude": [
     "target/**",
     "build/**",
+    "node_modules/**",
     ".git/**",
     ".agents/memory/**",
     ".agents/graph/exports/**",
     ".agents/graph/snapshots/**",
-    ".agents/graph/cache/**"
+    ".agents/graph/cache/**",
+    "**/*.jar",
+    "**/*.class",
+    "**/*secret*",
+    "**/*password*",
+    "**/*.pem",
+    "**/*.key"
   ],
   "limits": {
     "max_file_bytes": 1048576,

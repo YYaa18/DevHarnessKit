@@ -4,6 +4,7 @@ import com.devharnesskit.dhk.command.HelpCommand;
 import com.devharnesskit.dhk.command.DoctorCommand;
 import com.devharnesskit.dhk.command.VersionCommand;
 import com.devharnesskit.dhk.command.projectdb.DbCommand;
+import com.devharnesskit.dhk.command.graph.GraphCommand;
 import com.devharnesskit.dhk.command.memory.MemoryCommand;
 import com.devharnesskit.dhk.command.goal.GoalCommand;
 import com.devharnesskit.dhk.command.spec.SpecCommand;
@@ -51,6 +52,11 @@ public final class CommandRouter {
         this.commands.put("goal", new Supplier<Command>() {
             public Command get() {
                 return new GoalCommand();
+            }
+        });
+        this.commands.put("graph", new Supplier<Command>() {
+            public Command get() {
+                return new GraphCommand();
             }
         });
         this.commands.put("workflow", new Supplier<Command>() {

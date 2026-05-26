@@ -15,6 +15,7 @@ This repository is `0.1.0-alpha` and should be treated as a developer preview.
 | Sensitive guard | Alpha | Best-effort heuristic guard with project-level reject/redact/allow policy. Not a complete DLP system. |
 | DB readonly | Beta | Useful for inspection, but SQL guard is not a permission boundary. Use read-only database credentials. |
 | Goal orchestration | Experimental alpha | High-level `dhk goal` protocol for start/resume/next/step/check/evaluate/verify/complete and short context export. It is the preferred harness entry for agent work, but not stable. |
+| Graph Lite | Experimental alpha | `dhk graph init/status` can scan files and export a local index report. Symbol parsing and impact maps are still in progress. |
 | Workflow | Alpha | Records process state for audit and context export. It is not a workflow engine. |
 | Spec | Alpha | Records change documents, tasks, acceptance, and status. Markdown is export only. |
 | Agent packaging | Alpha | Ships `.agents/skills` and `.comate/rules` helpers for agent workflows. |
@@ -42,6 +43,7 @@ DevHarnessKit
 |-- memory core      project facts, short context export, checkpoint/recovery
 |-- db readonly      optional business database inspection
 |-- goal             high-level task orchestration over memory/workflow/spec
+|-- graph lite       snapshot-bound file graph context for impact analysis
 |-- workflow         process state recording, not a workflow engine
 |-- spec             requirements/design/tasks/acceptance state recording
 `-- agent packaging  skills, rules, and wrapper scripts

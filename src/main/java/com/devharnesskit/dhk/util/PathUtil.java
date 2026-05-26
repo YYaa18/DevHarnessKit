@@ -10,12 +10,17 @@ public final class PathUtil {
     public static final String AGENTS_DIRECTORY = ".agents";
     public static final String DEVHARNESS_DIRECTORY = "devharness";
     public static final String MEMORY_DIRECTORY = "memory";
+    public static final String GRAPH_DIRECTORY = "graph";
     public static final String EXPORTS_DIRECTORY = "exports";
     public static final String ARTIFACTS_DIRECTORY = "artifacts";
     public static final String BACKUPS_DIRECTORY = "backups";
+    public static final String SNAPSHOTS_DIRECTORY = "snapshots";
+    public static final String CACHE_DIRECTORY = "cache";
     public static final String PROJECT_JSON = "project.json";
     public static final String MEMORY_DB = "memory.db";
     public static final String PROJECT_INDEX = "PROJECT_INDEX.md";
+    public static final String GRAPH_CONFIG_JSON = "config.json";
+    public static final String GRAPH_INDEX_REPORT = "GRAPH_INDEX_REPORT.md";
     public static final String CURRENT_CONTEXT = "CURRENT_CONTEXT.md";
     public static final String RECOVERY_CONTEXT = "RECOVERY_CONTEXT.md";
     public static final String WORKFLOW_CONTEXT = "WORKFLOW_CONTEXT.md";
@@ -52,6 +57,30 @@ public final class PathUtil {
 
     public static Path devharnessDirectory(Path projectRoot) {
         return projectRoot.resolve(AGENTS_DIRECTORY).resolve(DEVHARNESS_DIRECTORY);
+    }
+
+    public static Path graphDirectory(Path projectRoot) {
+        return projectRoot.resolve(AGENTS_DIRECTORY).resolve(GRAPH_DIRECTORY);
+    }
+
+    public static Path graphConfig(Path projectRoot) {
+        return graphDirectory(projectRoot).resolve(GRAPH_CONFIG_JSON);
+    }
+
+    public static Path graphExportsDirectory(Path projectRoot) {
+        return graphDirectory(projectRoot).resolve(EXPORTS_DIRECTORY);
+    }
+
+    public static Path graphSnapshotsDirectory(Path projectRoot) {
+        return graphDirectory(projectRoot).resolve(SNAPSHOTS_DIRECTORY);
+    }
+
+    public static Path graphCacheDirectory(Path projectRoot) {
+        return graphDirectory(projectRoot).resolve(CACHE_DIRECTORY);
+    }
+
+    public static Path graphIndexReport(Path projectRoot) {
+        return graphExportsDirectory(projectRoot).resolve(GRAPH_INDEX_REPORT);
     }
 
     public static Path sensitivePolicy(Path projectRoot) {
@@ -137,6 +166,17 @@ public final class PathUtil {
             Files.createDirectories(artifactsDirectory(projectRoot));
         } catch (IOException ex) {
             throw new IllegalStateException("Failed to create memory directories: " + ex.getMessage(), ex);
+        }
+    }
+
+    public static void createGraphDirectories(Path projectRoot) {
+        try {
+            Files.createDirectories(graphDirectory(projectRoot));
+            Files.createDirectories(graphExportsDirectory(projectRoot));
+            Files.createDirectories(graphSnapshotsDirectory(projectRoot));
+            Files.createDirectories(graphCacheDirectory(projectRoot));
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to create graph directories: " + ex.getMessage(), ex);
         }
     }
 }

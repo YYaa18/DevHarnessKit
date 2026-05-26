@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "architecture": {
+    "layers": ["controller", "service", "repository", "domain"],
+    "allowed_dependencies": [
+      "controller->service",
+      "controller->dto",
+      "controller->support",
+      "service->repository",
+      "service->domain",
+      "service->dto",
+      "repository->domain"
+    ],
+    "forbidden_dependencies": [
+      "controller->repository",
+      "repository->controller",
+      "repository->service"
+    ]
+  },
+  "protected_files": [
+    "src/main/java/com/acme/modern/account/support/HttpGet.java",
+    "src/main/java/com/acme/modern/account/support/HttpPost.java"
+  ],
+  "command_allowlist": [
+    "mvn -q -f testbeds/fixtures/modern-java-api/pom.xml test"
+  ]
+}

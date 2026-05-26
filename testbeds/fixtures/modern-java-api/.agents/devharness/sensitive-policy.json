@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "default_action": "reject",
+  "rules": {
+    "email": "redact",
+    "phone": "redact",
+    "national_id": "redact",
+    "authorization_header": "reject",
+    "api_key": "reject",
+    "private_key": "reject"
+  }
+}

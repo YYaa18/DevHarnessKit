@@ -1,0 +1,105 @@
+{
+  "schema_version": "devharness-testbed-ground-truth/v1",
+  "task_id": "modern-java-api-001",
+  "fixture": "modern-java-api",
+  "project_type": "modern-java-api",
+  "initial_commit": "",
+  "required_changed_files": [
+    "src/main/java/com/acme/modern/account/domain/Account.java",
+    "src/main/java/com/acme/modern/account/dto/AccountResponse.java",
+    "src/main/java/com/acme/modern/account/service/AccountService.java",
+    "src/main/java/com/acme/modern/account/repository/InMemoryAccountRepository.java",
+    "src/test/java/com/acme/modern/account/service/AccountServiceTest.java",
+    "src/test/java/com/acme/modern/account/controller/AccountControllerTest.java"
+  ],
+  "allowed_changed_files": [
+    "tasks/add-risk-rating-field/scorecard.md"
+  ],
+  "forbidden_changed_files": [
+    "src/main/java/com/acme/modern/account/support/HttpGet.java",
+    "src/main/java/com/acme/modern/account/support/HttpPost.java"
+  ],
+  "expected_impact_points": [
+    {
+      "type": "public_api",
+      "name": "GET /api/accounts/{accountId}",
+      "file": "src/main/java/com/acme/modern/account/controller/AccountController.java",
+      "reason": "Response contract changes"
+    },
+    {
+      "type": "public_api",
+      "name": "GET /api/accounts",
+      "file": "src/main/java/com/acme/modern/account/controller/AccountController.java",
+      "reason": "List response contract changes"
+    },
+    {
+      "type": "domain",
+      "name": "Account",
+      "file": "src/main/java/com/acme/modern/account/domain/Account.java",
+      "reason": "Source field"
+    },
+    {
+      "type": "dto",
+      "name": "AccountResponse",
+      "file": "src/main/java/com/acme/modern/account/dto/AccountResponse.java",
+      "reason": "Public response DTO"
+    },
+    {
+      "type": "service",
+      "name": "AccountService.toResponse",
+      "file": "src/main/java/com/acme/modern/account/service/AccountService.java",
+      "reason": "Mapping point"
+    },
+    {
+      "type": "repository",
+      "name": "InMemoryAccountRepository",
+      "file": "src/main/java/com/acme/modern/account/repository/InMemoryAccountRepository.java",
+      "reason": "Seed data"
+    },
+    {
+      "type": "test",
+      "name": "AccountServiceTest",
+      "file": "src/test/java/com/acme/modern/account/service/AccountServiceTest.java",
+      "reason": "Mapping regression"
+    },
+    {
+      "type": "test",
+      "name": "AccountControllerTest",
+      "file": "src/test/java/com/acme/modern/account/controller/AccountControllerTest.java",
+      "reason": "API response regression"
+    }
+  ],
+  "expected_related_tests": [
+    "src/test/java/com/acme/modern/account/service/AccountServiceTest.java",
+    "src/test/java/com/acme/modern/account/controller/AccountControllerTest.java"
+  ],
+  "required_verification": [
+    {
+      "type": "command",
+      "command": "mvn -q -f testbeds/fixtures/modern-java-api/pom.xml test",
+      "required": true
+    }
+  ],
+  "manual_evidence_required": false,
+  "rollback_requirements": [
+    "Revert domain, DTO, mapper/service, repository seed, and test changes."
+  ],
+  "risk_points": [
+    "Changing route annotations is out of scope.",
+    "Adding the field to DTO only creates a broken mapping.",
+    "Public API impact must include both get and list routes."
+  ],
+  "public_api_impacts": [
+    "GET /api/accounts/{accountId}",
+    "GET /api/accounts"
+  ],
+  "scoring_notes": {
+    "impact_recall_denominator": 8,
+    "impact_precision_notes": "Do not count support annotations or unrelated request DTO as true positives.",
+    "hard_fail_conditions": [
+      "Fixture tests fail",
+      "riskRating is missing from AccountResponse",
+      "support annotations are modified"
+    ]
+  }
+}

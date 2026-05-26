@@ -16,7 +16,9 @@ import com.devharnesskit.dhk.repository.workflow.WorkflowGateRunRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowRunRepository;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
 import com.devharnesskit.dhk.model.policy.DevHarnessPolicy;
+import com.devharnesskit.dhk.model.graph.GraphArchitectureCheckResult;
 import com.devharnesskit.dhk.service.policy.DevHarnessPolicyService;
+import com.devharnesskit.dhk.service.graph.GraphArchitectureCheckService;
 import com.devharnesskit.dhk.util.PathUtil;
 
 import java.io.InputStream;
@@ -49,12 +51,13 @@ public final class GoalCheckService {
     private final WorkspaceFingerprintService fingerprintService;
     private final GoalStepRepository stepRepository;
     private final DevHarnessPolicyService devHarnessPolicyService;
+    private final GraphArchitectureCheckService architectureCheckService;
 
     public GoalCheckService() {
         this(new GoalCheckRepository(), new SpecTaskRepository(), new SpecAcceptanceRepository(),
                 new WorkflowRunRepository(), new WorkflowGateRunRepository(), new SensitiveDataGuard(),
                 new GoalCheckPolicyService(), new GoalProfileService(), new WorkspaceFingerprintService(),
-                new GoalStepRepository(), new DevHarnessPolicyService());
+                new GoalStepRepository(), new DevHarnessPolicyService(), new GraphArchitectureCheckService());
     }
 
     GoalCheckService(GoalCheckRepository checkRepository, SpecTaskRepository taskRepository,
@@ -66,7 +69,8 @@ public final class GoalCheckService {
                      GoalProfileService profileService,
                      WorkspaceFingerprintService fingerprintService,
                      GoalStepRepository stepRepository,
-                     DevHarnessPolicyService devHarnessPolicyService) {
+                     DevHarnessPolicyService devHarnessPolicyService,
+                     GraphArchitectureCheckService architectureCheckService) {
         this.checkRepository = checkRepository;
         this.taskRepository = taskRepository;
         this.acceptanceRepository = acceptanceRepository;
@@ -78,6 +82,7 @@ public final class GoalCheckService {
         this.fingerprintService = fingerprintService;
         this.stepRepository = stepRepository;
         this.devHarnessPolicyService = devHarnessPolicyService;
+        this.architectureCheckService = architectureCheckService;
     }
 
     public GoalCheck run(Connection connection, Path projectRoot, GoalRun goal,
@@ -111,6 +116,9 @@ public final class GoalCheckService {
         }
         if ("legacy".equals(checkKey)) {
             return runLegacyCheck(connection, projectRoot, goal, profile, now);
+        }
+        if ("architecture".equals(checkKey)) {
+            return runArchitectureCheck(connection, projectRoot, goal, now);
         }
         throw new IllegalArgumentException("Unknown goal check: " + checkKey);
     }
@@ -442,6 +450,15 @@ public final class GoalCheckService {
                 + " protected_impact_files=" + protectedFiles
                 : "legacy evidence failed: " + failures;
         return save(connection, projectRoot, goal, "legacy", "legacy", "", status, summary, log, now);
+    }
+
+    private GoalCheck runArchitectureCheck(Connection connection, Path projectRoot, GoalRun goal,
+                                           String now) throws Exception {
+        Path log = logPath(projectRoot, goal, "architecture");
+        GraphArchitectureCheckResult result = architectureCheckService.check(connection, projectRoot);
+        writeLog(log, result.output());
+        return save(connection, projectRoot, goal, "architecture", "architecture", "", result.status(),
+                result.summary(), log, now);
     }
 
     private boolean containsEvidenceFlag(List<GoalStep> steps, String key) {

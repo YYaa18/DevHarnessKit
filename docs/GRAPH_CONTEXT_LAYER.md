@@ -7,6 +7,7 @@ the latest completed graph snapshot and are not long-term confirmed memory.
 
 ```text
 .agents/graph/config.json
+.agents/graph/architecture.json
 .agents/graph/exports/GRAPH_INDEX_REPORT.md
 .agents/graph/exports/GRAPH_CONTEXT.md
 .agents/graph/exports/GRAPH_SNAPSHOT.json
@@ -47,3 +48,37 @@ rerun graph index/export/impact when files changed
 
 Graph output should guide impact analysis, not replace compile, test, sensitive,
 workflow, or spec checks.
+
+## Architecture Check Alpha
+
+Graph-aware Java goal profiles include an alpha `architecture` check. The check
+uses `.agents/graph/architecture.json` when present and otherwise defaults to
+controller/service/repository conventions. The default mode records a passing
+check with an `architecture warning` summary; projects can set `"mode": "fail"`
+to make violations block `goal verify`.
+
+Example:
+
+```json
+{
+  "schema_version": "devharness-graph-architecture/v1-alpha",
+  "mode": "fail",
+  "controller_patterns": ["src/main/java/**/controller/**"],
+  "service_patterns": ["src/main/java/**/service/**"],
+  "repository_patterns": ["src/main/java/**/repository/**"],
+  "public_api_patterns": ["src/main/java/**/controller/**"],
+  "forbidden_dependencies": [
+    "controller->repository",
+    "repository->controller",
+    "repository->service",
+    "service->controller"
+  ]
+}
+```
+
+Limitations:
+
+- The check is based on indexed imports and path/package naming.
+- Fully-qualified references without imports may be missed.
+- Public API impact is inferred from `IMPACT_MAP.md` route entries and files
+  matching `public_api_patterns`.

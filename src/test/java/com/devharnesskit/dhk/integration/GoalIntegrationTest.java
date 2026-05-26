@@ -10,9 +10,14 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -289,7 +294,8 @@ final class GoalIntegrationTest {
                 "--summary", "Inspected files with structured evidence",
                 "--read-files", "GoalStepCommand.java,GoalOrchestrator.java,GoalIntegrationTest.java"
         }, inspectStep.context());
-        assertEquals(ExitCodes.SUCCESS, inspectStepExit);
+        assertEquals(ExitCodes.SUCCESS, inspectStepExit,
+                "stdout=" + inspectStep.stdout() + "\nstderr=" + inspectStep.stderr());
         assertTrue(inspectStep.stdout().contains("current_action: create_change_plan"));
 
         String evidence = singleString(root, "SELECT evidence FROM goal_step WHERE goal_key = '" + goalKey + "'");
@@ -333,7 +339,8 @@ final class GoalIntegrationTest {
                 "--pending", "none",
                 "--evidence", "sensitive_result=passed"
         }, verifyStep.context());
-        assertEquals(ExitCodes.SUCCESS, verifyStepExit);
+        assertEquals(ExitCodes.SUCCESS, verifyStepExit,
+                "stdout=" + verifyStep.stdout() + "\nstderr=" + verifyStep.stderr());
         String verifyEvidence = singleString(root, "SELECT evidence FROM goal_step WHERE goal_key = '"
                 + goalKey + "' AND step_index = 4");
         assertTrue(verifyEvidence.contains("compile_result=passed"));
@@ -1784,6 +1791,7 @@ final class GoalIntegrationTest {
         assertTrue(next.stdout().contains("next_command: dhk graph index --project-root"));
         assertTrue(next.stdout().contains("graph_snapshot"));
         assertTrue(next.stdout().contains("graph_context"));
+        assertTrue(next.stdout().contains("  - architecture"));
         assertFalse(next.stdout().contains("current_action: inspect_existing_code"));
 
         String context = new String(Files.readAllBytes(PathUtil.goalContext(tempDir.resolve("demo"))), "UTF-8");
@@ -1981,6 +1989,113 @@ final class GoalIntegrationTest {
         assertTrue(verify.stdout().contains("dhk graph impact --project-root"));
         assertTrue(verify.stdout().contains("\"next_command\": \"dhk goal check --goal " + goalKey
                 + " --check impact\""));
+    }
+
+    @Test
+    void goalVerifyFailsArchitectureCheckWhenModeIsFail() throws Exception {
+        Path root = copyFixture("modern-java-api", tempDir.resolve("modern-java-api-arch-fail"));
+        String projectRoot = root.toString();
+        Files.createDirectories(PathUtil.graphDirectory(root));
+        Files.write(PathUtil.graphArchitectureConfig(root), ("{\n"
+                + "  \"schema_version\": \"devharness-graph-architecture/v1-alpha\",\n"
+                + "  \"mode\": \"fail\",\n"
+                + "  \"controller_patterns\": [\"src/main/java/**/controller/**\"],\n"
+                + "  \"service_patterns\": [\"src/main/java/**/service/**\"],\n"
+                + "  \"repository_patterns\": [\"src/main/java/**/repository/**\"],\n"
+                + "  \"public_api_patterns\": [\"src/main/java/**/controller/**\"],\n"
+                + "  \"forbidden_dependencies\": [\"controller->repository\"]\n"
+                + "}\n").getBytes("UTF-8"));
+        writeArchitectureProfile(root, "custom-architecture");
+        Path controller = root.resolve("src/main/java/com/acme/modern/account/controller/AccountController.java");
+        String controllerText = new String(Files.readAllBytes(controller), "UTF-8");
+        controllerText = controllerText.replace(
+                "import com.acme.modern.account.service.AccountService;\n",
+                "import com.acme.modern.account.service.AccountService;\n"
+                        + "import com.acme.modern.account.repository.AccountRepository;\n");
+        Files.write(controller, controllerText.getBytes("UTF-8"));
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", projectRoot,
+                "--profile", "custom-architecture",
+                "--task", "Architecture violation must fail",
+                "--module", "modern"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "index", "--project-root", projectRoot
+        }, new Harness(tempDir).context()));
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "export", "--project-root", projectRoot
+        }, new Harness(tempDir).context()));
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", projectRoot,
+                "--file", "src/main/java/com/acme/modern/account/controller/AccountController.java"
+        }, new Harness(tempDir).context()));
+        recordTwoStepGoalForProject(projectRoot, goalKey);
+
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", projectRoot, "--goal", goalKey
+        }, verify.context());
+
+        assertEquals(ExitCodes.SUCCESS, verifyExit, verify.stderr());
+        assertTrue(verify.stdout().contains("decision: not_ready"));
+        assertTrue(verify.stdout().contains("architecture: failed - architecture failed"));
+        assertTrue(verify.stdout().contains("violations=1"));
+        assertTrue(verify.stdout().contains("public_api_impact=true"));
+
+        String log = new String(Files.readAllBytes(PathUtil.goalCheckArtifactsDirectory(root, goalKey)
+                .resolve("architecture.log")), "UTF-8");
+        assertTrue(log.contains("controller -> repository"));
+        assertTrue(log.contains("com.acme.modern.account.controller.AccountController"));
+        assertTrue(log.contains("com.acme.modern.account.repository.AccountRepository"));
+        assertTrue(log.contains("public_api_impact_files: [src/main/java/com/acme/modern/account/controller/AccountController.java]"));
+    }
+
+    @Test
+    void goalVerifyAcceptsArchitectureWarningByDefault() throws Exception {
+        Path root = tempDir.resolve("demo-arch-warn");
+        String projectRoot = root.toString();
+        writeModernArchitectureFixture(root, false);
+        writeArchitectureProfile(root, "custom-architecture");
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", projectRoot,
+                "--profile", "custom-architecture",
+                "--task", "Architecture warning accepted",
+                "--module", "modern"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "index", "--project-root", projectRoot
+        }, new Harness(tempDir).context()));
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "export", "--project-root", projectRoot
+        }, new Harness(tempDir).context()));
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", projectRoot,
+                "--file", "src/main/java/com/example/account/controller/AccountController.java"
+        }, new Harness(tempDir).context()));
+        recordTwoStepGoalForProject(projectRoot, goalKey);
+
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", projectRoot, "--goal", goalKey
+        }, verify.context());
+
+        assertEquals(ExitCodes.SUCCESS, verifyExit, verify.stderr());
+        assertTrue(verify.stdout().contains("decision: ready_to_complete"));
+        assertTrue(verify.stdout().contains("architecture: passed - architecture warning"));
+        assertTrue(verify.stdout().contains("violations=1"));
+        assertTrue(verify.stdout().contains("public_api_impact=true"));
     }
 
     @Test
@@ -2274,30 +2389,40 @@ final class GoalIntegrationTest {
     }
 
     private void recordTwoStepGoal(String goalKey) {
-        recordTwoStepGoal(goalKey, "verification=done");
+        recordTwoStepGoal("demo", goalKey, "verification=done");
+    }
+
+    private void recordTwoStepGoalForProject(String projectRoot, String goalKey) {
+        recordTwoStepGoal(projectRoot, goalKey, "verification=done");
     }
 
     private void recordTwoStepGoal(String goalKey, String verifyEvidence) {
+        recordTwoStepGoal("demo", goalKey, verifyEvidence);
+    }
+
+    private void recordTwoStepGoal(String projectRoot, String goalKey, String verifyEvidence) {
         Harness inspectStep = new Harness(tempDir);
         int inspectStepExit = new CommandRouter().run(new String[]{
                 "goal", "step",
-                "--project-root", "demo",
+                "--project-root", projectRoot,
                 "--goal", goalKey,
                 "--summary", "Inspection complete",
                 "--evidence", "inspection=done"
         }, inspectStep.context());
-        assertEquals(ExitCodes.SUCCESS, inspectStepExit);
+        assertEquals(ExitCodes.SUCCESS, inspectStepExit,
+                "stdout=" + inspectStep.stdout() + "\nstderr=" + inspectStep.stderr());
 
         Harness verifyStep = new Harness(tempDir);
         int verifyStepExit = new CommandRouter().run(new String[]{
                 "goal", "step",
-                "--project-root", "demo",
+                "--project-root", projectRoot,
                 "--goal", goalKey,
                 "--summary", "Verification evidence complete",
                 "--evidence", "compile_result=not required; test_result=not required; "
                         + "sensitive_result=not required; " + verifyEvidence
         }, verifyStep.context());
-        assertEquals(ExitCodes.SUCCESS, verifyStepExit);
+        assertEquals(ExitCodes.SUCCESS, verifyStepExit,
+                "stdout=" + verifyStep.stdout() + "\nstderr=" + verifyStep.stderr());
     }
 
     private Path writeSource(Path root, String relativePath, String content) throws Exception {
@@ -2305,6 +2430,25 @@ final class GoalIntegrationTest {
         Files.createDirectories(file.getParent());
         Files.write(file, content.getBytes("UTF-8"));
         return file;
+    }
+
+    private Path copyFixture(String fixtureName, Path target) throws Exception {
+        final Path source = Paths.get("testbeds/fixtures").resolve(fixtureName).toAbsolutePath().normalize();
+        final Path destination = target.toAbsolutePath().normalize();
+        Files.walkFileTree(source, new SimpleFileVisitor<Path>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws java.io.IOException {
+                Files.createDirectories(destination.resolve(source.relativize(dir)));
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws java.io.IOException {
+                Files.copy(file, destination.resolve(source.relativize(file)), StandardCopyOption.REPLACE_EXISTING);
+                return FileVisitResult.CONTINUE;
+            }
+        });
+        return destination;
     }
 
     private void writeGraphProfile(Path root, String profileKey, boolean requireImpactMap) throws Exception {
@@ -2328,6 +2472,57 @@ final class GoalIntegrationTest {
                 + "  \"graph_require_impact_map\": \"" + requireImpactMap + "\",\n"
                 + "  \"graph_max_staleness_minutes\": \"60\",\n"
                 + "  \"graph_actions\": \"" + graphActions + "\"\n"
+                + "}\n").getBytes("UTF-8"));
+    }
+
+    private void writeArchitectureProfile(Path root, String profileKey) throws Exception {
+        Files.createDirectories(PathUtil.goalProfilesDirectory(root));
+        Files.write(PathUtil.goalProfile(root, profileKey), ("{\n"
+                + "  \"workflow_key\": \"api-change\",\n"
+                + "  \"requires_spec\": \"false\",\n"
+                + "  \"default_mode\": \"api\",\n"
+                + "  \"actions\": \"inspect,verify\",\n"
+                + "  \"required_checks\": \"architecture\",\n"
+                + "  \"completion_allow_skipped_checks\": \"false\"\n"
+                + "}\n").getBytes("UTF-8"));
+    }
+
+    private void writeModernArchitectureFixture(Path root, boolean failMode) throws Exception {
+        writeSource(root, "src/main/java/com/example/account/controller/AccountController.java",
+                "package com.example.account.controller;\n"
+                        + "import com.example.account.repository.AccountRepository;\n"
+                        + "import com.example.account.service.AccountService;\n"
+                        + "public class AccountController {\n"
+                        + "  private final AccountService accountService;\n"
+                        + "  private final AccountRepository accountRepository;\n"
+                        + "  public AccountController(AccountService accountService, AccountRepository accountRepository) {\n"
+                        + "    this.accountService = accountService;\n"
+                        + "    this.accountRepository = accountRepository;\n"
+                        + "  }\n"
+                        + "  public String get(String id) { return accountService.get(id); }\n"
+                        + "}\n");
+        writeSource(root, "src/main/java/com/example/account/service/AccountService.java",
+                "package com.example.account.service;\n"
+                        + "import com.example.account.repository.AccountRepository;\n"
+                        + "public class AccountService {\n"
+                        + "  private final AccountRepository accountRepository;\n"
+                        + "  public AccountService(AccountRepository accountRepository) {\n"
+                        + "    this.accountRepository = accountRepository;\n"
+                        + "  }\n"
+                        + "  public String get(String id) { return accountRepository.find(id); }\n"
+                        + "}\n");
+        writeSource(root, "src/main/java/com/example/account/repository/AccountRepository.java",
+                "package com.example.account.repository;\n"
+                        + "public interface AccountRepository { String find(String id); }\n");
+        Files.createDirectories(PathUtil.graphDirectory(root));
+        Files.write(PathUtil.graphArchitectureConfig(root), ("{\n"
+                + "  \"schema_version\": \"devharness-graph-architecture/v1-alpha\",\n"
+                + "  \"mode\": \"" + (failMode ? "fail" : "warn") + "\",\n"
+                + "  \"controller_patterns\": [\"src/main/java/**/controller/**\"],\n"
+                + "  \"service_patterns\": [\"src/main/java/**/service/**\"],\n"
+                + "  \"repository_patterns\": [\"src/main/java/**/repository/**\"],\n"
+                + "  \"public_api_patterns\": [\"src/main/java/**/controller/**\"],\n"
+                + "  \"forbidden_dependencies\": [\"controller->repository\"]\n"
                 + "}\n").getBytes("UTF-8"));
     }
 

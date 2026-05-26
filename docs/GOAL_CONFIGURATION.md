@@ -111,6 +111,23 @@ verifies that it was generated from the latest graph snapshot, applies the same
 staleness window, and checks that recorded `changed_files` under `src/` are
 covered by the impact map.
 
+Built-in graph-aware Java profiles also require the alpha `architecture` check.
+It reads `.agents/graph/architecture.json` when present, otherwise uses default
+controller/service/repository path rules:
+
+```text
+controller -> service -> repository
+controller must not import repository
+repository must not import controller or service
+service must not import controller
+```
+
+The architecture check is a Graph Lite heuristic. It uses indexed Java import
+edges and path/package conventions; it is not full Java type resolution. The
+default mode is `warn`, which records a passing check with an
+`architecture warning` summary. Set `"mode": "fail"` in
+`.agents/graph/architecture.json` to make violations block completion.
+
 Their action sequence is:
 
 ```text
@@ -219,7 +236,8 @@ Example:
   "accepted_spec_statuses": "passed",
   "accepted_workflow_statuses": "passed,skipped,waived",
   "accepted_graph_statuses": "passed",
-  "accepted_impact_statuses": "passed"
+  "accepted_impact_statuses": "passed",
+  "accepted_architecture_statuses": "passed"
 }
 ```
 

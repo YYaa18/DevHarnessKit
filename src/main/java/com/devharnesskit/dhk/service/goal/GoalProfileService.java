@@ -162,23 +162,24 @@ public final class GoalProfileService {
                 GoalActionMapping.MODE_CHECK, GoalActionMapping.MODE_CHECK,
                 GoalActionMapping.ACCEPTANCE_CHECKS,
                 graphAware
-                        ? new String[]{"compile", "test", "sensitive", "graph", "impact"}
+                        ? new String[]{"compile", "test", "sensitive", "graph", "impact", "architecture"}
                         : new String[]{"compile", "test", "sensitive"}));
 
         Map<String, GoalAcceptanceMapping> acceptances = new LinkedHashMap<String, GoalAcceptanceMapping>();
         acceptances.put("goal_checks_pass", new GoalAcceptanceMapping("goal_checks_pass",
                 "Required goal checks are accepted",
                 graphAware
-                        ? "compile/test/sensitive/graph/impact checks are accepted by policy"
+                        ? "compile/test/sensitive/graph/impact/architecture checks are accepted by policy"
                         : "compile/test/sensitive checks are accepted by policy",
                 GoalAcceptanceMapping.SOURCE_CHECKS,
                 graphAware
-                        ? new String[]{"compile", "test", "sensitive", "graph", "impact"}
+                        ? new String[]{"compile", "test", "sensitive", "graph", "impact", "architecture"}
                         : new String[]{"compile", "test", "sensitive"}, ""));
 
         return new GoalProfile(profileKey, workflowKey, true, defaultMode, actions, evidence,
                 graphAware
-                        ? new String[]{"compile", "test", "sensitive", "graph", "impact", "workflow", "spec"}
+                        ? new String[]{"compile", "test", "sensitive", "graph", "impact",
+                        "architecture", "workflow", "spec"}
                         : new String[]{"compile", "test", "sensitive", "workflow", "spec"},
                 true, false, true, true, true, true, mappings, acceptances,
                 graphAware, "lite", true, true, 60,

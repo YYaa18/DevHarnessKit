@@ -20,6 +20,7 @@ public final class PathUtil {
     public static final String MEMORY_DB = "memory.db";
     public static final String PROJECT_INDEX = "PROJECT_INDEX.md";
     public static final String GRAPH_CONFIG_JSON = "config.json";
+    public static final String GRAPH_ARCHITECTURE_JSON = "architecture.json";
     public static final String GRAPH_INDEX_REPORT = "GRAPH_INDEX_REPORT.md";
     public static final String IMPACT_MAP = "IMPACT_MAP.md";
     public static final String GRAPH_CONTEXT = "GRAPH_CONTEXT.md";
@@ -68,6 +69,10 @@ public final class PathUtil {
 
     public static Path graphConfig(Path projectRoot) {
         return graphDirectory(projectRoot).resolve(GRAPH_CONFIG_JSON);
+    }
+
+    public static Path graphArchitectureConfig(Path projectRoot) {
+        return graphDirectory(projectRoot).resolve(GRAPH_ARCHITECTURE_JSON);
     }
 
     public static Path graphExportsDirectory(Path projectRoot) {

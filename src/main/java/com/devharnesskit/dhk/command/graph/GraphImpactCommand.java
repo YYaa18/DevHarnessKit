@@ -62,7 +62,7 @@ public final class GraphImpactCommand implements Command {
         if (query.length() == 0) {
             return null;
         }
-        return new GraphImpactRequest(type, query, depth(args));
+        return new GraphImpactRequest(type, query, depth(args), args.hasFlag("allow-stale"));
     }
 
     private int depth(Args args) {
@@ -90,6 +90,11 @@ public final class GraphImpactCommand implements Command {
         }
         context.out().println("graph impact");
         context.out().println("snapshot_key: " + result.snapshot().snapshotKey());
+        context.out().println("snapshot_stale: " + result.snapshotStale());
+        context.out().println("allow_stale: " + result.staleAllowed());
+        if (result.snapshotStale()) {
+            context.out().println("warning: STALE_GRAPH_SNAPSHOT");
+        }
         context.out().println("query_type: " + result.request().queryType());
         context.out().println("query: " + result.request().query());
         context.out().println("depth: " + result.request().depth());
@@ -118,6 +123,11 @@ public final class GraphImpactCommand implements Command {
                 JsonOutput.numberField("max_impact_depth", result.maxImpactDepth()),
                 JsonOutput.booleanField("depth_limited", result.depthLimited()),
                 JsonOutput.stringField("snapshot_key", result.snapshot() == null ? "" : result.snapshot().snapshotKey()),
+                JsonOutput.booleanField("snapshot_stale", result.snapshotStale()),
+                JsonOutput.booleanField("allow_stale", result.staleAllowed()),
+                JsonOutput.stringField("current_workspace_fingerprint", result.currentWorkspaceFingerprint()),
+                JsonOutput.stringField("snapshot_workspace_fingerprint",
+                        result.snapshot() == null ? "" : result.snapshot().workspaceFingerprint()),
                 JsonOutput.numberField("related_files", result.relatedFiles().size()),
                 JsonOutput.numberField("related_sql", result.relatedSql().size()),
                 JsonOutput.numberField("related_tests", result.relatedTests().size()),

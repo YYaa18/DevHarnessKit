@@ -102,7 +102,7 @@ public final class GraphService {
             });
         }
         GraphScanReport reportWithSnapshot = new GraphScanReport(projectRoot, config, report.entries(),
-                report.parseResult(), snapshot);
+                report.parseResult(), snapshot, workspaceFingerprint, false);
         Files.write(PathUtil.graphIndexReport(projectRoot),
                 renderer.render(reportWithSnapshot, clock.now()).getBytes("UTF-8"));
         return new GraphIndexResult(snapshot, reportWithSnapshot, PathUtil.graphIndexReport(projectRoot));
@@ -112,7 +112,10 @@ public final class GraphService {
         PathUtil.createGraphDirectories(projectRoot);
         GraphConfig config = configService.load(projectRoot);
         GraphSnapshot latestSnapshot = latestSnapshot(projectRoot);
-        GraphScanReport report = scan(projectRoot, config, latestSnapshot);
+        String currentWorkspaceFingerprint = fingerprintService.workspaceFingerprint(projectRoot);
+        GraphScanReport scanned = scan(projectRoot, config, latestSnapshot);
+        GraphScanReport report = new GraphScanReport(projectRoot, config, scanned.entries(), scanned.parseResult(),
+                latestSnapshot, currentWorkspaceFingerprint, isSnapshotStale(latestSnapshot, currentWorkspaceFingerprint));
         Files.write(PathUtil.graphIndexReport(projectRoot),
                 renderer.render(report, clock.now()).getBytes("UTF-8"));
         return report;
@@ -136,6 +139,13 @@ public final class GraphService {
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    private boolean isSnapshotStale(GraphSnapshot snapshot, String currentWorkspaceFingerprint) {
+        return snapshot != null
+                && currentWorkspaceFingerprint != null
+                && currentWorkspaceFingerprint.length() > 0
+                && !currentWorkspaceFingerprint.equals(snapshot.workspaceFingerprint());
     }
 
     private String snapshotKey(Clock clock) {

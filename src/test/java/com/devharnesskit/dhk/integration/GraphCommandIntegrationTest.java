@@ -17,6 +17,7 @@ import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.security.MessageDigest;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -257,6 +258,55 @@ final class GraphCommandIntegrationTest {
     }
 
     @Test
+    void graphImpactRejectsStaleSnapshotUnlessAllowed() throws Exception {
+        Path root = tempDir.resolve("demo-stale-impact");
+        write(root, "src/main/java/com/example/App.java",
+                "package com.example;\npublic class App { public void run() {} }\n");
+
+        Harness indexHarness = new Harness(tempDir);
+        int indexExit = new CommandRouter().run(new String[]{"graph", "index", "--project-root", "demo-stale-impact"},
+                indexHarness.context());
+        Harness freshStatusHarness = new Harness(tempDir);
+        int freshStatusExit = new CommandRouter().run(new String[]{"graph", "status", "--project-root", "demo-stale-impact"},
+                freshStatusHarness.context());
+
+        write(root, "src/main/java/com/example/App.java",
+                "package com.example;\npublic class App { public void run() { String changed = \"yes\"; } }\n");
+
+        Harness staleStatusHarness = new Harness(tempDir);
+        int staleStatusExit = new CommandRouter().run(new String[]{"graph", "status", "--project-root", "demo-stale-impact"},
+                staleStatusHarness.context());
+        Harness rejectedImpactHarness = new Harness(tempDir);
+        int rejectedImpactExit = new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", "demo-stale-impact",
+                "--file", "src/main/java/com/example/App.java"
+        }, rejectedImpactHarness.context());
+        Harness allowedImpactHarness = new Harness(tempDir);
+        int allowedImpactExit = new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", "demo-stale-impact",
+                "--file", "src/main/java/com/example/App.java", "--allow-stale"
+        }, allowedImpactHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, indexExit);
+        assertEquals(ExitCodes.SUCCESS, freshStatusExit);
+        assertTrue(freshStatusHarness.stdout().contains("latest_snapshot_stale: false"));
+        assertEquals(ExitCodes.SUCCESS, staleStatusExit);
+        assertTrue(staleStatusHarness.stdout().contains("latest_snapshot_stale: true"));
+        assertEquals(ExitCodes.RUNTIME_ERROR, rejectedImpactExit);
+        assertTrue(rejectedImpactHarness.stderr().contains("STALE_GRAPH_SNAPSHOT"));
+        assertTrue(rejectedImpactHarness.stderr().contains("dhk graph index"));
+        assertEquals(ExitCodes.SUCCESS, allowedImpactExit);
+        assertTrue(allowedImpactHarness.stdout().contains("snapshot_stale: true"));
+        assertTrue(allowedImpactHarness.stdout().contains("allow_stale: true"));
+        assertTrue(allowedImpactHarness.stdout().contains("warning: STALE_GRAPH_SNAPSHOT"));
+
+        String impactMap = new String(Files.readAllBytes(PathUtil.graphImpactMap(root)), "UTF-8");
+        assertTrue(impactMap.contains("<snapshot-freshness>"));
+        assertTrue(impactMap.contains("- status: stale_allowed"));
+        assertTrue(impactMap.contains("- warning: STALE_GRAPH_SNAPSHOT"));
+    }
+
+    @Test
     void graphExportWritesContextAndSnapshotContractsWithoutSensitiveValues() throws Exception {
         Path root = tempDir.resolve("demo-export");
         write(root, "src/main/java/com/example/App.java",
@@ -291,6 +341,25 @@ final class GraphCommandIntegrationTest {
         assertTrue(snapshot.contains("\"edge_count\":"));
         assertFalse(context.contains("top-secret-value"));
         assertFalse(snapshot.contains("top-secret-value"));
+    }
+
+    @Test
+    void graphExportDoesNotRejectGeneratedHashThatLooksLikePhone() throws Exception {
+        Path root = tempDir.resolve("demo-phone-like-hash");
+        write(root, "src/main/java/com/example/App.java", contentWithPhoneLikeSha());
+
+        Harness indexHarness = new Harness(tempDir);
+        int indexExit = new CommandRouter().run(new String[]{"graph", "index", "--project-root", "demo-phone-like-hash"},
+                indexHarness.context());
+        Harness exportHarness = new Harness(tempDir);
+        int exportExit = new CommandRouter().run(new String[]{"graph", "export", "--project-root", "demo-phone-like-hash"},
+                exportHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, indexExit);
+        assertEquals(ExitCodes.SUCCESS, exportExit);
+        assertTrue(exportHarness.stdout().contains("graph export complete"));
+        String context = new String(Files.readAllBytes(PathUtil.graphContext(root)), "UTF-8");
+        assertTrue(context.contains("sha256:"));
     }
 
     @Test
@@ -552,6 +621,34 @@ final class GraphCommandIntegrationTest {
              ResultSet resultSet = statement.executeQuery("SELECT COUNT(*) FROM " + table + " WHERE " + where)) {
             return resultSet.next() ? resultSet.getInt(1) : 0;
         }
+    }
+
+    private String contentWithPhoneLikeSha() throws Exception {
+        for (int i = 0; i < 100000; i++) {
+            String content = "package com.example;\npublic class App { public int value() { return " + i + "; } }\n";
+            if (hasPhoneLikeSequence(sha256Hex(content))) {
+                return content;
+            }
+        }
+        throw new AssertionError("Unable to generate a deterministic phone-like SHA-256 hash");
+    }
+
+    private boolean hasPhoneLikeSequence(String value) {
+        return value.matches(".*(^|\\D)1[3-9]\\d{9}($|\\D).*");
+    }
+
+    private String sha256Hex(String content) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] hash = digest.digest(content.getBytes("UTF-8"));
+        StringBuilder builder = new StringBuilder();
+        for (byte b : hash) {
+            String hex = Integer.toHexString(b & 0xff);
+            if (hex.length() == 1) {
+                builder.append('0');
+            }
+            builder.append(hex);
+        }
+        return builder.toString();
     }
 
     private static final class Harness {

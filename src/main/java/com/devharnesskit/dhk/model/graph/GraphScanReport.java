@@ -13,6 +13,8 @@ public final class GraphScanReport {
     private final List<GraphFileEntry> entries;
     private final GraphParseResult parseResult;
     private final GraphSnapshot latestSnapshot;
+    private final String currentWorkspaceFingerprint;
+    private final boolean latestSnapshotStale;
 
     public GraphScanReport(Path projectRoot, GraphConfig config, List<GraphFileEntry> entries) {
         this(projectRoot, config, entries, GraphParseResult.empty());
@@ -25,11 +27,19 @@ public final class GraphScanReport {
 
     public GraphScanReport(Path projectRoot, GraphConfig config, List<GraphFileEntry> entries,
                            GraphParseResult parseResult, GraphSnapshot latestSnapshot) {
+        this(projectRoot, config, entries, parseResult, latestSnapshot, "", false);
+    }
+
+    public GraphScanReport(Path projectRoot, GraphConfig config, List<GraphFileEntry> entries,
+                           GraphParseResult parseResult, GraphSnapshot latestSnapshot,
+                           String currentWorkspaceFingerprint, boolean latestSnapshotStale) {
         this.projectRoot = projectRoot;
         this.config = config;
         this.entries = Collections.unmodifiableList(new ArrayList<GraphFileEntry>(entries));
         this.parseResult = parseResult == null ? GraphParseResult.empty() : parseResult;
         this.latestSnapshot = latestSnapshot;
+        this.currentWorkspaceFingerprint = currentWorkspaceFingerprint == null ? "" : currentWorkspaceFingerprint;
+        this.latestSnapshotStale = latestSnapshotStale;
     }
 
     public Path projectRoot() {
@@ -50,6 +60,14 @@ public final class GraphScanReport {
 
     public GraphSnapshot latestSnapshot() {
         return latestSnapshot;
+    }
+
+    public String currentWorkspaceFingerprint() {
+        return currentWorkspaceFingerprint;
+    }
+
+    public boolean latestSnapshotStale() {
+        return latestSnapshotStale;
     }
 
     public int filesConsidered() {

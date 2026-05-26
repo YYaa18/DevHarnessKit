@@ -13,6 +13,7 @@ import com.devharnesskit.dhk.model.graph.GraphNode;
 import com.devharnesskit.dhk.model.graph.GraphSnapshot;
 import com.devharnesskit.dhk.repository.graph.GraphRepository;
 import com.devharnesskit.dhk.service.ProjectService;
+import com.devharnesskit.dhk.service.goal.WorkspaceFingerprintService;
 import com.devharnesskit.dhk.util.Clock;
 import com.devharnesskit.dhk.util.PathUtil;
 
@@ -38,21 +39,23 @@ public final class GraphImpactService {
     private final GraphImpactRenderer renderer;
     private final GraphConfigService configService;
     private final GraphCgcAdapterService cgcAdapterService;
+    private final WorkspaceFingerprintService fingerprintService;
 
     public GraphImpactService() {
         this(new DbConnectionFactory(), new ProjectService(), new GraphRepository(), new GraphImpactRenderer(),
-                new GraphConfigService(), new GraphCgcAdapterService());
+                new GraphConfigService(), new GraphCgcAdapterService(), new WorkspaceFingerprintService());
     }
 
     GraphImpactService(DbConnectionFactory connectionFactory, ProjectService projectService,
                        GraphRepository graphRepository, GraphImpactRenderer renderer, GraphConfigService configService,
-                       GraphCgcAdapterService cgcAdapterService) {
+                       GraphCgcAdapterService cgcAdapterService, WorkspaceFingerprintService fingerprintService) {
         this.connectionFactory = connectionFactory;
         this.projectService = projectService;
         this.graphRepository = graphRepository;
         this.renderer = renderer;
         this.configService = configService;
         this.cgcAdapterService = cgcAdapterService;
+        this.fingerprintService = fingerprintService;
     }
 
     public GraphImpactResult impact(Path projectRoot, GraphImpactRequest request, Clock clock) throws Exception {
@@ -61,7 +64,7 @@ public final class GraphImpactService {
         int requestedDepth = request.depth();
         int maxDepth = Math.max(1, config.maxImpactDepth());
         GraphImpactRequest effectiveRequest = new GraphImpactRequest(request.queryType(), request.query(),
-                Math.min(Math.max(1, requestedDepth), maxDepth));
+                Math.min(Math.max(1, requestedDepth), maxDepth), request.allowStale());
         boolean depthLimited = requestedDepth > effectiveRequest.depth();
         if ("cgc".equalsIgnoreCase(config.provider())) {
             GraphImpactResult result = cgcAdapterService.impact(projectRoot, config, effectiveRequest, clock,
@@ -71,6 +74,15 @@ public final class GraphImpactService {
             return result;
         }
         GraphData data = loadData(projectRoot);
+        String currentWorkspaceFingerprint = fingerprintService.workspaceFingerprint(projectRoot);
+        boolean snapshotStale = isSnapshotStale(data.snapshot(), currentWorkspaceFingerprint);
+        if (snapshotStale && !effectiveRequest.allowStale()) {
+            throw new IllegalStateException("STALE_GRAPH_SNAPSHOT: latest graph snapshot "
+                    + data.snapshot().snapshotKey()
+                    + " does not match the current workspace. Run `dhk graph index --project-root "
+                    + projectRoot.toAbsolutePath().normalize()
+                    + "` or pass --allow-stale to continue with a warning.");
+        }
         List<GraphNode> startNodes = startNodes(data, effectiveRequest);
         List<GraphNode> candidates = startNodes.isEmpty() ? candidates(data, effectiveRequest.query()) : Collections.<GraphNode>emptyList();
         GraphImpactResult result;
@@ -81,10 +93,11 @@ public final class GraphImpactService {
                     Collections.<GraphNode>emptyList(), Collections.<String>emptyList(),
                     Collections.<String>emptyList(),
                     Collections.<GraphNode>emptyList(), Collections.<String>emptyList(), candidates,
-                    PathUtil.graphImpactMap(projectRoot), requestedDepth, maxDepth, depthLimited);
+                    PathUtil.graphImpactMap(projectRoot), requestedDepth, maxDepth, depthLimited,
+                    currentWorkspaceFingerprint, snapshotStale, effectiveRequest.allowStale());
         } else {
             result = buildResult(projectRoot, data, effectiveRequest, startNodes, requestedDepth, maxDepth,
-                    depthLimited);
+                    depthLimited, currentWorkspaceFingerprint, snapshotStale);
         }
         Files.write(PathUtil.graphImpactMap(projectRoot),
                 renderer.render(result, clock.now()).getBytes("UTF-8"));
@@ -105,9 +118,17 @@ public final class GraphImpactService {
         }
     }
 
+    private boolean isSnapshotStale(GraphSnapshot snapshot, String currentWorkspaceFingerprint) {
+        return snapshot != null
+                && currentWorkspaceFingerprint != null
+                && currentWorkspaceFingerprint.length() > 0
+                && !currentWorkspaceFingerprint.equals(snapshot.workspaceFingerprint());
+    }
+
     private GraphImpactResult buildResult(Path projectRoot, GraphData data, GraphImpactRequest request,
                                           List<GraphNode> startNodes, int requestedDepth, int maxImpactDepth,
-                                          boolean depthLimited) {
+                                          boolean depthLimited, String currentWorkspaceFingerprint,
+                                          boolean snapshotStale) {
         Map<String, GraphNode> nodesByKey = nodesByKey(data.nodes());
         Map<String, List<GraphEdge>> outgoing = new LinkedHashMap<String, List<GraphEdge>>();
         Map<String, List<GraphEdge>> incoming = new LinkedHashMap<String, List<GraphEdge>>();
@@ -136,7 +157,8 @@ public final class GraphImpactService {
 
         return new GraphImpactResult(request, data.snapshot(), true, startNodes, impactedNodes, callers,
                 callees, relatedFiles, sql, tests, missingTests, risks, recommended, Collections.<GraphNode>emptyList(),
-                PathUtil.graphImpactMap(projectRoot), requestedDepth, maxImpactDepth, depthLimited);
+                PathUtil.graphImpactMap(projectRoot), requestedDepth, maxImpactDepth, depthLimited,
+                currentWorkspaceFingerprint, snapshotStale, request.allowStale());
     }
 
     private List<GraphNode> startNodes(GraphData data, GraphImpactRequest request) {

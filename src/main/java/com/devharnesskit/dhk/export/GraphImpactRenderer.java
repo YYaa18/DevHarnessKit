@@ -22,7 +22,15 @@ public final class GraphImpactRenderer {
         if (result.snapshot() != null) {
             builder.append("- snapshot_key: ").append(result.snapshot().snapshotKey()).append('\n');
             builder.append("- snapshot_status: ").append(result.snapshot().status()).append('\n');
+            builder.append("- snapshot_workspace_fingerprint: ")
+                    .append(result.snapshot().workspaceFingerprint()).append('\n');
         }
+        if (result.currentWorkspaceFingerprint().length() > 0) {
+            builder.append("- current_workspace_fingerprint: ")
+                    .append(result.currentWorkspaceFingerprint()).append('\n');
+        }
+        builder.append("- snapshot_stale: ").append(result.snapshotStale()).append('\n');
+        builder.append("- allow_stale: ").append(result.staleAllowed()).append('\n');
         builder.append("- start_nodes: ").append(result.startNodes().size()).append('\n');
         builder.append("- impacted_nodes: ").append(result.impactedNodes().size()).append('\n');
         builder.append("- related_files: ").append(result.relatedFiles().size()).append('\n');
@@ -32,6 +40,7 @@ public final class GraphImpactRenderer {
         builder.append("- risk_nodes: ").append(result.riskNodes().size()).append('\n');
         builder.append("</summary>\n\n");
 
+        appendSnapshotFreshness(builder, result);
         appendNodes(builder, "start-nodes", result.startNodes());
         appendEdges(builder, "direct-callers", result.directCallers());
         appendEdges(builder, "direct-callees", result.directCallees());
@@ -53,6 +62,31 @@ public final class GraphImpactRenderer {
         builder.append("- scoring_note: compare related-files against task ground truth outside the CLI\n");
         builder.append("</scoring-data>\n");
         return builder.toString();
+    }
+
+    private void appendSnapshotFreshness(StringBuilder builder, GraphImpactResult result) {
+        builder.append("<snapshot-freshness>\n");
+        builder.append("- status: ").append(freshnessStatus(result)).append('\n');
+        if (result.snapshot() != null) {
+            builder.append("- snapshot_key: ").append(result.snapshot().snapshotKey()).append('\n');
+            builder.append("- snapshot_workspace_fingerprint: ")
+                    .append(result.snapshot().workspaceFingerprint()).append('\n');
+        }
+        builder.append("- current_workspace_fingerprint: ")
+                .append(result.currentWorkspaceFingerprint()).append('\n');
+        builder.append("- allow_stale: ").append(result.staleAllowed()).append('\n');
+        if (result.snapshotStale()) {
+            builder.append("- warning: STALE_GRAPH_SNAPSHOT; impact map is based on an older graph snapshot\n");
+            builder.append("- next_command: dhk graph index\n");
+        }
+        builder.append("</snapshot-freshness>\n\n");
+    }
+
+    private String freshnessStatus(GraphImpactResult result) {
+        if (!result.snapshotStale()) {
+            return "fresh";
+        }
+        return result.staleAllowed() ? "stale_allowed" : "stale";
     }
 
     private void appendNodes(StringBuilder builder, String section, Iterable<GraphNode> nodes) {

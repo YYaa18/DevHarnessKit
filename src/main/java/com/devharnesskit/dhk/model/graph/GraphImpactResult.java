@@ -24,6 +24,9 @@ public final class GraphImpactResult {
     private final int requestedDepth;
     private final int maxImpactDepth;
     private final boolean depthLimited;
+    private final String currentWorkspaceFingerprint;
+    private final boolean snapshotStale;
+    private final boolean staleAllowed;
 
     public GraphImpactResult(GraphImpactRequest request, GraphSnapshot snapshot, boolean found,
                              List<GraphNode> startNodes, List<GraphNode> impactedNodes,
@@ -34,7 +37,7 @@ public final class GraphImpactResult {
                              Path impactMapPath) {
         this(request, snapshot, found, startNodes, impactedNodes, directCallers, directCallees,
                 relatedFiles, relatedSql, relatedTests, new ArrayList<String>(), riskNodes, recommendedReadFiles, candidates,
-                impactMapPath, request.depth(), request.depth(), false);
+                impactMapPath, request.depth(), request.depth(), false, "", false, false);
     }
 
     public GraphImpactResult(GraphImpactRequest request, GraphSnapshot snapshot, boolean found,
@@ -44,6 +47,19 @@ public final class GraphImpactResult {
                              List<String> relatedTests, List<String> missingRelatedTests, List<GraphNode> riskNodes,
                              List<String> recommendedReadFiles, List<GraphNode> candidates,
                              Path impactMapPath, int requestedDepth, int maxImpactDepth, boolean depthLimited) {
+        this(request, snapshot, found, startNodes, impactedNodes, directCallers, directCallees, relatedFiles,
+                relatedSql, relatedTests, missingRelatedTests, riskNodes, recommendedReadFiles, candidates,
+                impactMapPath, requestedDepth, maxImpactDepth, depthLimited, "", false, false);
+    }
+
+    public GraphImpactResult(GraphImpactRequest request, GraphSnapshot snapshot, boolean found,
+                             List<GraphNode> startNodes, List<GraphNode> impactedNodes,
+                             List<GraphEdge> directCallers, List<GraphEdge> directCallees,
+                             List<String> relatedFiles, List<GraphNode> relatedSql,
+                             List<String> relatedTests, List<String> missingRelatedTests, List<GraphNode> riskNodes,
+                             List<String> recommendedReadFiles, List<GraphNode> candidates,
+                             Path impactMapPath, int requestedDepth, int maxImpactDepth, boolean depthLimited,
+                             String currentWorkspaceFingerprint, boolean snapshotStale, boolean staleAllowed) {
         this.request = request;
         this.snapshot = snapshot;
         this.found = found;
@@ -62,6 +78,9 @@ public final class GraphImpactResult {
         this.requestedDepth = requestedDepth;
         this.maxImpactDepth = maxImpactDepth;
         this.depthLimited = depthLimited;
+        this.currentWorkspaceFingerprint = currentWorkspaceFingerprint == null ? "" : currentWorkspaceFingerprint;
+        this.snapshotStale = snapshotStale;
+        this.staleAllowed = staleAllowed;
     }
 
     public GraphImpactRequest request() {
@@ -134,6 +153,18 @@ public final class GraphImpactResult {
 
     public boolean depthLimited() {
         return depthLimited;
+    }
+
+    public String currentWorkspaceFingerprint() {
+        return currentWorkspaceFingerprint;
+    }
+
+    public boolean snapshotStale() {
+        return snapshotStale;
+    }
+
+    public boolean staleAllowed() {
+        return staleAllowed;
     }
 
     private static List<GraphNode> copyNodes(List<GraphNode> values) {

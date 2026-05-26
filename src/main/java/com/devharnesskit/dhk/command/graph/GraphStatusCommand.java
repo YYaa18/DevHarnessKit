@@ -47,6 +47,10 @@ public final class GraphStatusCommand implements Command {
                         JsonOutput.numberField("parse_errors", report.parseResult().errors().size()),
                         JsonOutput.stringField("latest_snapshot_key", latest == null ? "" : latest.snapshotKey()),
                         JsonOutput.stringField("latest_snapshot_status", latest == null ? "" : latest.status()),
+                        JsonOutput.stringField("current_workspace_fingerprint", report.currentWorkspaceFingerprint()),
+                        JsonOutput.stringField("latest_snapshot_workspace_fingerprint",
+                                latest == null ? "" : latest.workspaceFingerprint()),
+                        JsonOutput.booleanField("latest_snapshot_stale", report.latestSnapshotStale()),
                         JsonOutput.numberField("latest_snapshot_nodes", latest == null ? 0 : latest.nodeCount()),
                         JsonOutput.numberField("latest_snapshot_edges", latest == null ? 0 : latest.edgeCount())
                 ));
@@ -69,6 +73,9 @@ public final class GraphStatusCommand implements Command {
                 } else {
                     context.out().println("latest_snapshot_key: " + latest.snapshotKey());
                     context.out().println("latest_snapshot_status: " + latest.status());
+                    context.out().println("current_workspace_fingerprint: " + report.currentWorkspaceFingerprint());
+                    context.out().println("latest_snapshot_workspace_fingerprint: " + latest.workspaceFingerprint());
+                    context.out().println("latest_snapshot_stale: " + report.latestSnapshotStale());
                     context.out().println("latest_snapshot_nodes: " + latest.nodeCount());
                     context.out().println("latest_snapshot_edges: " + latest.edgeCount());
                 }

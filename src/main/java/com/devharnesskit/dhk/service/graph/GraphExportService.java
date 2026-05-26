@@ -68,10 +68,18 @@ public final class GraphExportService {
 
     private String guard(String text) {
         String redacted = sensitiveDataGuard.redact(text);
-        List<String> matches = sensitiveDataGuard.findMatches(redacted);
+        List<String> matches = sensitiveDataGuard.findMatches(maskMachineHashes(redacted));
         if (!matches.isEmpty()) {
             throw new IllegalStateException("Graph export contains sensitive data: " + matches);
         }
         return redacted;
+    }
+
+    private String maskMachineHashes(String text) {
+        if (text == null || text.length() == 0) {
+            return text;
+        }
+        return text.replaceAll("\\b(sha256|git|fallback|config|context|check):[0-9a-fA-F]{32,}\\b",
+                "$1:[GENERATED_HASH]");
     }
 }

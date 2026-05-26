@@ -585,6 +585,22 @@ D 组人工介入次数下降 >= 20%
       scorecard.md
 ```
 
+仓库内的可提交靶场目录采用：
+
+```text
+testbeds/
+  fixtures/              synthetic projects committed to the repo
+  templates/             reusable task, ground truth, scorecard, and result templates
+  runs/                  local evaluation outputs, ignored by git
+```
+
+`testbeds/fixtures/` 存放可控测试项目和任务定义。`testbeds/templates/`
+提供 `task.md`、`ground-truth.json`、`scorecard.md` 和 `result.json` 的基准
+格式。`testbeds/runs/` 只用于本地实验输出，默认不提交，除非后续 issue 明确
+要求沉淀一份 curated baseline report。
+
+这些 testbed 文件不是产品运行时代码，也不应进入 alpha release archive。
+
 `result.json` 示例：
 
 ```json

@@ -1,0 +1,50 @@
+{
+  "schema_version": "devharness-testbed-ground-truth/v1",
+  "task_id": "fixture-001",
+  "fixture": "fixture-name",
+  "project_type": "legacy-java-web",
+  "initial_commit": "",
+  "required_changed_files": [
+    "src/main/java/example/RequiredFile.java"
+  ],
+  "allowed_changed_files": [
+    "src/test/java/example/RequiredFileTest.java"
+  ],
+  "forbidden_changed_files": [
+    "src/main/resources/application-prod.properties"
+  ],
+  "expected_impact_points": [
+    {
+      "type": "java_class",
+      "name": "example.RequiredFile",
+      "file": "src/main/java/example/RequiredFile.java",
+      "reason": "Primary implementation point"
+    }
+  ],
+  "expected_related_tests": [
+    "src/test/java/example/RequiredFileTest.java"
+  ],
+  "required_verification": [
+    {
+      "type": "command",
+      "command": "mvn test",
+      "required": true
+    }
+  ],
+  "manual_evidence_required": false,
+  "rollback_requirements": [
+    "Revert the changed files listed in required_changed_files."
+  ],
+  "risk_points": [
+    "Protected production configuration must not be modified."
+  ],
+  "scoring_notes": {
+    "impact_recall_denominator": 1,
+    "impact_precision_notes": "Only count files and symbols related to the task.",
+    "hard_fail_conditions": [
+      "Compilation fails",
+      "Forbidden file is modified",
+      "Sensitive data is written to exports"
+    ]
+  }
+}

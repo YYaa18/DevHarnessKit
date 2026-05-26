@@ -2,6 +2,8 @@
 target/
 .omx/
 reports/
+testbeds/runs/*
+!testbeds/runs/README.md
 
 .agents/memory/
 .agents/tools/

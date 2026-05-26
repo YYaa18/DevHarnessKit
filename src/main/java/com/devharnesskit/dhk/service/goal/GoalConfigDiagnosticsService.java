@@ -26,7 +26,7 @@ public final class GoalConfigDiagnosticsService {
     private static final Pattern ACTION_PATTERN = Pattern.compile("[a-z][a-z0-9_]*");
     private static final Set<String> PROFILE_FIELDS = set("profile_key", "workflow_key", "requires_spec",
             "default_mode", "actions", "required_checks", "completion_require_fresh_checks",
-            "completion_allow_skipped_checks", "completion_require_checkpoint",
+            "completion_allow_skipped_checks", "completion_require_checkpoint", "strict_workflow_phase_order",
             "spec_require_non_empty_tasks", "spec_require_non_empty_acceptance");
     private static final Set<String> POLICY_FIELDS = set("required_checks", "compile_command", "test_command",
             "fail_pending_hard_gates", "accepted_compile_statuses", "accepted_test_statuses",
@@ -34,8 +34,14 @@ public final class GoalConfigDiagnosticsService {
     private static final Set<String> CHECK_KEYS = set("compile", "test", "sensitive", "spec", "workflow");
     private static final Set<String> CHECK_STATUSES = set("passed", "skipped", "waived");
     private static final Set<String> MAPPING_FIELDS = set("workflow_phase", "required_gates",
-            "spec_task", "spec_acceptance_update");
+            "spec_task", "spec_acceptance_update", "phase_pass_mode", "gate_pass_mode",
+            "acceptance_source", "required_checks");
+    private static final Set<String> ACCEPTANCE_FIELDS = set("description", "expected", "source",
+            "required_checks", "evidence_key");
     private static final Set<String> SPEC_ACCEPTANCE_UPDATE_POLICIES = set("manual", "auto_pass", "disabled");
+    private static final Set<String> MAPPING_PASS_MODES = set("none", "step", "check");
+    private static final Set<String> ACCEPTANCE_SOURCES = set("none", "manual", "checks");
+    private static final Set<String> BUSINESS_ACCEPTANCE_SOURCES = set("checks", "test", "evidence", "manual");
     private static final Set<String> BUILT_IN_WORKFLOW_KEYS = set("api-change", "mvc-change",
             "systematic-debugging", "safe-refactor", "sql-review", "code-review");
     private static final Map<String, Set<String>> BUILT_IN_WORKFLOW_PHASES = workflowPhases();
@@ -116,9 +122,11 @@ public final class GoalConfigDiagnosticsService {
                     false, diagnostics);
         }
         diagnoseCompletionBooleans(file, raw, diagnostics);
+        diagnoseBoolean(file, raw, "strict_workflow_phase_order", diagnostics);
         diagnoseSpecBooleans(file, raw, diagnostics);
         diagnoseRequiredEvidence(file, raw, actions, diagnostics);
         diagnoseActionMappings(file, raw, workflowKey, actions, diagnostics);
+        diagnoseAcceptanceMappings(file, raw, diagnostics);
     }
 
     private void diagnoseCheckPolicy(Path projectRoot, List<Diagnostic> diagnostics) {
@@ -230,6 +238,75 @@ public final class GoalConfigDiagnosticsService {
         }
     }
 
+    private void diagnoseAcceptanceMappings(Path file, Map<String, String> raw, List<Diagnostic> diagnostics) {
+        Map<String, Set<String>> fieldsByAcceptance = new LinkedHashMap<String, Set<String>>();
+        for (Map.Entry<String, String> entry : raw.entrySet()) {
+            String key = entry.getKey();
+            if (!key.startsWith("acceptance.")) {
+                continue;
+            }
+            String[] parts = key.split("\\.", -1);
+            if (parts.length != 3) {
+                diagnostics.add(warning(file.toString(), key + " should use acceptance.<acceptance>.<field>"));
+                continue;
+            }
+            String acceptance = parts[1];
+            String field = parts[2];
+            if (!KEY_PATTERN.matcher(acceptance).matches()) {
+                diagnostics.add(warning(file.toString(), key + " has invalid acceptance key: " + acceptance));
+            }
+            if (!ACCEPTANCE_FIELDS.contains(field)) {
+                diagnostics.add(warning(file.toString(), key + " contains unsupported acceptance field: " + field));
+                continue;
+            }
+            Set<String> fields = fieldsByAcceptance.get(acceptance);
+            if (fields == null) {
+                fields = new LinkedHashSet<String>();
+                fieldsByAcceptance.put(acceptance, fields);
+            }
+            fields.add(field);
+            diagnoseAcceptanceField(file, key, field, entry.getValue(), diagnostics);
+        }
+        for (Map.Entry<String, Set<String>> entry : fieldsByAcceptance.entrySet()) {
+            String source = trim(raw.get("acceptance." + entry.getKey() + ".source"));
+            if (source.length() == 0) {
+                diagnostics.add(warning(file.toString(), "acceptance." + entry.getKey()
+                        + ".source is required and should be one of: "
+                        + join(new ArrayList<String>(BUSINESS_ACCEPTANCE_SOURCES))));
+            } else if ("checks".equals(source) && !entry.getValue().contains("required_checks")) {
+                diagnostics.add(warning(file.toString(), "acceptance." + entry.getKey()
+                        + ".required_checks is required when source is checks"));
+            } else if ("evidence".equals(source) && !entry.getValue().contains("evidence_key")) {
+                diagnostics.add(warning(file.toString(), "acceptance." + entry.getKey()
+                        + ".evidence_key is required when source is evidence"));
+            }
+        }
+    }
+
+    private void diagnoseAcceptanceField(Path file, String key, String field, String value,
+                                         List<Diagnostic> diagnostics) {
+        if ("description".equals(field) || "expected".equals(field)) {
+            if (trim(value).length() == 0) {
+                diagnostics.add(warning(file.toString(), key + " is empty"));
+            }
+        } else if ("source".equals(field)) {
+            String source = trim(value);
+            if (!BUSINESS_ACCEPTANCE_SOURCES.contains(source)) {
+                diagnostics.add(warning(file.toString(), key + " should be one of: "
+                        + join(new ArrayList<String>(BUSINESS_ACCEPTANCE_SOURCES))));
+            }
+        } else if ("required_checks".equals(field)) {
+            diagnoseList(file, key, value, KEY_PATTERN, CHECK_KEYS, false, diagnostics);
+        } else if ("evidence_key".equals(field)) {
+            String evidenceKey = trim(value);
+            if (evidenceKey.length() == 0) {
+                diagnostics.add(warning(file.toString(), key + " is empty"));
+            } else if (!ACTION_PATTERN.matcher(evidenceKey).matches()) {
+                diagnostics.add(warning(file.toString(), key + " contains invalid evidence key: " + evidenceKey));
+            }
+        }
+    }
+
     private void diagnoseMappingField(Path file, String key, String field, String value,
                                       Set<String> workflowPhases, Set<String> workflowGates,
                                       List<Diagnostic> diagnostics) {
@@ -258,6 +335,20 @@ public final class GoalConfigDiagnosticsService {
                 diagnostics.add(warning(file.toString(), key + " should be one of: "
                         + join(new ArrayList<String>(SPEC_ACCEPTANCE_UPDATE_POLICIES))));
             }
+        } else if ("phase_pass_mode".equals(field) || "gate_pass_mode".equals(field)) {
+            String mode = trim(value);
+            if (!MAPPING_PASS_MODES.contains(mode)) {
+                diagnostics.add(warning(file.toString(), key + " should be one of: "
+                        + join(new ArrayList<String>(MAPPING_PASS_MODES))));
+            }
+        } else if ("acceptance_source".equals(field)) {
+            String source = trim(value);
+            if (!ACCEPTANCE_SOURCES.contains(source)) {
+                diagnostics.add(warning(file.toString(), key + " should be one of: "
+                        + join(new ArrayList<String>(ACCEPTANCE_SOURCES))));
+            }
+        } else if ("required_checks".equals(field)) {
+            diagnoseList(file, key, value, KEY_PATTERN, CHECK_KEYS, false, diagnostics);
         }
     }
 
@@ -321,6 +412,10 @@ public final class GoalConfigDiagnosticsService {
         }
         if (key.startsWith("required_evidence.")) {
             return key.length() > "required_evidence.".length();
+        }
+        if (key.startsWith("acceptance.")) {
+            String[] parts = key.split("\\.", -1);
+            return parts.length == 3 && parts[1].length() > 0 && ACCEPTANCE_FIELDS.contains(parts[2]);
         }
         if (!key.startsWith("mapping.")) {
             return false;

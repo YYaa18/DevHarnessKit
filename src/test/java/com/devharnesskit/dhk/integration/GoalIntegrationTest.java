@@ -60,19 +60,26 @@ final class GoalIntegrationTest {
         String initialContext = new String(Files.readAllBytes(goalContext), "UTF-8");
         assertTrue(initialContext.contains("# GOAL_CONTEXT"));
         assertSectionOrder(initialContext, "# GOAL_CONTEXT", "<generated-at>", "<goal>",
-                "<current-action>", "<next-instruction>", "<allowed-actions>", "<forbidden-actions>",
-                "<required-evidence>", "<structured-evidence-fields>", "<required-checks>",
-                "<context-files>", "<completion-blockers>", "<completion-condition>", "<next-command>");
+                "<current-action>", "<next-instruction>", "<allowed-actions>", "<allowed-commands>",
+                "<forbidden-actions>", "<required-evidence>", "<evidence-contract>",
+                "<structured-evidence-fields>", "<required-checks>", "<context-files>",
+                "<completion-blockers>", "<freshness-status>", "<completion-condition>", "<next-command>");
         assertTrue(initialContext.contains("inspect_existing_code"));
         assertTrue(initialContext.contains("- perform_current_action_only"));
+        assertTrue(initialContext.contains("<allowed-commands>"));
+        assertTrue(initialContext.contains("dhk goal verify --goal " + goalKey));
         assertTrue(initialContext.contains("- do_not_archive_spec"));
         assertTrue(initialContext.contains("- do_not_claim_completion_before_goal_evaluate"));
         assertTrue(initialContext.contains("- existing_controller"));
+        assertTrue(initialContext.contains("<evidence-contract>"));
+        assertTrue(initialContext.contains("- current_action: inspect_existing_code"));
         assertTrue(initialContext.contains("- --read-files"));
         assertTrue(initialContext.contains("- --compile-result"));
         assertTrue(initialContext.contains("- compile"));
         assertTrue(initialContext.contains("- check compile is pending"));
         assertTrue(initialContext.contains("- .agents/memory/exports/SPEC_CONTEXT.md"));
+        assertTrue(initialContext.contains("<freshness-status>"));
+        assertTrue(initialContext.contains("- status: fresh"));
         assertTrue(initialContext.contains("dhk goal step --goal " + goalKey));
         assertTrue(initialContext.length() <= 16 * 1024);
         assertTrue(Files.isRegularFile(PathUtil.currentContext(root)));
@@ -199,6 +206,8 @@ final class GoalIntegrationTest {
         assertTrue(verifyReady.stdout().contains("checks:"));
         assertTrue(verifyReady.stdout().contains("compile: passed"));
         assertTrue(verifyReady.stdout().contains("failed_checks:"));
+        assertTrue(verifyReady.stdout().contains("freshness_status: fresh"));
+        assertTrue(verifyReady.stdout().contains("completion_blockers:"));
         assertTrue(verifyReady.stdout().contains("next_command: dhk goal complete --goal " + goalKey));
         assertTrue(verifyReady.stdout().contains("context_path: " + goalContext));
 
@@ -634,7 +643,10 @@ final class GoalIntegrationTest {
         assertTrue(verify.stdout().contains("\"command\": \"goal verify\""));
         assertTrue(verify.stdout().contains("\"decision\": \"not_ready\""));
         assertTrue(verify.stdout().contains("\"ready_to_complete\": false"));
+        assertTrue(verify.stdout().contains("\"freshness_status\": \"fresh\""));
         assertTrue(verify.stdout().contains("\"missing_count\": 3"));
+        assertTrue(verify.stdout().contains("\"completion_blocker_count\": 3"));
+        assertTrue(verify.stdout().contains("\"completion_blockers\": ["));
         assertTrue(verify.stdout().contains("check compile is skipped; accepted_statuses=passed"));
         assertTrue(verify.stdout().contains("check test is skipped; accepted_statuses=passed"));
         assertTrue(verify.stdout().contains("check spec is failed; accepted_statuses=passed"));
@@ -647,6 +659,77 @@ final class GoalIntegrationTest {
         assertEquals(ExitCodes.VALIDATION_ERROR, completeExit);
         assertTrue(complete.stdout().contains("decision: not_ready"));
         assertTrue(complete.stdout().contains("check compile is skipped; accepted_statuses=passed"));
+    }
+
+    @Test
+    void mvcVerifyPhaseIsCheckDrivenNotStepDriven() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "java-mvc-change",
+                "--task", "MVC verify strictness",
+                "--module", "view",
+                "--mode", "mvc"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+        String workflowRun = firstValue(start.stdout(), "workflow_run: ");
+
+        recordJavaGoalSteps(goalKey);
+
+        assertEquals("pending", singleString(root, "SELECT status FROM workflow_phase_run "
+                + "WHERE run_key = '" + workflowRun + "' AND phase_key = 'verify_view_flow'"));
+        assertEquals("pending", singleString(root, "SELECT status FROM workflow_gate_run "
+                + "WHERE run_key = '" + workflowRun + "' AND gate_key = 'view_name_checked'"));
+    }
+
+    @Test
+    void strictWorkflowPhaseOrderBlocksOutOfOrderMappedPhase() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Files.createDirectories(PathUtil.goalProfilesDirectory(root));
+        Files.write(PathUtil.goalProfile(root, "custom-out-of-order"), ("{\n"
+                + "  \"workflow_key\": \"api-change\",\n"
+                + "  \"requires_spec\": \"false\",\n"
+                + "  \"default_mode\": \"api\",\n"
+                + "  \"actions\": \"implement_minimal_change\",\n"
+                + "  \"strict_workflow_phase_order\": \"true\",\n"
+                + "  \"mapping.implement_minimal_change.workflow_phase\": \"implement_minimal_change\",\n"
+                + "  \"mapping.implement_minimal_change.phase_pass_mode\": \"step\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "custom-out-of-order",
+                "--task", "Out of order strict workflow",
+                "--module", "goal",
+                "--mode", "api"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+        String workflowRun = firstValue(start.stdout(), "workflow_run: ");
+
+        Harness step = new Harness(tempDir);
+        int stepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Tried to implement before planning",
+                "--changed-files", "src/main/java/Demo.java",
+                "--evidence", "implementation_summary=out of order"
+        }, step.context());
+        assertEquals(ExitCodes.SUCCESS, stepExit);
+
+        assertEquals("pending", singleString(root, "SELECT status FROM workflow_phase_run "
+                + "WHERE run_key = '" + workflowRun + "' AND phase_key = 'implement_minimal_change'"));
+        assertEquals("inspect_existing_code", singleString(root, "SELECT current_phase_key FROM workflow_run "
+                + "WHERE run_key = '" + workflowRun + "'"));
+        assertTrue(countRows(root, "workflow_event WHERE run_key = '" + workflowRun
+                + "' AND event_type = 'custom' AND level = 'warn' "
+                + "AND message LIKE 'Phase sync blocked%'") >= 1);
     }
 
     @Test
@@ -722,6 +805,187 @@ final class GoalIntegrationTest {
     }
 
     @Test
+    void profileAcceptanceMappingPassesFromFreshChecksSource() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Files.createDirectories(PathUtil.goalProfilesDirectory(root));
+        Files.write(PathUtil.goalProfile(root, "custom-acceptance-checks"), ("{\n"
+                + "  \"workflow_key\": \"api-change\",\n"
+                + "  \"requires_spec\": \"true\",\n"
+                + "  \"default_mode\": \"api\",\n"
+                + "  \"actions\": \"inspect,verify\",\n"
+                + "  \"required_checks\": \"sensitive,spec\",\n"
+                + "  \"completion_allow_skipped_checks\": \"false\",\n"
+                + "  \"mapping.inspect.spec_task\": \"inspect\",\n"
+                + "  \"mapping.verify.spec_task\": \"verify\",\n"
+                + "  \"acceptance.business_rule.description\": \"Business rule is verified\",\n"
+                + "  \"acceptance.business_rule.expected\": \"Sensitive and spec checks prove the rule\",\n"
+                + "  \"acceptance.business_rule.source\": \"checks\",\n"
+                + "  \"acceptance.business_rule.required_checks\": \"sensitive\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "custom-acceptance-checks",
+                "--task", "Checks-backed acceptance",
+                "--module", "goal"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+        String specChange = firstValue(start.stdout(), "spec_change: ");
+
+        recordTwoStepGoal(goalKey);
+
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, verify.context());
+        assertEquals(ExitCodes.SUCCESS, verifyExit);
+        assertTrue(verify.stdout().contains("\"decision\": \"ready_to_complete\""));
+        assertTrue(verify.stdout().contains("\"check_key\": \"spec\""));
+        assertEquals("passed", singleString(root, "SELECT status FROM spec_acceptance "
+                + "WHERE change_key = '" + specChange + "' AND acceptance_key = 'business_rule'"));
+    }
+
+    @Test
+    void profileAcceptanceMappingPassesFromTestSource() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Files.createDirectories(PathUtil.goalProfilesDirectory(root));
+        Files.write(PathUtil.goalProfile(root, "custom-acceptance-test"), ("{\n"
+                + "  \"workflow_key\": \"api-change\",\n"
+                + "  \"requires_spec\": \"true\",\n"
+                + "  \"default_mode\": \"api\",\n"
+                + "  \"actions\": \"inspect,verify\",\n"
+                + "  \"required_checks\": \"test,spec\",\n"
+                + "  \"completion_allow_skipped_checks\": \"true\",\n"
+                + "  \"mapping.inspect.spec_task\": \"inspect\",\n"
+                + "  \"mapping.verify.spec_task\": \"verify\",\n"
+                + "  \"acceptance.test_rule.description\": \"Test-backed business rule is verified\",\n"
+                + "  \"acceptance.test_rule.expected\": \"The test check is accepted by policy\",\n"
+                + "  \"acceptance.test_rule.source\": \"test\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "custom-acceptance-test",
+                "--task", "Test-backed acceptance",
+                "--module", "goal"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+        String specChange = firstValue(start.stdout(), "spec_change: ");
+
+        recordTwoStepGoal(goalKey);
+
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, verify.context());
+        assertEquals(ExitCodes.SUCCESS, verifyExit);
+        assertTrue(verify.stdout().contains("\"decision\": \"ready_to_complete\""));
+        assertEquals("passed", singleString(root, "SELECT status FROM spec_acceptance "
+                + "WHERE change_key = '" + specChange + "' AND acceptance_key = 'test_rule'"));
+    }
+
+    @Test
+    void profileAcceptanceMappingPassesFromExplicitEvidenceSource() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Files.createDirectories(PathUtil.goalProfilesDirectory(root));
+        Files.write(PathUtil.goalProfile(root, "custom-acceptance-evidence"), ("{\n"
+                + "  \"workflow_key\": \"api-change\",\n"
+                + "  \"requires_spec\": \"true\",\n"
+                + "  \"default_mode\": \"api\",\n"
+                + "  \"actions\": \"inspect,verify\",\n"
+                + "  \"required_checks\": \"spec\",\n"
+                + "  \"completion_allow_skipped_checks\": \"false\",\n"
+                + "  \"mapping.inspect.spec_task\": \"inspect\",\n"
+                + "  \"mapping.verify.spec_task\": \"verify\",\n"
+                + "  \"acceptance.business_verified.description\": \"Business verification evidence exists\",\n"
+                + "  \"acceptance.business_verified.expected\": \"A goal step explicitly records business_verified\",\n"
+                + "  \"acceptance.business_verified.source\": \"evidence\",\n"
+                + "  \"acceptance.business_verified.evidence_key\": \"business_verified\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "custom-acceptance-evidence",
+                "--task", "Evidence-backed acceptance",
+                "--module", "goal"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+        String specChange = firstValue(start.stdout(), "spec_change: ");
+
+        recordTwoStepGoal(goalKey, "business_verified=confirmed");
+
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, verify.context());
+        assertEquals(ExitCodes.SUCCESS, verifyExit);
+        assertTrue(verify.stdout().contains("\"decision\": \"ready_to_complete\""));
+        assertEquals("passed", singleString(root, "SELECT status FROM spec_acceptance "
+                + "WHERE change_key = '" + specChange + "' AND acceptance_key = 'business_verified'"));
+    }
+
+    @Test
+    void profileAcceptanceMappingManualSourceBlocksCompletionUntilConfirmed() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Files.createDirectories(PathUtil.goalProfilesDirectory(root));
+        Files.write(PathUtil.goalProfile(root, "custom-acceptance-manual"), ("{\n"
+                + "  \"workflow_key\": \"api-change\",\n"
+                + "  \"requires_spec\": \"true\",\n"
+                + "  \"default_mode\": \"api\",\n"
+                + "  \"actions\": \"inspect,verify\",\n"
+                + "  \"required_checks\": \"spec\",\n"
+                + "  \"completion_allow_skipped_checks\": \"false\",\n"
+                + "  \"mapping.inspect.spec_task\": \"inspect\",\n"
+                + "  \"mapping.verify.spec_task\": \"verify\",\n"
+                + "  \"acceptance.manual_business.description\": \"Manual business owner sign-off\",\n"
+                + "  \"acceptance.manual_business.expected\": \"Business owner has approved the behavior\",\n"
+                + "  \"acceptance.manual_business.source\": \"manual\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "custom-acceptance-manual",
+                "--task", "Manual acceptance guard",
+                "--module", "goal"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+        String specChange = firstValue(start.stdout(), "spec_change: ");
+
+        recordTwoStepGoal(goalKey);
+
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, verify.context());
+        assertEquals(ExitCodes.SUCCESS, verifyExit);
+        assertTrue(verify.stdout().contains("\"decision\": \"not_ready\""));
+        assertTrue(verify.stdout().contains("check spec is failed; accepted_statuses=passed"));
+        assertTrue(verify.stdout().contains("acceptance manual_business is pending"));
+        assertEquals("pending", singleString(root, "SELECT status FROM spec_acceptance "
+                + "WHERE change_key = '" + specChange + "' AND acceptance_key = 'manual_business'"));
+
+        Harness complete = new Harness(tempDir);
+        int completeExit = new CommandRouter().run(new String[]{
+                "goal", "complete", "--project-root", "demo", "--goal", goalKey
+        }, complete.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, completeExit);
+        assertTrue(complete.stdout().contains("decision: not_ready"));
+        assertTrue(complete.stdout().contains("check spec is failed; accepted_statuses=passed"));
+    }
+
+    @Test
     void javaGoalSyncsMappedWorkflowGatesByDefault() throws Exception {
         Path root = tempDir.resolve("demo");
         Harness start = new Harness(tempDir);
@@ -788,6 +1052,12 @@ final class GoalIntegrationTest {
                 + "  \"protected_files\": \"src/main/java/com/devharnesskit/dhk/service/goal/GoalCheckPolicy.java\"\n"
                 + "}\n").getBytes("UTF-8"));
 
+        Harness freshCheck = new Harness(tempDir);
+        int freshCheckExit = new CommandRouter().run(new String[]{
+                "goal", "check", "--project-root", "demo", "--goal", goalKey, "--all"
+        }, freshCheck.context());
+        assertEquals(ExitCodes.SUCCESS, freshCheckExit);
+
         Harness complete = new Harness(tempDir);
         int completeExit = new CommandRouter().run(new String[]{
                 "goal", "complete", "--project-root", "demo", "--goal", goalKey
@@ -796,6 +1066,177 @@ final class GoalIntegrationTest {
         assertEquals(ExitCodes.VALIDATION_ERROR, completeExit);
         assertTrue(complete.stderr().contains("Policy blocked goal complete"));
         assertTrue(complete.stderr().contains("protected file changed"));
+    }
+
+    @Test
+    void policyCanBlockGoalStepBeforeStateMutation() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "java-api-change",
+                "--task", "Step policy guard",
+                "--module", "goal"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        Files.write(PathUtil.devharnessPolicy(root), ("{\n"
+                + "  \"mode\": \"strict\",\n"
+                + "  \"forbidden_dhk_commands\": \"goal step\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness step = new Harness(tempDir);
+        int stepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Inspected existing controller/service/mapper/tests",
+                "--evidence", "existing_controller,existing_service,existing_mapper,existing_tests"
+        }, step.context());
+
+        assertEquals(ExitCodes.VALIDATION_ERROR, stepExit);
+        assertTrue(step.stderr().contains("Policy blocked goal step"));
+        assertTrue(step.stderr().contains("command is forbidden by policy"));
+        assertEquals(0, countRows(root, "goal_step WHERE goal_key = '" + goalKey + "'"));
+        assertEquals("inspect_existing_code", singleString(root,
+                "SELECT current_action FROM goal_run WHERE goal_key = '" + goalKey + "'"));
+    }
+
+    @Test
+    void policyCanBlockGoalStepProtectedFileBeforeStateMutation() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "java-api-change",
+                "--task", "Step protected file guard",
+                "--module", "goal"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        Files.write(PathUtil.devharnessPolicy(root), ("{\n"
+                + "  \"mode\": \"strict\",\n"
+                + "  \"protected_files\": \"src/main/java/Secret.java\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness step = new Harness(tempDir);
+        int stepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Inspected existing controller/service/mapper/tests",
+                "--changed-files", "src/main/java/Secret.java",
+                "--evidence", "existing_controller,existing_service,existing_mapper,existing_tests"
+        }, step.context());
+
+        assertEquals(ExitCodes.VALIDATION_ERROR, stepExit);
+        assertTrue(step.stderr().contains("Policy blocked goal step"));
+        assertTrue(step.stderr().contains("protected file changed"));
+        assertEquals(0, countRows(root, "goal_step WHERE goal_key = '" + goalKey + "'"));
+    }
+
+    @Test
+    void policyCanBlockGoalStepOutsideAllowedWritePathsBeforeStateMutation() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "java-api-change",
+                "--task", "Step allowed write guard",
+                "--module", "goal"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        Files.write(PathUtil.devharnessPolicy(root), ("{\n"
+                + "  \"mode\": \"strict\",\n"
+                + "  \"allowed_write_paths\": \"src/main/java/**\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness step = new Harness(tempDir);
+        int stepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Inspected existing controller/service/mapper/tests",
+                "--changed-files", "docs/README.md",
+                "--evidence", "existing_controller,existing_service,existing_mapper,existing_tests"
+        }, step.context());
+
+        assertEquals(ExitCodes.VALIDATION_ERROR, stepExit);
+        assertTrue(step.stderr().contains("Policy blocked goal step"));
+        assertTrue(step.stderr().contains("outside allowed_write_paths"));
+        assertEquals(0, countRows(root, "goal_step WHERE goal_key = '" + goalKey + "'"));
+    }
+
+    @Test
+    void policyCanBlockGoalCheckBeforeRows() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "java-api-change",
+                "--task", "Check policy guard",
+                "--module", "goal"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        Files.write(PathUtil.devharnessPolicy(root), ("{\n"
+                + "  \"mode\": \"strict\",\n"
+                + "  \"forbidden_dhk_commands\": \"goal check\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness check = new Harness(tempDir);
+        int checkExit = new CommandRouter().run(new String[]{
+                "goal", "check",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--check", "sensitive"
+        }, check.context());
+
+        assertEquals(ExitCodes.VALIDATION_ERROR, checkExit);
+        assertTrue(check.stderr().contains("Policy blocked goal check"));
+        assertTrue(check.stderr().contains("command is forbidden by policy"));
+        assertEquals(0, countRows(root, "goal_check WHERE goal_key = '" + goalKey + "'"));
+    }
+
+    @Test
+    void policyCanReturnValidationForGoalExportHookFailure() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "java-api-change",
+                "--task", "Export policy guard",
+                "--module", "goal"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        Files.write(PathUtil.devharnessPolicy(root), ("{\n"
+                + "  \"mode\": \"strict\",\n"
+                + "  \"context_export_forbidden_files\": \".agents/memory/exports/GOAL_CONTEXT.md\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness export = new Harness(tempDir);
+        int exportExit = new CommandRouter().run(new String[]{
+                "goal", "export",
+                "--project-root", "demo",
+                "--goal", goalKey
+        }, export.context());
+
+        assertEquals(ExitCodes.VALIDATION_ERROR, exportExit);
+        assertTrue(export.stderr().contains("Policy blocked context export"));
+        assertTrue(export.stderr().contains("output path is forbidden"));
+        assertFalse(export.stderr().contains("ERROR goal export failed"));
     }
 
     @Test
@@ -1124,6 +1565,98 @@ final class GoalIntegrationTest {
     }
 
     @Test
+    void goalEvaluateRejectsWorkspaceChangesAfterChecksUntilRerun() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Files.createDirectories(PathUtil.goalProfilesDirectory(root));
+        Files.write(PathUtil.goalProfile(root, "custom-workspace-stale"), ("{\n"
+                + "  \"workflow_key\": \"api-change\",\n"
+                + "  \"requires_spec\": \"false\",\n"
+                + "  \"default_mode\": \"api\",\n"
+                + "  \"actions\": \"inspect,verify\"\n"
+                + "}\n").getBytes("UTF-8"));
+        Files.write(PathUtil.goalCheckPolicy(root), ("{\n"
+                + "  \"required_checks\": \"sensitive\",\n"
+                + "  \"accepted_sensitive_statuses\": \"passed\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "custom-workspace-stale",
+                "--task", "Workspace stale guard",
+                "--module", "goal"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        Harness inspectStep = new Harness(tempDir);
+        int inspectStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Inspection complete",
+                "--evidence", "evidence=inspection"
+        }, inspectStep.context());
+        assertEquals(ExitCodes.SUCCESS, inspectStepExit);
+
+        Harness verifyStep = new Harness(tempDir);
+        int verifyStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Verification evidence recorded",
+                "--evidence", "compile_result=not required; test_result=not required; sensitive_result=ok"
+        }, verifyStep.context());
+        assertEquals(ExitCodes.SUCCESS, verifyStepExit);
+
+        Harness check = new Harness(tempDir);
+        int checkExit = new CommandRouter().run(new String[]{
+                "goal", "check", "--project-root", "demo", "--goal", goalKey, "--all"
+        }, check.context());
+        assertEquals(ExitCodes.SUCCESS, checkExit);
+        assertTrue(check.stdout().contains("workspace_fingerprint: fallback:"));
+        assertTrue(check.stdout().contains("context_fingerprint: context:"));
+        assertTrue(check.stdout().contains("check_fingerprint: check:"));
+        assertEquals(1, countRows(root, "schema_version WHERE version = 8"));
+
+        Harness readyEvaluate = new Harness(tempDir);
+        int readyEvaluateExit = new CommandRouter().run(new String[]{
+                "goal", "evaluate", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, readyEvaluate.context());
+        assertEquals(ExitCodes.SUCCESS, readyEvaluateExit);
+        assertTrue(readyEvaluate.stdout().contains("\"decision\": \"ready_to_complete\""));
+
+        Files.createDirectories(root.resolve("src/main/java"));
+        Files.write(root.resolve("src/main/java/Demo.java"),
+                "final class Demo {}\n".getBytes("UTF-8"));
+
+        Harness staleEvaluate = new Harness(tempDir);
+        int staleEvaluateExit = new CommandRouter().run(new String[]{
+                "goal", "evaluate", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, staleEvaluate.context());
+        assertEquals(ExitCodes.SUCCESS, staleEvaluateExit);
+        assertTrue(staleEvaluate.stdout().contains("\"decision\": \"not_ready\""));
+        assertTrue(staleEvaluate.stdout().contains("check sensitive is stale: workspace fingerprint changed"));
+        assertTrue(staleEvaluate.stdout().contains("\"stale_count\": 1"));
+
+        Harness staleComplete = new Harness(tempDir);
+        int staleCompleteExit = new CommandRouter().run(new String[]{
+                "goal", "complete", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, staleComplete.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, staleCompleteExit);
+        assertTrue(staleComplete.stdout().contains("workspace fingerprint changed"));
+
+        Harness verifyFresh = new Harness(tempDir);
+        int verifyFreshExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, verifyFresh.context());
+        assertEquals(ExitCodes.SUCCESS, verifyFreshExit);
+        assertTrue(verifyFresh.stdout().contains("\"decision\": \"ready_to_complete\""));
+        assertTrue(verifyFresh.stdout().contains("\"stale_count\": 0"));
+    }
+
+    @Test
     void goalUsesFormalProfileSchemaForEvidenceChecksAndMappings() throws Exception {
         Path root = tempDir.resolve("demo");
         Files.createDirectories(PathUtil.goalProfilesDirectory(root));
@@ -1142,7 +1675,11 @@ final class GoalIntegrationTest {
                 + "  \"mapping.custom_inspect.workflow_phase\": \"inspect_existing_code\",\n"
                 + "  \"mapping.verify.workflow_phase\": \"verify_tests\",\n"
                 + "  \"mapping.verify.required_gates\": \"tests_recorded\",\n"
-                + "  \"mapping.verify.spec_acceptance_update\": \"manual\"\n"
+                + "  \"mapping.verify.phase_pass_mode\": \"check\",\n"
+                + "  \"mapping.verify.gate_pass_mode\": \"check\",\n"
+                + "  \"mapping.verify.spec_acceptance_update\": \"manual\",\n"
+                + "  \"mapping.verify.acceptance_source\": \"manual\",\n"
+                + "  \"mapping.verify.required_checks\": \"sensitive\"\n"
                 + "}\n").getBytes("UTF-8"));
 
         Harness start = new Harness(tempDir);
@@ -1329,6 +1866,33 @@ final class GoalIntegrationTest {
         assertTrue(completeJson.stdout().contains("\"command\": \"goal complete\""));
         assertTrue(completeJson.stdout().contains("\"status\": \"completed\""));
         assertTrue(completeJson.stdout().contains("\"summary_path\": "));
+    }
+
+    private void recordTwoStepGoal(String goalKey) {
+        recordTwoStepGoal(goalKey, "verification=done");
+    }
+
+    private void recordTwoStepGoal(String goalKey, String verifyEvidence) {
+        Harness inspectStep = new Harness(tempDir);
+        int inspectStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Inspection complete",
+                "--evidence", "inspection=done"
+        }, inspectStep.context());
+        assertEquals(ExitCodes.SUCCESS, inspectStepExit);
+
+        Harness verifyStep = new Harness(tempDir);
+        int verifyStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Verification evidence complete",
+                "--evidence", "compile_result=not required; test_result=not required; "
+                        + "sensitive_result=not required; " + verifyEvidence
+        }, verifyStep.context());
+        assertEquals(ExitCodes.SUCCESS, verifyStepExit);
     }
 
     private void recordJavaGoalSteps(String goalKey) {

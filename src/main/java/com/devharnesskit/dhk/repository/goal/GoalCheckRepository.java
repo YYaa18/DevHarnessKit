@@ -14,7 +14,8 @@ public final class GoalCheckRepository {
     public long upsert(Connection connection, GoalCheck check) throws SQLException {
         try (PreparedStatement update = connection.prepareStatement(
                 "UPDATE goal_check SET check_type = ?, required = ?, step_count_at_check = ?, command = ?, status = ?, "
-                        + "result_summary = ?, evidence_path = ?, checked_at = ?, updated_at = ? "
+                        + "result_summary = ?, evidence_path = ?, workspace_fingerprint = ?, "
+                        + "context_fingerprint = ?, check_fingerprint = ?, checked_at = ?, updated_at = ? "
                         + "WHERE goal_key = ? AND check_key = ?")) {
             update.setString(1, check.checkType());
             update.setInt(2, check.required() ? 1 : 0);
@@ -23,10 +24,13 @@ public final class GoalCheckRepository {
             update.setString(5, check.status());
             update.setString(6, check.resultSummary());
             update.setString(7, check.evidencePath());
-            update.setString(8, check.checkedAt());
-            update.setString(9, check.updatedAt());
-            update.setString(10, check.goalKey());
-            update.setString(11, check.checkKey());
+            update.setString(8, check.workspaceFingerprint());
+            update.setString(9, check.contextFingerprint());
+            update.setString(10, check.checkFingerprint());
+            update.setString(11, check.checkedAt());
+            update.setString(12, check.updatedAt());
+            update.setString(13, check.goalKey());
+            update.setString(14, check.checkKey());
             if (update.executeUpdate() > 0) {
                 GoalCheck existing = find(connection, check.goalKey(), check.checkKey());
                 return existing == null ? 0L : existing.id();
@@ -34,8 +38,9 @@ public final class GoalCheckRepository {
         }
         try (PreparedStatement insert = connection.prepareStatement(
                 "INSERT INTO goal_check(goal_key, check_key, check_type, required, step_count_at_check, command, status, "
-                        + "result_summary, evidence_path, checked_at, created_at, updated_at) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        + "result_summary, evidence_path, workspace_fingerprint, context_fingerprint, "
+                        + "check_fingerprint, checked_at, created_at, updated_at) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 Statement.RETURN_GENERATED_KEYS)) {
             insert.setString(1, check.goalKey());
             insert.setString(2, check.checkKey());
@@ -46,9 +51,12 @@ public final class GoalCheckRepository {
             insert.setString(7, check.status());
             insert.setString(8, check.resultSummary());
             insert.setString(9, check.evidencePath());
-            insert.setString(10, check.checkedAt());
-            insert.setString(11, check.createdAt());
-            insert.setString(12, check.updatedAt());
+            insert.setString(10, check.workspaceFingerprint());
+            insert.setString(11, check.contextFingerprint());
+            insert.setString(12, check.checkFingerprint());
+            insert.setString(13, check.checkedAt());
+            insert.setString(14, check.createdAt());
+            insert.setString(15, check.updatedAt());
             insert.executeUpdate();
             try (ResultSet resultSet = insert.getGeneratedKeys()) {
                 if (!resultSet.next()) {
@@ -96,6 +104,9 @@ public final class GoalCheckRepository {
                 resultSet.getString("status"),
                 resultSet.getString("result_summary"),
                 resultSet.getString("evidence_path"),
+                resultSet.getString("workspace_fingerprint"),
+                resultSet.getString("context_fingerprint"),
+                resultSet.getString("check_fingerprint"),
                 resultSet.getString("checked_at"),
                 resultSet.getString("created_at"),
                 resultSet.getString("updated_at"));

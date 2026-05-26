@@ -112,7 +112,7 @@ with the matching CLI version.
 
 ## SQLite Schema Contract
 
-Current schema version: `7`.
+Current schema version: `8`.
 
 Before 1.0, the schema is not a stable public API. Users may rely on these
 operational guarantees:

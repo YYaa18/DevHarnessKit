@@ -21,6 +21,7 @@ public final class MigrationRunner {
     public static final int V5 = 5;
     public static final int V6 = 6;
     public static final int V7 = 7;
+    public static final int V8 = 8;
 
     public MigrationResult migrate(Connection connection, Clock clock) throws SQLException {
         String backupPath = backupBeforeUpgrade(connection, clock);
@@ -106,6 +107,7 @@ public final class MigrationRunner {
         migrateV5(connection, clock);
         migrateV6(connection, clock);
         migrateV7(connection, clock);
+        migrateV8(connection, clock);
 
         boolean ftsAvailable = true;
         String ftsError = "";
@@ -124,7 +126,7 @@ public final class MigrationRunner {
             return "";
         }
         int currentVersion = currentSchemaVersion(connection);
-        if (currentVersion >= V7) {
+        if (currentVersion >= V8) {
             return "";
         }
         try {
@@ -141,7 +143,7 @@ public final class MigrationRunner {
             }
             MemoryBackupService backupService = new MemoryBackupService();
             Path out = backupService.defaultBackupPath(projectRoot, clock.now().toString(),
-                    "pre-migration-v" + currentVersion + "-to-v" + V7);
+                    "pre-migration-v" + currentVersion + "-to-v" + V8);
             backupService.writeBackup(PathUtil.memoryDirectory(projectRoot), out);
             return out.toString();
         } catch (IOException ex) {
@@ -652,6 +654,19 @@ public final class MigrationRunner {
             if (!schemaVersionExists(connection, V7)) {
                 statement.executeUpdate("INSERT INTO schema_version(version, description, applied_at) VALUES ("
                         + V7 + ", 'V0.4.1 goal context export recovery schema', '" + clock.now().toString() + "')");
+            }
+        }
+    }
+
+    private void migrateV8(Connection connection, Clock clock) throws SQLException {
+        addColumnIfMissing(connection, "goal_check", "workspace_fingerprint", "TEXT NOT NULL DEFAULT ''");
+        addColumnIfMissing(connection, "goal_check", "context_fingerprint", "TEXT NOT NULL DEFAULT ''");
+        addColumnIfMissing(connection, "goal_check", "check_fingerprint", "TEXT NOT NULL DEFAULT ''");
+        try (Statement statement = connection.createStatement()) {
+            if (!schemaVersionExists(connection, V8)) {
+                statement.executeUpdate("INSERT INTO schema_version(version, description, applied_at) VALUES ("
+                        + V8 + ", 'V0.4.3 goal workspace fingerprint freshness schema', '"
+                        + clock.now().toString() + "')");
             }
         }
     }

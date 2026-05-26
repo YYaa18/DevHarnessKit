@@ -20,6 +20,12 @@ public final class GoalCompletionEvaluator {
 
     public GoalEvaluation evaluate(GoalRun goal, List<GoalCheck> checks, GoalCheckPolicy policy,
                                    GoalProfile profile, List<GoalStep> steps) {
+        return evaluate(goal, checks, policy, profile, steps, "", "");
+    }
+
+    public GoalEvaluation evaluate(GoalRun goal, List<GoalCheck> checks, GoalCheckPolicy policy,
+                                   GoalProfile profile, List<GoalStep> steps,
+                                   String currentWorkspaceFingerprint, String currentContextFingerprint) {
         List<String> missing = new ArrayList<String>();
         List<String> staleChecks = new ArrayList<String>();
         if ("failed".equals(goal.status()) || "abandoned".equals(goal.status())) {
@@ -48,7 +54,20 @@ public final class GoalCompletionEvaluator {
                     && check.stepCountAtCheck() < recordedSteps) {
                 missing.add("check " + required + " is stale: checked_at_step="
                         + check.stepCountAtCheck() + " current_step=" + recordedSteps);
-                staleChecks.add(required);
+                addStale(staleChecks, required);
+                continue;
+            }
+            if ((profile == null || profile.completionRequireFreshChecks())
+                    && currentWorkspaceFingerprint != null && currentWorkspaceFingerprint.length() > 0) {
+                if (check.workspaceFingerprint().length() == 0) {
+                    missing.add("check " + required + " is stale: workspace fingerprint missing");
+                    addStale(staleChecks, required);
+                    continue;
+                }
+                if (!currentWorkspaceFingerprint.equals(check.workspaceFingerprint())) {
+                    missing.add("check " + required + " is stale: workspace fingerprint changed");
+                    addStale(staleChecks, required);
+                }
             }
         }
         if (missing.isEmpty()) {
@@ -81,5 +100,11 @@ public final class GoalCompletionEvaluator {
             }
         }
         return null;
+    }
+
+    private void addStale(List<String> staleChecks, String checkKey) {
+        if (!staleChecks.contains(checkKey)) {
+            staleChecks.add(checkKey);
+        }
     }
 }

@@ -20,14 +20,19 @@ final class GoalContextRendererTest {
 
         String markdown = new GoalContextRenderer().render(goal, plan,
                 new String[]{"compile", "test", "sensitive"},
-                new String[]{"check compile is pending"}, "now");
+                new String[]{"check compile is pending"},
+                new String[]{"compile"}, "stale", "now");
 
         assertTrue(markdown.length() <= 16 * 1024);
         assertTrue(markdown.contains("# GOAL_CONTEXT"));
         assertSectionOrder(markdown, "# GOAL_CONTEXT", "<generated-at>", "<goal>",
-                "<current-action>", "<next-instruction>", "<allowed-actions>", "<forbidden-actions>",
-                "<required-evidence>", "<structured-evidence-fields>", "<required-checks>",
-                "<context-files>", "<completion-blockers>", "<completion-condition>", "<next-command>");
+                "<current-action>", "<next-instruction>", "<allowed-actions>", "<allowed-commands>",
+                "<forbidden-actions>", "<required-evidence>", "<evidence-contract>",
+                "<structured-evidence-fields>", "<required-checks>", "<context-files>",
+                "<completion-blockers>", "<freshness-status>", "<completion-condition>", "<next-command>");
+        assertTrue(markdown.contains("<allowed-commands>"));
+        assertTrue(markdown.contains("dhk goal verify --goal goal-1"));
+        assertTrue(markdown.contains("<evidence-contract>"));
         assertTrue(markdown.contains("<structured-evidence-fields>"));
         assertTrue(markdown.contains("- --read-files"));
         assertTrue(markdown.contains("- --compile-result"));
@@ -35,6 +40,9 @@ final class GoalContextRendererTest {
         assertTrue(markdown.contains("- compile"));
         assertTrue(markdown.contains("<completion-blockers>"));
         assertTrue(markdown.contains("- check compile is pending"));
+        assertTrue(markdown.contains("<freshness-status>"));
+        assertTrue(markdown.contains("- status: stale"));
+        assertTrue(markdown.contains("- compile"));
         assertTrue(markdown.contains("<completion-condition>"));
         assertTrue(markdown.contains("<next-command>"));
         assertTrue(markdown.contains("<!-- truncated: goal context exceeded budget -->"));

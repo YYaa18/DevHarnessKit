@@ -51,7 +51,10 @@ public final class GoalVerifyCommand implements Command {
         }
         context.out().println("failed_checks:");
         printStringList(context, failedChecks(checks));
+        context.out().println("freshness_status: " + freshnessStatus(evaluation));
         context.out().println("missing:");
+        printArray(context, evaluation.missing());
+        context.out().println("completion_blockers:");
         printArray(context, evaluation.missing());
         context.out().println("stale_checks:");
         printArray(context, evaluation.staleChecks());
@@ -68,6 +71,9 @@ public final class GoalVerifyCommand implements Command {
                     JsonOutput.stringField("check_key", check.checkKey()),
                     JsonOutput.stringField("status", check.status()),
                     JsonOutput.numberField("step_count_at_check", check.stepCountAtCheck()),
+                    JsonOutput.stringField("workspace_fingerprint", check.workspaceFingerprint()),
+                    JsonOutput.stringField("context_fingerprint", check.contextFingerprint()),
+                    JsonOutput.stringField("check_fingerprint", check.checkFingerprint()),
                     JsonOutput.stringField("result_summary", check.resultSummary()),
                     JsonOutput.stringField("evidence_path", check.evidencePath())
             ).trim());
@@ -81,8 +87,11 @@ public final class GoalVerifyCommand implements Command {
                 JsonOutput.rawField("checks", JsonOutput.array(rawChecks)),
                 JsonOutput.numberField("failed_count", failedChecks(checks).length),
                 JsonOutput.rawField("failed_checks", JsonOutput.stringArray(failedChecks(checks))),
+                JsonOutput.stringField("freshness_status", freshnessStatus(evaluation)),
                 JsonOutput.numberField("missing_count", evaluation.missing().length),
                 JsonOutput.rawField("missing", JsonOutput.stringArray(evaluation.missing())),
+                JsonOutput.numberField("completion_blocker_count", evaluation.missing().length),
+                JsonOutput.rawField("completion_blockers", JsonOutput.stringArray(evaluation.missing())),
                 JsonOutput.numberField("stale_count", evaluation.staleChecks().length),
                 JsonOutput.rawField("stale_checks", JsonOutput.stringArray(evaluation.staleChecks())),
                 JsonOutput.stringField("next_action", evaluation.nextAction()),
@@ -113,5 +122,9 @@ public final class GoalVerifyCommand implements Command {
             }
         }
         return failed.toArray(new String[failed.size()]);
+    }
+
+    private String freshnessStatus(GoalEvaluation evaluation) {
+        return evaluation.staleChecks().length == 0 ? "fresh" : "stale";
     }
 }

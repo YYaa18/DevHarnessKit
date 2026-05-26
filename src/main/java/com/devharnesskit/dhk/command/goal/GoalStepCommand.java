@@ -5,11 +5,14 @@ import com.devharnesskit.dhk.cli.Command;
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.service.goal.GoalOrchestrator;
+import com.devharnesskit.dhk.service.policy.PolicyHookService;
+import com.devharnesskit.dhk.service.policy.PolicyViolationException;
 
 import java.nio.file.Path;
 
 public final class GoalStepCommand implements Command {
     private final GoalOrchestrator orchestrator = new GoalOrchestrator();
+    private final PolicyHookService policyHookService = new PolicyHookService();
 
     public int run(CommandContext context, Args args) {
         String goalKey = args.option("goal").trim();
@@ -24,6 +27,7 @@ public final class GoalStepCommand implements Command {
         String combinedEvidence = combineEvidence(evidence, structuredEvidence);
         Path projectRoot = GoalCommandSupport.projectRoot(args, context);
         try {
+            policyHookService.requireGoalStepAllowed(projectRoot, changedFiles);
             GoalOrchestrator.GoalStepResult result = orchestrator.step(context, projectRoot, goalKey,
                     summary, changedFiles, combinedEvidence);
             context.out().println("step_id: " + result.stepId());
@@ -34,6 +38,9 @@ public final class GoalStepCommand implements Command {
             context.out().println("context_path: " + result.contextPath());
             return ExitCodes.SUCCESS;
         } catch (IllegalArgumentException ex) {
+            context.err().println(ex.getMessage());
+            return ExitCodes.VALIDATION_ERROR;
+        } catch (PolicyViolationException ex) {
             context.err().println(ex.getMessage());
             return ExitCodes.VALIDATION_ERROR;
         } catch (Exception ex) {

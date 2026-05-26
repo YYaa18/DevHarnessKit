@@ -1,6 +1,7 @@
 package com.devharnesskit.dhk.service.goal;
 
 import com.devharnesskit.dhk.model.Project;
+import com.devharnesskit.dhk.model.goal.GoalAcceptanceMapping;
 import com.devharnesskit.dhk.model.goal.GoalActionMapping;
 import com.devharnesskit.dhk.model.goal.GoalCheck;
 import com.devharnesskit.dhk.model.goal.GoalProfile;
@@ -33,8 +34,10 @@ import java.nio.file.Path;
 import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public final class GoalActionSyncService {
     private static final String GOAL_ACCEPTANCE = "goal_checks_pass";
@@ -123,8 +126,8 @@ public final class GoalActionSyncService {
     public void syncOnComplete(Connection connection, Project project, GoalRun goal, GoalProfile profile,
                                GoalCheckPolicy policy, List<GoalCheck> checks, long checkpointId,
                                String now) throws Exception {
-        passCheckpoint(connection, project, goal, checkpointId, now);
-        passOptionalFinalWorkflowPhases(connection, project, goal, now);
+        passCheckpoint(connection, project, goal, profile, checkpointId, now);
+        passOptionalFinalWorkflowPhases(connection, project, goal, profile, now);
         refreshWorkflowProgress(connection, goal.workflowRunKey(), now);
         verifySpecChange(connection, goal, profile, now);
     }
@@ -141,7 +144,7 @@ public final class GoalActionSyncService {
             syncSpecTaskForStep(connection, project, goal, profile, step, now);
         }
         if (hasImplementationStep(steps)) {
-            passUserApproval(connection, project, goal, now);
+            passUserApproval(connection, project, goal, profile, now);
         }
         refreshWorkflowProgress(connection, goal.workflowRunKey(), now);
     }
@@ -155,14 +158,19 @@ public final class GoalActionSyncService {
         if (mapping == null) {
             return;
         }
-        for (String gateKey : mapping.requiredGates()) {
-            passGate(connection, project, goal, gateKey, "Passed by goal action evidence",
-                    "goal_step=" + step.id() + " action=" + step.actionKey(), now);
+        if (isImplementationAction(step, mapping)) {
+            passUserApproval(connection, project, goal, profile, now);
         }
-        if (mapping.workflowPhase().length() > 0 && !"verify_tests".equals(mapping.workflowPhase())
-                && !"verify_compile".equals(mapping.workflowPhase())) {
+        if (GoalActionMapping.MODE_STEP.equals(mapping.gatePassMode())) {
+            for (String gateKey : mapping.requiredGates()) {
+                passGate(connection, project, goal, gateKey, "Passed by goal action evidence",
+                        "goal_step=" + step.id() + " action=" + step.actionKey(), now);
+            }
+        }
+        if (mapping.workflowPhase().length() > 0
+                && GoalActionMapping.MODE_STEP.equals(mapping.phasePassMode())) {
             passPhase(connection, project, goal, mapping.workflowPhase(), "Completed by goal action",
-                    "goal_step=" + step.id() + " action=" + step.actionKey(), now);
+                    "goal_step=" + step.id() + " action=" + step.actionKey(), now, profile);
         }
     }
 
@@ -194,14 +202,25 @@ public final class GoalActionSyncService {
         GoalCheck compile = checks.get("compile");
         if (isFreshAccepted(compile, goal, policy, profile)) {
             passPhase(connection, project, goal, "verify_compile", "Compile check passed",
-                    checkEvidence(compile), now);
+                    checkEvidence(compile), now, profile);
         }
-        GoalCheck test = checks.get("test");
-        if (isFreshAccepted(test, goal, policy, profile)) {
-            passGate(connection, project, goal, "tests_recorded", "Test check accepted",
-                    checkEvidence(test), now);
-            passPhase(connection, project, goal, "verify_tests", "Test check accepted",
-                    checkEvidence(test), now);
+        if (profile != null) {
+            for (GoalActionMapping mapping : profile.actionMappings().values()) {
+                if (!mappingChecksAccepted(mapping, checks, goal, policy, profile)) {
+                    continue;
+                }
+                if (GoalActionMapping.MODE_CHECK.equals(mapping.gatePassMode())) {
+                    for (String gateKey : mapping.requiredGates()) {
+                        passGate(connection, project, goal, gateKey, "Goal checks accepted",
+                                checksEvidence(mapping, checks), now);
+                    }
+                }
+                if (mapping.workflowPhase().length() > 0
+                        && GoalActionMapping.MODE_CHECK.equals(mapping.phasePassMode())) {
+                    passPhase(connection, project, goal, mapping.workflowPhase(), "Goal checks accepted",
+                            checksEvidence(mapping, checks), now, profile);
+                }
+            }
         }
         refreshWorkflowProgress(connection, goal.workflowRunKey(), now);
     }
@@ -210,11 +229,95 @@ public final class GoalActionSyncService {
                                     GoalProfile profile, GoalCheckPolicy policy,
                                     List<GoalCheck> currentRunChecks, String now) throws Exception {
         SpecChange change = specChange(connection, goal);
-        if (change == null || profile == null || !hasAutoAcceptance(profile)) {
+        if (change == null || profile == null || !hasManagedAcceptance(profile)) {
             return;
         }
         Map<String, GoalCheck> checks = checksByKey(connection, goal.goalKey(), currentRunChecks);
-        String[] required = policy.requiredChecks(profile);
+        List<GoalStep> steps = stepRepository.listByGoal(connection, goal.goalKey());
+        if (!profile.acceptanceMappings().isEmpty()) {
+            for (GoalAcceptanceMapping mapping : profile.acceptanceMappings().values()) {
+                syncMappedAcceptance(connection, change, mapping, checks, steps, goal, policy, profile, now);
+            }
+            if (profile.acceptanceMapping(GOAL_ACCEPTANCE) != null) {
+                return;
+            }
+        }
+        if (hasAutoAcceptance(profile)) {
+            syncLegacyAutoAcceptance(connection, change, goal, profile, policy, checks, now);
+        }
+    }
+
+    private void syncMappedAcceptance(Connection connection, SpecChange change, GoalAcceptanceMapping mapping,
+                                      Map<String, GoalCheck> checks, List<GoalStep> steps, GoalRun goal,
+                                      GoalCheckPolicy policy, GoalProfile profile, String now) throws Exception {
+        SpecAcceptance acceptance = acceptanceRepository.findByKey(connection, change.changeKey(),
+                mapping.acceptanceKey());
+        if (acceptance == null || "passed".equals(acceptance.status()) || "waived".equals(acceptance.status())) {
+            return;
+        }
+        String evidence = acceptanceEvidence(mapping, checks, steps, goal, policy, profile);
+        if (evidence.length() == 0) {
+            return;
+        }
+        acceptanceService.updateAcceptance(connection, change, acceptance, "passed", evidence, now);
+    }
+
+    private String acceptanceEvidence(GoalAcceptanceMapping mapping, Map<String, GoalCheck> checks,
+                                      List<GoalStep> steps, GoalRun goal, GoalCheckPolicy policy,
+                                      GoalProfile profile) {
+        if (GoalAcceptanceMapping.SOURCE_MANUAL.equals(mapping.source())) {
+            return "";
+        }
+        if (GoalAcceptanceMapping.SOURCE_EVIDENCE.equals(mapping.source())) {
+            return evidenceKeyMatched(mapping, steps);
+        }
+        String[] required = acceptanceRequiredChecks(mapping);
+        if (required.length == 0) {
+            return "";
+        }
+        for (String checkKey : required) {
+            GoalCheck check = checks.get(checkKey);
+            if (!isFreshAccepted(check, goal, policy, profile)) {
+                return "";
+            }
+        }
+        return checksEvidence(required, checks);
+    }
+
+    private String evidenceKeyMatched(GoalAcceptanceMapping mapping, List<GoalStep> steps) {
+        if (mapping.evidenceKey().length() == 0) {
+            return "";
+        }
+        for (GoalStep step : steps) {
+            if (containsEvidenceKey(step.evidence(), mapping.evidenceKey())) {
+                return "goal_step=" + step.id() + " evidence_key=" + mapping.evidenceKey();
+            }
+        }
+        return "";
+    }
+
+    private boolean containsEvidenceKey(String evidence, String key) {
+        if (evidence == null || key == null || key.length() == 0) {
+            return false;
+        }
+        return evidence.contains(key + "=") || evidence.contains(key + ":") || evidence.contains(key);
+    }
+
+    private String[] acceptanceRequiredChecks(GoalAcceptanceMapping mapping) {
+        if (GoalAcceptanceMapping.SOURCE_TEST.equals(mapping.source()) && mapping.requiredChecks().length == 0) {
+            return new String[]{"test"};
+        }
+        if (GoalAcceptanceMapping.SOURCE_CHECKS.equals(mapping.source())
+                || GoalAcceptanceMapping.SOURCE_TEST.equals(mapping.source())) {
+            return mapping.requiredChecks();
+        }
+        return new String[0];
+    }
+
+    private void syncLegacyAutoAcceptance(Connection connection, SpecChange change, GoalRun goal,
+                                          GoalProfile profile, GoalCheckPolicy policy,
+                                          Map<String, GoalCheck> checks, String now) throws Exception {
+        String[] required = acceptanceChecks(profile, policy);
         List<String> missing = new ArrayList<String>();
         for (String checkKey : required) {
             if ("spec".equals(checkKey)) {
@@ -255,12 +358,101 @@ public final class GoalActionSyncService {
             }
             index++;
         }
+        for (GoalAcceptanceMapping mapping : profile.acceptanceMappings().values()) {
+            if (acceptanceRepository.findByKey(connection, change.changeKey(), mapping.acceptanceKey()) == null) {
+                acceptanceService.addAcceptance(connection, change, mapping.acceptanceKey(),
+                        mapping.description(), mapping.expectedResult(), now);
+            }
+        }
         if (hasAutoAcceptance(profile)
                 && acceptanceRepository.findByKey(connection, change.changeKey(), GOAL_ACCEPTANCE) == null) {
             acceptanceService.addAcceptance(connection, change, GOAL_ACCEPTANCE,
                     "Required goal checks are accepted",
                     "compile/test/sensitive/workflow checks are accepted by policy", now);
         }
+    }
+
+    private boolean mappingChecksAccepted(GoalActionMapping mapping, Map<String, GoalCheck> checks,
+                                          GoalRun goal, GoalCheckPolicy policy, GoalProfile profile) {
+        String[] required = mappingRequiredChecks(mapping);
+        if (required.length == 0) {
+            return false;
+        }
+        for (String checkKey : required) {
+            GoalCheck check = checks.get(checkKey);
+            if (!isFreshAccepted(check, goal, policy, profile)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private String[] mappingRequiredChecks(GoalActionMapping mapping) {
+        if (mapping.requiredChecks().length > 0) {
+            return mapping.requiredChecks();
+        }
+        Set<String> checks = new LinkedHashSet<String>();
+        if ("verify_compile".equals(mapping.workflowPhase())) {
+            checks.add("compile");
+        }
+        if ("verify_tests".equals(mapping.workflowPhase()) || "verify_view_flow".equals(mapping.workflowPhase())
+                || mapping.actionKey().indexOf("verify") >= 0) {
+            checks.add("test");
+        }
+        for (String gate : mapping.requiredGates()) {
+            if ("tests_recorded".equals(gate)) {
+                checks.add("test");
+            }
+        }
+        return checks.toArray(new String[checks.size()]);
+    }
+
+    private String checksEvidence(GoalActionMapping mapping, Map<String, GoalCheck> checks) {
+        String[] required = mappingRequiredChecks(mapping);
+        return checksEvidence(required, checks);
+    }
+
+    private String checksEvidence(String[] required, Map<String, GoalCheck> checks) {
+        StringBuilder builder = new StringBuilder();
+        for (String checkKey : required) {
+            GoalCheck check = checks.get(checkKey);
+            if (check == null) {
+                continue;
+            }
+            if (builder.length() > 0) {
+                builder.append("; ");
+            }
+            builder.append(checkEvidence(check));
+        }
+        return builder.length() == 0 ? "goal_checks" : builder.toString();
+    }
+
+    private String[] acceptanceChecks(GoalProfile profile, GoalCheckPolicy policy) {
+        Set<String> checks = new LinkedHashSet<String>();
+        if (profile != null) {
+            for (GoalActionMapping mapping : profile.actionMappings().values()) {
+                if (!GoalActionMapping.ACCEPTANCE_CHECKS.equals(mapping.acceptanceSource())
+                        && !"auto_pass".equals(mapping.specAcceptanceUpdate())) {
+                    continue;
+                }
+                for (String checkKey : mapping.requiredChecks()) {
+                    addAcceptanceCheck(checks, checkKey);
+                }
+            }
+        }
+        if (checks.isEmpty()) {
+            for (String checkKey : policy.requiredChecks(profile)) {
+                addAcceptanceCheck(checks, checkKey);
+            }
+        }
+        return checks.toArray(new String[checks.size()]);
+    }
+
+    private void addAcceptanceCheck(Set<String> checks, String checkKey) {
+        if (checkKey == null || checkKey.length() == 0 || "spec".equals(checkKey)) {
+            return;
+        }
+        checks.add(checkKey);
     }
 
     private void passContextExport(Connection connection, Path projectRoot, Project project,
@@ -279,34 +471,35 @@ public final class GoalActionSyncService {
                 "goal_context_export", now);
     }
 
-    private void passUserApproval(Connection connection, Project project, GoalRun goal, String now) throws Exception {
+    private void passUserApproval(Connection connection, Project project, GoalRun goal, GoalProfile profile,
+                                  String now) throws Exception {
         passGate(connection, project, goal, "user_approval_before_implementation",
                 "Goal implementation step recorded under ordered protocol",
                 "goal_step=implement_minimal_change", now);
         passPhase(connection, project, goal, "user_approval",
                 "Approval/rationale satisfied by ordered goal protocol",
-                "goal_step=implement_minimal_change", now);
+                "goal_step=implement_minimal_change", now, profile);
     }
 
     private void passCheckpoint(Connection connection, Project project, GoalRun goal,
-                                long checkpointId, String now) throws Exception {
+                                GoalProfile profile, long checkpointId, String now) throws Exception {
         if (goal.workflowRunKey().length() == 0) {
             return;
         }
         passGate(connection, project, goal, "checkpoint_created", "Completion checkpoint created",
                 "checkpoint_id=" + checkpointId, now);
         passPhase(connection, project, goal, "create_checkpoint", "Completion checkpoint created",
-                "checkpoint_id=" + checkpointId, now);
+                "checkpoint_id=" + checkpointId, now, profile);
     }
 
     private void passOptionalFinalWorkflowPhases(Connection connection, Project project,
-                                                 GoalRun goal, String now) throws Exception {
+                                                 GoalRun goal, GoalProfile profile, String now) throws Exception {
         if (goal.workflowRunKey().length() == 0) {
             return;
         }
         passPhase(connection, project, goal, "suggest_memory_updates",
                 "No automatic memory confirmation; suggestions remain optional",
-                "goal_complete", now);
+                "goal_complete", now, profile);
     }
 
     private boolean passGate(Connection connection, Project project, GoalRun goal, String gateKey,
@@ -331,6 +524,11 @@ public final class GoalActionSyncService {
 
     private boolean passPhase(Connection connection, Project project, GoalRun goal, String phaseKey,
                               String summary, String evidence, String now) throws Exception {
+        return passPhase(connection, project, goal, phaseKey, summary, evidence, now, null);
+    }
+
+    private boolean passPhase(Connection connection, Project project, GoalRun goal, String phaseKey,
+                              String summary, String evidence, String now, GoalProfile profile) throws Exception {
         if (phaseKey == null || phaseKey.length() == 0 || goal.workflowRunKey().length() == 0) {
             return false;
         }
@@ -339,12 +537,36 @@ public final class GoalActionSyncService {
                 || "blocked".equals(phase.status())) {
             return false;
         }
+        WorkflowPhaseRun blocker = priorIncompletePhase(connection, goal, profile, phase);
+        if (blocker != null) {
+            workflowEventRepository.insert(connection, new WorkflowEvent(0L, project.projectKey(),
+                    goal.workflowRunKey(), "custom", phaseKey, "", "warn",
+                    "Phase sync blocked by pending earlier phase: " + blocker.phaseKey(), summary, now));
+            return false;
+        }
         phaseRunRepository.updateStatus(connection, goal.workflowRunKey(), phaseKey, "passed",
                 summary, evidence, now, now);
         workflowEventRepository.insert(connection, new WorkflowEvent(0L, project.projectKey(),
                 goal.workflowRunKey(), "phase_completed", phaseKey, "", "info",
                 "Phase passed by goal sync: " + phaseKey, summary, now));
         return true;
+    }
+
+    private WorkflowPhaseRun priorIncompletePhase(Connection connection, GoalRun goal, GoalProfile profile,
+                                                 WorkflowPhaseRun target) throws Exception {
+        if (profile == null || !profile.strictWorkflowPhaseOrder()) {
+            return null;
+        }
+        List<WorkflowPhaseRun> phases = phaseRunRepository.listByRun(connection, goal.workflowRunKey());
+        for (WorkflowPhaseRun phase : phases) {
+            if (phase.phaseOrder() >= target.phaseOrder()) {
+                continue;
+            }
+            if (!"passed".equals(phase.status())) {
+                return phase;
+            }
+        }
+        return null;
     }
 
     private void refreshWorkflowProgress(Connection connection, String workflowRunKey, String now) throws Exception {
@@ -423,9 +645,17 @@ public final class GoalActionSyncService {
         return false;
     }
 
+    private boolean isImplementationAction(GoalStep step, GoalActionMapping mapping) {
+        return step.actionKey().indexOf("implement") >= 0 || step.actionKey().indexOf("apply") >= 0
+                || mapping.workflowPhase().indexOf("implement") >= 0 || mapping.workflowPhase().indexOf("apply") >= 0;
+    }
+
     private boolean hasManagedSpec(GoalProfile profile) {
         if (profile == null) {
             return false;
+        }
+        if (!profile.acceptanceMappings().isEmpty()) {
+            return true;
         }
         for (GoalActionMapping mapping : profile.actionMappings().values()) {
             if (mapping.specTask().length() > 0 || mapping.specAcceptanceUpdate().length() > 0) {
@@ -435,12 +665,17 @@ public final class GoalActionSyncService {
         return false;
     }
 
+    private boolean hasManagedAcceptance(GoalProfile profile) {
+        return profile != null && (!profile.acceptanceMappings().isEmpty() || hasAutoAcceptance(profile));
+    }
+
     private boolean hasAutoAcceptance(GoalProfile profile) {
         if (profile == null) {
             return false;
         }
         for (GoalActionMapping mapping : profile.actionMappings().values()) {
-            if ("auto_pass".equals(mapping.specAcceptanceUpdate())) {
+            if (GoalActionMapping.ACCEPTANCE_CHECKS.equals(mapping.acceptanceSource())
+                    || "auto_pass".equals(mapping.specAcceptanceUpdate())) {
                 return true;
             }
         }

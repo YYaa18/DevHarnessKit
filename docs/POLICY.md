@@ -76,6 +76,8 @@ The first alpha hook points are:
 
 | Hook | Command path | What can block |
 | --- | --- | --- |
+| `before-goal-step` | `dhk goal step` | `forbidden_dhk_commands`, missing `allowed_dhk_commands`, `protected_files`, or changed files outside `allowed_write_paths`. |
+| `before-goal-check` | `dhk goal check` | `forbidden_dhk_commands` or missing `allowed_dhk_commands`. `dhk goal verify` may still run its internal checks under the `goal verify` command. |
 | `before-goal-complete` | `dhk goal complete` | `forbidden_dhk_commands`, missing `allowed_dhk_commands`, or goal steps that changed `protected_files`. |
 | `before-db-sql` | `dhk db sql` | `forbidden_dhk_commands`, missing `allowed_dhk_commands`, or non-dry-run SQL without `--i-understand-db-readonly-risk` when `db_sql_requires_explicit_request` is true. |
 | `before-context-export` | `dhk memory export` and goal context exports | `context_export_allowed_files`, `context_export_forbidden_files`, and sensitive matches when `context_export_block_on_sensitive` is true. |

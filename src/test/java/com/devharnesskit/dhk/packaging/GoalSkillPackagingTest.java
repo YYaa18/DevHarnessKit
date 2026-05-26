@@ -55,7 +55,7 @@ final class GoalSkillPackagingTest {
         String evidence = read(skillRoot.resolve("references/evidence-format.md"));
         String forbidden = read(skillRoot.resolve("references/forbidden-actions.md"));
         String selfCheck = read(skillRoot.resolve("references/self-check-format.md"));
-        assertTrue(protocol.contains("Use wrapper scripts under `scripts/`"));
+        assertTrue(protocol.contains("Use wrapper scripts under `.agents/skills/devharness-goal-development/scripts/`"));
         assertTrue(protocol.contains("Run `goal verify` before final completion"));
         assertTrue(evidence.contains("Mirror required evidence keys exactly"));
         assertTrue(forbidden.contains("direct lower-level `dhk memory ...`"));

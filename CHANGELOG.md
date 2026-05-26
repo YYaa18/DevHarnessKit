@@ -8,7 +8,7 @@ Initial developer-preview release.
 - DB readonly: test, sql, and dry-run with fail-closed SQL guard.
 - Workflow alpha: templates, runs, phases, gates, artifacts, bindings, summary, and export.
 - Spec alpha: changes, documents, tasks, acceptance criteria, status, archive, workflow binding, and export.
-- Goal orchestration alpha MVP: `goal start`, `goal resume`, `goal next`, `goal step`, `goal status`, `goal export`, `goal check`, `goal evaluate`, `goal complete`, schema v5, `GOAL_CONTEXT.md`, and `GOAL_SUMMARY.md`.
+- Goal orchestration alpha MVP: `goal start`, `goal resume`, `goal next`, `goal step`, `goal status`, `goal export`, `goal check`, `goal evaluate`, `goal verify`, `goal complete`, schema v5, `GOAL_CONTEXT.md`, and `GOAL_SUMMARY.md`.
 - Goal evidence hardening: `goal step` validates required evidence for the current action and `goal evaluate` refuses completion until configured actions are recorded.
 - Goal-first skill hardening: wrapper project-root behavior and protocol reference docs are covered by packaging tests.
 - Goal config diagnostics: `dhk doctor` warns about invalid project-level goal profiles and check policies, including unknown fields, invalid actions, empty required checks, and missing workflow templates.
@@ -38,3 +38,9 @@ Initial developer-preview release.
 - Goal stale-check enforcement: `goal evaluate` and `goal complete` now reject required checks recorded before the latest goal step.
 - Goal check status policy: built-in Java goal profiles now require passed compile/test/sensitive/spec checks, with project-level `accepted_<check>_statuses` overrides for non-Maven flows.
 - Goal context export recovery: schema v7 adds resumable `context_exporting` and `context_export_failed` states for failed `GOAL_CONTEXT.md` exports.
+- Goal workspace freshness: schema v8 records workspace, context, and check fingerprints so completion can reject checks that became stale after later workspace changes.
+- Goal Sync Strictness alpha: profile action mappings can drive workflow phases, workflow gates, spec tasks, and strict phase order from accepted evidence or fresh checks.
+- Goal business acceptance mappings: profiles can define managed acceptance items backed by fresh checks, test results, explicit evidence, or manual confirmation.
+- Policy hook expansion: project policy can block goal step/check/export and DB SQL non-dry-run now requires explicit risk acknowledgement before credential validation.
+- Goal verify/context protocol hardening: `goal verify` emits `freshness_status` and `completion_blockers`, and `GOAL_CONTEXT.md` includes allowed commands, evidence contract, freshness status, and completion blockers.
+- Documentation: Goal Sync Strictness guide documents the goal-controlled workflow/spec model, automatic sync rules, manual confirmation boundaries, and experimental alpha limits.

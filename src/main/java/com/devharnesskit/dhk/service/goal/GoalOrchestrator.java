@@ -88,6 +88,7 @@ public final class GoalOrchestrator {
     private final GoalCheckPolicyService checkPolicyService = new GoalCheckPolicyService();
     private final GoalCompletionEvaluator completionEvaluator = new GoalCompletionEvaluator();
     private final GoalActionSyncService actionSyncService = new GoalActionSyncService();
+    private final WorkspaceFingerprintService fingerprintService = new WorkspaceFingerprintService();
     private final GoalSummaryRenderer summaryRenderer = new GoalSummaryRenderer();
     private final SensitiveDataGuard sensitiveDataGuard = new SensitiveDataGuard();
     private final PolicyHookService policyHookService = new PolicyHookService();
@@ -408,7 +409,9 @@ public final class GoalOrchestrator {
         actionSyncService.syncBeforeEvaluate(connection, projectRoot, project, goal, profile, policy, now);
         return completionEvaluator.evaluate(goal, goalCheckRepository.listByGoal(connection, goal.goalKey()),
                 policy, profile,
-                goalStepRepository.listByGoal(connection, goal.goalKey()));
+                goalStepRepository.listByGoal(connection, goal.goalKey()),
+                fingerprintService.workspaceFingerprint(projectRoot),
+                fingerprintService.contextFingerprint(projectRoot));
     }
 
     private List<GoalCheck> runAllChecks(Connection connection, Path projectRoot, Project project,

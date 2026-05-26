@@ -10,16 +10,16 @@ Use this skill for code changes in repositories that include DevHarnessKit. Deve
 ## Required Protocol
 
 1. Do not start by editing code.
-2. Start a new goal with `scripts/goal-start.sh`, or resume the current goal with `scripts/goal-resume.sh`.
-3. Run `scripts/goal-next.sh` before each work step.
+2. Start a new goal with the skill wrapper `scripts/goal-start.sh`, or resume the current goal with `scripts/goal-resume.sh`. From the repository root, call them as `.agents/skills/devharness-goal-development/scripts/goal-start.sh` and `.agents/skills/devharness-goal-development/scripts/goal-resume.sh`.
+3. Run the skill wrapper `scripts/goal-next.sh` before each work step.
 4. Read `.agents/memory/exports/GOAL_CONTEXT.md`.
-5. Perform only the `current_action` from GOAL_CONTEXT.
+5. Perform only the `current_action` from GOAL_CONTEXT, and stay within its `<allowed-commands>`, `<forbidden-actions>`, `<evidence-contract>`, and `<freshness-status>` sections.
 6. Do not use lower-level `memory`, `workflow`, `spec`, or `db` commands unless GOAL_CONTEXT explicitly allows it.
 7. After every investigation, plan, edit, or verification step, run `scripts/goal-step.sh` with summary, structured fields, changed files, and the required evidence keys from GOAL_CONTEXT.
-8. Before claiming completion, run `scripts/goal-verify.sh`. If debugging is needed, use `scripts/goal-check.sh --all` followed by `scripts/goal-evaluate.sh`.
-9. Only run `scripts/goal-complete.sh` when verify/evaluate returns `ready_to_complete`.
+8. Before claiming completion, run `scripts/goal-verify.sh`; if it is not ready, follow its `next_command`.
+9. Only run `scripts/goal-complete.sh` when `goal verify` returns `ready_to_complete`. Use `scripts/goal-check.sh --all` plus `scripts/goal-evaluate.sh` only when debugging readiness.
 
-Use the wrapper scripts instead of composing raw `dhk goal ...` commands; the wrappers pass the repository root even when invoked from a subdirectory.
+Use the wrapper scripts instead of composing raw `dhk goal ...` commands; the wrappers pass the repository root even when invoked from a subdirectory. In this repo they live under `.agents/skills/devharness-goal-development/scripts/`.
 
 ## Forbidden By Default
 

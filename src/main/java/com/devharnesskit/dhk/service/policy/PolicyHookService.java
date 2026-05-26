@@ -29,13 +29,30 @@ public final class PolicyHookService {
             throw new PolicyViolationException("Policy blocked goal complete: " + command.reason());
         }
         for (GoalStep step : steps) {
-            String[] files = splitChangedFiles(step.changedFiles());
-            for (String file : files) {
-                if (matchesAny(file, policy.protectedFiles())) {
-                    throw new PolicyViolationException("Policy blocked goal complete: protected file changed: "
-                            + file);
-                }
-            }
+            requireChangedFilesAllowed(policy, "goal complete", step.changedFiles(), false);
+        }
+    }
+
+    public void requireGoalStepAllowed(Path projectRoot, String changedFiles) {
+        if (!policyService.hasPolicy(projectRoot)) {
+            return;
+        }
+        DevHarnessPolicy policy = policyService.load(projectRoot);
+        PolicyDecision command = commandDecision(policy, "goal step");
+        if (!command.allowed()) {
+            throw new PolicyViolationException("Policy blocked goal step: " + command.reason());
+        }
+        requireChangedFilesAllowed(policy, "goal step", changedFiles, true);
+    }
+
+    public void requireGoalCheckAllowed(Path projectRoot) {
+        if (!policyService.hasPolicy(projectRoot)) {
+            return;
+        }
+        DevHarnessPolicy policy = policyService.load(projectRoot);
+        PolicyDecision command = commandDecision(policy, "goal check");
+        if (!command.allowed()) {
+            throw new PolicyViolationException("Policy blocked goal check: " + command.reason());
         }
     }
 
@@ -94,6 +111,22 @@ public final class PolicyHookService {
             }
         }
         return false;
+    }
+
+    private void requireChangedFilesAllowed(DevHarnessPolicy policy, String hook, String changedFiles,
+                                            boolean enforceAllowedWritePaths) {
+        String[] files = splitChangedFiles(changedFiles);
+        for (String file : files) {
+            if (matchesAny(file, policy.protectedFiles())) {
+                throw new PolicyViolationException("Policy blocked " + hook + ": protected file changed: "
+                        + file);
+            }
+            if (enforceAllowedWritePaths && policy.allowedWritePaths().length > 0
+                    && !matchesAny(file, policy.allowedWritePaths())) {
+                throw new PolicyViolationException("Policy blocked " + hook
+                        + ": changed file is outside allowed_write_paths: " + file);
+            }
+        }
     }
 
     private String[] splitChangedFiles(String changedFiles) {

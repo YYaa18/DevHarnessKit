@@ -77,7 +77,7 @@ final class MemoryInitDoctorIntegrationTest {
         int exitCode = new CommandRouter().run(new String[]{"doctor", "--project-root", root.toString()}, doctorHarness.context());
 
         assertEquals(ExitCodes.SUCCESS, exitCode);
-        assertTrue(doctorHarness.stdout().contains("schema_version: ok (7)"));
+        assertTrue(doctorHarness.stdout().contains("schema_version: ok (8)"));
         assertTrue(doctorHarness.stdout().contains("mysql_driver: ok"));
         assertTrue(doctorHarness.stdout().contains("sensitive_policy: default"));
         assertTrue(doctorHarness.stdout().contains("devharness_policy: default"));
@@ -90,7 +90,7 @@ final class MemoryInitDoctorIntegrationTest {
         }, jsonDoctorHarness.context());
         assertEquals(ExitCodes.SUCCESS, jsonExitCode);
         assertTrue(jsonDoctorHarness.stdout().contains("\"command\": \"doctor\""));
-        assertTrue(jsonDoctorHarness.stdout().contains("\"schema_version\": 7"));
+        assertTrue(jsonDoctorHarness.stdout().contains("\"schema_version\": 8"));
         assertTrue(jsonDoctorHarness.stdout().contains("\"mysql_driver_loaded\": true"));
         assertTrue(jsonDoctorHarness.stdout().contains("\"devharness_policy\": \"default\""));
     }
@@ -122,7 +122,10 @@ final class MemoryInitDoctorIntegrationTest {
                 + "  \"mapping.verify.workflow_phase\": \"missing_phase\",\n"
                 + "  \"mapping.verify.required_gates\": \"missing_gate\",\n"
                 + "  \"mapping.verify.spec_acceptance_update\": \"robot\",\n"
-                + "  \"mapping.ghost.workflow_phase\": \"verify_tests\"\n"
+                + "  \"mapping.ghost.workflow_phase\": \"verify_tests\",\n"
+                + "  \"acceptance.Business.source\": \"robot\",\n"
+                + "  \"acceptance.business_rule.required_checks\": \"sensitive,custom\",\n"
+                + "  \"acceptance.evidence_rule.source\": \"evidence\"\n"
                 + "}\n").getBytes("UTF-8"));
         Files.write(PathUtil.goalCheckPolicy(root), ("{\n"
                 + "  \"required_checks\": \"\",\n"
@@ -151,6 +154,11 @@ final class MemoryInitDoctorIntegrationTest {
         assertTrue(doctorHarness.stderr().contains("mapping.verify.required_gates contains unsupported item: missing_gate"));
         assertTrue(doctorHarness.stderr().contains("mapping.verify.spec_acceptance_update should be one of"));
         assertTrue(doctorHarness.stderr().contains("mapping.ghost.workflow_phase references action not listed in actions"));
+        assertTrue(doctorHarness.stderr().contains("acceptance.Business.source has invalid acceptance key"));
+        assertTrue(doctorHarness.stderr().contains("acceptance.Business.source should be one of"));
+        assertTrue(doctorHarness.stderr().contains("acceptance.business_rule.source is required"));
+        assertTrue(doctorHarness.stderr().contains("acceptance.business_rule.required_checks contains unsupported item: custom"));
+        assertTrue(doctorHarness.stderr().contains("acceptance.evidence_rule.evidence_key is required when source is evidence"));
         assertTrue(doctorHarness.stderr().contains("required_checks is empty"));
         assertTrue(doctorHarness.stderr().contains("accepted_compile_statuses contains unsupported item: unknown"));
         assertTrue(doctorHarness.stderr().contains("fail_pending_hard_gates should be true/false"));
@@ -181,14 +189,25 @@ final class MemoryInitDoctorIntegrationTest {
                 + "  \"completion_require_fresh_checks\": \"true\",\n"
                 + "  \"completion_allow_skipped_checks\": \"false\",\n"
                 + "  \"completion_require_checkpoint\": \"true\",\n"
+                + "  \"strict_workflow_phase_order\": \"true\",\n"
                 + "  \"required_evidence.inspect_existing_code\": \"existing_controller,existing_service,existing_mapper,existing_tests\",\n"
                 + "  \"required_evidence.create_change_plan\": \"impacted_files,risk_points,verification_plan\",\n"
                 + "  \"mapping.inspect_existing_code.workflow_phase\": \"inspect_existing_code\",\n"
                 + "  \"mapping.create_change_plan.workflow_phase\": \"create_change_plan\",\n"
+                + "  \"mapping.create_change_plan.phase_pass_mode\": \"step\",\n"
                 + "  \"mapping.create_change_plan.required_gates\": \"impacted_files_listed,verification_plan_ready\",\n"
+                + "  \"mapping.create_change_plan.gate_pass_mode\": \"step\",\n"
                 + "  \"mapping.verify.workflow_phase\": \"verify_tests\",\n"
+                + "  \"mapping.verify.phase_pass_mode\": \"check\",\n"
                 + "  \"mapping.verify.required_gates\": \"tests_recorded\",\n"
-                + "  \"mapping.verify.spec_acceptance_update\": \"manual\"\n"
+                + "  \"mapping.verify.gate_pass_mode\": \"check\",\n"
+                + "  \"mapping.verify.spec_acceptance_update\": \"manual\",\n"
+                + "  \"mapping.verify.acceptance_source\": \"manual\",\n"
+                + "  \"mapping.verify.required_checks\": \"compile,test,sensitive\",\n"
+                + "  \"acceptance.business_rule.description\": \"Business rule is verified\",\n"
+                + "  \"acceptance.business_rule.expected\": \"Business rule evidence is present\",\n"
+                + "  \"acceptance.business_rule.source\": \"evidence\",\n"
+                + "  \"acceptance.business_rule.evidence_key\": \"business_verified\"\n"
                 + "}\n").getBytes("UTF-8"));
         Files.write(PathUtil.goalCheckPolicy(root), ("{\n"
                 + "  \"required_checks\": \"compile,test,sensitive,spec,workflow\",\n"

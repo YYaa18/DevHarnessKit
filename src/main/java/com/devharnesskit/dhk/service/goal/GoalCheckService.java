@@ -37,11 +37,12 @@ public final class GoalCheckService {
     private final SensitiveDataGuard sensitiveDataGuard;
     private final GoalCheckPolicyService policyService;
     private final GoalProfileService profileService;
+    private final WorkspaceFingerprintService fingerprintService;
 
     public GoalCheckService() {
         this(new GoalCheckRepository(), new SpecTaskRepository(), new SpecAcceptanceRepository(),
                 new WorkflowRunRepository(), new WorkflowGateRunRepository(), new SensitiveDataGuard(),
-                new GoalCheckPolicyService(), new GoalProfileService());
+                new GoalCheckPolicyService(), new GoalProfileService(), new WorkspaceFingerprintService());
     }
 
     GoalCheckService(GoalCheckRepository checkRepository, SpecTaskRepository taskRepository,
@@ -50,7 +51,8 @@ public final class GoalCheckService {
                      WorkflowGateRunRepository gateRunRepository,
                      SensitiveDataGuard sensitiveDataGuard,
                      GoalCheckPolicyService policyService,
-                     GoalProfileService profileService) {
+                     GoalProfileService profileService,
+                     WorkspaceFingerprintService fingerprintService) {
         this.checkRepository = checkRepository;
         this.taskRepository = taskRepository;
         this.acceptanceRepository = acceptanceRepository;
@@ -59,6 +61,7 @@ public final class GoalCheckService {
         this.sensitiveDataGuard = sensitiveDataGuard;
         this.policyService = policyService;
         this.profileService = profileService;
+        this.fingerprintService = fingerprintService;
     }
 
     public GoalCheck run(Connection connection, Path projectRoot, GoalRun goal,
@@ -79,10 +82,10 @@ public final class GoalCheckService {
             return runSensitiveCheck(connection, projectRoot, goal, now);
         }
         if ("spec".equals(checkKey)) {
-            return runSpecCheck(connection, goal, profile, now);
+            return runSpecCheck(connection, projectRoot, goal, profile, now);
         }
         if ("workflow".equals(checkKey)) {
-            return runWorkflowCheck(connection, goal, now, policy, profile);
+            return runWorkflowCheck(connection, projectRoot, goal, now, policy, profile);
         }
         throw new IllegalArgumentException("Unknown goal check: " + checkKey);
     }
@@ -104,7 +107,7 @@ public final class GoalCheckService {
         if (!Files.isRegularFile(projectRoot.resolve("pom.xml"))) {
             String summary = "pom.xml not found; " + checkKey + " check skipped";
             writeLog(log, summary + "\n");
-            return save(connection, goal, checkKey, "command", commandText, "skipped", summary, log, now);
+            return save(connection, projectRoot, goal, checkKey, "command", commandText, "skipped", summary, log, now);
         }
         CommandResult result = execute(projectRoot, command, 120);
         writeLog(log, result.output());
@@ -112,7 +115,7 @@ public final class GoalCheckService {
         String summary = checkKey + " exit_code=" + result.exitCode()
                 + " duration_ms=" + result.durationMs()
                 + " output_truncated=" + result.truncated();
-        return save(connection, goal, checkKey, "command", commandText, status, summary, log, now);
+        return save(connection, projectRoot, goal, checkKey, "command", commandText, status, summary, log, now);
     }
 
     private GoalCheck runSensitiveCheck(Connection connection, Path projectRoot, GoalRun goal,
@@ -147,18 +150,18 @@ public final class GoalCheckService {
         String summary = failures.isEmpty()
                 ? "sensitive scan passed; files_scanned=" + scanned
                 : "sensitive scan failed: " + failures;
-        return save(connection, goal, "sensitive", "sensitive", "", status, summary, log, now);
+        return save(connection, projectRoot, goal, "sensitive", "sensitive", "", status, summary, log, now);
     }
 
-    private GoalCheck runSpecCheck(Connection connection, GoalRun goal, GoalProfile profile,
+    private GoalCheck runSpecCheck(Connection connection, Path projectRoot, GoalRun goal, GoalProfile profile,
                                    String now) throws Exception {
         Path log = null;
         if (goal.specChangeKey().length() == 0) {
             if (profile != null && profile.specRequired()) {
-                return save(connection, goal, "spec", "spec", "", "failed",
+                return save(connection, projectRoot, goal, "spec", "spec", "", "failed",
                         "spec required but goal has no spec change", log, now);
             }
-            return save(connection, goal, "spec", "spec", "", "skipped",
+            return save(connection, projectRoot, goal, "spec", "spec", "", "skipped",
                     "goal has no spec change", log, now);
         }
         List<String> missing = new ArrayList<String>();
@@ -185,22 +188,22 @@ public final class GoalCheckService {
         String summary = missing.isEmpty()
                 ? "spec tasks and acceptance are closed"
                 : "spec incomplete: " + missing;
-        return save(connection, goal, "spec", "spec", "", status, summary, log, now);
+        return save(connection, projectRoot, goal, "spec", "spec", "", status, summary, log, now);
     }
 
-    private GoalCheck runWorkflowCheck(Connection connection, GoalRun goal, String now,
+    private GoalCheck runWorkflowCheck(Connection connection, Path projectRoot, GoalRun goal, String now,
                                        GoalCheckPolicy policy, GoalProfile profile) throws Exception {
         if (goal.workflowRunKey().length() == 0) {
-            return save(connection, goal, "workflow", "workflow", "", "skipped",
+            return save(connection, projectRoot, goal, "workflow", "workflow", "", "skipped",
                     "goal has no workflow run", null, now);
         }
         WorkflowRun run = workflowRunRepository.findByKey(connection, goal.workflowRunKey());
         if (run == null) {
-            return save(connection, goal, "workflow", "workflow", "", "failed",
+            return save(connection, projectRoot, goal, "workflow", "workflow", "", "failed",
                     "workflow run not found", null, now);
         }
         if ("blocked".equals(run.status()) || "failed".equals(run.status()) || "abandoned".equals(run.status())) {
-            return save(connection, goal, "workflow", "workflow", "", "failed",
+            return save(connection, projectRoot, goal, "workflow", "workflow", "", "failed",
                     "workflow run status is " + run.status(), null, now);
         }
         int failedHard = 0;
@@ -220,24 +223,29 @@ public final class GoalCheckService {
             }
         }
         if (failedHard > 0) {
-            return save(connection, goal, "workflow", "workflow", "", "failed",
+            return save(connection, projectRoot, goal, "workflow", "workflow", "", "failed",
                     "workflow has failed hard gates: " + failedHard, null, now);
         }
         if (policy.failPendingHardGates(profile) && pendingHard > 0) {
-            return save(connection, goal, "workflow", "workflow", "", "failed",
+            return save(connection, projectRoot, goal, "workflow", "workflow", "", "failed",
                     "workflow has pending hard gates: " + pendingHard, null, now);
         }
-        return save(connection, goal, "workflow", "workflow", "", "passed",
+        return save(connection, projectRoot, goal, "workflow", "workflow", "", "passed",
                 "workflow run is active; pending_hard_gates=" + pendingHard
                         + " pending_completion_gates=" + pendingCompletionHard, null, now);
     }
 
-    private GoalCheck save(Connection connection, GoalRun goal, String checkKey, String checkType,
+    private GoalCheck save(Connection connection, Path projectRoot, GoalRun goal, String checkKey, String checkType,
                            String command, String status, String summary, Path evidencePath,
                            String now) throws Exception {
+        String evidence = evidencePath == null ? "" : evidencePath.toString();
+        String workspaceFingerprint = fingerprintService.workspaceFingerprint(projectRoot);
+        String contextFingerprint = fingerprintService.contextFingerprint(projectRoot);
+        String checkFingerprint = fingerprintService.checkFingerprint(checkKey, status, summary, evidence,
+                workspaceFingerprint, contextFingerprint);
         GoalCheck check = new GoalCheck(0L, goal.goalKey(), checkKey, checkType, true, goal.stepCount(),
-                command, status, summary, evidencePath == null ? "" : evidencePath.toString(),
-                now, now, now);
+                command, status, summary, evidence, workspaceFingerprint, contextFingerprint,
+                checkFingerprint, now, now, now);
         checkRepository.upsert(connection, check);
         return checkRepository.find(connection, goal.goalKey(), checkKey);
     }

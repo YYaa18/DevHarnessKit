@@ -23,6 +23,7 @@ Example:
   "completion_require_fresh_checks": "true",
   "completion_allow_skipped_checks": "false",
   "completion_require_checkpoint": "true",
+  "strict_workflow_phase_order": "true",
   "spec_require_non_empty_tasks": "true",
   "spec_require_non_empty_acceptance": "true",
   "required_evidence.inspect_existing_code": "existing_controller,existing_service,existing_mapper,existing_tests",
@@ -30,15 +31,28 @@ Example:
   "required_evidence.implement_minimal_change": "changed_files,implementation_summary",
   "required_evidence.verify": "compile_result,test_result,sensitive_result",
   "mapping.inspect_existing_code.workflow_phase": "inspect_existing_code",
+  "mapping.inspect_existing_code.phase_pass_mode": "step",
   "mapping.inspect_existing_code.spec_task": "inspect_existing_code",
   "mapping.create_change_plan.workflow_phase": "create_change_plan",
+  "mapping.create_change_plan.phase_pass_mode": "step",
   "mapping.create_change_plan.required_gates": "impacted_files_listed,verification_plan_ready",
+  "mapping.create_change_plan.gate_pass_mode": "step",
   "mapping.create_change_plan.spec_task": "create_change_plan",
   "mapping.implement_minimal_change.workflow_phase": "implement_minimal_change",
+  "mapping.implement_minimal_change.phase_pass_mode": "step",
   "mapping.implement_minimal_change.spec_task": "implement_minimal_change",
   "mapping.verify.workflow_phase": "verify_tests",
+  "mapping.verify.phase_pass_mode": "check",
+  "mapping.verify.required_gates": "tests_recorded",
+  "mapping.verify.gate_pass_mode": "check",
   "mapping.verify.spec_task": "verify",
-  "mapping.verify.spec_acceptance_update": "auto_pass"
+  "mapping.verify.spec_acceptance_update": "auto_pass",
+  "mapping.verify.acceptance_source": "checks",
+  "mapping.verify.required_checks": "compile,test,sensitive",
+  "acceptance.goal_checks_pass.description": "Required goal checks are accepted",
+  "acceptance.goal_checks_pass.expected": "compile/test/sensitive checks are accepted by policy",
+  "acceptance.goal_checks_pass.source": "checks",
+  "acceptance.goal_checks_pass.required_checks": "compile,test,sensitive"
 }
 ```
 
@@ -70,6 +84,7 @@ Supported profile fields:
 | `completion_require_fresh_checks` | If true, checks become stale after later goal steps. |
 | `completion_allow_skipped_checks` | If false, skipped checks are not accepted unless policy explicitly allows them. |
 | `completion_require_checkpoint` | Declares that completion should create a checkpoint. Current `goal complete` always creates one. |
+| `strict_workflow_phase_order` | If true, mapped phases are not marked passed while earlier workflow phases are still incomplete. |
 | `spec_require_non_empty_tasks` | If true and `requires_spec` is true, the spec check fails when the spec has no tasks. Defaults to `requires_spec`. |
 | `spec_require_non_empty_acceptance` | If true and `requires_spec` is true, the spec check fails when the spec has no acceptance criteria. Defaults to `requires_spec`. |
 
@@ -83,20 +98,46 @@ Action mapping fields use:
 
 ```text
 mapping.<action_key>.workflow_phase: "<workflow_phase_key>"
+mapping.<action_key>.phase_pass_mode: "none|step|check"
 mapping.<action_key>.required_gates: "gate_1,gate_2"
+mapping.<action_key>.gate_pass_mode: "none|step|check"
 mapping.<action_key>.spec_task: "<spec_task_key>"
 mapping.<action_key>.spec_acceptance_update: "manual|auto_pass|disabled"
+mapping.<action_key>.acceptance_source: "none|manual|checks"
+mapping.<action_key>.required_checks: "compile,test,sensitive"
 ```
 
 Mappings are alpha process definitions. `goal step`, `goal check`, `goal verify`, and `goal complete` use them to synchronize deterministic workflow/spec state:
 
-- mapped workflow phases are marked passed after the corresponding goal step is accepted;
-- mapped required gates are marked passed when the goal step provides the required evidence;
+- mapped workflow phases use `phase_pass_mode`: `step` passes them after the corresponding goal step, `check` passes them only after the mapping's required checks are freshly accepted, and `none` leaves them manual;
+- mapped required gates use `gate_pass_mode`: `step` passes them after accepted goal evidence, `check` passes them only after required checks are freshly accepted, and `none` leaves them manual;
 - mapped spec tasks are created automatically and marked done after the corresponding goal step;
-- `spec_acceptance_update=auto_pass` creates a goal acceptance item and passes it only after all non-spec required checks are accepted;
+- `spec_acceptance_update=auto_pass` with `acceptance_source=checks` creates a goal acceptance item and passes it only after the mapping's required checks are accepted;
 - completion creates the checkpoint, passes the `checkpoint_created` gate, and marks the workflow completed when all phases are closed.
 
+For backward compatibility, omitted mapping modes are inferred from existing fields: non-verify workflow phases default to `step`, verify-style phases default to `check`, gates default to `step` when present, and `spec_acceptance_update=auto_pass` defaults `acceptance_source` to `checks`.
+
+Business acceptance mappings use:
+
+```text
+acceptance.<acceptance_key>.description: "Human-readable criterion"
+acceptance.<acceptance_key>.expected: "Expected observable result"
+acceptance.<acceptance_key>.source: "checks|test|evidence|manual"
+acceptance.<acceptance_key>.required_checks: "compile,test,sensitive"
+acceptance.<acceptance_key>.evidence_key: "business_verified"
+```
+
+Business acceptance mappings create managed spec acceptance items. Automatic completion is deliberately narrow:
+
+- `source=checks` passes the acceptance only when every listed `required_checks` is fresh and accepted by policy;
+- `source=test` passes the acceptance from the fresh accepted `test` check, or from listed checks when `required_checks` is provided;
+- `source=evidence` passes the acceptance only when a recorded goal step contains the configured `evidence_key`;
+- `source=manual` creates the acceptance but never auto-passes it, so `goal verify` and `goal complete` remain blocked until it is explicitly confirmed.
+
 Mappings remain alpha and are validated by `dhk doctor`.
+
+See [GOAL_SYNC_STRICTNESS.md](GOAL_SYNC_STRICTNESS.md) for the controller model,
+automatic sync rules, manual boundaries, and completion gates.
 
 Built-in Java profiles (`java-api-change` and `java-mvc-change`) now express their own required evidence, required checks, strict completion policy, and action mappings through this same model.
 
@@ -105,6 +146,7 @@ Built-in Java profiles are strict by default:
 - `compile`, `test`, `sensitive`, required `spec`, and `workflow` checks must pass.
 - A missing `pom.xml` makes compile/test checks `skipped`, which is not accepted.
 - Required specs must contain at least one task and one acceptance item, and those items must be closed.
+- Workflow phases are strict-order by default: a mapped phase cannot be passed while an earlier phase is still incomplete.
 - Pending hard workflow gates fail the workflow check unless mapped goal actions or accepted checks close them. The `checkpoint_created` gate is a completion gate and is closed by `goal complete`.
 
 Minimal custom profile:
@@ -187,6 +229,7 @@ The command parser is intentionally simple and splits `compile_command` and `tes
 - action mappings that reference actions not listed in `actions`;
 - action mappings that reference unknown workflow phases or gates for built-in workflows;
 - unsupported `spec_acceptance_update` policies;
+- unsupported business acceptance mapping fields, sources, checks, or missing source-specific requirements;
 - invalid `spec_require_non_empty_tasks` or `spec_require_non_empty_acceptance` values;
 - empty `required_checks`;
 - unsupported check names;

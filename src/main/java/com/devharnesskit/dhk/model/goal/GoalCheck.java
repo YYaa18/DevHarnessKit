@@ -11,6 +11,9 @@ public final class GoalCheck {
     private final String status;
     private final String resultSummary;
     private final String evidencePath;
+    private final String workspaceFingerprint;
+    private final String contextFingerprint;
+    private final String checkFingerprint;
     private final String checkedAt;
     private final String createdAt;
     private final String updatedAt;
@@ -19,6 +22,15 @@ public final class GoalCheck {
                      boolean required, int stepCountAtCheck, String command, String status,
                      String resultSummary, String evidencePath, String checkedAt, String createdAt,
                      String updatedAt) {
+        this(id, goalKey, checkKey, checkType, required, stepCountAtCheck, command, status,
+                resultSummary, evidencePath, "", "", "", checkedAt, createdAt, updatedAt);
+    }
+
+    public GoalCheck(long id, String goalKey, String checkKey, String checkType,
+                     boolean required, int stepCountAtCheck, String command, String status,
+                     String resultSummary, String evidencePath, String workspaceFingerprint,
+                     String contextFingerprint, String checkFingerprint,
+                     String checkedAt, String createdAt, String updatedAt) {
         this.id = id;
         this.goalKey = value(goalKey);
         this.checkKey = value(checkKey);
@@ -29,6 +41,9 @@ public final class GoalCheck {
         this.status = value(status);
         this.resultSummary = value(resultSummary);
         this.evidencePath = value(evidencePath);
+        this.workspaceFingerprint = value(workspaceFingerprint);
+        this.contextFingerprint = value(contextFingerprint);
+        this.checkFingerprint = value(checkFingerprint);
         this.checkedAt = value(checkedAt);
         this.createdAt = value(createdAt);
         this.updatedAt = value(updatedAt);
@@ -44,6 +59,9 @@ public final class GoalCheck {
     public String status() { return status; }
     public String resultSummary() { return resultSummary; }
     public String evidencePath() { return evidencePath; }
+    public String workspaceFingerprint() { return workspaceFingerprint; }
+    public String contextFingerprint() { return contextFingerprint; }
+    public String checkFingerprint() { return checkFingerprint; }
     public String checkedAt() { return checkedAt; }
     public String createdAt() { return createdAt; }
     public String updatedAt() { return updatedAt; }

@@ -28,7 +28,7 @@ final class MigrationRunnerTest {
     Path tempDir;
 
     @Test
-    void migrationIsIdempotentThroughGoalV7() throws Exception {
+    void migrationIsIdempotentThroughGoalV8() throws Exception {
         PathUtil.createMemoryDirectories(tempDir);
         DbConnectionFactory factory = new DbConnectionFactory();
         MigrationRunner runner = new MigrationRunner();
@@ -37,8 +37,8 @@ final class MigrationRunnerTest {
             MigrationResult first = runner.migrate(connection, new FixedClock());
             MigrationResult second = runner.migrate(connection, new FixedClock());
 
-            assertEquals(MigrationRunner.V7, first.schemaVersion());
-            assertEquals(MigrationRunner.V7, second.schemaVersion());
+            assertEquals(MigrationRunner.V8, first.schemaVersion());
+            assertEquals(MigrationRunner.V8, second.schemaVersion());
             assertTrue(MigrationRunner.hasTable(connection, "schema_version"));
             assertTrue(MigrationRunner.hasTable(connection, "project"));
             assertTrue(MigrationRunner.hasTable(connection, "memory_item"));
@@ -65,6 +65,9 @@ final class MigrationRunnerTest {
             assertTrue(MigrationRunner.hasTable(connection, "goal_check"));
             assertTrue(MigrationRunner.hasTable(connection, "goal_artifact"));
             assertTrue(columnExists(connection, "goal_check", "step_count_at_check"));
+            assertTrue(columnExists(connection, "goal_check", "workspace_fingerprint"));
+            assertTrue(columnExists(connection, "goal_check", "context_fingerprint"));
+            assertTrue(columnExists(connection, "goal_check", "check_fingerprint"));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V1));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V2));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V3));
@@ -72,6 +75,7 @@ final class MigrationRunnerTest {
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V5));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V6));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V7));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V8));
             assertTrue(goalRunTableSql(connection).contains("context_export_failed"));
             assertTrue(indexExists(connection, "idx_memory_item_project_status_confidence"));
             assertTrue(indexExists(connection, "idx_memory_item_project_module"));
@@ -103,11 +107,12 @@ final class MigrationRunnerTest {
             MigrationResult result = new MigrationRunner().migrate(connection, new FixedClock());
             Project project = new ProjectRepository().findByKey(connection, "demo");
 
-            assertEquals(MigrationRunner.V7, result.schemaVersion());
-            assertTrue(result.backupPath().contains("pre-migration-v1-to-v7"));
+            assertEquals(MigrationRunner.V8, result.schemaVersion());
+            assertTrue(result.backupPath().contains("pre-migration-v1-to-v8"));
             assertTrue(Files.isRegularFile(Paths.get(result.backupPath())));
             assertTrue(MigrationRunner.hasTable(connection, "goal_check"));
             assertTrue(columnExists(connection, "goal_check", "step_count_at_check"));
+            assertTrue(columnExists(connection, "goal_check", "workspace_fingerprint"));
             assertEquals("Demo", project.projectName());
             assertEquals("java", project.language());
             assertEquals("unknown", project.framework());
@@ -124,8 +129,8 @@ final class MigrationRunnerTest {
         try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(tempDir))) {
             MigrationResult result = new MigrationRunner().migrate(connection, new FixedClock());
 
-            assertEquals(MigrationRunner.V7, result.schemaVersion());
-            assertTrue(result.backupPath().contains("pre-migration-v2-to-v7"));
+            assertEquals(MigrationRunner.V8, result.schemaVersion());
+            assertTrue(result.backupPath().contains("pre-migration-v2-to-v8"));
             assertTrue(Files.isRegularFile(Paths.get(result.backupPath())));
             assertTrue(MigrationRunner.hasTable(connection, "workflow_artifact"));
             assertTrue(MigrationRunner.hasTable(connection, "workflow_memory_binding"));
@@ -144,6 +149,7 @@ final class MigrationRunnerTest {
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V5));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V6));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V7));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V8));
         }
     }
 
@@ -155,8 +161,8 @@ final class MigrationRunnerTest {
         try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(tempDir))) {
             MigrationResult result = new MigrationRunner().migrate(connection, new FixedClock());
 
-            assertEquals(MigrationRunner.V7, result.schemaVersion());
-            assertTrue(result.backupPath().contains("pre-migration-v4-to-v7"));
+            assertEquals(MigrationRunner.V8, result.schemaVersion());
+            assertTrue(result.backupPath().contains("pre-migration-v4-to-v8"));
             assertTrue(Files.isRegularFile(Paths.get(result.backupPath())));
             assertTrue(MigrationRunner.hasTable(connection, "goal_run"));
             assertTrue(MigrationRunner.hasTable(connection, "goal_check"));
@@ -173,7 +179,9 @@ final class MigrationRunnerTest {
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V5));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V6));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V7));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V8));
             assertTrue(columnExists(connection, "goal_check", "step_count_at_check"));
+            assertTrue(columnExists(connection, "goal_check", "workspace_fingerprint"));
         }
     }
 
@@ -185,15 +193,19 @@ final class MigrationRunnerTest {
         try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(tempDir))) {
             MigrationResult result = new MigrationRunner().migrate(connection, new FixedClock());
 
-            assertEquals(MigrationRunner.V7, result.schemaVersion());
-            assertTrue(result.backupPath().contains("pre-migration-v5-to-v7"));
+            assertEquals(MigrationRunner.V8, result.schemaVersion());
+            assertTrue(result.backupPath().contains("pre-migration-v5-to-v8"));
             assertTrue(Files.isRegularFile(Paths.get(result.backupPath())));
             assertTrue(columnExists(connection, "goal_check", "step_count_at_check"));
+            assertTrue(columnExists(connection, "goal_check", "workspace_fingerprint"));
+            assertTrue(columnExists(connection, "goal_check", "context_fingerprint"));
+            assertTrue(columnExists(connection, "goal_check", "check_fingerprint"));
             assertEquals(1, countRowsWhere(connection, "goal_check",
                     "goal_key = 'fixture-goal' AND check_key = 'sensitive' AND step_count_at_check = 0"));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V5));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V6));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V7));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V8));
             assertTrue(goalRunTableSql(connection).contains("context_export_failed"));
             assertEquals("goal_run", foreignKeyTable(connection, "goal_check"));
         }

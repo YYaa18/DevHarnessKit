@@ -20,6 +20,13 @@ public final class GoalContextRenderer {
 
     public String render(GoalRun goal, GoalPlan plan, String[] requiredChecks,
                          String[] completionBlockers, String generatedAt) {
+        return render(goal, plan, requiredChecks, completionBlockers,
+                new String[0], "fresh", generatedAt);
+    }
+
+    public String render(GoalRun goal, GoalPlan plan, String[] requiredChecks,
+                         String[] completionBlockers, String[] staleChecks,
+                         String freshnessStatus, String generatedAt) {
         StringBuilder builder = new StringBuilder();
         builder.append("# GOAL_CONTEXT\n\n");
         builder.append("<generated-at>").append(generatedAt).append("</generated-at>\n\n");
@@ -48,6 +55,15 @@ public final class GoalContextRenderer {
         builder.append("- run_goal_next_before_continuing\n");
         builder.append("</allowed-actions>\n\n");
 
+        builder.append("<allowed-commands>\n");
+        builder.append("- dhk goal next --goal ").append(goal.goalKey()).append('\n');
+        builder.append("- dhk goal step --goal ").append(goal.goalKey())
+                .append(" --summary \"<summary>\" --evidence \"<evidence>\"\n");
+        builder.append("- dhk goal verify --goal ").append(goal.goalKey()).append('\n');
+        builder.append("- dhk goal complete --goal ").append(goal.goalKey())
+                .append(" only when ready_to_complete\n");
+        builder.append("</allowed-commands>\n\n");
+
         builder.append("<forbidden-actions>\n");
         for (String action : plan.forbiddenActions()) {
             builder.append("- ").append(action).append('\n');
@@ -62,6 +78,13 @@ public final class GoalContextRenderer {
             builder.append("- concise_summary\n");
         }
         builder.append("</required-evidence>\n\n");
+
+        builder.append("<evidence-contract>\n");
+        builder.append("- current_action: ").append(plan.currentAction()).append('\n');
+        builder.append("- include every required-evidence key in goal step evidence\n");
+        builder.append("- put modified paths in --changed-files when files changed\n");
+        builder.append("- use structured fields for read_files, tests_run, compile_result, risks, and pending\n");
+        builder.append("</evidence-contract>\n\n");
 
         builder.append("<structured-evidence-fields>\n");
         appendList(builder, STRUCTURED_EVIDENCE_FIELDS, "none");
@@ -82,6 +105,14 @@ public final class GoalContextRenderer {
         builder.append("<completion-blockers>\n");
         appendList(builder, completionBlockers, "none");
         builder.append("</completion-blockers>\n\n");
+
+        builder.append("<freshness-status>\n");
+        builder.append("- status: ").append(freshnessStatus == null || freshnessStatus.length() == 0
+                ? "fresh" : freshnessStatus).append('\n');
+        builder.append("- stale_checks:\n");
+        appendList(builder, staleChecks, "none");
+        builder.append("- rule: checks become stale after later goal steps or workspace fingerprint changes\n");
+        builder.append("</freshness-status>\n\n");
 
         builder.append("<completion-condition>\n");
         builder.append("- goal evaluate must return ready_to_complete before final completion\n");

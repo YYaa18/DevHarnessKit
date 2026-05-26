@@ -18,7 +18,7 @@ This repository is `0.1.0-alpha` and should be treated as a developer preview.
 | Workflow | Alpha | Records process state for audit and context export. It is not a workflow engine. |
 | Spec | Alpha | Records change documents, tasks, acceptance, and status. Markdown is export only. |
 | Agent packaging | Alpha | Ships `.agents/skills` and `.comate/rules` helpers for agent workflows. |
-| SQLite schema | Alpha | Current schema version is v7. Compatibility policy is documented, but not yet guaranteed as stable. |
+| SQLite schema | Alpha | Current schema version is v8. Compatibility policy is documented, but not yet guaranteed as stable. |
 
 Do not publish or describe the current build as stable or 1.0-ready.
 
@@ -228,6 +228,8 @@ java -jar target/dhk-cli-0.1.0-alpha-all.jar goal complete --project-root . --go
 
 Goal orchestration is still experimental alpha. Built-in Java profiles are intentionally strict: skipped compile/test checks are not accepted, required specs must contain at least one closed task and one closed acceptance item, and pending hard workflow gates block completion unless mapped goal actions or accepted checks close them. `goal complete` closes the checkpoint gate while creating the completion checkpoint.
 
+Goal Sync Strictness makes `goal` the main controller for agent work while workflow and spec remain auditable state layers. Profile mappings can auto-pass deterministic workflow phases, gates, spec tasks, and business acceptance items from accepted evidence or fresh checks. Manual acceptance, gate waivers, spec archive, memory confirmation, and DB SQL remain explicit human or user-approved actions.
+
 For agent-facing usage, `.agents/skills/devharness-goal-development/` provides goal-first wrapper scripts such as `goal-start.sh`, `goal-next.sh`, `goal-step.sh`, `goal-check.sh`, `goal-evaluate.sh`, and `goal-complete.sh`.
 
 Projects can customize goal profiles, required checks, and accepted check statuses with `.agents/devharness/goal-profiles/*.json` and `.agents/devharness/goal-check-policy.json`.
@@ -248,6 +250,7 @@ Projects can customize goal profiles, required checks, and accepted check status
 - Workflow gates are manual/audit state unless explicitly wired to commands.
 - Goal orchestration is a deterministic CLI protocol over existing modules. `goal evaluate` checks recorded evidence before `goal complete`, but the project still does not prove code correctness.
 - Goal context exports reject sensitive findings. Goal completion summaries use redaction before writing, then reject if sensitive patterns still remain after redaction.
+- Goal check freshness includes goal step count and workspace/context fingerprints so completion cannot silently reuse stale verification after later changes.
 - DevHarness Kit records development process state; it does not prove code correctness.
 
 Read [SECURITY.md](SECURITY.md) before using DB readonly features.
@@ -263,8 +266,10 @@ Read [SECURITY.md](SECURITY.md) before using DB readonly features.
 - [docs/DEVHARNESS_GOAL_CLI_ORCHESTRATION_PLAN.md](docs/DEVHARNESS_GOAL_CLI_ORCHESTRATION_PLAN.md): V0.4 goal orchestration plan.
 - [docs/DEVHARNESS_SKILLS_REDESIGN_PLAN.md](docs/DEVHARNESS_SKILLS_REDESIGN_PLAN.md): goal-first skill redesign plan.
 - [docs/GOAL_CONFIGURATION.md](docs/GOAL_CONFIGURATION.md): project-level goal profile and check policy configuration.
+- [docs/GOAL_SYNC_STRICTNESS.md](docs/GOAL_SYNC_STRICTNESS.md): goal-controlled workflow/spec synchronization model and alpha boundaries.
 - [docs/JSON_OUTPUT.md](docs/JSON_OUTPUT.md): alpha JSON output commands and required fields.
 - [docs/MIGRATIONS.md](docs/MIGRATIONS.md): SQLite schema compatibility and recovery policy.
+- [docs/POLICY.md](docs/POLICY.md): project policy hooks for protected paths, command guards, DB SQL, export, and goal lifecycle checks.
 - [docs/ROADMAP.md](docs/ROADMAP.md): release maturity plan.
 - [docs/SENSITIVE_POLICY.md](docs/SENSITIVE_POLICY.md): project-level sensitive-data reject/redact/allow policy.
 - [SECURITY.md](SECURITY.md): threat model, limitations, and reporting.

@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.export.WorkflowContextRenderer;
 import com.devharnesskit.dhk.model.Checkpoint;
 import com.devharnesskit.dhk.model.MemoryItem;
 import com.devharnesskit.dhk.model.Project;
+import com.devharnesskit.dhk.model.goal.GoalEvaluation;
 import com.devharnesskit.dhk.model.goal.GoalPlan;
 import com.devharnesskit.dhk.model.goal.GoalProfile;
 import com.devharnesskit.dhk.model.goal.GoalRun;
@@ -50,6 +51,7 @@ public final class GoalContextService {
     private final GoalStepRepository goalStepRepository;
     private final SensitiveDataGuard sensitiveDataGuard;
     private final PolicyHookService policyHookService;
+    private final WorkspaceFingerprintService fingerprintService;
 
     public GoalContextService() {
         this(new ExportSelectionService(new MemoryRepository()), new CheckpointRepository(),
@@ -61,7 +63,7 @@ public final class GoalContextService {
                 new CurrentContextRenderer(), new GoalContextRenderer(), new GoalProfileService(),
                 new GoalPlanner(), new GoalCheckPolicyService(), new GoalCompletionEvaluator(),
                 new GoalCheckRepository(), new GoalStepRepository(), new SensitiveDataGuard(),
-                new PolicyHookService());
+                new PolicyHookService(), new WorkspaceFingerprintService());
     }
 
     GoalContextService(ExportSelectionService exportSelectionService,
@@ -77,7 +79,8 @@ public final class GoalContextService {
                        GoalCheckRepository goalCheckRepository,
                        GoalStepRepository goalStepRepository,
                        SensitiveDataGuard sensitiveDataGuard,
-                       PolicyHookService policyHookService) {
+                       PolicyHookService policyHookService,
+                       WorkspaceFingerprintService fingerprintService) {
         this.exportSelectionService = exportSelectionService;
         this.checkpointRepository = checkpointRepository;
         this.workflowExportService = workflowExportService;
@@ -92,6 +95,7 @@ public final class GoalContextService {
         this.goalStepRepository = goalStepRepository;
         this.sensitiveDataGuard = sensitiveDataGuard;
         this.policyHookService = policyHookService;
+        this.fingerprintService = fingerprintService;
     }
 
     public Path export(Connection connection, Path projectRoot, Project project, GoalRun goal,
@@ -121,11 +125,13 @@ public final class GoalContextService {
         GoalProfile profile = profileService.find(projectRoot, goal.profileKey());
         GoalPlan plan = planner.plan(goal, profile);
         GoalCheckPolicy policy = checkPolicyService.load(projectRoot);
-        String[] completionBlockers = completionEvaluator.evaluate(goal,
+        GoalEvaluation evaluation = completionEvaluator.evaluate(goal,
                 goalCheckRepository.listByGoal(connection, goal.goalKey()), policy, profile,
-                goalStepRepository.listByGoal(connection, goal.goalKey())).missing();
+                goalStepRepository.listByGoal(connection, goal.goalKey()),
+                fingerprintService.workspaceFingerprint(projectRoot),
+                fingerprintService.contextFingerprint(projectRoot));
         String goalContext = goalContextRenderer.render(goal, plan, policy.requiredChecks(profile),
-                completionBlockers, generatedAt);
+                evaluation.missing(), evaluation.staleChecks(), freshnessStatus(evaluation), generatedAt);
         return writePath(projectRoot, PathUtil.goalContext(projectRoot), goalContext);
     }
 
@@ -145,5 +151,9 @@ public final class GoalContextService {
         Files.createDirectories(path.getParent());
         Files.write(path, output.getBytes("UTF-8"));
         return path;
+    }
+
+    private String freshnessStatus(GoalEvaluation evaluation) {
+        return evaluation.staleChecks().length == 0 ? "fresh" : "stale";
     }
 }

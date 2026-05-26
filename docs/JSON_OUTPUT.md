@@ -169,6 +169,9 @@ Each check includes:
 check_key
 status
 step_count_at_check
+workspace_fingerprint
+context_fingerprint
+check_fingerprint
 result_summary
 evidence_path
 ```
@@ -202,12 +205,15 @@ missing_count
 missing
 stale_count
 stale_checks
+freshness_status
+completion_blocker_count
+completion_blockers
 next_action
 next_command
 context_path
 ```
 
-`goal verify` runs required checks before evaluating readiness. `failed_checks` lists checks with `failed` status; skipped-disallowed checks are reported through `missing`.
+`goal verify` runs required checks before evaluating readiness. `failed_checks` lists checks with `failed` status; skipped-disallowed checks are reported through `missing`. `freshness_status` is `fresh` only when required checks are current for the latest goal steps and workspace fingerprint. `completion_blockers` combines failed, missing, stale, and policy blockers for agent-facing next-action decisions.
 
 `goal complete` success:
 

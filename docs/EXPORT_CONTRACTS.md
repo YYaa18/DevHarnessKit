@@ -56,11 +56,70 @@ Required content:
 
 Spec records change intent, tasks, acceptance criteria, and workflow bindings. It does not automatically validate implementation correctness.
 
+## GOAL_CONTEXT.md
+
+Required section order:
+
+```text
+# GOAL_CONTEXT
+<generated-at>
+<goal>
+<current-action>
+<next-instruction>
+<allowed-actions>
+<allowed-commands>
+<forbidden-actions>
+<required-evidence>
+<evidence-contract>
+<structured-evidence-fields>
+<required-checks>
+<context-files>
+<completion-blockers>
+<freshness-status>
+<completion-condition>
+<next-command>
+```
+
+Required content:
+
+- `goal` includes `goal_key`, `profile`, `task`, `module`, `mode`, `status`,
+  `workflow_run`, `spec_change`, and completion condition when available.
+- `current-action` contains the only action the agent should perform next.
+- `allowed-commands` lists the goal commands permitted by the current protocol.
+- `forbidden-actions` lists lower-level bypasses and completion shortcuts that
+  remain blocked unless explicitly allowed.
+- `evidence-contract` and `structured-evidence-fields` define what the next
+  `goal step` must report.
+- `completion-blockers` and `freshness-status` explain why completion is not
+  yet ready.
+- `next-command` gives the next goal command to run.
+
+Goal context is the agent protocol export. It guides the next action; it is not
+durable state and must be regenerated after goal state changes.
+
+## GOAL_SUMMARY.md
+
+Required section order:
+
+```text
+# GOAL_SUMMARY
+<generated-at>
+<goal>
+<steps>
+<checks>
+<completion>
+<artifacts>
+```
+
+Goal summary is a completion artifact. Sensitive values are redacted before the
+summary is written, and the redacted result is checked again before export.
+
 ## Regeneration
 
 Do not hand-edit exported Markdown to change source state. Regenerate exports from SQLite with the matching CLI:
 
 ```bash
+dhk goal export --goal <goal-key>
 dhk workflow export --run <run-key>
 dhk spec export --change <change-key>
 ```

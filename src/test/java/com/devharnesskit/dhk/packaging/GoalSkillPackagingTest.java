@@ -64,6 +64,50 @@ final class GoalSkillPackagingTest {
         assertTrue(selfCheck.contains("goal evaluate"));
     }
 
+    @Test
+    void graphAwareSkillPackageContainsRequiredProtocolAndScripts() throws Exception {
+        Path skillRoot = Paths.get(".agents/skills/devharness-graph-aware-development");
+
+        assertTrue(Files.isRegularFile(skillRoot.resolve("SKILL.md")));
+        assertTrue(Files.isRegularFile(skillRoot.resolve("references/graph-protocol.md")));
+        assertTrue(Files.isRegularFile(skillRoot.resolve("references/graph-evidence-format.md")));
+        assertTrue(Files.isRegularFile(skillRoot.resolve("references/graph-forbidden-actions.md")));
+
+        assertScriptPair(skillRoot, "graph-index");
+        assertScriptPair(skillRoot, "graph-export");
+        assertScriptPair(skillRoot, "graph-index-export");
+        assertScriptPair(skillRoot, "graph-impact");
+        assertScriptPair(skillRoot, "graph-status");
+
+        String skill = read(skillRoot.resolve("SKILL.md"));
+        assertTrue(skill.contains("graph_index_export"));
+        assertTrue(skill.contains("graph_impact"));
+        assertTrue(skill.contains("GRAPH_CONTEXT.md"));
+        assertTrue(skill.contains("IMPACT_MAP.md"));
+        assertTrue(skill.contains("ready_to_complete"));
+        assertTrue(skill.contains("snapshot-bound generated facts"));
+
+        String protocol = read(skillRoot.resolve("references/graph-protocol.md"));
+        String evidence = read(skillRoot.resolve("references/graph-evidence-format.md"));
+        String forbidden = read(skillRoot.resolve("references/graph-forbidden-actions.md"));
+        assertTrue(protocol.contains("Re-run `graph-impact` after implementation"));
+        assertTrue(evidence.contains("post_change_impact_map"));
+        assertTrue(evidence.contains("changed_files_covered"));
+        assertTrue(forbidden.contains("editing before graph snapshot and impact map are ready"));
+        assertTrue(forbidden.contains("failed or stale `graph` / `impact` checks"));
+
+        assertGraphWrapper(skillRoot, "graph-index", "index");
+        assertGraphWrapper(skillRoot, "graph-export", "export");
+        assertGraphWrapper(skillRoot, "graph-impact", "impact");
+        assertGraphWrapper(skillRoot, "graph-status", "status");
+        String indexExportShell = read(skillRoot.resolve("scripts/graph-index-export.sh"));
+        String indexExportBatch = read(skillRoot.resolve("scripts/graph-index-export.bat"));
+        assertTrue(indexExportShell.contains("graph index"));
+        assertTrue(indexExportShell.contains("graph export"));
+        assertTrue(indexExportBatch.contains("graph index"));
+        assertTrue(indexExportBatch.contains("graph export"));
+    }
+
     private void assertScriptPair(Path skillRoot, String name) {
         assertTrue(Files.isRegularFile(skillRoot.resolve("scripts/" + name + ".sh")));
         assertTrue(Files.isRegularFile(skillRoot.resolve("scripts/" + name + ".bat")));
@@ -83,6 +127,15 @@ final class GoalSkillPackagingTest {
         String batch = read(skillRoot.resolve("scripts/" + scriptName + ".bat"));
         assertTrue(shell.contains("exec \"$SCRIPT_DIR/dhk.sh\" goal " + goalCommand + " \"$@\""));
         assertTrue(batch.contains("dhk.bat\" goal " + goalCommand + " %*"));
+    }
+
+    private void assertGraphWrapper(Path skillRoot, String scriptName, String graphCommand) throws Exception {
+        String shell = read(skillRoot.resolve("scripts/" + scriptName + ".sh"));
+        String batch = read(skillRoot.resolve("scripts/" + scriptName + ".bat"));
+        assertTrue(shell.contains("devharness-goal-development/scripts/dhk.sh\" graph "
+                + graphCommand + " \"$@\""));
+        assertTrue(batch.contains("devharness-goal-development\\scripts\\dhk.bat\" graph "
+                + graphCommand + " %*"));
     }
 
     private String read(Path path) throws Exception {

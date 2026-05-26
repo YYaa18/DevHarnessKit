@@ -89,7 +89,8 @@ public final class GraphParseResult {
         }
 
         private boolean isReference(String kind) {
-            return "reference".equals(kind) || "type_reference".equals(kind) || "import".equals(kind);
+            return "reference".equals(kind) || "method_reference".equals(kind)
+                    || "type_reference".equals(kind) || "import".equals(kind);
         }
     }
 }

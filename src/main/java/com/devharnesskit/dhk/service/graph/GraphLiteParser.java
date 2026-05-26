@@ -14,6 +14,7 @@ public final class GraphLiteParser {
     public GraphLiteParser() {
         this(Arrays.<GraphSourceParser>asList(
                 new JavaLiteParser(),
+                new JspLiteParser(),
                 new MyBatisXmlLiteParser(),
                 new PropertiesLiteParser()));
     }

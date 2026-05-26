@@ -48,6 +48,35 @@ final class GraphLiteParserTest {
     }
 
     @Test
+    void parsesLegacyJspServletFixtureNodesAndEdges() {
+        Path fixture = Paths.get("testbeds/fixtures/legacy-jsp-servlet-shop");
+        GraphConfig config = GraphConfig.defaults();
+        GraphScanReport scan = new GraphFileScanner().scan(fixture, config);
+
+        GraphParseResult result = new GraphLiteParser().parse(fixture, scan.entries());
+
+        assertNode(result, "jsp_page", "src/main/webapp/WEB-INF/jsp/shop/order-list.jsp");
+        assertNode(result, "jsp_page", "src/main/webapp/WEB-INF/jsp/common/header.jsp");
+        assertNode(result, "jsp_form", "orderSearchForm");
+        assertNode(result, "form_field", "customerNo");
+        assertNode(result, "form_field", "status");
+        assertNode(result, "form_field", "legacyAction");
+        assertNode(result, "route", "/shop/orders/search");
+        assertNode(result, "servlet", "shopOrderServlet");
+        assertNode(result, "class", "com.acme.legacy.shop.web.ShopOrderServlet");
+        assertNode(result, "method", "com.acme.legacy.shop.web.ShopOrderServlet#search");
+        assertNode(result, "method", "com.acme.legacy.shop.service.ShopOrderService#searchOrders");
+        assertNode(result, "method_reference", "com.acme.legacy.shop.dao.ShopOrderDao#findOrders");
+        assertEdge(result, "includes", "jsp_page:src/main/webapp/WEB-INF/jsp/common/header.jsp");
+        assertEdge(result, "submits_to", "route:ANY:/shop/orders/search");
+        assertEdge(result, "maps_to", "servlet:shopOrderServlet");
+        assertEdge(result, "maps_to", "java_type:com.acme.legacy.shop.web.ShopOrderServlet");
+        assertEdge(result, "calls", "java_method:com.acme.legacy.shop.service.ShopOrderService#searchOrders");
+        assertEdge(result, "calls", "java_method:com.acme.legacy.shop.dao.ShopOrderDao#findOrders");
+        assertTrue(result.errors().isEmpty());
+    }
+
+    @Test
     void parseErrorsDoNotStopOtherFiles() throws Exception {
         write("src/main/java/com/example/App.java", "package com.example;\npublic class App { public void run() {} }\n");
         write("src/main/resources/mybatis/BrokenMapper.xml",
@@ -87,12 +116,20 @@ final class GraphLiteParserTest {
     }
 
     private void assertNode(GraphParseResult result, String kind, String qualifiedName) {
+        StringBuilder candidates = new StringBuilder();
         for (GraphNode node : result.nodes()) {
             if (kind.equals(node.nodeKind()) && qualifiedName.equals(node.qualifiedName())) {
                 return;
             }
+            if (qualifiedName.equals(node.qualifiedName()) || node.qualifiedName().contains(qualifiedName)
+                    || qualifiedName.contains(node.qualifiedName())) {
+                candidates.append("\n  ")
+                        .append(node.nodeKind()).append(" ")
+                        .append(node.qualifiedName()).append(" ")
+                        .append(node.relativePath());
+            }
         }
-        throw new AssertionError("Missing node: " + kind + " " + qualifiedName);
+        throw new AssertionError("Missing node: " + kind + " " + qualifiedName + candidates);
     }
 
     private void assertEdge(GraphParseResult result, String kind, String targetNodeKey) {

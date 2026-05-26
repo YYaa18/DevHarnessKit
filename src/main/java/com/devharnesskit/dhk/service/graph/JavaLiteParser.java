@@ -27,6 +27,7 @@ final class JavaLiteParser implements GraphSourceParser {
     private static final Pattern METHOD_CALL = Pattern.compile("\\b([A-Za-z_][\\w]*)\\.([A-Za-z_][\\w]*)\\s*\\(");
     private static final Pattern NEW_TYPE = Pattern.compile("\\bnew\\s+([A-Z][A-Za-z0-9_]*)\\s*\\(");
     private static final Pattern WORD = Pattern.compile("\\b([A-Z][A-Za-z0-9_]*)\\b");
+    private static final Pattern VARIABLE_DECLARATION = Pattern.compile("\\b([A-Z][A-Za-z0-9_]*)\\s+([a-z][A-Za-z0-9_]*)\\b\\s*(?:=|;|,|\\))");
 
     public boolean supports(GraphFileEntry entry) {
         return "java".equals(entry.language());
@@ -42,6 +43,7 @@ final class JavaLiteParser implements GraphSourceParser {
         String currentTypeQualifiedName = "";
         String currentTypeName = "";
         String currentMethodKey = "";
+        Map<String, String> variableTypes = new LinkedHashMap<String, String>();
         List<String> pendingAnnotations = new ArrayList<String>();
 
         for (int index = 0; index < lines.size(); index++) {
@@ -95,6 +97,7 @@ final class JavaLiteParser implements GraphSourceParser {
             if (currentTypeKey.length() > 0) {
                 MethodMatch method = matchMethod(code, currentTypeName);
                 if (method != null) {
+                    addParameterTypes(variableTypes, method.parameters, importBySimpleName, packageName);
                     String qualifiedName = currentTypeQualifiedName + "#" + method.name;
                     String methodKey = javaMethodKey(qualifiedName);
                     String nodeKind = hasAnnotation(pendingAnnotations, "Test") ? "test_case" : "method";
@@ -107,8 +110,10 @@ final class JavaLiteParser implements GraphSourceParser {
                     pendingAnnotations.clear();
                     currentMethodKey = methodKey;
                 }
+                addVariableTypes(variableTypes, code, importBySimpleName, packageName);
                 if (currentMethodKey.length() > 0) {
-                    addCallEdges(builder, entry, currentMethodKey, code, importBySimpleName, lineNumber);
+                    addCallEdges(builder, entry, currentMethodKey, code, importBySimpleName, variableTypes,
+                            packageName, lineNumber);
                 }
             }
         }
@@ -190,7 +195,8 @@ final class JavaLiteParser implements GraphSourceParser {
     }
 
     private void addCallEdges(GraphParseResult.Builder builder, GraphFileEntry entry, String methodKey,
-                              String code, Map<String, String> imports, int lineNumber) {
+                              String code, Map<String, String> imports, Map<String, String> variableTypes,
+                              String packageName, int lineNumber) {
         Matcher callMatcher = METHOD_CALL.matcher(code);
         while (callMatcher.find()) {
             String receiver = callMatcher.group(1);
@@ -198,12 +204,23 @@ final class JavaLiteParser implements GraphSourceParser {
             if (isIgnoredReceiver(receiver)) {
                 continue;
             }
-            String qualified = receiver + "." + method;
-            String targetKey = "java_call:" + qualified;
-            builder.addNode(new GraphNode(targetKey, "reference", method, qualified, entry.relativePath(),
-                    lineNumber, lineNumber, "java", "", "", 65, "lite", "method call expression"));
-            builder.addEdge(new GraphEdge("calls", methodKey, targetKey, entry.relativePath(), 65,
-                    "lite", "call " + qualified + "()"));
+            String receiverType = variableTypes.get(receiver);
+            if (receiverType != null && receiverType.length() > 0) {
+                String qualified = receiverType + "#" + method;
+                String targetKey = javaMethodKey(qualified);
+                builder.addNode(new GraphNode(targetKey, "method_reference", method, qualified,
+                        entry.relativePath(), lineNumber, lineNumber, "java", "", "", 70, "lite",
+                        "typed method call expression"));
+                builder.addEdge(new GraphEdge("calls", methodKey, targetKey, entry.relativePath(), 75,
+                        "lite", "call " + qualified + "()"));
+            } else {
+                String qualified = receiver + "." + method;
+                String targetKey = "java_call:" + qualified;
+                builder.addNode(new GraphNode(targetKey, "reference", method, qualified, entry.relativePath(),
+                        lineNumber, lineNumber, "java", "", "", 65, "lite", "method call expression"));
+                builder.addEdge(new GraphEdge("calls", methodKey, targetKey, entry.relativePath(), 65,
+                        "lite", "call " + qualified + "()"));
+            }
         }
         Matcher newMatcher = NEW_TYPE.matcher(code);
         while (newMatcher.find()) {
@@ -236,16 +253,55 @@ final class JavaLiteParser implements GraphSourceParser {
         }
         Matcher constructor = CONSTRUCTOR.matcher(code);
         if (constructor.find() && constructor.group(2).equals(currentTypeName)) {
-            return new MethodMatch(currentTypeName, visibility(code));
+            return new MethodMatch(currentTypeName, visibility(code), constructor.group(3));
         }
         Matcher method = METHOD.matcher(code);
         if (method.find()) {
             String name = method.group(2);
             if (!isControlKeyword(name)) {
-                return new MethodMatch(name, visibility(code));
+                return new MethodMatch(name, visibility(code), method.group(3));
             }
         }
         return null;
+    }
+
+    private void addParameterTypes(Map<String, String> variableTypes, String parameters,
+                                   Map<String, String> imports, String packageName) {
+        if (parameters == null || parameters.trim().length() == 0) {
+            return;
+        }
+        String[] parts = parameters.split(",");
+        for (String part : parts) {
+            Matcher matcher = VARIABLE_DECLARATION.matcher(part.trim() + ";");
+            if (matcher.find()) {
+                variableTypes.put(matcher.group(2), resolveType(matcher.group(1), imports, packageName));
+            }
+        }
+    }
+
+    private void addVariableTypes(Map<String, String> variableTypes, String code,
+                                  Map<String, String> imports, String packageName) {
+        Matcher matcher = VARIABLE_DECLARATION.matcher(code);
+        while (matcher.find()) {
+            String type = matcher.group(1);
+            String name = matcher.group(2);
+            if (!isControlKeyword(name)) {
+                variableTypes.put(name, resolveType(type, imports, packageName));
+            }
+        }
+    }
+
+    private String resolveType(String type, Map<String, String> imports, String packageName) {
+        if (type == null || type.length() == 0) {
+            return "";
+        }
+        if (imports.containsKey(type)) {
+            return imports.get(type);
+        }
+        if (type.indexOf('.') >= 0) {
+            return type;
+        }
+        return packageName.length() == 0 ? type : packageName + "." + type;
     }
 
     private boolean hasAnnotation(List<String> annotations, String name) {
@@ -358,10 +414,12 @@ final class JavaLiteParser implements GraphSourceParser {
     private static final class MethodMatch {
         private final String name;
         private final String visibility;
+        private final String parameters;
 
-        private MethodMatch(String name, String visibility) {
+        private MethodMatch(String name, String visibility, String parameters) {
             this.name = name;
             this.visibility = visibility;
+            this.parameters = parameters == null ? "" : parameters;
         }
     }
 

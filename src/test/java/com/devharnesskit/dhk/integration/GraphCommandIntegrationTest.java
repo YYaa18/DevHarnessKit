@@ -247,6 +247,43 @@ final class GraphCommandIntegrationTest {
     }
 
     @Test
+    void graphImpactCoversLegacyJspServletShopFlow() throws Exception {
+        Path fixture = copyFixture("legacy-jsp-servlet-shop", tempDir.resolve("legacy-jsp-impact"));
+        write(fixture, ".agents/graph/config.json",
+                "{\n"
+                        + "  \"limits\": {\n"
+                        + "    \"max_impact_depth\": 8\n"
+                        + "  }\n"
+                        + "}\n");
+
+        Harness indexHarness = new Harness(tempDir);
+        int indexExit = new CommandRouter().run(new String[]{"graph", "index", "--project-root", "legacy-jsp-impact"},
+                indexHarness.context());
+        Harness impactHarness = new Harness(tempDir);
+        int impactExit = new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", "legacy-jsp-impact",
+                "--file", "src/main/webapp/WEB-INF/jsp/shop/order-list.jsp", "--depth", "8"
+        }, impactHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, indexExit);
+        assertEquals(ExitCodes.SUCCESS, impactExit);
+        assertTrue(impactHarness.stdout().contains("graph impact"));
+        String impactMap = new String(Files.readAllBytes(PathUtil.graphImpactMap(fixture)), "UTF-8");
+        assertTrue(impactMap.contains("src/main/webapp/WEB-INF/jsp/shop/order-list.jsp"));
+        assertTrue(impactMap.contains("src/main/webapp/WEB-INF/jsp/common/header.jsp"));
+        assertTrue(impactMap.contains("src/main/webapp/WEB-INF/web.xml"));
+        assertTrue(impactMap.contains("src/main/java/com/acme/legacy/shop/web/ShopOrderServlet.java"));
+        assertTrue(impactMap.contains("src/main/java/com/acme/legacy/shop/service/ShopOrderService.java"));
+        assertTrue(impactMap.contains("src/main/java/com/acme/legacy/shop/dao/ShopOrderDao.java"));
+        assertTrue(impactMap.contains("src/main/java/com/acme/legacy/shop/dao/JdbcShopOrderDao.java"));
+        assertTrue(impactMap.contains("form_field customerNo"));
+        assertTrue(impactMap.contains("form_field status"));
+        assertTrue(impactMap.contains("submits_to jsp_form:src/main/webapp/WEB-INF/jsp/shop/order-list.jsp#orderSearchForm"
+                + " -> route:ANY:/shop/orders/search"));
+        assertTrue(impactMap.contains("route /shop/orders/search"));
+    }
+
+    @Test
     void graphImpactReturnsCandidateSuggestionsWhenSymbolIsMissing() throws Exception {
         Path fixture = copyFixture("legacy-mybatis-order", tempDir.resolve("legacy-candidates"));
 

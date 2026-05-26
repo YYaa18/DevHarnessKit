@@ -22,14 +22,35 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 final class MyBatisXmlLiteParser implements GraphSourceParser {
-    private static final Pattern MAPPER = Pattern.compile("<mapper\\b[^>]*namespace\\s*=\\s*\"([^\"]+)\"", Pattern.CASE_INSENSITIVE);
+    private static final Pattern MAPPER = Pattern.compile("<mapper\\b[^>]*namespace\\s*=\\s*(['\"])(.*?)\\1",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern SERVLET = Pattern.compile("<servlet\\b[^>]*>(.*?)</servlet>",
+            Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    private static final Pattern SERVLET_MAPPING = Pattern.compile("<servlet-mapping\\b[^>]*>(.*?)</servlet-mapping>",
+            Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    private static final Pattern FILTER = Pattern.compile("<filter\\b[^>]*>(.*?)</filter>",
+            Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    private static final Pattern FILTER_MAPPING = Pattern.compile("<filter-mapping\\b[^>]*>(.*?)</filter-mapping>",
+            Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    private static final Pattern LISTENER = Pattern.compile("<listener\\b[^>]*>(.*?)</listener>",
+            Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    private static final Pattern STRUTS_ACTION = Pattern.compile("<action\\b([^>]*)>(.*?)</action>",
+            Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    private static final Pattern STRUTS_FORWARD = Pattern.compile("<forward\\b([^>]*)/?>",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern SPRING_BEAN_BLOCK = Pattern.compile("<bean\\b([^>]*)>(.*?)</bean>",
+            Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    private static final Pattern SPRING_BEAN_SELF_CLOSING = Pattern.compile("<bean\\b([^>]*)/>",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern SPRING_PROPERTY_REF = Pattern.compile("<property\\b[^>]*\\bref\\s*=\\s*(['\"])(.*?)\\1[^>]*/?>",
+            Pattern.CASE_INSENSITIVE);
     private static final Pattern RESULT_MAP = Pattern.compile("<resultMap\\b([^>]*)>", Pattern.CASE_INSENSITIVE);
     private static final Pattern STATEMENT = Pattern.compile("<(select|insert|update|delete)\\b([^>]*)>(.*?)</\\1>",
             Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
-    private static final Pattern ATTR = Pattern.compile("([A-Za-z_][\\w.-]*)\\s*=\\s*\"([^\"]*)\"");
+    private static final Pattern ATTR = Pattern.compile("([A-Za-z_][\\w.-]*)\\s*=\\s*(['\"])(.*?)\\2");
     private static final Pattern TABLE_FROM = Pattern.compile("(?i)\\b(?:from|join|update)\\s+([A-Za-z_][\\w.]*)");
     private static final Pattern TABLE_INSERT = Pattern.compile("(?i)\\binsert\\s+into\\s+([A-Za-z_][\\w.]*)");
-    private static final Pattern COLUMN_ATTR = Pattern.compile("column\\s*=\\s*\"([A-Za-z_][\\w.]*)\"", Pattern.CASE_INSENSITIVE);
+    private static final Pattern COLUMN_ATTR = Pattern.compile("column\\s*=\\s*(['\"])([A-Za-z_][\\w.]*)\\1", Pattern.CASE_INSENSITIVE);
     private static final Pattern QUALIFIED_COLUMN = Pattern.compile("\\b[A-Za-z_][\\w]*\\.([A-Za-z_][\\w]*)\\b");
 
     public boolean supports(GraphFileEntry entry) {
@@ -40,12 +61,15 @@ final class MyBatisXmlLiteParser implements GraphSourceParser {
         Path file = projectRoot.resolve(entry.relativePath());
         String content = new String(Files.readAllBytes(file), "UTF-8");
         validateXml(content, entry, builder);
+        addWebXml(builder, entry, content);
+        addStruts(builder, entry, content);
+        addSpringBeans(builder, entry, content);
 
         Matcher mapperMatcher = MAPPER.matcher(content);
         if (!mapperMatcher.find()) {
             return;
         }
-        String namespace = mapperMatcher.group(1);
+        String namespace = mapperMatcher.group(2);
         String mapperKey = mapperKey(namespace);
         int mapperLine = lineOf(content, mapperMatcher.start());
         builder.addNode(new GraphNode(mapperKey, "xml_mapper", simpleName(namespace), namespace,
@@ -54,6 +78,179 @@ final class MyBatisXmlLiteParser implements GraphSourceParser {
         addMapperJavaReference(builder, entry, mapperKey, namespace, mapperLine);
         addResultMaps(builder, entry, content, mapperKey);
         addStatements(builder, entry, content, namespace, mapperKey);
+    }
+
+    private void addWebXml(GraphParseResult.Builder builder, GraphFileEntry entry, String content) {
+        java.util.Map<String, String> servletClasses = new java.util.LinkedHashMap<String, String>();
+        Matcher servletMatcher = SERVLET.matcher(content);
+        while (servletMatcher.find()) {
+            String block = servletMatcher.group(1);
+            String name = tag(block, "servlet-name");
+            String className = tag(block, "servlet-class");
+            if (name.length() == 0) {
+                continue;
+            }
+            int line = lineOf(content, servletMatcher.start());
+            String servletKey = "servlet:" + name;
+            builder.addNode(new GraphNode(servletKey, "servlet", name, name, entry.relativePath(),
+                    line, line, "xml", "", "", 85, "lite", "web.xml servlet"));
+            if (className.length() > 0) {
+                servletClasses.put(name, className);
+                addJavaTypeMapping(builder, entry, servletKey, className, line,
+                        "web.xml servlet-class");
+            }
+        }
+        Matcher mappingMatcher = SERVLET_MAPPING.matcher(content);
+        while (mappingMatcher.find()) {
+            String block = mappingMatcher.group(1);
+            String name = tag(block, "servlet-name");
+            String urlPattern = tag(block, "url-pattern");
+            if (name.length() == 0 || urlPattern.length() == 0) {
+                continue;
+            }
+            int line = lineOf(content, mappingMatcher.start());
+            String routeKey = routeKey("ANY", urlPattern);
+            String servletKey = "servlet:" + name;
+            builder.addNode(new GraphNode(routeKey, "route", urlPattern, urlPattern, entry.relativePath(),
+                    line, line, "xml", "", "", 85, "lite", "web.xml servlet mapping"));
+            builder.addNode(new GraphNode(servletKey, "servlet", name, name, entry.relativePath(),
+                    line, line, "xml", "", "", 80, "lite", "web.xml servlet mapping target"));
+            builder.addEdge(new GraphEdge("maps_to", routeKey, servletKey, entry.relativePath(), 90,
+                    "lite", "url-pattern maps to servlet"));
+            String className = servletClasses.get(name);
+            if (className != null) {
+                addJavaTypeMapping(builder, entry, servletKey, className, line,
+                        "web.xml mapping servlet-class");
+            }
+        }
+
+        Matcher filterMatcher = FILTER.matcher(content);
+        while (filterMatcher.find()) {
+            String block = filterMatcher.group(1);
+            String name = tag(block, "filter-name");
+            String className = tag(block, "filter-class");
+            if (name.length() > 0) {
+                int line = lineOf(content, filterMatcher.start());
+                String filterKey = "web_filter:" + name;
+                builder.addNode(new GraphNode(filterKey, "web_filter", name, name, entry.relativePath(),
+                        line, line, "xml", "", "", 70, "lite", "web.xml filter"));
+                if (className.length() > 0) {
+                    addJavaTypeMapping(builder, entry, filterKey, className, line, "web.xml filter-class");
+                }
+            }
+        }
+        Matcher filterMappingMatcher = FILTER_MAPPING.matcher(content);
+        while (filterMappingMatcher.find()) {
+            String block = filterMappingMatcher.group(1);
+            String name = tag(block, "filter-name");
+            if (name.length() == 0) {
+                continue;
+            }
+            int line = lineOf(content, filterMappingMatcher.start());
+            String filterKey = "web_filter:" + name;
+            builder.addNode(new GraphNode(filterKey, "web_filter", name, name, entry.relativePath(),
+                    line, line, "xml", "", "", 70, "lite", "web.xml filter mapping target"));
+            for (String urlPattern : tags(block, "url-pattern")) {
+                String routeKey = routeKey("ANY", urlPattern);
+                builder.addNode(new GraphNode(routeKey, "route", urlPattern, urlPattern, entry.relativePath(),
+                        line, line, "xml", "", "", 70, "lite", "web.xml filter mapping"));
+                builder.addEdge(new GraphEdge("filters", filterKey, routeKey, entry.relativePath(), 70,
+                        "lite", "filter applies to url-pattern"));
+            }
+        }
+        Matcher listenerMatcher = LISTENER.matcher(content);
+        while (listenerMatcher.find()) {
+            String className = tag(listenerMatcher.group(1), "listener-class");
+            if (className.length() > 0) {
+                int line = lineOf(content, listenerMatcher.start());
+                String listenerKey = "web_listener:" + className;
+                builder.addNode(new GraphNode(listenerKey, "web_listener", simpleName(className), className,
+                        entry.relativePath(), line, line, "xml", "", "", 70, "lite", "web.xml listener"));
+                addJavaTypeMapping(builder, entry, listenerKey, className, line, "web.xml listener-class");
+            }
+        }
+    }
+
+    private void addStruts(GraphParseResult.Builder builder, GraphFileEntry entry, String content) {
+        Matcher actionMatcher = STRUTS_ACTION.matcher(content);
+        while (actionMatcher.find()) {
+            String attrs = actionMatcher.group(1);
+            String body = actionMatcher.group(2);
+            String path = attr(attrs, "path");
+            String type = attr(attrs, "type");
+            if (path.length() == 0) {
+                path = attr(attrs, "name");
+            }
+            if (path.length() == 0) {
+                continue;
+            }
+            int line = lineOf(content, actionMatcher.start());
+            String actionKey = "struts_action:" + path;
+            builder.addNode(new GraphNode(actionKey, "struts_action", path, path, entry.relativePath(),
+                    line, line, "xml", "", "", 80, "lite", "Struts action"));
+            String routeKey = routeKey("ANY", path);
+            builder.addNode(new GraphNode(routeKey, "route", path, path, entry.relativePath(),
+                    line, line, "xml", "", "", 80, "lite", "Struts action path"));
+            builder.addEdge(new GraphEdge("maps_to", routeKey, actionKey, entry.relativePath(), 85,
+                    "lite", "Struts path maps to action"));
+            if (type.length() > 0) {
+                addJavaTypeMapping(builder, entry, actionKey, type, line, "Struts action type");
+            }
+            Matcher forwardMatcher = STRUTS_FORWARD.matcher(body);
+            while (forwardMatcher.find()) {
+                String forwardPath = attr(forwardMatcher.group(1), "path");
+                if (forwardPath.length() == 0) {
+                    continue;
+                }
+                String jspPath = normalizeWebPath(forwardPath);
+                String jspKey = "jsp_page:" + jspPath;
+                builder.addNode(new GraphNode(jspKey, "jsp_page", jspPath, jspPath, jspPath,
+                        line, line, "xml", "", "", 65, "lite", "Struts forward target"));
+                builder.addEdge(new GraphEdge("forwards_to", actionKey, jspKey, entry.relativePath(),
+                        70, "lite", "Struts action forward"));
+            }
+        }
+    }
+
+    private void addSpringBeans(GraphParseResult.Builder builder, GraphFileEntry entry, String content) {
+        Matcher blockMatcher = SPRING_BEAN_BLOCK.matcher(content);
+        while (blockMatcher.find()) {
+            addSpringBean(builder, entry, content, blockMatcher.group(1), blockMatcher.group(2),
+                    blockMatcher.start());
+        }
+        Matcher selfClosingMatcher = SPRING_BEAN_SELF_CLOSING.matcher(content);
+        while (selfClosingMatcher.find()) {
+            addSpringBean(builder, entry, content, selfClosingMatcher.group(1), "", selfClosingMatcher.start());
+        }
+    }
+
+    private void addSpringBean(GraphParseResult.Builder builder, GraphFileEntry entry, String content,
+                               String attrs, String body, int offset) {
+        String id = attr(attrs, "id");
+        if (id.length() == 0) {
+            id = attr(attrs, "name");
+        }
+        String className = attr(attrs, "class");
+        if (id.length() == 0 && className.length() == 0) {
+            return;
+        }
+        String beanName = id.length() == 0 ? className : id;
+        int line = lineOf(content, offset);
+        String beanKey = "spring_bean:" + beanName;
+        builder.addNode(new GraphNode(beanKey, "spring_bean", beanName, beanName, entry.relativePath(),
+                line, line, "xml", "", "", 75, "lite", "Spring bean"));
+        if (className.length() > 0) {
+            addJavaTypeMapping(builder, entry, beanKey, className, line, "Spring bean class");
+        }
+        Matcher refMatcher = SPRING_PROPERTY_REF.matcher(body == null ? "" : body);
+        while (refMatcher.find()) {
+            String ref = refMatcher.group(2);
+            String refKey = "spring_bean:" + ref;
+            builder.addNode(new GraphNode(refKey, "spring_bean", ref, ref, entry.relativePath(),
+                    line, line, "xml", "", "", 60, "lite", "Spring bean reference"));
+            builder.addEdge(new GraphEdge("references", beanKey, refKey, entry.relativePath(),
+                    70, "lite", "Spring property ref"));
+        }
     }
 
     private void validateXml(String content, GraphFileEntry entry, GraphParseResult.Builder builder) {
@@ -185,7 +382,7 @@ final class MyBatisXmlLiteParser implements GraphSourceParser {
     private void collect(Pattern pattern, String text, Set<String> output) {
         Matcher matcher = pattern.matcher(text);
         while (matcher.find()) {
-            String value = matcher.group(1).trim();
+            String value = matcher.group(matcher.groupCount() >= 2 ? matcher.groupCount() : 1).trim();
             if (value.length() > 0 && !value.startsWith("#{") && !value.startsWith("${")) {
                 output.add(value);
             }
@@ -196,10 +393,28 @@ final class MyBatisXmlLiteParser implements GraphSourceParser {
         Matcher matcher = ATTR.matcher(attrs == null ? "" : attrs);
         while (matcher.find()) {
             if (name.equalsIgnoreCase(matcher.group(1))) {
-                return matcher.group(2);
+                return matcher.group(3).trim();
             }
         }
         return "";
+    }
+
+    private java.util.List<String> tags(String block, String name) {
+        java.util.List<String> values = new java.util.ArrayList<String>();
+        Matcher matcher = Pattern.compile("<" + Pattern.quote(name) + "\\b[^>]*>(.*?)</" + Pattern.quote(name) + ">",
+                Pattern.CASE_INSENSITIVE | Pattern.DOTALL).matcher(block == null ? "" : block);
+        while (matcher.find()) {
+            String value = matcher.group(1).trim();
+            if (value.length() > 0) {
+                values.add(value);
+            }
+        }
+        return values;
+    }
+
+    private String tag(String block, String name) {
+        java.util.List<String> values = tags(block, name);
+        return values.isEmpty() ? "" : values.get(0);
     }
 
     private String tableEdge(String sqlType) {
@@ -234,5 +449,29 @@ final class MyBatisXmlLiteParser implements GraphSourceParser {
 
     private String safeMessage(String message) {
         return message == null ? "XML parse failed" : message.replace('\n', ' ').replace('\r', ' ');
+    }
+
+    private String routeKey(String method, String path) {
+        return "route:" + method + ":" + normalizeWebPath(path);
+    }
+
+    private String normalizeWebPath(String raw) {
+        String value = raw == null ? "" : raw.trim();
+        value = value.replace("${pageContext.request.contextPath}", "");
+        value = value.replace("${request.contextPath}", "");
+        return value;
+    }
+
+    private void addJavaTypeMapping(GraphParseResult.Builder builder, GraphFileEntry entry, String sourceKey,
+                                    String className, int line, String evidence) {
+        String qualified = className == null ? "" : className.trim();
+        if (qualified.length() == 0) {
+            return;
+        }
+        String typeKey = "java_type:" + qualified;
+        builder.addNode(new GraphNode(typeKey, "type_reference", simpleName(qualified), qualified,
+                entry.relativePath(), line, line, "xml", "", "", 70, "lite", evidence));
+        builder.addEdge(new GraphEdge("maps_to", sourceKey, typeKey, entry.relativePath(), 75,
+                "lite", evidence));
     }
 }

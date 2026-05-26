@@ -229,6 +229,7 @@ final class GoalIntegrationTest {
         assertTrue(summary.contains("- spec_change:"));
         assertTrue(summary.contains("- workflow_checkpoint_binding: created"));
         assertTrue(summary.contains("- workflow_artifact: GOAL_SUMMARY.md"));
+        assertFalse(summary.contains("<graph-artifacts>"));
         assertTrue(summary.contains("- #1 inspect_existing_code: Inspected existing controller/service/mapper/tests"));
         assertTrue(summary.contains("- [passed] sensitive: sensitive scan passed"));
         assertTrue(summary.contains("evidence_path:"));
@@ -1983,6 +1984,64 @@ final class GoalIntegrationTest {
     }
 
     @Test
+    void graphAwareGoalCompleteBindsGraphArtifactsAndSummary() throws Exception {
+        Path root = tempDir.resolve("demo-graph-complete");
+        writeSource(root, "src/main/java/com/example/App.java",
+                "package com.example;\npublic class App { public void run() {} }\n");
+        writeGraphProfile(root, "custom-graph-complete", true);
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo-graph-complete",
+                "--profile", "custom-graph-complete",
+                "--task", "Graph artifacts must bind on complete",
+                "--module", "graph"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "index", "--project-root", "demo-graph-complete"
+        }, new Harness(tempDir).context()));
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "export", "--project-root", "demo-graph-complete"
+        }, new Harness(tempDir).context()));
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", "demo-graph-complete",
+                "--file", "src/main/java/com/example/App.java"
+        }, new Harness(tempDir).context()));
+        recordCustomGraphGoalSteps("demo-graph-complete", goalKey,
+                "src/main/java/com/example/App.java", true);
+
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "demo-graph-complete", "--goal", goalKey
+        }, verify.context());
+        assertEquals(ExitCodes.SUCCESS, verifyExit);
+        assertTrue(verify.stdout().contains("decision: ready_to_complete"));
+
+        Harness complete = new Harness(tempDir);
+        int completeExit = new CommandRouter().run(new String[]{
+                "goal", "complete", "--project-root", "demo-graph-complete", "--goal", goalKey
+        }, complete.context());
+        assertEquals(ExitCodes.SUCCESS, completeExit);
+        assertTrue(complete.stdout().contains("status: completed"));
+
+        String summary = new String(Files.readAllBytes(PathUtil.goalSummary(root)), "UTF-8");
+        assertTrue(summary.contains("<graph-artifacts>"));
+        assertTrue(summary.contains("- snapshot_key: graph-"));
+        assertTrue(summary.contains("- graph_snapshot: "));
+        assertTrue(summary.contains("GRAPH_SNAPSHOT.json"));
+        assertTrue(summary.contains("GRAPH_CONTEXT.md"));
+        assertTrue(summary.contains("IMPACT_MAP.md"));
+        assertTrue(summary.contains("- goal_graph_binding: used,summary,impact_map"));
+        assertTrue(summary.contains("impact map is query-scoped"));
+        assertFalse(summary.contains("password="));
+        assertGraphCompletionRows(root, goalKey);
+    }
+
+    @Test
     void goalUsesConfiguredProfileCheckPolicyAndJsonOutput() throws Exception {
         Path root = tempDir.resolve("demo");
         Files.createDirectories(PathUtil.goalProfilesDirectory(root));
@@ -2376,6 +2435,33 @@ final class GoalIntegrationTest {
             assertEquals(1, count(statement, "SELECT COUNT(*) FROM workflow_artifact "
                     + "WHERE artifact_type = 'custom' AND produced_by_phase = 'goal_complete' "
                     + "AND title = 'GOAL_SUMMARY.md'"));
+        }
+    }
+
+    private void assertGraphCompletionRows(Path root, String goalKey) throws Exception {
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(root));
+             Statement statement = connection.createStatement()) {
+            assertEquals(3, count(statement, "SELECT COUNT(*) FROM goal_graph_binding "
+                    + "WHERE goal_key = '" + goalKey + "'"));
+            assertEquals(1, count(statement, "SELECT COUNT(*) FROM goal_graph_binding "
+                    + "WHERE goal_key = '" + goalKey + "' AND binding_type = 'used' "
+                    + "AND artifact_path LIKE '%GRAPH_SNAPSHOT.json' AND impact_hash LIKE 'sha256:%'"));
+            assertEquals(1, count(statement, "SELECT COUNT(*) FROM goal_graph_binding "
+                    + "WHERE goal_key = '" + goalKey + "' AND binding_type = 'summary' "
+                    + "AND artifact_path LIKE '%GRAPH_CONTEXT.md' AND impact_hash LIKE 'sha256:%'"));
+            assertEquals(1, count(statement, "SELECT COUNT(*) FROM goal_graph_binding "
+                    + "WHERE goal_key = '" + goalKey + "' AND binding_type = 'impact_map' "
+                    + "AND artifact_path LIKE '%IMPACT_MAP.md' AND impact_hash LIKE 'sha256:%'"));
+            assertEquals(1, count(statement, "SELECT COUNT(*) FROM goal_artifact "
+                    + "WHERE goal_key = '" + goalKey + "' AND artifact_type = 'graph_snapshot'"));
+            assertEquals(1, count(statement, "SELECT COUNT(*) FROM goal_artifact "
+                    + "WHERE goal_key = '" + goalKey + "' AND artifact_type = 'graph_context'"));
+            assertEquals(1, count(statement, "SELECT COUNT(*) FROM goal_artifact "
+                    + "WHERE goal_key = '" + goalKey + "' AND artifact_type = 'graph_impact_map'"));
+            assertEquals(3, count(statement, "SELECT COUNT(*) FROM workflow_artifact "
+                    + "WHERE produced_by_phase = 'goal_complete' AND tags LIKE '%graph%'"));
+            assertEquals(1, count(statement, "SELECT COUNT(*) FROM checkpoint "
+                    + "WHERE verify_status LIKE 'goal checks accepted; graph evidence bound%'"));
         }
     }
 

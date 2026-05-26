@@ -11,10 +11,12 @@ import com.devharnesskit.dhk.model.goal.GoalArtifact;
 import com.devharnesskit.dhk.model.goal.GoalCheck;
 import com.devharnesskit.dhk.model.goal.GoalEvaluation;
 import com.devharnesskit.dhk.model.goal.GoalEvent;
+import com.devharnesskit.dhk.model.goal.GoalGraphArtifacts;
 import com.devharnesskit.dhk.model.goal.GoalPlan;
 import com.devharnesskit.dhk.model.goal.GoalProfile;
 import com.devharnesskit.dhk.model.goal.GoalRun;
 import com.devharnesskit.dhk.model.goal.GoalStep;
+import com.devharnesskit.dhk.model.graph.GraphSnapshot;
 import com.devharnesskit.dhk.model.spec.SpecChange;
 import com.devharnesskit.dhk.model.workflow.WorkflowArtifact;
 import com.devharnesskit.dhk.model.workflow.WorkflowCheckpointBinding;
@@ -27,6 +29,8 @@ import com.devharnesskit.dhk.repository.goal.GoalCheckRepository;
 import com.devharnesskit.dhk.repository.goal.GoalEventRepository;
 import com.devharnesskit.dhk.repository.goal.GoalRunRepository;
 import com.devharnesskit.dhk.repository.goal.GoalStepRepository;
+import com.devharnesskit.dhk.repository.graph.GoalGraphBindingRepository;
+import com.devharnesskit.dhk.repository.graph.GraphRepository;
 import com.devharnesskit.dhk.repository.spec.SpecChangeRepository;
 import com.devharnesskit.dhk.repository.spec.SpecDocumentRepository;
 import com.devharnesskit.dhk.repository.spec.SpecEventRepository;
@@ -50,6 +54,7 @@ import com.devharnesskit.dhk.util.PathUtil;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.List;
@@ -76,6 +81,8 @@ public final class GoalOrchestrator {
     private final GoalEventRepository goalEventRepository = new GoalEventRepository();
     private final GoalCheckRepository goalCheckRepository = new GoalCheckRepository();
     private final GoalArtifactRepository goalArtifactRepository = new GoalArtifactRepository();
+    private final GraphRepository graphRepository = new GraphRepository();
+    private final GoalGraphBindingRepository goalGraphBindingRepository = new GoalGraphBindingRepository();
     private final CheckpointRepository checkpointRepository = new CheckpointRepository();
     private final WorkflowArtifactRepository workflowArtifactRepository = new WorkflowArtifactRepository();
     private final WorkflowCheckpointBindingRepository workflowCheckpointBindingRepository =
@@ -310,11 +317,14 @@ public final class GoalOrchestrator {
             GoalCompleteResult result = transactionTemplate.execute(connection,
                     new TransactionTemplate.Work<GoalCompleteResult>() {
                         public GoalCompleteResult execute() throws Exception {
+                            GoalGraphArtifacts graphArtifacts = bindGraphArtifacts(connection, projectRoot,
+                                    project, goal, profile, now);
                             long checkpointId = checkpointRepository.insert(connection, new Checkpoint(0L,
                                     project.projectKey(), goal.taskName(), goal.moduleName(),
                                     "Goal completed: " + goal.taskName(), changedFiles(steps),
-                                    "none", "goal checks accepted", PathUtil.GOAL_SUMMARY, now));
-                            String summary = summaryRenderer.render(goal, steps, checks, checkpointId, now);
+                                    "none", checkpointSummary(profile, graphArtifacts), PathUtil.GOAL_SUMMARY, now));
+                            String summary = summaryRenderer.render(goal, steps, checks, checkpointId, now,
+                                    graphArtifacts);
                             summary = sensitiveDataGuard.redact(summary);
                             if (sensitiveDataGuard.containsSensitiveData(summary)) {
                                 throw new IllegalStateException("Sensitive data rejected during goal summary export: "
@@ -358,6 +368,83 @@ public final class GoalOrchestrator {
                 goal.workflowRunKey(), "custom", "GOAL_SUMMARY.md", summaryPath.toString(), "",
                 "confirmed", "goal_complete", "Goal summary exported for goal " + goal.goalKey(),
                 "goal,completion", now, now));
+    }
+
+    private GoalGraphArtifacts bindGraphArtifacts(Connection connection, Path projectRoot, Project project,
+                                                  GoalRun goal, GoalProfile profile, String now) throws Exception {
+        if (profile == null || !profile.graphRequired()) {
+            return GoalGraphArtifacts.none();
+        }
+        GraphSnapshot snapshot = graphRepository.latestCompletedSnapshot(connection, project.projectKey());
+        if (snapshot == null) {
+            throw new IllegalStateException("Graph-required goal completed without a completed graph snapshot");
+        }
+
+        Path snapshotPath = PathUtil.graphSnapshotJson(projectRoot);
+        Path contextPath = PathUtil.graphContext(projectRoot);
+        Path impactPath = PathUtil.graphImpactMap(projectRoot);
+        String snapshotHash = fileHash(snapshotPath);
+        String contextHash = fileHash(contextPath);
+        String impactHash = fileHash(impactPath);
+
+        if (Files.isRegularFile(snapshotPath)) {
+            bindGraphArtifact(connection, project, goal, snapshot, "used", "graph_snapshot",
+                    "GRAPH_SNAPSHOT.json", snapshotPath, snapshotHash,
+                    "Graph snapshot used for goal completion", now);
+        }
+        if (Files.isRegularFile(contextPath)) {
+            bindGraphArtifact(connection, project, goal, snapshot, "summary", "graph_context",
+                    "GRAPH_CONTEXT.md", contextPath, contextHash,
+                    "Graph context export used for goal completion", now);
+        }
+        if (Files.isRegularFile(impactPath)) {
+            bindGraphArtifact(connection, project, goal, snapshot, "impact_map", "graph_impact_map",
+                    "IMPACT_MAP.md", impactPath, impactHash,
+                    "Impact map used for goal completion", now);
+        }
+
+        return new GoalGraphArtifacts(true, snapshot.id(), snapshot.snapshotKey(), snapshot.provider(),
+                snapshot.fileCount(), snapshot.nodeCount(), snapshot.edgeCount(),
+                Files.isRegularFile(snapshotPath) ? snapshotPath.toString() : "",
+                Files.isRegularFile(contextPath) ? contextPath.toString() : "",
+                Files.isRegularFile(impactPath) ? impactPath.toString() : "",
+                snapshotHash, contextHash, impactHash);
+    }
+
+    private void bindGraphArtifact(Connection connection, Project project, GoalRun goal, GraphSnapshot snapshot,
+                                   String bindingType, String artifactType, String title, Path path,
+                                   String contentHash, String summary, String now) throws Exception {
+        goalGraphBindingRepository.upsert(connection, goal.goalKey(), snapshot.id(), bindingType,
+                path.toString(), contentHash, now);
+        goalArtifactRepository.insert(connection, new GoalArtifact(0L, goal.goalKey(), artifactType,
+                title, path.toString(), contentHash,
+                summary + "; snapshot_key=" + snapshot.snapshotKey(), now));
+        if (goal.workflowRunKey().length() > 0) {
+            workflowArtifactRepository.insert(connection, new WorkflowArtifact(0L, project.projectKey(),
+                    goal.workflowRunKey(), "custom", title, path.toString(), contentHash,
+                    "confirmed", "goal_complete", summary + " for goal " + goal.goalKey(),
+                    "goal,completion,graph", now, now));
+        }
+    }
+
+    private String checkpointSummary(GoalProfile profile, GoalGraphArtifacts graphArtifacts) {
+        if (profile != null && profile.graphRequired() && graphArtifacts != null && graphArtifacts.enabled()) {
+            return "goal checks accepted; graph evidence bound snapshot_key=" + graphArtifacts.snapshotKey();
+        }
+        return "goal checks accepted";
+    }
+
+    private String fileHash(Path path) throws Exception {
+        if (path == null || !Files.isRegularFile(path)) {
+            return "";
+        }
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] hash = digest.digest(Files.readAllBytes(path));
+        StringBuilder builder = new StringBuilder("sha256:");
+        for (byte b : hash) {
+            builder.append(String.format("%02x", b & 0xff));
+        }
+        return builder.toString();
     }
 
     private Path exportGoalContext(Connection connection, Path projectRoot, Project project, GoalRun goal,

@@ -1,6 +1,7 @@
 package com.devharnesskit.dhk.export;
 
 import com.devharnesskit.dhk.model.goal.GoalCheck;
+import com.devharnesskit.dhk.model.goal.GoalGraphArtifacts;
 import com.devharnesskit.dhk.model.goal.GoalRun;
 import com.devharnesskit.dhk.model.goal.GoalStep;
 
@@ -9,6 +10,11 @@ import java.util.List;
 public final class GoalSummaryRenderer {
     public String render(GoalRun goal, List<GoalStep> steps, List<GoalCheck> checks,
                          long checkpointId, String generatedAt) {
+        return render(goal, steps, checks, checkpointId, generatedAt, GoalGraphArtifacts.none());
+    }
+
+    public String render(GoalRun goal, List<GoalStep> steps, List<GoalCheck> checks,
+                         long checkpointId, String generatedAt, GoalGraphArtifacts graphArtifacts) {
         StringBuilder builder = new StringBuilder();
         builder.append("# GOAL_SUMMARY\n\n");
         builder.append("<generated-at>").append(generatedAt).append("</generated-at>\n\n");
@@ -29,6 +35,8 @@ public final class GoalSummaryRenderer {
         builder.append("- workflow_checkpoint_binding: created\n");
         builder.append("- workflow_artifact: GOAL_SUMMARY.md\n");
         builder.append("</completion-bindings>\n\n");
+
+        appendGraphArtifacts(builder, graphArtifacts);
 
         builder.append("<steps>\n");
         for (GoalStep step : steps) {
@@ -65,6 +73,33 @@ public final class GoalSummaryRenderer {
         builder.append("- Do not treat generated summary text as confirmed long-term memory unless it is added as draft and confirmed separately.\n");
         builder.append("</agent-instructions>\n");
         return builder.toString();
+    }
+
+    private void appendGraphArtifacts(StringBuilder builder, GoalGraphArtifacts artifacts) {
+        if (artifacts == null || !artifacts.enabled()) {
+            return;
+        }
+        builder.append("<graph-artifacts>\n");
+        builder.append("- snapshot_id: ").append(artifacts.snapshotId()).append('\n');
+        builder.append("- snapshot_key: ").append(artifacts.snapshotKey()).append('\n');
+        builder.append("- provider: ").append(artifacts.provider()).append('\n');
+        builder.append("- file_count: ").append(artifacts.fileCount()).append('\n');
+        builder.append("- node_count: ").append(artifacts.nodeCount()).append('\n');
+        builder.append("- edge_count: ").append(artifacts.edgeCount()).append('\n');
+        builder.append("- graph_snapshot: ").append(emptyValue(artifacts.graphSnapshotPath())).append('\n');
+        builder.append("- graph_context: ").append(emptyValue(artifacts.graphContextPath())).append('\n');
+        builder.append("- impact_map: ").append(emptyValue(artifacts.impactMapPath())).append('\n');
+        builder.append("- graph_snapshot_hash: ").append(emptyValue(artifacts.graphSnapshotHash())).append('\n');
+        builder.append("- graph_context_hash: ").append(emptyValue(artifacts.graphContextHash())).append('\n');
+        builder.append("- impact_map_hash: ").append(emptyValue(artifacts.impactMapHash())).append('\n');
+        builder.append("- goal_graph_binding: used,summary");
+        if (artifacts.impactMapPath().length() > 0) {
+            builder.append(",impact_map");
+        }
+        builder.append('\n');
+        builder.append("- limitation: graph facts are generated snapshot facts, not confirmed memory\n");
+        builder.append("- limitation: impact map is query-scoped and must be regenerated after code changes\n");
+        builder.append("</graph-artifacts>\n\n");
     }
 
     private String emptyValue(String value) {

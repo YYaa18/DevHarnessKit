@@ -58,6 +58,9 @@ public final class GoalProfileService {
                     new String[]{"identify_behavior_boundary", "create_refactor_plan",
                             "apply_small_refactor", "verify"});
         }
+        if ("safe-refactor-with-graph".equals(profileKey)) {
+            return safeRefactorGraphProfile(profileKey);
+        }
         return null;
     }
 
@@ -244,6 +247,59 @@ public final class GoalProfileService {
                 true, "lite", true, true, 60,
                 new String[]{"graph_index_or_refresh", "graph_impact_analysis", "graph_reimpact"},
                 true, true, true, true, 8);
+    }
+
+    private GoalProfile safeRefactorGraphProfile(String profileKey) {
+        String[] actions = new String[]{"graph_index_or_refresh", "graph_impact_analysis",
+                "identify_behavior_boundary", "create_refactor_plan", "apply_small_refactor",
+                "graph_reimpact", "verify"};
+        Map<String, String[]> evidence = new LinkedHashMap<String, String[]>();
+        evidence.put("graph_index_or_refresh", new String[]{"graph_snapshot", "graph_context"});
+        evidence.put("graph_impact_analysis",
+                new String[]{"impact_map", "impacted_files", "risk_nodes", "recommended_read_files"});
+        evidence.put("identify_behavior_boundary",
+                new String[]{"behavior_boundary", "preserved_behavior", "related_tests"});
+        evidence.put("create_refactor_plan",
+                new String[]{"refactor_plan", "rollback_plan", "risk_points"});
+        evidence.put("apply_small_refactor",
+                new String[]{"changed_files", "implementation_summary", "scope_guard"});
+        evidence.put("graph_reimpact",
+                new String[]{"post_change_impact_map", "impact_delta", "changed_files_covered"});
+        evidence.put("verify",
+                new String[]{"compile_result", "test_result", "sensitive_result",
+                        "graph_result", "impact_result"});
+
+        Map<String, GoalActionMapping> mappings = new LinkedHashMap<String, GoalActionMapping>();
+        mappings.put("identify_behavior_boundary", new GoalActionMapping("identify_behavior_boundary",
+                "identify_behavior_boundary", new String[]{"behavior_preservation_stated"},
+                "identify_behavior_boundary", "", GoalActionMapping.MODE_STEP,
+                GoalActionMapping.MODE_STEP, GoalActionMapping.ACCEPTANCE_NONE, new String[0]));
+        mappings.put("create_refactor_plan", new GoalActionMapping("create_refactor_plan",
+                "create_refactor_plan", new String[]{"rollback_plan_ready"},
+                "create_refactor_plan", "", GoalActionMapping.MODE_STEP,
+                GoalActionMapping.MODE_STEP, GoalActionMapping.ACCEPTANCE_NONE, new String[0]));
+        mappings.put("apply_small_refactor", new GoalActionMapping("apply_small_refactor",
+                "apply_small_refactor", new String[]{"single_boundary_change"},
+                "apply_small_refactor", "", GoalActionMapping.MODE_STEP,
+                GoalActionMapping.MODE_STEP, GoalActionMapping.ACCEPTANCE_NONE, new String[0]));
+        mappings.put("verify", new GoalActionMapping("verify",
+                "verify_tests", new String[]{"verification_recorded"},
+                "verify", "auto_pass", GoalActionMapping.MODE_CHECK,
+                GoalActionMapping.MODE_CHECK, GoalActionMapping.ACCEPTANCE_CHECKS,
+                new String[]{"compile", "test", "sensitive", "graph", "impact"}));
+
+        Map<String, GoalAcceptanceMapping> acceptances = new LinkedHashMap<String, GoalAcceptanceMapping>();
+        acceptances.put("safe_refactor_checks_pass", new GoalAcceptanceMapping("safe_refactor_checks_pass",
+                "Safe refactor graph checks are accepted",
+                "compile/test/sensitive/graph/impact checks are accepted by policy",
+                GoalAcceptanceMapping.SOURCE_CHECKS,
+                new String[]{"compile", "test", "sensitive", "graph", "impact"}, ""));
+
+        return new GoalProfile(profileKey, "safe-refactor", false, "auto", actions, evidence,
+                new String[]{"compile", "test", "sensitive", "graph", "impact", "workflow"},
+                true, false, true, true, false, false, mappings, acceptances,
+                true, "lite", true, true, 60,
+                new String[]{"graph_index_or_refresh", "graph_impact_analysis", "graph_reimpact"});
     }
 
     private Map<String, String[]> requiredEvidence(Map<String, String> raw) {

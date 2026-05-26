@@ -19,10 +19,13 @@ Rules:
 - SQLite graph tables remain the source of truth for graph snapshots.
 - Markdown and JSON graph exports are derived artifacts.
 - Agents should read `GRAPH_CONTEXT.md` and task-specific `IMPACT_MAP.md`, not
-  `memory.db`.
+`memory.db`.
 - Graph facts are snapshot-bound machine facts. They must not be promoted to
   confirmed memory without human review.
 - Regenerate graph exports after code changes.
+- `IMPACT_MAP.md` can include `related-tests` and `missing-related-tests`.
+  Missing tests are inferred from Java path conventions and should be treated as
+  review prompts.
 
 ## Safety Boundary
 
@@ -48,6 +51,10 @@ rerun graph index/export/impact when files changed
 
 Graph output should guide impact analysis, not replace compile, test, sensitive,
 workflow, or spec checks.
+
+For `safe-refactor-with-graph`, rerunning impact after the change is mandatory.
+If the post-change impact is wider than the pre-change impact, record explicit
+risk evidence before completion.
 
 ## Architecture Check Alpha
 

@@ -2099,6 +2099,81 @@ final class GoalIntegrationTest {
     }
 
     @Test
+    void safeRefactorWithGraphVerifyFailsWhenImpactExpandedWithoutRiskEvidence() throws Exception {
+        Path root = copyFixture("modern-java-api", tempDir.resolve("modern-safe-refactor-risk"));
+        String projectRoot = root.toString();
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", projectRoot,
+                "--profile", "safe-refactor-with-graph",
+                "--task", "Safe refactor requires expansion risk evidence",
+                "--module", "modern"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        indexExportImpact(projectRoot, "src/main/java/com/acme/modern/account/service/AccountService.java");
+        recordSafeRefactorGraphGoalSteps(projectRoot, goalKey, false);
+
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", projectRoot, "--goal", goalKey
+        }, verify.context());
+
+        assertEquals(ExitCodes.SUCCESS, verifyExit);
+        assertTrue(verify.stdout().contains("decision: not_ready"));
+        assertTrue(verify.stdout().contains("impact: failed - impact freshness failed"));
+        assertTrue(verify.stdout().contains("impact expansion risk evidence missing for safe-refactor"));
+
+        String log = new String(Files.readAllBytes(PathUtil.goalCheckArtifactsDirectory(root, goalKey)
+                .resolve("impact.log")), "UTF-8");
+        assertTrue(log.contains("safe_refactor_reimpact_required: true"));
+        assertTrue(log.contains("missing_related_tests_count: 1"));
+    }
+
+    @Test
+    void safeRefactorWithGraphSummaryRecordsTestGapAndReimpactResult() throws Exception {
+        Path root = copyFixture("modern-java-api", tempDir.resolve("modern-safe-refactor-summary"));
+        String projectRoot = root.toString();
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", projectRoot,
+                "--profile", "safe-refactor-with-graph",
+                "--task", "Safe refactor summary records graph evidence",
+                "--module", "modern"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        indexExportImpact(projectRoot, "src/main/java/com/acme/modern/account/service/AccountService.java");
+        recordSafeRefactorGraphGoalSteps(projectRoot, goalKey, true);
+
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", projectRoot, "--goal", goalKey
+        }, verify.context());
+        assertEquals(ExitCodes.SUCCESS, verifyExit);
+        assertTrue(verify.stdout().contains("decision: ready_to_complete"));
+
+        Harness complete = new Harness(tempDir);
+        int completeExit = new CommandRouter().run(new String[]{
+                "goal", "complete", "--project-root", projectRoot, "--goal", goalKey
+        }, complete.context());
+        assertEquals(ExitCodes.SUCCESS, completeExit);
+
+        String summary = new String(Files.readAllBytes(PathUtil.goalSummary(root)), "UTF-8");
+        assertTrue(summary.contains("<graph-artifacts>"));
+        assertTrue(summary.contains("- missing_related_tests: 1"));
+        assertTrue(summary.contains("src/test/java/com/acme/modern/account/repository/AccountRepositoryTest.java"));
+        assertTrue(summary.contains("impact_delta=expanded"));
+        assertTrue(summary.contains("impact_expansion_risk=reviewed expanded repository test gap"));
+    }
+
+    @Test
     void graphAwareGoalCompleteBindsGraphArtifactsAndSummary() throws Exception {
         Path root = tempDir.resolve("demo-graph-complete");
         writeSource(root, "src/main/java/com/example/App.java",
@@ -2601,6 +2676,45 @@ final class GoalIntegrationTest {
                 "--evidence", "compile_result=not required; test_result=not required; sensitive_result=not required"
         }, verifyStep.context());
         assertEquals(ExitCodes.SUCCESS, verifyStepExit);
+    }
+
+    private void indexExportImpact(String projectRoot, String impactFile) {
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "index", "--project-root", projectRoot
+        }, new Harness(tempDir).context()));
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "export", "--project-root", projectRoot
+        }, new Harness(tempDir).context()));
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", projectRoot,
+                "--file", impactFile, "--depth", "4"
+        }, new Harness(tempDir).context()));
+    }
+
+    private void recordSafeRefactorGraphGoalSteps(String projectRoot, String goalKey,
+                                                  boolean includeExpansionRisk) {
+        step(projectRoot, goalKey, "Graph snapshot exported", "",
+                "graph_snapshot=GRAPH_SNAPSHOT.json; graph_context=GRAPH_CONTEXT.md");
+        step(projectRoot, goalKey, "Graph impact analysis recorded", "",
+                "impact_map=IMPACT_MAP.md; impacted_files=src/main/java/com/acme/modern/account/service/AccountService.java"
+                        + "; risk_nodes=repository; recommended_read_files=src/main/java/com/acme/modern/account/service/AccountService.java");
+        step(projectRoot, goalKey, "Behavior boundary identified", "",
+                "behavior_boundary=AccountService public behavior; preserved_behavior=account lookup semantics"
+                        + "; related_tests=AccountServiceTest");
+        step(projectRoot, goalKey, "Refactor plan created", "",
+                "refactor_plan=small service cleanup; rollback_plan=revert service change"
+                        + "; risk_points=repository test gap remains visible");
+        step(projectRoot, goalKey, "Applied bounded refactor", "src/main/java/com/acme/modern/account/service/AccountService.java",
+                "changed_files=src/main/java/com/acme/modern/account/service/AccountService.java"
+                        + "; implementation_summary=small safe refactor; scope_guard=single service boundary");
+        String risk = includeExpansionRisk
+                ? "; impact_expansion_risk=reviewed expanded repository test gap" : "";
+        step(projectRoot, goalKey, "Post-change impact recorded", "",
+                "post_change_impact_map=IMPACT_MAP.md; impact_delta=expanded: repository test gap surfaced"
+                        + "; changed_files_covered=covered" + risk);
+        step(projectRoot, goalKey, "Verification evidence recorded", "",
+                "compile_result=pending; test_result=pending; sensitive_result=pending"
+                        + "; graph_result=pending; impact_result=pending");
     }
 
     private void recordLegacyGraphGoalSteps(String projectRoot, String goalKey, String changedFile,

@@ -609,7 +609,8 @@ public final class GoalConfigDiagnosticsService {
                 "form_validation_checked", "checkpoint_created"));
         values.put("systematic-debugging", set("error_evidence_collected",
                 "first_business_stack_identified", "hypothesis_has_evidence", "fix_has_verification"));
-        values.put("safe-refactor", set("behavior_preservation_stated", "rollback_plan_ready"));
+        values.put("safe-refactor", set("behavior_preservation_stated", "rollback_plan_ready",
+                "single_boundary_change", "verification_recorded"));
         return values;
     }
 

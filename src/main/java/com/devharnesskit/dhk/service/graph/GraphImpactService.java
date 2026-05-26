@@ -69,6 +69,7 @@ public final class GraphImpactService {
                     Collections.<GraphNode>emptyList(), Collections.<GraphEdge>emptyList(),
                     Collections.<GraphEdge>emptyList(), Collections.<String>emptyList(),
                     Collections.<GraphNode>emptyList(), Collections.<String>emptyList(),
+                    Collections.<String>emptyList(),
                     Collections.<GraphNode>emptyList(), Collections.<String>emptyList(), candidates,
                     PathUtil.graphImpactMap(projectRoot), requestedDepth, maxDepth, depthLimited);
         } else {
@@ -111,12 +112,13 @@ public final class GraphImpactService {
         List<GraphEdge> callees = directEdges(startNodes, outgoing);
         List<String> relatedFiles = expandLegacyDataFlowFiles(relatedFiles(impactedNodes), data.files());
         List<String> tests = relatedTests(relatedFiles, data.files());
+        List<String> missingTests = missingRelatedTests(relatedFiles, data.files());
         List<GraphNode> sql = filterNodes(impactedNodes, "xml_mapper", "sql_statement", "db_table", "db_column");
         List<GraphNode> risks = riskNodes(impactedNodes);
         List<String> recommended = recommendedReadFiles(relatedFiles);
 
         return new GraphImpactResult(request, data.snapshot(), true, startNodes, impactedNodes, callers,
-                callees, relatedFiles, sql, tests, risks, recommended, Collections.<GraphNode>emptyList(),
+                callees, relatedFiles, sql, tests, missingTests, risks, recommended, Collections.<GraphNode>emptyList(),
                 PathUtil.graphImpactMap(projectRoot), requestedDepth, maxImpactDepth, depthLimited);
     }
 
@@ -251,19 +253,60 @@ public final class GraphImpactService {
 
     private List<String> relatedTests(List<String> relatedFiles, List<GraphFileEntry> files) {
         Set<String> tests = new LinkedHashSet<String>();
+        Set<String> indexedFiles = indexedFiles(files);
         for (String file : relatedFiles) {
             if (file.startsWith("src/test/")) {
                 tests.add(file);
+                continue;
+            }
+            String expected = expectedTestPath(file);
+            if (expected.length() > 0 && indexedFiles.contains(expected)) {
+                tests.add(expected);
             }
         }
-        if (tests.isEmpty()) {
-            for (GraphFileEntry file : files) {
-                if (file.indexed() && file.relativePath().startsWith("src/test/")) {
-                    tests.add(file.relativePath());
-                }
+        List<String> sorted = new ArrayList<String>(tests);
+        Collections.sort(sorted);
+        return sorted;
+    }
+
+    private List<String> missingRelatedTests(List<String> relatedFiles, List<GraphFileEntry> files) {
+        Set<String> indexedFiles = indexedFiles(files);
+        Set<String> missing = new LinkedHashSet<String>();
+        for (String file : relatedFiles) {
+            String expected = expectedTestPath(file);
+            if (expected.length() > 0 && !indexedFiles.contains(expected)) {
+                missing.add(expected);
             }
         }
-        return new ArrayList<String>(tests);
+        List<String> sorted = new ArrayList<String>(missing);
+        Collections.sort(sorted);
+        return sorted;
+    }
+
+    private Set<String> indexedFiles(List<GraphFileEntry> files) {
+        Set<String> indexed = new LinkedHashSet<String>();
+        for (GraphFileEntry file : files) {
+            if (file.indexed()) {
+                indexed.add(file.relativePath());
+            }
+        }
+        return indexed;
+    }
+
+    private String expectedTestPath(String file) {
+        if (file == null || !file.startsWith("src/main/java/") || !file.endsWith(".java")) {
+            return "";
+        }
+        if (!(file.contains("/controller/") || file.contains("/service/") || file.contains("/repository/"))) {
+            return "";
+        }
+        String className = file.substring(file.lastIndexOf('/') + 1, file.length() - ".java".length());
+        if (className.startsWith("InMemory") || className.startsWith("Noop") || className.endsWith("Config")
+                || className.endsWith("Publisher")) {
+            return "";
+        }
+        String withoutPrefix = file.substring("src/main/java/".length(), file.length() - ".java".length());
+        return "src/test/java/" + withoutPrefix + "Test.java";
     }
 
     private List<String> expandLegacyDataFlowFiles(List<String> relatedFiles, List<GraphFileEntry> files) {

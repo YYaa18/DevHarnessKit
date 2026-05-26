@@ -215,6 +215,7 @@ public final class GoalCheckPolicy {
                 || "java-mvc-change".equals(profile.profileKey())
                 || "java-api-change-with-graph".equals(profile.profileKey())
                 || "java-mvc-change-with-graph".equals(profile.profileKey())
+                || "safe-refactor-with-graph".equals(profile.profileKey())
                 || profile.legacyGraphProfile();
     }
 

@@ -28,6 +28,7 @@ public final class GraphImpactRenderer {
         builder.append("- related_files: ").append(result.relatedFiles().size()).append('\n');
         builder.append("- related_sql: ").append(result.relatedSql().size()).append('\n');
         builder.append("- related_tests: ").append(result.relatedTests().size()).append('\n');
+        builder.append("- missing_related_tests: ").append(result.missingRelatedTests().size()).append('\n');
         builder.append("- risk_nodes: ").append(result.riskNodes().size()).append('\n');
         builder.append("</summary>\n\n");
 
@@ -37,6 +38,7 @@ public final class GraphImpactRenderer {
         appendStrings(builder, "related-files", result.relatedFiles());
         appendNodes(builder, "related-sql", result.relatedSql());
         appendStrings(builder, "related-tests", result.relatedTests());
+        appendStrings(builder, "missing-related-tests", result.missingRelatedTests());
         appendNodes(builder, "risk-nodes", result.riskNodes());
         appendStrings(builder, "recommended-read-files", result.recommendedReadFiles());
         appendNodes(builder, "candidate-suggestions", result.candidates());
@@ -44,6 +46,7 @@ public final class GraphImpactRenderer {
         builder.append("<scoring-data>\n");
         builder.append("- impact_file_count: ").append(result.relatedFiles().size()).append('\n');
         builder.append("- related_test_count: ").append(result.relatedTests().size()).append('\n');
+        builder.append("- missing_related_test_count: ").append(result.missingRelatedTests().size()).append('\n');
         builder.append("- sql_node_count: ").append(result.relatedSql().size()).append('\n');
         builder.append("- risk_node_count: ").append(result.riskNodes().size()).append('\n');
         builder.append("- ground_truth_ready: false\n");

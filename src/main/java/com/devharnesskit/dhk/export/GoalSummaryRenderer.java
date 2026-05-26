@@ -5,6 +5,9 @@ import com.devharnesskit.dhk.model.goal.GoalGraphArtifacts;
 import com.devharnesskit.dhk.model.goal.GoalRun;
 import com.devharnesskit.dhk.model.goal.GoalStep;
 
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 
 public final class GoalSummaryRenderer {
@@ -92,6 +95,7 @@ public final class GoalSummaryRenderer {
         builder.append("- graph_snapshot_hash: ").append(emptyValue(artifacts.graphSnapshotHash())).append('\n');
         builder.append("- graph_context_hash: ").append(emptyValue(artifacts.graphContextHash())).append('\n');
         builder.append("- impact_map_hash: ").append(emptyValue(artifacts.impactMapHash())).append('\n');
+        appendImpactHighlights(builder, artifacts.impactMapPath());
         builder.append("- goal_graph_binding: used,summary");
         if (artifacts.impactMapPath().length() > 0) {
             builder.append(",impact_map");
@@ -100,6 +104,41 @@ public final class GoalSummaryRenderer {
         builder.append("- limitation: graph facts are generated snapshot facts, not confirmed memory\n");
         builder.append("- limitation: impact map is query-scoped and must be regenerated after code changes\n");
         builder.append("</graph-artifacts>\n\n");
+    }
+
+    private void appendImpactHighlights(StringBuilder builder, String impactMapPath) {
+        List<String> missingTests = missingRelatedTests(impactMapPath);
+        builder.append("- missing_related_tests: ").append(missingTests.size()).append('\n');
+        for (String test : missingTests) {
+            builder.append("  - ").append(test).append('\n');
+        }
+    }
+
+    private List<String> missingRelatedTests(String impactMapPath) {
+        List<String> result = new ArrayList<String>();
+        if (impactMapPath == null || impactMapPath.length() == 0) {
+            return result;
+        }
+        try {
+            List<String> lines = Files.readAllLines(Paths.get(impactMapPath));
+            boolean inSection = false;
+            for (String line : lines) {
+                String trimmed = line.trim();
+                if ("<missing-related-tests>".equals(trimmed)) {
+                    inSection = true;
+                    continue;
+                }
+                if ("</missing-related-tests>".equals(trimmed)) {
+                    break;
+                }
+                if (inSection && trimmed.startsWith("- ")) {
+                    result.add(trimmed.substring(2).trim());
+                }
+            }
+        } catch (Exception ignored) {
+            return new ArrayList<String>();
+        }
+        return result;
     }
 
     private String emptyValue(String value) {

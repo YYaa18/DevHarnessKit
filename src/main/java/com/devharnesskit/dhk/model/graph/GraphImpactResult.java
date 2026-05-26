@@ -16,6 +16,7 @@ public final class GraphImpactResult {
     private final List<String> relatedFiles;
     private final List<GraphNode> relatedSql;
     private final List<String> relatedTests;
+    private final List<String> missingRelatedTests;
     private final List<GraphNode> riskNodes;
     private final List<String> recommendedReadFiles;
     private final List<GraphNode> candidates;
@@ -32,7 +33,7 @@ public final class GraphImpactResult {
                              List<String> recommendedReadFiles, List<GraphNode> candidates,
                              Path impactMapPath) {
         this(request, snapshot, found, startNodes, impactedNodes, directCallers, directCallees,
-                relatedFiles, relatedSql, relatedTests, riskNodes, recommendedReadFiles, candidates,
+                relatedFiles, relatedSql, relatedTests, new ArrayList<String>(), riskNodes, recommendedReadFiles, candidates,
                 impactMapPath, request.depth(), request.depth(), false);
     }
 
@@ -40,7 +41,7 @@ public final class GraphImpactResult {
                              List<GraphNode> startNodes, List<GraphNode> impactedNodes,
                              List<GraphEdge> directCallers, List<GraphEdge> directCallees,
                              List<String> relatedFiles, List<GraphNode> relatedSql,
-                             List<String> relatedTests, List<GraphNode> riskNodes,
+                             List<String> relatedTests, List<String> missingRelatedTests, List<GraphNode> riskNodes,
                              List<String> recommendedReadFiles, List<GraphNode> candidates,
                              Path impactMapPath, int requestedDepth, int maxImpactDepth, boolean depthLimited) {
         this.request = request;
@@ -53,6 +54,7 @@ public final class GraphImpactResult {
         this.relatedFiles = copyStrings(relatedFiles);
         this.relatedSql = copyNodes(relatedSql);
         this.relatedTests = copyStrings(relatedTests);
+        this.missingRelatedTests = copyStrings(missingRelatedTests);
         this.riskNodes = copyNodes(riskNodes);
         this.recommendedReadFiles = copyStrings(recommendedReadFiles);
         this.candidates = copyNodes(candidates);
@@ -100,6 +102,10 @@ public final class GraphImpactResult {
 
     public List<String> relatedTests() {
         return relatedTests;
+    }
+
+    public List<String> missingRelatedTests() {
+        return missingRelatedTests;
     }
 
     public List<GraphNode> riskNodes() {

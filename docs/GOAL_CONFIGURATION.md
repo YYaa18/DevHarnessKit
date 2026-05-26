@@ -99,6 +99,7 @@ Built-in graph-aware Java profiles are available as alpha profiles:
 ```text
 java-api-change-with-graph
 java-mvc-change-with-graph
+safe-refactor-with-graph
 ```
 
 Graph-required profiles automatically require `graph` when `graph_require_fresh_snapshot=true`
@@ -109,7 +110,9 @@ workspace fingerprint still matches the current workspace, and applies
 `graph_max_staleness_minutes`. The `impact` check requires `IMPACT_MAP.md`,
 verifies that it was generated from the latest graph snapshot, applies the same
 staleness window, and checks that recorded `changed_files` under `src/` are
-covered by the impact map.
+covered by the impact map. The impact map also reports related tests and
+`missing-related-tests` using Java file conventions. This is an alpha heuristic:
+it is meant to surface likely test gaps, not to prove test sufficiency.
 
 Built-in graph-aware Java profiles also require the alpha `architecture` check.
 It reads `.agents/graph/architecture.json` when present, otherwise uses default
@@ -139,6 +142,21 @@ implement_minimal_change
 graph_reimpact
 verify
 ```
+
+`safe-refactor-with-graph` uses the same graph index/impact flow, but its
+`graph_reimpact` evidence is stricter. It requires:
+
+```text
+post_change_impact_map
+impact_delta
+changed_files_covered
+```
+
+When `impact_delta` says the post-change impact expanded or widened, the impact
+check also requires explicit expansion risk evidence such as
+`impact_expansion_risk` or `risk_evidence`. General planning `risk_points` are
+not enough for this post-change claim. Missing reimpact evidence blocks
+`goal verify`.
 
 Per-action evidence fields use:
 

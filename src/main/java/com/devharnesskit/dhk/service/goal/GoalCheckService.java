@@ -31,6 +31,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -334,6 +335,7 @@ public final class GoalCheckService {
         Path snapshot = PathUtil.graphSnapshotJson(projectRoot);
         Path impact = PathUtil.graphImpactMap(projectRoot);
         List<String> failures = new ArrayList<String>();
+        List<GoalStep> steps = stepRepository.listByGoal(connection, goal.goalKey());
         StringBuilder output = new StringBuilder();
         output.append("graph_snapshot: ").append(snapshot).append('\n');
         output.append("impact_map: ").append(impact).append('\n');
@@ -371,14 +373,83 @@ public final class GoalCheckService {
                 failures.add("changed files not covered by impact map: " + uncovered
                         + "; next_command=" + commandForChangedFile(projectRoot, uncovered.get(0)));
             }
+            List<String> missingTests = sectionValues(impactText, "missing-related-tests");
+            output.append("missing_related_tests: ").append(missingTests).append('\n');
+            output.append("missing_related_tests_count: ").append(missingTests.size()).append('\n');
+            validateSafeRefactorReimpact(projectRoot, profile, steps, output, failures);
         }
 
         writeLog(log, output.toString());
         String status = failures.isEmpty() ? "passed" : "failed";
         String summary = failures.isEmpty()
                 ? "impact map fresh and covers changed files"
+                + (impactText.length() > 0
+                ? "; missing_related_tests=" + sectionValues(impactText, "missing-related-tests").size()
+                : "")
                 : "impact freshness failed: " + failures;
         return save(connection, projectRoot, goal, "impact", "impact", command, status, summary, log, now);
+    }
+
+    private void validateSafeRefactorReimpact(Path projectRoot, GoalProfile profile, List<GoalStep> steps,
+                                              StringBuilder output, List<String> failures) {
+        if (profile == null || !"safe-refactor-with-graph".equals(profile.profileKey())) {
+            return;
+        }
+        String postChangeImpact = evidenceValue(steps, "post_change_impact_map");
+        String impactDelta = evidenceValue(steps, "impact_delta");
+        String changedFilesCovered = evidenceValue(steps, "changed_files_covered");
+        String expansionRisk = firstNonEmpty(evidenceValue(steps, "impact_expansion_risk"),
+                evidenceValue(steps, "risk_evidence"));
+        output.append("safe_refactor_reimpact_required: true\n");
+        output.append("post_change_impact_map: ").append(postChangeImpact).append('\n');
+        output.append("impact_delta: ").append(impactDelta).append('\n');
+        output.append("changed_files_covered: ").append(changedFilesCovered).append('\n');
+        output.append("impact_expansion_risk: ").append(expansionRisk).append('\n');
+        if (!impactArtifactExists(projectRoot, postChangeImpact)) {
+            failures.add("safe-refactor reimpact missing or not exported: post_change_impact_map="
+                    + empty(postChangeImpact, "none"));
+        }
+        if (!acceptedCoverageEvidence(changedFilesCovered)) {
+            failures.add("safe-refactor changed files are not confirmed covered by reimpact: changed_files_covered="
+                    + empty(changedFilesCovered, "none"));
+        }
+        if (impactExpanded(impactDelta) && expansionRisk.length() == 0) {
+            failures.add("impact expansion risk evidence missing for safe-refactor: impact_delta="
+                    + empty(impactDelta, "none"));
+        }
+    }
+
+    private boolean impactArtifactExists(Path projectRoot, String pathText) {
+        if (pathText == null || pathText.trim().length() == 0) {
+            return false;
+        }
+        String text = pathText.trim();
+        if ("IMPACT_MAP.md".equals(text) || text.endsWith("/IMPACT_MAP.md")) {
+            return Files.isRegularFile(PathUtil.graphImpactMap(projectRoot));
+        }
+        return artifactExists(projectRoot, text);
+    }
+
+    private boolean acceptedCoverageEvidence(String value) {
+        String normalized = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+        return "yes".equals(normalized) || "true".equals(normalized) || "covered".equals(normalized)
+                || "passed".equals(normalized) || normalized.indexOf("covered") >= 0;
+    }
+
+    private boolean impactExpanded(String value) {
+        String normalized = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+        return normalized.indexOf("expanded") >= 0
+                || normalized.indexOf("increased") >= 0
+                || normalized.indexOf("newly_impacted") >= 0
+                || normalized.indexOf("new impacted") >= 0
+                || normalized.indexOf("wider") >= 0;
+    }
+
+    private String firstNonEmpty(String first, String second) {
+        if (first != null && first.length() > 0) {
+            return first;
+        }
+        return second == null ? "" : second;
     }
 
     private GoalCheck runLegacyCheck(Connection connection, Path projectRoot, GoalRun goal, GoalProfile profile,
@@ -717,6 +788,30 @@ public final class GoalCheckService {
         Pattern pattern = Pattern.compile("<" + Pattern.quote(tag) + ">([^<]+)</" + Pattern.quote(tag) + ">");
         Matcher matcher = pattern.matcher(text);
         return matcher.find() ? matcher.group(1).trim() : "";
+    }
+
+    private List<String> sectionValues(String text, String section) {
+        List<String> values = new ArrayList<String>();
+        if (text == null || text.length() == 0 || section == null || section.length() == 0) {
+            return values;
+        }
+        String start = "<" + section + ">";
+        String end = "</" + section + ">";
+        boolean inSection = false;
+        for (String line : text.split("\\r?\\n")) {
+            String trimmed = line.trim();
+            if (start.equals(trimmed)) {
+                inSection = true;
+                continue;
+            }
+            if (end.equals(trimmed)) {
+                break;
+            }
+            if (inSection && trimmed.startsWith("- ")) {
+                values.add(trimmed.substring(2).trim());
+            }
+        }
+        return values;
     }
 
     private String lineValue(String text, String prefix) {

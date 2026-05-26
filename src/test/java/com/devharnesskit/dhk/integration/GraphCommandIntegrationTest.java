@@ -284,6 +284,32 @@ final class GraphCommandIntegrationTest {
     }
 
     @Test
+    void graphImpactMarksMissingRelatedTestsForModernFixture() throws Exception {
+        Path fixture = copyFixture("modern-java-api", tempDir.resolve("modern-test-gap"));
+
+        Harness indexHarness = new Harness(tempDir);
+        int indexExit = new CommandRouter().run(new String[]{"graph", "index", "--project-root", "modern-test-gap"},
+                indexHarness.context());
+        Harness impactHarness = new Harness(tempDir);
+        int impactExit = new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", "modern-test-gap",
+                "--file", "src/main/java/com/acme/modern/account/service/AccountService.java",
+                "--depth", "4"
+        }, impactHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, indexExit);
+        assertEquals(ExitCodes.SUCCESS, impactExit);
+        assertTrue(impactHarness.stdout().contains("related_tests:"));
+        String impactMap = new String(Files.readAllBytes(PathUtil.graphImpactMap(fixture)), "UTF-8");
+        assertTrue(impactMap.contains("- missing_related_tests: 1"));
+        assertTrue(impactMap.contains("<missing-related-tests>"));
+        assertTrue(impactMap.contains("src/test/java/com/acme/modern/account/repository/AccountRepositoryTest.java"));
+        assertTrue(impactMap.contains("src/test/java/com/acme/modern/account/service/AccountServiceTest.java"));
+        assertFalse(impactMap.contains("src/test/java/com/acme/modern/account/repository/InMemoryAccountRepositoryTest.java"));
+        assertTrue(impactMap.contains("- missing_related_test_count: 1"));
+    }
+
+    @Test
     void graphImpactReturnsCandidateSuggestionsWhenSymbolIsMissing() throws Exception {
         Path fixture = copyFixture("legacy-mybatis-order", tempDir.resolve("legacy-candidates"));
 

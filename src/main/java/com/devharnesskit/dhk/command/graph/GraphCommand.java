@@ -13,6 +13,7 @@ public final class GraphCommand implements Command {
 
     public GraphCommand() {
         commands.put("init", new GraphInitCommand());
+        commands.put("doctor", new GraphDoctorCommand());
         commands.put("status", new GraphStatusCommand());
         commands.put("index", new GraphIndexCommand());
         commands.put("impact", new GraphImpactCommand());

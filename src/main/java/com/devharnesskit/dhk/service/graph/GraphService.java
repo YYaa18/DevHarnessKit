@@ -147,6 +147,7 @@ public final class GraphService {
     private String configHash(GraphConfig config) {
         StringBuilder builder = new StringBuilder();
         builder.append(config.provider()).append('\n')
+                .append(config.cgcCommand()).append('\n')
                 .append(config.include()).append('\n')
                 .append(config.exclude()).append('\n')
                 .append(config.maxFileBytes()).append('\n')

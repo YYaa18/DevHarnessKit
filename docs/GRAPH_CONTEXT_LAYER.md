@@ -32,6 +32,11 @@ Rules:
 Graph Lite is best-effort static indexing. It does not provide full AST parsing,
 type resolution, runtime call tracing, or security proof.
 
+`provider=cgc` is an optional alpha adapter contract. DevHarnessKit does not
+ship CGC and the default `provider=lite` path must continue to work when CGC is
+not installed. Use `dhk graph doctor` to check whether the configured CGC command
+is available before enabling the adapter.
+
 Sensitive and protected file content is not copied into graph exports. The
 scanner may record skipped metadata such as path, size, language, file kind, and
 skip reason so users can see what was omitted.

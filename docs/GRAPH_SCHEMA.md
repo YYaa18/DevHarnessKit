@@ -24,6 +24,7 @@ and cache files are ignored.
 
 ```bash
 dhk graph init --project-root <path>
+dhk graph doctor --project-root <path>
 dhk graph status --project-root <path>
 dhk graph index --project-root <path>
 dhk graph impact --file <path>|--symbol <name>|--sql-table <table> --project-root <path>
@@ -38,6 +39,12 @@ and edge rows into SQLite. Each index run creates a new snapshot; historical
 snapshots are not silently overwritten. `graph impact` reads the latest completed
 snapshot and writes `IMPACT_MAP.md` with related files, SQL nodes, tests, risk
 nodes, recommended reads, and scoring input counts.
+
+`graph doctor` checks the local graph configuration and reports optional
+provider availability. For the default `provider=lite`, CGC is reported as
+`not_required`. For `provider=cgc`, it probes the configured `cgc_command` with a
+short timeout and reports `available`, `unavailable`, or `timeout`; missing CGC
+does not affect Lite graph commands.
 
 `graph export` writes:
 
@@ -84,6 +91,7 @@ Key defaults:
 
 ```text
 provider: lite
+cgc_command: cgc
 max_file_bytes: 1048576
 max_indexed_files: 5000
 max_impact_depth: 3

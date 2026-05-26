@@ -35,6 +35,7 @@ public final class HelpCommand implements Command {
         context.out().println("  dhk goal status [--goal <goal-key>]");
         context.out().println("  dhk goal export [--goal <goal-key>]");
         context.out().println("  dhk graph init --project-root <path>");
+        context.out().println("  dhk graph doctor --project-root <path>");
         context.out().println("  dhk graph status --project-root <path>");
         context.out().println("  dhk graph index --project-root <path>");
         context.out().println("  dhk graph impact --file <path>|--symbol <name>|--sql-table <table> [--depth <n>]");

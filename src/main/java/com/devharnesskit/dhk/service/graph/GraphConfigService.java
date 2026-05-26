@@ -27,6 +27,7 @@ public final class GraphConfigService {
             GraphConfig defaults = GraphConfig.defaults();
             return new GraphConfig(
                     stringValue(text, "provider", defaults.provider()),
+                    stringValue(text, "cgc_command", defaults.cgcCommand()),
                     stringArray(text, "include", defaults.include()),
                     stringArray(text, "exclude", defaults.exclude()),
                     numberValue(text, "max_file_bytes", defaults.maxFileBytes()),
@@ -54,6 +55,7 @@ public final class GraphConfigService {
         builder.append("{\n");
         builder.append("  \"schema_version\": \"devharness-graph-config/v1-alpha\",\n");
         builder.append("  \"provider\": ").append(JsonOutput.quote(config.provider())).append(",\n");
+        builder.append("  \"cgc_command\": ").append(JsonOutput.quote(config.cgcCommand())).append(",\n");
         appendArray(builder, "include", config.include(), true);
         appendArray(builder, "exclude", config.exclude(), true);
         builder.append("  \"limits\": {\n");

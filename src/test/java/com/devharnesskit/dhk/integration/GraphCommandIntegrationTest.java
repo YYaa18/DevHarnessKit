@@ -86,6 +86,51 @@ final class GraphCommandIntegrationTest {
     }
 
     @Test
+    void graphDoctorReportsLiteProviderWithoutCgcRequirement() throws Exception {
+        Path root = tempDir.resolve("demo-doctor-lite");
+        Files.createDirectories(root);
+
+        Harness harness = new Harness(tempDir);
+        int exit = new CommandRouter().run(new String[]{
+                "graph", "doctor", "--project-root", "demo-doctor-lite", "--json"
+        }, harness.context());
+
+        assertEquals(ExitCodes.SUCCESS, exit);
+        assertTrue(harness.stdout().contains("\"command\": \"graph doctor\""));
+        assertTrue(harness.stdout().contains("\"config_source\": \"default\""));
+        assertTrue(harness.stdout().contains("\"provider\": \"lite\""));
+        assertTrue(harness.stdout().contains("\"cgc_required\": false"));
+        assertTrue(harness.stdout().contains("\"cgc_available\": false"));
+        assertTrue(harness.stdout().contains("\"cgc_status\": \"not_required\""));
+        assertTrue(harness.stdout().contains("\"default_provider_unaffected\": true"));
+    }
+
+    @Test
+    void graphDoctorReportsCgcUnavailableWhenConfigured() throws Exception {
+        Path root = tempDir.resolve("demo-doctor-cgc");
+        write(root, ".agents/graph/config.json",
+                "{\n"
+                        + "  \"schema_version\": \"devharness-graph-config/v1-alpha\",\n"
+                        + "  \"provider\": \"cgc\",\n"
+                        + "  \"cgc_command\": \"definitely-missing-cgc-command\"\n"
+                        + "}\n");
+
+        Harness harness = new Harness(tempDir);
+        int exit = new CommandRouter().run(new String[]{
+                "graph", "doctor", "--project-root", "demo-doctor-cgc", "--json"
+        }, harness.context());
+
+        assertEquals(ExitCodes.SUCCESS, exit);
+        assertTrue(harness.stdout().contains("\"config_source\": \"file\""));
+        assertTrue(harness.stdout().contains("\"provider\": \"cgc\""));
+        assertTrue(harness.stdout().contains("\"cgc_command\": \"definitely-missing-cgc-command\""));
+        assertTrue(harness.stdout().contains("\"cgc_required\": true"));
+        assertTrue(harness.stdout().contains("\"cgc_available\": false"));
+        assertTrue(harness.stdout().contains("\"cgc_status\": \"unavailable\""));
+        assertTrue(harness.stdout().contains("\"default_provider_unaffected\": false"));
+    }
+
+    @Test
     void graphReportsLimitsTruncationAndProtectedFileSkips() throws Exception {
         Path root = tempDir.resolve("demo-limits");
         write(root, "src/main/java/com/example/App.java",

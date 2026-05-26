@@ -23,8 +23,14 @@ public final class GoalProfileService {
         if ("java-api-change".equals(profileKey)) {
             return javaProfile(profileKey, "api-change", "api");
         }
+        if ("java-api-change-with-graph".equals(profileKey)) {
+            return javaProfile(profileKey, "api-change", "api", true);
+        }
         if ("java-mvc-change".equals(profileKey)) {
             return javaProfile(profileKey, "mvc-change", "mvc");
+        }
+        if ("java-mvc-change-with-graph".equals(profileKey)) {
+            return javaProfile(profileKey, "mvc-change", "mvc", true);
         }
         if ("bugfix".equals(profileKey)) {
             return new GoalProfile(profileKey, "systematic-debugging", false, "debug",
@@ -79,16 +85,37 @@ public final class GoalProfileService {
                     parseBoolean(value(raw, "strict_workflow_phase_order", "false")),
                     parseBoolean(value(raw, "spec_require_non_empty_tasks", Boolean.toString(specRequired))),
                     parseBoolean(value(raw, "spec_require_non_empty_acceptance", Boolean.toString(specRequired))),
-                    actionMappings(raw, actions), acceptanceMappings(raw));
+                    actionMappings(raw, actions), acceptanceMappings(raw),
+                    parseBoolean(value(raw, "graph_required", "false")),
+                    value(raw, "graph_provider", "lite"),
+                    parseBoolean(value(raw, "graph_require_fresh_snapshot", value(raw, "graph_required", "false"))),
+                    parseBoolean(value(raw, "graph_require_impact_map", value(raw, "graph_required", "false"))),
+                    parsePositiveInt(value(raw, "graph_max_staleness_minutes", "60"), 60),
+                    split(raw.get("graph_actions")));
         } catch (Exception ex) {
             return null;
         }
     }
 
     private GoalProfile javaProfile(String profileKey, String workflowKey, String defaultMode) {
-        String[] actions = new String[]{"inspect_existing_code", "create_change_plan",
+        return javaProfile(profileKey, workflowKey, defaultMode, false);
+    }
+
+    private GoalProfile javaProfile(String profileKey, String workflowKey, String defaultMode, boolean graphAware) {
+        String[] actions = graphAware
+                ? new String[]{"graph_index_or_refresh", "graph_impact_analysis", "inspect_existing_code",
+                "create_change_plan", "implement_minimal_change", "graph_reimpact", "verify"}
+                : new String[]{"inspect_existing_code", "create_change_plan",
                 "implement_minimal_change", "verify"};
         Map<String, String[]> evidence = new LinkedHashMap<String, String[]>();
+        if (graphAware) {
+            evidence.put("graph_index_or_refresh",
+                    new String[]{"graph_snapshot", "graph_context"});
+            evidence.put("graph_impact_analysis",
+                    new String[]{"impact_map", "impacted_files", "risk_nodes", "recommended_read_files"});
+            evidence.put("graph_reimpact",
+                    new String[]{"post_change_impact_map", "impact_delta", "changed_files_covered"});
+        }
         evidence.put("inspect_existing_code",
                 new String[]{"existing_controller", "existing_service", "existing_mapper", "existing_tests"});
         evidence.put("create_change_plan",
@@ -134,7 +161,10 @@ public final class GoalProfileService {
 
         return new GoalProfile(profileKey, workflowKey, true, defaultMode, actions, evidence,
                 new String[]{"compile", "test", "sensitive", "workflow", "spec"},
-                true, false, true, true, true, true, mappings, acceptances);
+                true, false, true, true, true, true, mappings, acceptances,
+                graphAware, "lite", true, true, 60,
+                graphAware ? new String[]{"graph_index_or_refresh", "graph_impact_analysis", "graph_reimpact"}
+                        : new String[0]);
     }
 
     private Map<String, String[]> requiredEvidence(Map<String, String> raw) {
@@ -219,6 +249,15 @@ public final class GoalProfileService {
     private boolean parseBoolean(String value) {
         String normalized = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
         return "true".equals(normalized) || "yes".equals(normalized) || "1".equals(normalized);
+    }
+
+    private int parsePositiveInt(String value, int defaultValue) {
+        try {
+            int parsed = Integer.parseInt(value == null ? "" : value.trim());
+            return parsed > 0 ? parsed : defaultValue;
+        } catch (NumberFormatException ex) {
+            return defaultValue;
+        }
     }
 
     private String[] split(String value) {

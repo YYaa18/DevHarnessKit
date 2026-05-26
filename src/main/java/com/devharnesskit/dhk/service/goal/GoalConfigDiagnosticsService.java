@@ -27,7 +27,9 @@ public final class GoalConfigDiagnosticsService {
     private static final Set<String> PROFILE_FIELDS = set("profile_key", "workflow_key", "requires_spec",
             "default_mode", "actions", "required_checks", "completion_require_fresh_checks",
             "completion_allow_skipped_checks", "completion_require_checkpoint", "strict_workflow_phase_order",
-            "spec_require_non_empty_tasks", "spec_require_non_empty_acceptance");
+            "spec_require_non_empty_tasks", "spec_require_non_empty_acceptance",
+            "graph_required", "graph_provider", "graph_require_fresh_snapshot",
+            "graph_require_impact_map", "graph_max_staleness_minutes", "graph_actions");
     private static final Set<String> POLICY_FIELDS = set("required_checks", "compile_command", "test_command",
             "fail_pending_hard_gates", "accepted_compile_statuses", "accepted_test_statuses",
             "accepted_sensitive_statuses", "accepted_spec_statuses", "accepted_workflow_statuses");
@@ -42,6 +44,7 @@ public final class GoalConfigDiagnosticsService {
     private static final Set<String> MAPPING_PASS_MODES = set("none", "step", "check");
     private static final Set<String> ACCEPTANCE_SOURCES = set("none", "manual", "checks");
     private static final Set<String> BUSINESS_ACCEPTANCE_SOURCES = set("checks", "test", "evidence", "manual");
+    private static final Set<String> GRAPH_PROVIDERS = set("lite", "cgc");
     private static final Set<String> BUILT_IN_WORKFLOW_KEYS = set("api-change", "mvc-change",
             "systematic-debugging", "safe-refactor", "sql-review", "code-review");
     private static final Map<String, Set<String>> BUILT_IN_WORKFLOW_PHASES = workflowPhases();
@@ -124,6 +127,7 @@ public final class GoalConfigDiagnosticsService {
         diagnoseCompletionBooleans(file, raw, diagnostics);
         diagnoseBoolean(file, raw, "strict_workflow_phase_order", diagnostics);
         diagnoseSpecBooleans(file, raw, diagnostics);
+        diagnoseGraphFields(file, raw, actions, diagnostics);
         diagnoseRequiredEvidence(file, raw, actions, diagnostics);
         diagnoseActionMappings(file, raw, workflowKey, actions, diagnostics);
         diagnoseAcceptanceMappings(file, raw, diagnostics);
@@ -183,6 +187,34 @@ public final class GoalConfigDiagnosticsService {
     private void diagnoseSpecBooleans(Path file, Map<String, String> raw, List<Diagnostic> diagnostics) {
         diagnoseBoolean(file, raw, "spec_require_non_empty_tasks", diagnostics);
         diagnoseBoolean(file, raw, "spec_require_non_empty_acceptance", diagnostics);
+    }
+
+    private void diagnoseGraphFields(Path file, Map<String, String> raw, Set<String> actions,
+                                     List<Diagnostic> diagnostics) {
+        diagnoseBoolean(file, raw, "graph_required", diagnostics);
+        diagnoseBoolean(file, raw, "graph_require_fresh_snapshot", diagnostics);
+        diagnoseBoolean(file, raw, "graph_require_impact_map", diagnostics);
+        if (raw.containsKey("graph_provider")) {
+            String provider = trim(raw.get("graph_provider"));
+            if (!GRAPH_PROVIDERS.contains(provider)) {
+                diagnostics.add(warning(file.toString(), "graph_provider should be one of: "
+                        + join(new ArrayList<String>(GRAPH_PROVIDERS))));
+            }
+        }
+        if (raw.containsKey("graph_max_staleness_minutes")
+                && !positiveInteger(trim(raw.get("graph_max_staleness_minutes")))) {
+            diagnostics.add(warning(file.toString(), "graph_max_staleness_minutes should be a positive integer"));
+        }
+        if (raw.containsKey("graph_actions")) {
+            diagnoseList(file, "graph_actions", raw.get("graph_actions"), ACTION_PATTERN, null,
+                    false, diagnostics);
+            for (String graphAction : splitSet(raw.get("graph_actions"))) {
+                if (!actions.contains(graphAction)) {
+                    diagnostics.add(warning(file.toString(),
+                            "graph_actions references action not listed in actions: " + graphAction));
+                }
+            }
+        }
     }
 
     private void diagnoseBoolean(Path file, Map<String, String> raw, String field,
@@ -504,6 +536,14 @@ public final class GoalConfigDiagnosticsService {
         String normalized = trim(value).toLowerCase(Locale.ROOT);
         return "true".equals(normalized) || "yes".equals(normalized) || "1".equals(normalized)
                 || "false".equals(normalized) || "no".equals(normalized) || "0".equals(normalized);
+    }
+
+    private boolean positiveInteger(String value) {
+        try {
+            return Integer.parseInt(value) > 0;
+        } catch (NumberFormatException ex) {
+            return false;
+        }
     }
 
     private String trim(String value) {

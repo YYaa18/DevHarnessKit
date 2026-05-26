@@ -110,6 +110,12 @@ final class MemoryInitDoctorIntegrationTest {
                 + "  \"actions\": \"inspect_existing_code,bad-action,verify,verify\",\n"
                 + "  \"required_checks\": \"compile,custom\",\n"
                 + "  \"completion_allow_skipped_checks\": \"maybe\",\n"
+                + "  \"graph_required\": \"sometimes\",\n"
+                + "  \"graph_provider\": \"unknown\",\n"
+                + "  \"graph_require_fresh_snapshot\": \"maybe\",\n"
+                + "  \"graph_require_impact_map\": \"nah\",\n"
+                + "  \"graph_max_staleness_minutes\": \"0\",\n"
+                + "  \"graph_actions\": \"graph_index_or_refresh,bad-action\",\n"
                 + "  \"required_evidence.verify\": \"compile_result,,sensitive_result\",\n"
                 + "  \"required_evidence.ghost\": \"ghost_evidence\",\n"
                 + "  \"unexpected\": \"value\"\n"
@@ -148,6 +154,13 @@ final class MemoryInitDoctorIntegrationTest {
         assertTrue(doctorHarness.stderr().contains("actions contains duplicate item: verify"));
         assertTrue(doctorHarness.stderr().contains("required_checks contains unsupported item: custom"));
         assertTrue(doctorHarness.stderr().contains("completion_allow_skipped_checks should be true/false"));
+        assertTrue(doctorHarness.stderr().contains("graph_required should be true/false"));
+        assertTrue(doctorHarness.stderr().contains("graph_provider should be one of"));
+        assertTrue(doctorHarness.stderr().contains("graph_require_fresh_snapshot should be true/false"));
+        assertTrue(doctorHarness.stderr().contains("graph_require_impact_map should be true/false"));
+        assertTrue(doctorHarness.stderr().contains("graph_max_staleness_minutes should be a positive integer"));
+        assertTrue(doctorHarness.stderr().contains("graph_actions contains invalid item: bad-action"));
+        assertTrue(doctorHarness.stderr().contains("graph_actions references action not listed in actions: graph_index_or_refresh"));
         assertTrue(doctorHarness.stderr().contains("required_evidence.verify contains an empty item"));
         assertTrue(doctorHarness.stderr().contains("required_evidence.ghost references action not listed in actions"));
         assertTrue(doctorHarness.stderr().contains("mapping.verify.workflow_phase references unknown workflow phase: missing_phase"));
@@ -190,6 +203,12 @@ final class MemoryInitDoctorIntegrationTest {
                 + "  \"completion_allow_skipped_checks\": \"false\",\n"
                 + "  \"completion_require_checkpoint\": \"true\",\n"
                 + "  \"strict_workflow_phase_order\": \"true\",\n"
+                + "  \"graph_required\": \"true\",\n"
+                + "  \"graph_provider\": \"lite\",\n"
+                + "  \"graph_require_fresh_snapshot\": \"true\",\n"
+                + "  \"graph_require_impact_map\": \"true\",\n"
+                + "  \"graph_max_staleness_minutes\": \"60\",\n"
+                + "  \"graph_actions\": \"inspect_existing_code\",\n"
                 + "  \"required_evidence.inspect_existing_code\": \"existing_controller,existing_service,existing_mapper,existing_tests\",\n"
                 + "  \"required_evidence.create_change_plan\": \"impacted_files,risk_points,verification_plan\",\n"
                 + "  \"mapping.inspect_existing_code.workflow_phase\": \"inspect_existing_code\",\n"

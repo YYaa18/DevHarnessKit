@@ -1757,6 +1757,34 @@ final class GoalIntegrationTest {
     }
 
     @Test
+    void builtInGraphAwareJavaProfileStartsWithGraphActionContract() throws Exception {
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "java-api-change-with-graph",
+                "--task", "Graph aware API change",
+                "--module", "order"
+        }, start.context());
+
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        assertTrue(start.stdout().contains("profile: java-api-change-with-graph"));
+        assertTrue(start.stdout().contains("current_action: graph_index_or_refresh"));
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        Harness next = new Harness(tempDir);
+        int nextExit = new CommandRouter().run(new String[]{
+                "goal", "next", "--project-root", "demo", "--goal", goalKey
+        }, next.context());
+
+        assertEquals(ExitCodes.SUCCESS, nextExit);
+        assertTrue(next.stdout().contains("current_action: graph_index_or_refresh"));
+        assertTrue(next.stdout().contains("graph_snapshot"));
+        assertTrue(next.stdout().contains("graph_context"));
+        assertFalse(next.stdout().contains("current_action: inspect_existing_code"));
+    }
+
+    @Test
     void goalUsesConfiguredProfileCheckPolicyAndJsonOutput() throws Exception {
         Path root = tempDir.resolve("demo");
         Files.createDirectories(PathUtil.goalProfilesDirectory(root));

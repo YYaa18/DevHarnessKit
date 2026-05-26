@@ -20,6 +20,12 @@ public final class GoalProfile {
     private final boolean specRequireNonEmptyAcceptance;
     private final Map<String, GoalActionMapping> actionMappings;
     private final Map<String, GoalAcceptanceMapping> acceptanceMappings;
+    private final boolean graphRequired;
+    private final String graphProvider;
+    private final boolean graphRequireFreshSnapshot;
+    private final boolean graphRequireImpactMap;
+    private final int graphMaxStalenessMinutes;
+    private final String[] graphActions;
 
     public GoalProfile(String profileKey, String workflowKey, boolean specRequired,
                        String defaultMode, String[] actions) {
@@ -91,6 +97,31 @@ public final class GoalProfile {
                        boolean specRequireNonEmptyAcceptance,
                        Map<String, GoalActionMapping> actionMappings,
                        Map<String, GoalAcceptanceMapping> acceptanceMappings) {
+        this(profileKey, workflowKey, specRequired, defaultMode, actions, requiredEvidenceByAction,
+                requiredChecks, completionRequireFreshChecks, completionAllowSkippedChecks,
+                completionRequireCheckpoint, strictWorkflowPhaseOrder, specRequireNonEmptyTasks,
+                specRequireNonEmptyAcceptance, actionMappings, acceptanceMappings, false, "lite",
+                true, true, 60, new String[0]);
+    }
+
+    public GoalProfile(String profileKey, String workflowKey, boolean specRequired,
+                       String defaultMode, String[] actions,
+                       Map<String, String[]> requiredEvidenceByAction,
+                       String[] requiredChecks,
+                       boolean completionRequireFreshChecks,
+                       boolean completionAllowSkippedChecks,
+                       boolean completionRequireCheckpoint,
+                       boolean strictWorkflowPhaseOrder,
+                       boolean specRequireNonEmptyTasks,
+                       boolean specRequireNonEmptyAcceptance,
+                       Map<String, GoalActionMapping> actionMappings,
+                       Map<String, GoalAcceptanceMapping> acceptanceMappings,
+                       boolean graphRequired,
+                       String graphProvider,
+                       boolean graphRequireFreshSnapshot,
+                       boolean graphRequireImpactMap,
+                       int graphMaxStalenessMinutes,
+                       String[] graphActions) {
         this.profileKey = profileKey;
         this.workflowKey = workflowKey;
         this.specRequired = specRequired;
@@ -106,6 +137,12 @@ public final class GoalProfile {
         this.specRequireNonEmptyAcceptance = specRequireNonEmptyAcceptance;
         this.actionMappings = copyMappings(actionMappings);
         this.acceptanceMappings = copyAcceptanceMappings(acceptanceMappings);
+        this.graphRequired = graphRequired;
+        this.graphProvider = graphProvider == null || graphProvider.trim().length() == 0 ? "lite" : graphProvider.trim();
+        this.graphRequireFreshSnapshot = graphRequireFreshSnapshot;
+        this.graphRequireImpactMap = graphRequireImpactMap;
+        this.graphMaxStalenessMinutes = graphMaxStalenessMinutes <= 0 ? 60 : graphMaxStalenessMinutes;
+        this.graphActions = graphActions == null ? new String[0] : graphActions;
     }
 
     public String profileKey() { return profileKey; }
@@ -120,6 +157,12 @@ public final class GoalProfile {
     public boolean strictWorkflowPhaseOrder() { return strictWorkflowPhaseOrder; }
     public boolean specRequireNonEmptyTasks() { return specRequireNonEmptyTasks; }
     public boolean specRequireNonEmptyAcceptance() { return specRequireNonEmptyAcceptance; }
+    public boolean graphRequired() { return graphRequired; }
+    public String graphProvider() { return graphProvider; }
+    public boolean graphRequireFreshSnapshot() { return graphRequireFreshSnapshot; }
+    public boolean graphRequireImpactMap() { return graphRequireImpactMap; }
+    public int graphMaxStalenessMinutes() { return graphMaxStalenessMinutes; }
+    public String[] graphActions() { return graphActions; }
 
     public String[] requiredEvidence(String actionKey) {
         String[] evidence = requiredEvidenceByAction.get(actionKey);

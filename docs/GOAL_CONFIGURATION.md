@@ -87,6 +87,31 @@ Supported profile fields:
 | `strict_workflow_phase_order` | If true, mapped phases are not marked passed while earlier workflow phases are still incomplete. |
 | `spec_require_non_empty_tasks` | If true and `requires_spec` is true, the spec check fails when the spec has no tasks. Defaults to `requires_spec`. |
 | `spec_require_non_empty_acceptance` | If true and `requires_spec` is true, the spec check fails when the spec has no acceptance criteria. Defaults to `requires_spec`. |
+| `graph_required` | If true, the profile declares that graph snapshot and impact evidence are part of the goal protocol. AI-60 only records the policy; enforcement is handled by graph-aware goal checks. |
+| `graph_provider` | Graph provider key. Supported alpha values are `lite` and `cgc`; built-in graph-aware profiles default to `lite`. |
+| `graph_require_fresh_snapshot` | If true, graph-aware verification should require a fresh graph snapshot. Defaults to `graph_required`. |
+| `graph_require_impact_map` | If true, graph-aware verification should require `IMPACT_MAP.md`. Defaults to `graph_required`. |
+| `graph_max_staleness_minutes` | Positive integer staleness window for graph evidence. Defaults to `60`. |
+| `graph_actions` | Comma-separated action keys that are graph-specific and must also be present in `actions`. |
+
+Built-in graph-aware Java profiles are available as alpha profiles:
+
+```text
+java-api-change-with-graph
+java-mvc-change-with-graph
+```
+
+Their action sequence is:
+
+```text
+graph_index_or_refresh
+graph_impact_analysis
+inspect_existing_code
+create_change_plan
+implement_minimal_change
+graph_reimpact
+verify
+```
 
 Per-action evidence fields use:
 

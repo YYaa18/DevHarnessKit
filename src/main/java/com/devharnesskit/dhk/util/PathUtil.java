@@ -21,6 +21,7 @@ public final class PathUtil {
     public static final String PROJECT_INDEX = "PROJECT_INDEX.md";
     public static final String GRAPH_CONFIG_JSON = "config.json";
     public static final String GRAPH_INDEX_REPORT = "GRAPH_INDEX_REPORT.md";
+    public static final String IMPACT_MAP = "IMPACT_MAP.md";
     public static final String CURRENT_CONTEXT = "CURRENT_CONTEXT.md";
     public static final String RECOVERY_CONTEXT = "RECOVERY_CONTEXT.md";
     public static final String WORKFLOW_CONTEXT = "WORKFLOW_CONTEXT.md";
@@ -81,6 +82,10 @@ public final class PathUtil {
 
     public static Path graphIndexReport(Path projectRoot) {
         return graphExportsDirectory(projectRoot).resolve(GRAPH_INDEX_REPORT);
+    }
+
+    public static Path graphImpactMap(Path projectRoot) {
+        return graphExportsDirectory(projectRoot).resolve(IMPACT_MAP);
     }
 
     public static Path sensitivePolicy(Path projectRoot) {

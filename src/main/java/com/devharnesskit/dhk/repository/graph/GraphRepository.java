@@ -1,6 +1,7 @@
 package com.devharnesskit.dhk.repository.graph;
 
 import com.devharnesskit.dhk.model.graph.GraphConfig;
+import com.devharnesskit.dhk.model.graph.GraphData;
 import com.devharnesskit.dhk.model.graph.GraphEdge;
 import com.devharnesskit.dhk.model.graph.GraphFileEntry;
 import com.devharnesskit.dhk.model.graph.GraphNode;
@@ -13,7 +14,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 public final class GraphRepository {
@@ -51,6 +54,92 @@ public final class GraphRepository {
                 return resultSet.next() ? resultSet.getInt(1) : 0;
             }
         }
+    }
+
+    public GraphData loadGraphData(Connection connection, GraphSnapshot snapshot) throws SQLException {
+        return new GraphData(snapshot, listFiles(connection, snapshot.id()), listNodes(connection, snapshot.id()),
+                listEdges(connection, snapshot.id()));
+    }
+
+    private List<GraphFileEntry> listFiles(Connection connection, long snapshotId) throws SQLException {
+        List<GraphFileEntry> files = new ArrayList<GraphFileEntry>();
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT relative_path, file_kind, language, content_hash, size_bytes, indexed, skip_reason "
+                        + "FROM code_graph_file WHERE snapshot_id = ? ORDER BY relative_path")) {
+            statement.setLong(1, snapshotId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    files.add(new GraphFileEntry(
+                            resultSet.getString("relative_path"),
+                            resultSet.getString("language"),
+                            resultSet.getString("file_kind"),
+                            resultSet.getString("content_hash"),
+                            resultSet.getLong("size_bytes"),
+                            resultSet.getInt("indexed") != 0,
+                            resultSet.getString("skip_reason")
+                    ));
+                }
+            }
+        }
+        return files;
+    }
+
+    private List<GraphNode> listNodes(Connection connection, long snapshotId) throws SQLException {
+        List<GraphNode> nodes = new ArrayList<GraphNode>();
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT n.node_key, n.node_kind, n.name, n.qualified_name, n.start_line, n.end_line, "
+                        + "n.signature, n.metadata, f.relative_path, f.language "
+                        + "FROM code_graph_node n JOIN code_graph_file f ON n.file_id = f.id "
+                        + "WHERE n.snapshot_id = ? ORDER BY n.id")) {
+            statement.setLong(1, snapshotId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    Map<String, String> metadata = parseMetadata(resultSet.getString("metadata"));
+                    nodes.add(new GraphNode(
+                            resultSet.getString("node_key"),
+                            resultSet.getString("node_kind"),
+                            resultSet.getString("name"),
+                            resultSet.getString("qualified_name"),
+                            resultSet.getString("relative_path"),
+                            resultSet.getInt("start_line"),
+                            resultSet.getInt("end_line"),
+                            value(metadata.get("language"), resultSet.getString("language")),
+                            value(metadata.get("visibility"), ""),
+                            resultSet.getString("signature"),
+                            intValue(metadata.get("confidence"), 70),
+                            value(metadata.get("source"), "lite"),
+                            value(metadata.get("evidence"), "")
+                    ));
+                }
+            }
+        }
+        return nodes;
+    }
+
+    private List<GraphEdge> listEdges(Connection connection, long snapshotId) throws SQLException {
+        List<GraphEdge> edges = new ArrayList<GraphEdge>();
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT e.edge_kind, e.source_node_key, e.target_node_key, e.confidence, e.metadata, "
+                        + "COALESCE(f.relative_path, '') AS relative_path "
+                        + "FROM code_graph_edge e LEFT JOIN code_graph_file f ON e.file_id = f.id "
+                        + "WHERE e.snapshot_id = ? ORDER BY e.id")) {
+            statement.setLong(1, snapshotId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    Map<String, String> metadata = parseMetadata(resultSet.getString("metadata"));
+                    edges.add(new GraphEdge(
+                            resultSet.getString("edge_kind"),
+                            resultSet.getString("source_node_key"),
+                            resultSet.getString("target_node_key"),
+                            resultSet.getString("relative_path"),
+                            resultSet.getInt("confidence"),
+                            value(metadata.get("source"), "lite"),
+                            value(metadata.get("evidence"), "")
+                    ));
+                }
+            }
+        }
+        return edges;
     }
 
     private long insertSnapshot(Connection connection, String projectKey, String snapshotKey,
@@ -226,5 +315,25 @@ public final class GraphRepository {
         metadata.put("evidence", edge.evidence());
         metadata.put("created_at", createdAt);
         return JsonUtil.toObject(metadata);
+    }
+
+    private Map<String, String> parseMetadata(String metadata) {
+        try {
+            return JsonUtil.parseObject(metadata == null ? "" : metadata);
+        } catch (Exception ex) {
+            return new LinkedHashMap<String, String>();
+        }
+    }
+
+    private String value(String value, String fallback) {
+        return value == null || value.length() == 0 ? fallback : value;
+    }
+
+    private int intValue(String value, int fallback) {
+        try {
+            return value == null || value.length() == 0 ? fallback : Integer.parseInt(value);
+        } catch (NumberFormatException ex) {
+            return fallback;
+        }
     }
 }

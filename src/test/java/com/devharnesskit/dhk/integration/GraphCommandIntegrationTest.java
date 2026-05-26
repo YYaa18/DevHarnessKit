@@ -10,8 +10,13 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -115,10 +120,79 @@ final class GraphCommandIntegrationTest {
         assertTrue(countRowsWhere(root, "code_graph_edge", "edge_kind = 'reads'") > 0);
     }
 
+    @Test
+    void graphImpactCoversLegacyMybatisOrderSearchFlow() throws Exception {
+        Path fixture = copyFixture("legacy-mybatis-order", tempDir.resolve("legacy-impact"));
+
+        Harness indexHarness = new Harness(tempDir);
+        int indexExit = new CommandRouter().run(new String[]{"graph", "index", "--project-root", "legacy-impact"},
+                indexHarness.context());
+        Harness impactHarness = new Harness(tempDir);
+        int impactExit = new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", "legacy-impact", "--sql-table", "legacy_order", "--depth", "6"
+        }, impactHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, indexExit);
+        assertEquals(ExitCodes.SUCCESS, impactExit);
+        assertTrue(impactHarness.stdout().contains("graph impact"));
+        assertTrue(impactHarness.stdout().contains("related_tests:"));
+        String impactMap = new String(Files.readAllBytes(PathUtil.graphImpactMap(fixture)), "UTF-8");
+        assertTrue(impactMap.contains("src/main/java/com/acme/legacy/order/web/OrderController.java"));
+        assertTrue(impactMap.contains("src/main/java/com/acme/legacy/order/service/OrderService.java"));
+        assertTrue(impactMap.contains("src/main/java/com/acme/legacy/order/mapper/OrderMapper.java"));
+        assertTrue(impactMap.contains("src/main/resources/mybatis/OrderMapper.xml"));
+        assertTrue(impactMap.contains("src/main/java/com/acme/legacy/order/dto/OrderQuery.java"));
+        assertTrue(impactMap.contains("src/main/java/com/acme/legacy/order/dto/OrderRow.java"));
+        assertTrue(impactMap.contains("src/main/java/com/acme/legacy/order/dto/OrderView.java"));
+        assertTrue(impactMap.contains("src/test/java/com/acme/legacy/order/service/OrderServiceTest.java"));
+        assertTrue(impactMap.contains("confidence="));
+        assertTrue(impactMap.contains("source=lite"));
+        assertTrue(impactMap.contains("evidence="));
+        assertTrue(impactMap.contains("<scoring-data>"));
+    }
+
+    @Test
+    void graphImpactReturnsCandidateSuggestionsWhenSymbolIsMissing() throws Exception {
+        Path fixture = copyFixture("legacy-mybatis-order", tempDir.resolve("legacy-candidates"));
+
+        Harness indexHarness = new Harness(tempDir);
+        int indexExit = new CommandRouter().run(new String[]{"graph", "index", "--project-root", "legacy-candidates"},
+                indexHarness.context());
+        Harness impactHarness = new Harness(tempDir);
+        int impactExit = new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", "legacy-candidates", "--symbol", "OrderServiceCandidate"
+        }, impactHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, indexExit);
+        assertEquals(ExitCodes.NOT_FOUND, impactExit);
+        assertTrue(impactHarness.stderr().contains("candidate_suggestions"));
+        assertTrue(impactHarness.stderr().contains("OrderService"));
+        String impactMap = new String(Files.readAllBytes(PathUtil.graphImpactMap(fixture)), "UTF-8");
+        assertTrue(impactMap.contains("<candidate-suggestions>"));
+        assertTrue(impactMap.contains("OrderService"));
+    }
+
     private void write(Path root, String relativePath, String content) throws Exception {
         Path file = root.resolve(relativePath);
         Files.createDirectories(file.getParent());
         Files.write(file, content.getBytes("UTF-8"));
+    }
+
+    private Path copyFixture(String fixtureName, final Path target) throws Exception {
+        final Path source = Paths.get("testbeds/fixtures").resolve(fixtureName);
+        Files.walkFileTree(source, new SimpleFileVisitor<Path>() {
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws java.io.IOException {
+                Files.createDirectories(target.resolve(source.relativize(dir)));
+                return FileVisitResult.CONTINUE;
+            }
+
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws java.io.IOException {
+                Path relative = source.relativize(file);
+                Files.copy(file, target.resolve(relative), StandardCopyOption.REPLACE_EXISTING);
+                return FileVisitResult.CONTINUE;
+            }
+        });
+        return target;
     }
 
     private int countRows(Path root, String table) throws Exception {
@@ -153,6 +227,10 @@ final class GraphCommandIntegrationTest {
 
         String stdout() {
             return out.toString();
+        }
+
+        String stderr() {
+            return err.toString();
         }
     }
 

@@ -26,6 +26,7 @@ and cache files are ignored.
 dhk graph init --project-root <path>
 dhk graph status --project-root <path>
 dhk graph index --project-root <path>
+dhk graph impact --file <path>|--symbol <name>|--sql-table <table> --project-root <path>
 ```
 
 `graph init` creates `.agents/graph/config.json` and generated artifact
@@ -33,8 +34,9 @@ directories. `graph status` scans configured files, runs the built-in Lite
 parsers, and writes `GRAPH_INDEX_REPORT.md`. `graph index` runs the same scan
 and parser pipeline, then persists a completed snapshot, file rows, node rows,
 and edge rows into SQLite. Each index run creates a new snapshot; historical
-snapshots are not silently overwritten. Graph Lite does not yet produce impact
-maps.
+snapshots are not silently overwritten. `graph impact` reads the latest completed
+snapshot and writes `IMPACT_MAP.md` with related files, SQL nodes, tests, risk
+nodes, recommended reads, and scoring input counts.
 
 ## Default Config
 

@@ -11,11 +11,18 @@ public final class GraphScanReport {
     private final Path projectRoot;
     private final GraphConfig config;
     private final List<GraphFileEntry> entries;
+    private final GraphParseResult parseResult;
 
     public GraphScanReport(Path projectRoot, GraphConfig config, List<GraphFileEntry> entries) {
+        this(projectRoot, config, entries, GraphParseResult.empty());
+    }
+
+    public GraphScanReport(Path projectRoot, GraphConfig config, List<GraphFileEntry> entries,
+                           GraphParseResult parseResult) {
         this.projectRoot = projectRoot;
         this.config = config;
         this.entries = Collections.unmodifiableList(new ArrayList<GraphFileEntry>(entries));
+        this.parseResult = parseResult == null ? GraphParseResult.empty() : parseResult;
     }
 
     public Path projectRoot() {
@@ -28,6 +35,10 @@ public final class GraphScanReport {
 
     public List<GraphFileEntry> entries() {
         return entries;
+    }
+
+    public GraphParseResult parseResult() {
+        return parseResult;
     }
 
     public int filesConsidered() {

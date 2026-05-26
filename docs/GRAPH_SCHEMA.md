@@ -28,9 +28,9 @@ dhk graph status --project-root <path>
 ```
 
 `graph init` creates `.agents/graph/config.json` and generated artifact
-directories. `graph status` scans configured files and writes
-`GRAPH_INDEX_REPORT.md`. It does not yet write graph rows or produce impact
-maps.
+directories. `graph status` scans configured files, runs the built-in Lite
+parsers, and writes `GRAPH_INDEX_REPORT.md`. It does not yet persist graph rows
+or produce impact maps.
 
 ## Default Config
 
@@ -70,6 +70,30 @@ build/**
 
 Protected or sensitive file content should not be copied into graph exports.
 Implementations may record skipped metadata such as path, reason, and size.
+
+## Lite Parser Scope
+
+The built-in Lite parser is heuristic and source-bound. Every extracted node and
+edge includes `source=lite`, confidence, file path, line, and short evidence.
+
+Current extraction:
+
+```text
+Java:
+  package, import, class/interface/enum, method/test_case, annotation route,
+  simple method calls, constructor/type references, extends/implements
+
+XML/MyBatis:
+  mapper namespace, resultMap, select/insert/update/delete statement,
+  Java mapper mapping, table and column heuristics, XML parse errors
+
+properties:
+  config_key only; property values are never exported
+```
+
+Parse failures are report entries, not fatal index failures. Sensitive filenames
+are skipped by the scanner, and parser evidence must not include raw property
+values, SQL result data, tokens, passwords, or credentials.
 
 ## SQLite Version
 

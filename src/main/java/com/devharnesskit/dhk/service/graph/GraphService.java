@@ -3,6 +3,7 @@ package com.devharnesskit.dhk.service.graph;
 import com.devharnesskit.dhk.export.GraphIndexReportRenderer;
 import com.devharnesskit.dhk.model.graph.GraphConfig;
 import com.devharnesskit.dhk.model.graph.GraphInitResult;
+import com.devharnesskit.dhk.model.graph.GraphParseResult;
 import com.devharnesskit.dhk.model.graph.GraphScanReport;
 import com.devharnesskit.dhk.util.Clock;
 import com.devharnesskit.dhk.util.PathUtil;
@@ -14,15 +15,18 @@ import java.nio.file.Path;
 public final class GraphService {
     private final GraphConfigService configService;
     private final GraphFileScanner scanner;
+    private final GraphLiteParser parser;
     private final GraphIndexReportRenderer renderer;
 
     public GraphService() {
-        this(new GraphConfigService(), new GraphFileScanner(), new GraphIndexReportRenderer());
+        this(new GraphConfigService(), new GraphFileScanner(), new GraphLiteParser(), new GraphIndexReportRenderer());
     }
 
-    GraphService(GraphConfigService configService, GraphFileScanner scanner, GraphIndexReportRenderer renderer) {
+    GraphService(GraphConfigService configService, GraphFileScanner scanner, GraphLiteParser parser,
+                 GraphIndexReportRenderer renderer) {
         this.configService = configService;
         this.scanner = scanner;
+        this.parser = parser;
         this.renderer = renderer;
     }
 
@@ -34,7 +38,9 @@ public final class GraphService {
     public GraphScanReport status(Path projectRoot, Clock clock) throws IOException {
         PathUtil.createGraphDirectories(projectRoot);
         GraphConfig config = configService.load(projectRoot);
-        GraphScanReport report = scanner.scan(projectRoot, config);
+        GraphScanReport scanReport = scanner.scan(projectRoot, config);
+        GraphParseResult parseResult = parser.parse(projectRoot, scanReport.entries());
+        GraphScanReport report = new GraphScanReport(projectRoot, config, scanReport.entries(), parseResult);
         Files.write(PathUtil.graphIndexReport(projectRoot),
                 renderer.render(report, clock.now()).getBytes("UTF-8"));
         return report;

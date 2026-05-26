@@ -35,7 +35,10 @@ public final class GraphStatusCommand implements Command {
                         JsonOutput.stringField("report_path", reportPath.toString()),
                         JsonOutput.numberField("files_considered", report.filesConsidered()),
                         JsonOutput.numberField("indexed_files", report.indexedFiles()),
-                        JsonOutput.numberField("skipped_files", report.skippedFiles())
+                        JsonOutput.numberField("skipped_files", report.skippedFiles()),
+                        JsonOutput.numberField("graph_nodes", report.parseResult().nodes().size()),
+                        JsonOutput.numberField("graph_edges", report.parseResult().edges().size()),
+                        JsonOutput.numberField("parse_errors", report.parseResult().errors().size())
                 ));
             } else {
                 context.out().println("graph status");
@@ -44,6 +47,9 @@ public final class GraphStatusCommand implements Command {
                 context.out().println("files_considered: " + report.filesConsidered());
                 context.out().println("indexed_files: " + report.indexedFiles());
                 context.out().println("skipped_files: " + report.skippedFiles());
+                context.out().println("graph_nodes: " + report.parseResult().nodes().size());
+                context.out().println("graph_edges: " + report.parseResult().edges().size());
+                context.out().println("parse_errors: " + report.parseResult().errors().size());
             }
             return ExitCodes.SUCCESS;
         } catch (IOException | RuntimeException ex) {

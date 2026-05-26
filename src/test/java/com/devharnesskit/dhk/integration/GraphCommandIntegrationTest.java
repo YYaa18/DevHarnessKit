@@ -25,7 +25,8 @@ final class GraphCommandIntegrationTest {
     void graphInitAndStatusCreateConfigAndReport() throws Exception {
         Path root = tempDir.resolve("demo");
         write(root, "src/main/java/App.java", "class App {}\n");
-        write(root, "src/main/resources/mapper.xml", "<mapper />\n");
+        write(root, "src/main/resources/mybatis/Mapper.xml",
+                "<mapper namespace=\"com.example.Mapper\"><select id=\"findAll\">SELECT id FROM example_table</select></mapper>\n");
         write(root, "src/main/webapp/WEB-INF/view.jsp", "<html />\n");
         write(root, "src/main/resources/application.properties", "app=true\n");
         write(root, "src/main/resources/query.sql", "select 1\n");
@@ -47,11 +48,15 @@ final class GraphCommandIntegrationTest {
         assertTrue(initHarness.stdout().contains("graph init complete"));
         assertTrue(statusHarness.stdout().contains("indexed_files: 5"));
         assertTrue(statusHarness.stdout().contains("skipped_files: 1"));
+        assertTrue(statusHarness.stdout().contains("graph_nodes: "));
+        assertTrue(statusHarness.stdout().contains("graph_edges: "));
 
         String report = new String(Files.readAllBytes(PathUtil.graphIndexReport(root)), "UTF-8");
         assertTrue(report.contains("GRAPH_INDEX_REPORT"));
         assertTrue(report.contains("src/main/java/App.java"));
         assertTrue(report.contains("src/main/resources/secret.properties [sensitive_filename]"));
+        assertTrue(report.contains("sql_statement com.example.Mapper.findAll"));
+        assertTrue(report.contains("db_table example_table"));
     }
 
     @Test
@@ -67,6 +72,7 @@ final class GraphCommandIntegrationTest {
         assertEquals(ExitCodes.SUCCESS, exit);
         assertTrue(harness.stdout().contains("\"command\": \"graph status\""));
         assertTrue(harness.stdout().contains("\"indexed_files\": 1"));
+        assertTrue(harness.stdout().contains("\"graph_nodes\":"));
     }
 
     private void write(Path root, String relativePath, String content) throws Exception {

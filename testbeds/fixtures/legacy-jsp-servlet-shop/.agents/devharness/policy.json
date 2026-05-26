@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "protected_files": [
+    "src/main/resources/application-prod.properties",
+    "src/main/java/com/acme/legacy/shop/web/LegacyBaseServlet.java",
+    "src/main/webapp/WEB-INF/jsp/common/header.jsp"
+  ],
+  "manual_approval_required": [
+    "src/main/webapp/WEB-INF/web.xml"
+  ],
+  "command_allowlist": [
+    "mvn -q -f testbeds/fixtures/legacy-jsp-servlet-shop/pom.xml test"
+  ]
+}

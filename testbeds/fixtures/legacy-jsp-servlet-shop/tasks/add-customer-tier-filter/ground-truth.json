@@ -1,0 +1,131 @@
+{
+  "schema_version": "devharness-testbed-ground-truth/v1",
+  "task_id": "legacy-jsp-servlet-shop-001",
+  "fixture": "legacy-jsp-servlet-shop",
+  "project_type": "legacy-java-jsp-servlet",
+  "initial_commit": "",
+  "required_changed_files": [
+    "src/main/webapp/WEB-INF/jsp/shop/order-list.jsp",
+    "src/main/java/com/acme/legacy/shop/web/ShopOrderServlet.java",
+    "src/main/java/com/acme/legacy/shop/dto/ShopOrderQuery.java",
+    "src/main/java/com/acme/legacy/shop/dto/ShopOrderRow.java",
+    "src/main/java/com/acme/legacy/shop/dto/ShopOrderView.java",
+    "src/main/java/com/acme/legacy/shop/service/ShopOrderService.java",
+    "src/main/java/com/acme/legacy/shop/dao/JdbcShopOrderDao.java",
+    "src/main/resources/sql/shop-order-search.sql",
+    "src/test/java/com/acme/legacy/shop/service/ShopOrderServiceTest.java",
+    "src/test/java/com/acme/legacy/shop/web/ShopOrderServletTest.java"
+  ],
+  "allowed_changed_files": [
+    "tasks/add-customer-tier-filter/scorecard.md"
+  ],
+  "forbidden_changed_files": [
+    "src/main/resources/application-prod.properties",
+    "src/main/java/com/acme/legacy/shop/web/LegacyBaseServlet.java",
+    "src/main/webapp/WEB-INF/jsp/common/header.jsp"
+  ],
+  "expected_impact_points": [
+    {
+      "type": "jsp_form",
+      "name": "orderSearchForm",
+      "file": "src/main/webapp/WEB-INF/jsp/shop/order-list.jsp",
+      "reason": "User-facing search field"
+    },
+    {
+      "type": "url_mapping",
+      "name": "/shop/orders/search",
+      "file": "src/main/webapp/WEB-INF/web.xml",
+      "reason": "Route from JSP action to servlet"
+    },
+    {
+      "type": "java_class",
+      "name": "com.acme.legacy.shop.web.ShopOrderServlet",
+      "file": "src/main/java/com/acme/legacy/shop/web/ShopOrderServlet.java",
+      "reason": "Binds request parameter"
+    },
+    {
+      "type": "java_class",
+      "name": "com.acme.legacy.shop.service.ShopOrderService",
+      "file": "src/main/java/com/acme/legacy/shop/service/ShopOrderService.java",
+      "reason": "Maps row data to view data"
+    },
+    {
+      "type": "java_interface",
+      "name": "com.acme.legacy.shop.dao.ShopOrderDao",
+      "file": "src/main/java/com/acme/legacy/shop/dao/ShopOrderDao.java",
+      "reason": "DAO contract for search"
+    },
+    {
+      "type": "java_class",
+      "name": "com.acme.legacy.shop.dao.JdbcShopOrderDao",
+      "file": "src/main/java/com/acme/legacy/shop/dao/JdbcShopOrderDao.java",
+      "reason": "Legacy DAO filtering logic"
+    },
+    {
+      "type": "sql_column",
+      "name": "shop_customer.customer_tier",
+      "file": "src/main/resources/sql/shop-order-search.sql",
+      "reason": "New SQL filter and select metadata"
+    },
+    {
+      "type": "dto",
+      "name": "ShopOrderQuery",
+      "file": "src/main/java/com/acme/legacy/shop/dto/ShopOrderQuery.java",
+      "reason": "Search input field"
+    },
+    {
+      "type": "dto",
+      "name": "ShopOrderRow",
+      "file": "src/main/java/com/acme/legacy/shop/dto/ShopOrderRow.java",
+      "reason": "DAO row field"
+    },
+    {
+      "type": "view",
+      "name": "ShopOrderView",
+      "file": "src/main/java/com/acme/legacy/shop/dto/ShopOrderView.java",
+      "reason": "Display/output field"
+    },
+    {
+      "type": "test",
+      "name": "ShopOrderServiceTest",
+      "file": "src/test/java/com/acme/legacy/shop/service/ShopOrderServiceTest.java",
+      "reason": "Service regression coverage"
+    },
+    {
+      "type": "test",
+      "name": "ShopOrderServletTest",
+      "file": "src/test/java/com/acme/legacy/shop/web/ShopOrderServletTest.java",
+      "reason": "Servlet binding regression coverage"
+    }
+  ],
+  "expected_related_tests": [
+    "src/test/java/com/acme/legacy/shop/service/ShopOrderServiceTest.java",
+    "src/test/java/com/acme/legacy/shop/web/ShopOrderServletTest.java"
+  ],
+  "required_verification": [
+    {
+      "type": "command",
+      "command": "mvn -q -f testbeds/fixtures/legacy-jsp-servlet-shop/pom.xml test",
+      "required": true
+    }
+  ],
+  "manual_evidence_required": false,
+  "rollback_requirements": [
+    "Revert JSP, servlet binding, DTO, service, DAO, SQL resource, and test changes."
+  ],
+  "risk_points": [
+    "Adding the field only to JSP but not service/DAO creates a false UI-only change.",
+    "Changing shared header or base servlet is a protected-file violation.",
+    "Forgetting SQL resource metadata lowers impact recall."
+  ],
+  "scoring_notes": {
+    "impact_recall_denominator": 12,
+    "impact_precision_notes": "Do not count production properties or shared header as true positives.",
+    "hard_fail_conditions": [
+      "Fixture tests fail",
+      "application-prod.properties is modified",
+      "LegacyBaseServlet is modified",
+      "customerTier is added only in JSP"
+    ]
+  }
+}

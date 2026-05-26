@@ -394,6 +394,81 @@ final class GraphCommandIntegrationTest {
     }
 
     @Test
+    void graphImpactSuppressesModernDtoNeighborFalsePositives() throws Exception {
+        Path fixture = copyFixture("modern-java-api", tempDir.resolve("modern-dto-precision"));
+
+        Harness indexHarness = new Harness(tempDir);
+        int indexExit = new CommandRouter().run(new String[]{"graph", "index", "--project-root", "modern-dto-precision"},
+                indexHarness.context());
+        Harness impactHarness = new Harness(tempDir);
+        int impactExit = new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", "modern-dto-precision",
+                "--file", "src/main/java/com/acme/modern/account/dto/AccountResponse.java",
+                "--depth", "4"
+        }, impactHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, indexExit);
+        assertEquals(ExitCodes.SUCCESS, impactExit);
+        String impactMap = new String(Files.readAllBytes(PathUtil.graphImpactMap(fixture)), "UTF-8");
+        assertTrue(impactMap.contains("src/main/java/com/acme/modern/account/dto/AccountResponse.java"));
+        assertTrue(impactMap.contains("src/main/java/com/acme/modern/account/controller/AccountController.java"));
+        assertTrue(impactMap.contains("src/main/java/com/acme/modern/account/service/AccountService.java"));
+        assertFalse(impactMap.contains("src/main/java/com/acme/modern/account/dto/AccountUpdateRequest.java"));
+        assertFalse(impactMap.contains("src/test/java/com/acme/modern/account/repository/AccountRepositoryTest.java"));
+        assertTrue(impactMap.contains("- missing_related_tests: 0"));
+    }
+
+    @Test
+    void graphImpactNarrowsLegacyUtilitySymbol() throws Exception {
+        Path fixture = copyFixture("legacy-mybatis-order", tempDir.resolve("legacy-utility-precision"));
+
+        Harness indexHarness = new Harness(tempDir);
+        int indexExit = new CommandRouter().run(new String[]{"graph", "index", "--project-root", "legacy-utility-precision"},
+                indexHarness.context());
+        Harness impactHarness = new Harness(tempDir);
+        int impactExit = new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", "legacy-utility-precision",
+                "--symbol", "LegacyPageBounds", "--depth", "3"
+        }, impactHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, indexExit);
+        assertEquals(ExitCodes.SUCCESS, impactExit);
+        String impactMap = new String(Files.readAllBytes(PathUtil.graphImpactMap(fixture)), "UTF-8");
+        assertTrue(impactMap.contains("src/main/java/com/acme/legacy/order/util/LegacyPageBounds.java"));
+        assertTrue(impactMap.contains("src/main/java/com/acme/legacy/order/service/OrderService.java"));
+        assertTrue(impactMap.contains("src/test/java/com/acme/legacy/order/service/OrderServiceTest.java"));
+        assertFalse(impactMap.contains("src/main/resources/mybatis/OrderMapper.xml"));
+        assertFalse(impactMap.contains("src/main/java/com/acme/legacy/order/web/OrderController.java"));
+        assertTrue(impactMap.contains("- related_sql: 0"));
+    }
+
+    @Test
+    void graphImpactLinksMybatisDynamicParametersToSqlStatements() throws Exception {
+        Path fixture = copyFixture("legacy-mybatis-order", tempDir.resolve("legacy-dynamic-sql"));
+
+        Harness indexHarness = new Harness(tempDir);
+        int indexExit = new CommandRouter().run(new String[]{"graph", "index", "--project-root", "legacy-dynamic-sql"},
+                indexHarness.context());
+        Harness impactHarness = new Harness(tempDir);
+        int impactExit = new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", "legacy-dynamic-sql",
+                "--symbol", "paidOnly", "--depth", "3"
+        }, impactHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, indexExit);
+        assertEquals(ExitCodes.SUCCESS, impactExit);
+        String impactMap = new String(Files.readAllBytes(PathUtil.graphImpactMap(fixture)), "UTF-8");
+        assertTrue(impactMap.contains("sql_parameter com.acme.legacy.order.mapper.OrderMapper.findOrders#paidOnly"));
+        assertTrue(impactMap.contains("sql_statement com.acme.legacy.order.mapper.OrderMapper.findOrders"));
+        assertTrue(impactMap.contains("sql_statement com.acme.legacy.order.mapper.OrderMapper.countOrders"));
+        assertTrue(impactMap.contains("src/main/java/com/acme/legacy/order/mapper/InMemoryOrderMapper.java"));
+        assertTrue(impactMap.contains("src/main/resources/mybatis/OrderMapper.xml"));
+        assertTrue(impactMap.contains("src/test/java/com/acme/legacy/order/service/OrderServiceTest.java"));
+        assertFalse(impactMap.contains("src/main/java/com/acme/legacy/order/web/OrderController.java"));
+        assertFalse(impactMap.contains("src/main/java/com/acme/legacy/order/util/LegacyPageBounds.java"));
+    }
+
+    @Test
     void graphImpactReturnsCandidateSuggestionsWhenSymbolIsMissing() throws Exception {
         Path fixture = copyFixture("legacy-mybatis-order", tempDir.resolve("legacy-candidates"));
 

@@ -93,6 +93,35 @@ focus on:
 5. Keeping legacy graph profiles strict: rollback evidence, manual evidence
    where required, and protected-file confirmation must remain completion gates.
 
+## V0.5.5 Precision Follow-up
+
+The first precision fix keeps CGC out of the default path and tightens Graph
+Lite itself:
+
+```text
+symbol start nodes:
+  exclude package/import/reference-only nodes
+traversal:
+  do not follow imports
+  do not expand package contains edges
+  do not expand from test_case nodes
+legacy utility symbols:
+  keep direct utility file, direct caller file, and related tests only
+MyBatis dynamic SQL:
+  parse <if test="..."> parameters as sql_parameter nodes
+```
+
+Representative fixture checks after the change:
+
+| Query | Before related files | After related files | Recall note |
+| --- | ---: | ---: | --- |
+| `LegacyPageBounds` | 11 | 3 | Utility file, service caller, and service test are retained. |
+| `paidOnly` | 11 | 4 | DTO flag, in-memory mapper, mapper XML, and service test are retained. |
+| `legacy_order` table | 7 | 7 | Data-flow field-addition surface remains available. |
+
+This closes the largest legacy precision regression without weakening rollback,
+manual evidence, protected-file, or MyBatis SQL impact checks.
+
 ## Baseline Files
 
 Graph-aware result files are committed under:

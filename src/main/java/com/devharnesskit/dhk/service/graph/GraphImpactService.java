@@ -116,14 +116,21 @@ public final class GraphImpactService {
             addEdge(incoming, edge.targetNodeKey(), edge);
         }
 
-        Set<String> impactedKeys = traverse(startNodes, outgoing, incoming, request.depth());
+        Set<String> impactedKeys = traverse(startNodes, nodesByKey, outgoing, incoming, request.depth());
         List<GraphNode> impactedNodes = nodesForKeys(nodesByKey, impactedKeys);
-        List<GraphEdge> callers = directEdges(startNodes, incoming);
-        List<GraphEdge> callees = directEdges(startNodes, outgoing);
-        List<String> relatedFiles = expandLegacyDataFlowFiles(relatedFiles(impactedNodes), data.files());
+        List<GraphEdge> callers = directEdges(startNodes, incoming, nodesByKey, false);
+        List<GraphEdge> callees = directEdges(startNodes, outgoing, nodesByKey, true);
+        if (isUtilitySymbolQuery(request, startNodes)) {
+            impactedNodes = filterNodesByFiles(impactedNodes, utilityImpactFiles(startNodes, callers, nodesByKey));
+        } else if (isSqlParameterSymbolQuery(request, startNodes)) {
+            impactedNodes = filterNodesByFiles(impactedNodes, sqlParameterImpactFiles(startNodes, callers, nodesByKey));
+        }
+        List<String> relatedFiles = expandLegacyDataFlowFiles(relatedFiles(impactedNodes), data.files(),
+                request, startNodes, impactedNodes);
         List<String> tests = relatedTests(relatedFiles, data.files());
-        List<String> missingTests = missingRelatedTests(relatedFiles, data.files());
-        List<GraphNode> sql = filterNodes(impactedNodes, "xml_mapper", "sql_statement", "db_table", "db_column");
+        relatedFiles = includeRelatedTests(relatedFiles, tests);
+        List<String> missingTests = missingRelatedTests(relatedFiles, data.files(), request, startNodes);
+        List<GraphNode> sql = relatedSqlNodes(impactedNodes, request);
         List<GraphNode> risks = riskNodes(impactedNodes);
         List<String> recommended = recommendedReadFiles(relatedFiles);
 
@@ -137,7 +144,7 @@ public final class GraphImpactService {
         String query = normalize(request.query());
         for (GraphNode node : data.nodes()) {
             if ("file".equals(request.queryType())) {
-                if (normalize(node.relativePath()).equals(query)) {
+                if (normalize(node.relativePath()).equals(query) && isActionableStartNode(node)) {
                     matches.add(node);
                 }
             } else if ("sql-table".equals(request.queryType())) {
@@ -145,26 +152,43 @@ public final class GraphImpactService {
                     matches.add(node);
                 }
             } else if ("symbol".equals(request.queryType())) {
-                if (normalize(node.qualifiedName()).equals(query) || normalize(node.name()).equals(query)
-                        || normalize(node.nodeKey()).equals(query)) {
+                if (isActionableStartNode(node) && (normalize(node.qualifiedName()).equals(query)
+                        || normalize(node.name()).equals(query) || normalize(node.nodeKey()).equals(query))) {
                     matches.add(node);
                 }
             }
         }
         if (!matches.isEmpty() || !"symbol".equals(request.queryType())) {
+            if ("symbol".equals(request.queryType())) {
+                addPropertyAccessorMatches(matches, data.nodes(), query);
+            }
             return matches;
         }
         for (GraphNode node : data.nodes()) {
-            if (normalize(node.qualifiedName()).contains(query) || normalize(node.name()).contains(query)
-                    || normalize(node.nodeKey()).contains(query)) {
+            if (isActionableStartNode(node) && isPropertyAccessorMatch(node, query)) {
                 matches.add(node);
             }
         }
-        return matches;
+        if (!matches.isEmpty()) {
+            return matches;
+        }
+        List<GraphNode> productionMatches = new ArrayList<GraphNode>();
+        for (GraphNode node : data.nodes()) {
+            if (isActionableStartNode(node) && (normalize(node.qualifiedName()).contains(query)
+                    || normalize(node.name()).contains(query) || normalize(node.nodeKey()).contains(query))) {
+                if (!isTestNode(node)) {
+                    productionMatches.add(node);
+                } else {
+                    matches.add(node);
+                }
+            }
+        }
+        return productionMatches.isEmpty() ? matches : productionMatches;
     }
 
-    private Set<String> traverse(List<GraphNode> startNodes, Map<String, List<GraphEdge>> outgoing,
-                                 Map<String, List<GraphEdge>> incoming, int depth) {
+    private Set<String> traverse(List<GraphNode> startNodes, Map<String, GraphNode> nodesByKey,
+                                 Map<String, List<GraphEdge>> outgoing, Map<String, List<GraphEdge>> incoming,
+                                 int depth) {
         Set<String> visited = new LinkedHashSet<String>();
         Queue<Step> queue = new ArrayDeque<Step>();
         for (GraphNode node : startNodes) {
@@ -177,19 +201,27 @@ public final class GraphImpactService {
             if (step.depth >= maxDepth) {
                 continue;
             }
-            visitNeighbors(outgoing.get(step.nodeKey), visited, queue, step.depth + 1, true);
-            visitNeighbors(incoming.get(step.nodeKey), visited, queue, step.depth + 1, false);
+            GraphNode current = nodesByKey.get(step.nodeKey);
+            if (!shouldExpandNode(current)) {
+                continue;
+            }
+            visitNeighbors(outgoing.get(step.nodeKey), nodesByKey, current, visited, queue, step.depth + 1, true);
+            visitNeighbors(incoming.get(step.nodeKey), nodesByKey, current, visited, queue, step.depth + 1, false);
         }
         return visited;
     }
 
-    private void visitNeighbors(List<GraphEdge> edges, Set<String> visited, Queue<Step> queue,
-                                int nextDepth, boolean outgoing) {
+    private void visitNeighbors(List<GraphEdge> edges, Map<String, GraphNode> nodesByKey, GraphNode current,
+                                Set<String> visited, Queue<Step> queue, int nextDepth, boolean outgoing) {
         if (edges == null) {
             return;
         }
         for (GraphEdge edge : edges) {
             String neighbor = outgoing ? edge.targetNodeKey() : edge.sourceNodeKey();
+            GraphNode neighborNode = nodesByKey.get(neighbor);
+            if (!shouldTraverseEdge(edge, current, neighborNode)) {
+                continue;
+            }
             if (visited.add(neighbor)) {
                 queue.add(new Step(neighbor, nextDepth));
             }
@@ -238,12 +270,18 @@ public final class GraphImpactService {
         return nodes;
     }
 
-    private List<GraphEdge> directEdges(List<GraphNode> nodes, Map<String, List<GraphEdge>> edgeMap) {
+    private List<GraphEdge> directEdges(List<GraphNode> nodes, Map<String, List<GraphEdge>> edgeMap,
+                                        Map<String, GraphNode> nodesByKey, boolean outgoing) {
         List<GraphEdge> result = new ArrayList<GraphEdge>();
         for (GraphNode node : nodes) {
             List<GraphEdge> edges = edgeMap.get(node.nodeKey());
             if (edges != null) {
-                result.addAll(edges);
+                for (GraphEdge edge : edges) {
+                    String neighbor = outgoing ? edge.targetNodeKey() : edge.sourceNodeKey();
+                    if (shouldTraverseEdge(edge, node, nodesByKey.get(neighbor))) {
+                        result.add(edge);
+                    }
+                }
             }
         }
         return result;
@@ -279,16 +317,28 @@ public final class GraphImpactService {
         return sorted;
     }
 
-    private List<String> missingRelatedTests(List<String> relatedFiles, List<GraphFileEntry> files) {
+    private List<String> missingRelatedTests(List<String> relatedFiles, List<GraphFileEntry> files,
+                                             GraphImpactRequest request, List<GraphNode> startNodes) {
         Set<String> indexedFiles = indexedFiles(files);
         Set<String> missing = new LinkedHashSet<String>();
         for (String file : relatedFiles) {
             String expected = expectedTestPath(file);
             if (expected.length() > 0 && !indexedFiles.contains(expected)) {
+                if (isRepositoryFile(file) && !isRepositoryTestGapRelevant(request, startNodes)) {
+                    continue;
+                }
                 missing.add(expected);
             }
         }
         List<String> sorted = new ArrayList<String>(missing);
+        Collections.sort(sorted);
+        return sorted;
+    }
+
+    private List<String> includeRelatedTests(List<String> relatedFiles, List<String> tests) {
+        Set<String> values = new LinkedHashSet<String>(relatedFiles);
+        values.addAll(tests);
+        List<String> sorted = new ArrayList<String>(values);
         Collections.sort(sorted);
         return sorted;
     }
@@ -319,7 +369,14 @@ public final class GraphImpactService {
         return "src/test/java/" + withoutPrefix + "Test.java";
     }
 
-    private List<String> expandLegacyDataFlowFiles(List<String> relatedFiles, List<GraphFileEntry> files) {
+    private List<String> expandLegacyDataFlowFiles(List<String> relatedFiles, List<GraphFileEntry> files,
+                                                   GraphImpactRequest request, List<GraphNode> startNodes,
+                                                   List<GraphNode> impactedNodes) {
+        if (!isLegacyProject(files) || isUtilitySymbolQuery(request, startNodes)
+                || isSqlParameterSymbolQuery(request, startNodes)
+                || !isLegacyDataFlowImpact(request, startNodes, impactedNodes)) {
+            return relatedFiles;
+        }
         boolean dataFlow = false;
         for (String file : relatedFiles) {
             if (file.contains("/service/") || file.contains("/mapper/") || file.contains("/mybatis/")
@@ -342,6 +399,197 @@ public final class GraphImpactService {
         return sorted;
     }
 
+    private boolean isActionableStartNode(GraphNode node) {
+        if (node == null) {
+            return false;
+        }
+        String kind = node.nodeKind();
+        return !("package".equals(kind) || "import".equals(kind) || "annotation".equals(kind)
+                || "type_reference".equals(kind) || "method_reference".equals(kind)
+                || "reference".equals(kind));
+    }
+
+    private boolean isPropertyAccessorMatch(GraphNode node, String query) {
+        if (!"method".equals(node.nodeKind()) && !"test_case".equals(node.nodeKind())) {
+            return false;
+        }
+        String name = normalize(node.name());
+        String normalizedQuery = normalize(query);
+        return name.equals("get" + normalizedQuery) || name.equals("set" + normalizedQuery)
+                || name.equals("is" + normalizedQuery);
+    }
+
+    private void addPropertyAccessorMatches(List<GraphNode> matches, List<GraphNode> nodes, String query) {
+        for (GraphNode node : nodes) {
+            if (isActionableStartNode(node) && isPropertyAccessorMatch(node, query) && !containsNode(matches, node)) {
+                matches.add(node);
+            }
+        }
+    }
+
+    private boolean containsNode(List<GraphNode> nodes, GraphNode candidate) {
+        for (GraphNode node : nodes) {
+            if (node.nodeKey().equals(candidate.nodeKey())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean shouldExpandNode(GraphNode node) {
+        if (node == null) {
+            return false;
+        }
+        String kind = node.nodeKind();
+        return !("package".equals(kind) || "import".equals(kind) || "annotation".equals(kind)
+                || "reference".equals(kind) || "type_reference".equals(kind)
+                || "method_reference".equals(kind) || "test_case".equals(kind));
+    }
+
+    private boolean shouldTraverseEdge(GraphEdge edge, GraphNode current, GraphNode neighbor) {
+        if (edge == null) {
+            return false;
+        }
+        if ("imports".equals(edge.edgeKind())) {
+            return false;
+        }
+        if (isExternalJavaKey(edge.sourceNodeKey()) || isExternalJavaKey(edge.targetNodeKey())) {
+            return false;
+        }
+        if ("contains".equals(edge.edgeKind()) && current != null && "package".equals(current.nodeKind())) {
+            return false;
+        }
+        if (neighbor == null) {
+            return true;
+        }
+        String kind = neighbor.nodeKind();
+        return !("package".equals(kind) || "import".equals(kind) || "annotation".equals(kind)
+                || "reference".equals(kind) || "type_reference".equals(kind)
+                || "method_reference".equals(kind));
+    }
+
+    private boolean isExternalJavaKey(String key) {
+        return key != null && (key.startsWith("java_import:java.") || key.startsWith("java_type:java.")
+                || key.startsWith("java_method:java."));
+    }
+
+    private boolean isTestNode(GraphNode node) {
+        return node != null && ("test_case".equals(node.nodeKind())
+                || node.relativePath().startsWith("src/test/"));
+    }
+
+    private boolean isUtilitySymbolQuery(GraphImpactRequest request, List<GraphNode> startNodes) {
+        if (!"symbol".equals(request.queryType())) {
+            return false;
+        }
+        for (GraphNode node : startNodes) {
+            if (node.relativePath().contains("/util/") || node.relativePath().contains("/helper/")
+                    || node.relativePath().contains("/support/")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isSqlParameterSymbolQuery(GraphImpactRequest request, List<GraphNode> startNodes) {
+        if (!"symbol".equals(request.queryType())) {
+            return false;
+        }
+        for (GraphNode node : startNodes) {
+            if ("sql_parameter".equals(node.nodeKind())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Set<String> utilityImpactFiles(List<GraphNode> startNodes, List<GraphEdge> directCallers,
+                                           Map<String, GraphNode> nodesByKey) {
+        return directImpactFiles(startNodes, directCallers, nodesByKey);
+    }
+
+    private Set<String> sqlParameterImpactFiles(List<GraphNode> startNodes, List<GraphEdge> directCallers,
+                                                Map<String, GraphNode> nodesByKey) {
+        return directImpactFiles(startNodes, directCallers, nodesByKey);
+    }
+
+    private Set<String> directImpactFiles(List<GraphNode> startNodes, List<GraphEdge> directCallers,
+                                          Map<String, GraphNode> nodesByKey) {
+        Set<String> files = new LinkedHashSet<String>();
+        for (GraphNode node : startNodes) {
+            addFile(files, node.relativePath());
+        }
+        for (GraphEdge edge : directCallers) {
+            GraphNode caller = nodesByKey.get(edge.sourceNodeKey());
+            if (caller != null) {
+                addFile(files, caller.relativePath());
+            }
+        }
+        return files;
+    }
+
+    private List<GraphNode> filterNodesByFiles(List<GraphNode> nodes, Set<String> files) {
+        List<GraphNode> result = new ArrayList<GraphNode>();
+        for (GraphNode node : nodes) {
+            if (files.contains(node.relativePath())) {
+                result.add(node);
+            }
+        }
+        return result;
+    }
+
+    private void addFile(Set<String> files, String file) {
+        if (file != null && file.length() > 0) {
+            files.add(file);
+        }
+    }
+
+    private boolean isLegacyProject(List<GraphFileEntry> files) {
+        for (GraphFileEntry file : files) {
+            String path = file.relativePath();
+            if (path.startsWith("src/main/webapp/") || path.contains("/mybatis/")
+                    || path.contains("/mapper/") || path.endsWith("web.xml")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isLegacyDataFlowImpact(GraphImpactRequest request, List<GraphNode> startNodes,
+                                           List<GraphNode> impactedNodes) {
+        if ("sql-table".equals(request.queryType())) {
+            return true;
+        }
+        for (GraphNode node : startNodes) {
+            if (node.relativePath().contains("/mapper/") || node.relativePath().contains("/mybatis/")) {
+                return true;
+            }
+        }
+        for (GraphNode node : impactedNodes) {
+            if ("sql_statement".equals(node.nodeKind()) || "xml_mapper".equals(node.nodeKind())
+                    || "db_table".equals(node.nodeKind())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isRepositoryFile(String file) {
+        return file != null && file.contains("/repository/") && file.endsWith(".java");
+    }
+
+    private boolean isRepositoryTestGapRelevant(GraphImpactRequest request, List<GraphNode> startNodes) {
+        if ("file".equals(request.queryType())) {
+            return request.query().contains("/service/") || request.query().contains("/repository/");
+        }
+        for (GraphNode node : startNodes) {
+            if (node.relativePath().contains("/service/") || node.relativePath().contains("/repository/")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private List<GraphNode> filterNodes(List<GraphNode> nodes, String... kinds) {
         Set<String> wanted = new LinkedHashSet<String>();
         Collections.addAll(wanted, kinds);
@@ -354,12 +602,26 @@ public final class GraphImpactService {
         return result;
     }
 
+    private List<GraphNode> relatedSqlNodes(List<GraphNode> nodes, GraphImpactRequest request) {
+        List<GraphNode> result = new ArrayList<GraphNode>();
+        String query = normalize(request.query());
+        for (GraphNode node : nodes) {
+            if ("xml_mapper".equals(node.nodeKind()) || "sql_statement".equals(node.nodeKind())
+                    || "db_table".equals(node.nodeKind())) {
+                result.add(node);
+            } else if ("sql_parameter".equals(node.nodeKind())
+                    && (!"symbol".equals(request.queryType()) || normalize(node.name()).equals(query))) {
+                result.add(node);
+            }
+        }
+        return result;
+    }
+
     private List<GraphNode> riskNodes(List<GraphNode> nodes) {
         List<GraphNode> result = new ArrayList<GraphNode>();
         for (GraphNode node : nodes) {
             if ("route".equals(node.nodeKind()) || "sql_statement".equals(node.nodeKind())
-                    || "db_table".equals(node.nodeKind()) || "db_column".equals(node.nodeKind())
-                    || "xml_mapper".equals(node.nodeKind())) {
+                    || "db_table".equals(node.nodeKind()) || "xml_mapper".equals(node.nodeKind())) {
                 result.add(node);
             }
         }

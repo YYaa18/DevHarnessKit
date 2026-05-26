@@ -43,14 +43,41 @@ impact_precision_avg_graph_aware: 0.61
 
 ## False Positives / Limitations
 
-1. The risk-rating task currently reports `AccountRepositoryTest` as a possible
-   gap even though the task primarily needs response mapping coverage.
-2. Impact traversal is broad around account DTO/domain/audit neighbors, so
+1. The risk-rating task no longer reports `AccountRepositoryTest` as a missing
+   test gap when the query starts from `AccountResponse`.
+2. Impact traversal is still broad around account domain/repository neighbors, so
    precision is lower than Goal-only manual reasoning.
 3. Public API impact is inferred from controller files and route nodes; it is
    not yet a semantic OpenAPI contract diff.
 4. Graph Lite remains import/path heuristic; it is not full Java type
    resolution.
+
+## V0.5.5 Precision Follow-up
+
+The first precision fix keeps CGC as a reference-only optional provider and
+tightens Graph Lite:
+
+```text
+file/symbol starts:
+  ignore package/import/type_reference/reference nodes
+traversal:
+  skip imports and package fanout
+  skip external java.* bridge nodes
+  stop test_case fanout
+test gaps:
+  only report repository test gaps when the query starts from service/repository
+```
+
+Representative fixture checks after the change:
+
+| Query | Before related files | After related files | Result |
+| --- | ---: | ---: | --- |
+| `AccountResponse` DTO | 10 | 7 | Removes `AccountUpdateRequest` and the false `AccountRepositoryTest` gap. |
+| `AccountService` service | 8 | 8 | Keeps repository test-gap detection for service-level change. |
+
+The modern precision issue is improved but not fully closed. The next remaining
+work is route-level public API impact scoring and more semantic repository
+implementation filtering.
 
 ## Decision
 

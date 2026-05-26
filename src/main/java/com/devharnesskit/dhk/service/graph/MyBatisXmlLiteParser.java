@@ -52,6 +52,8 @@ final class MyBatisXmlLiteParser implements GraphSourceParser {
     private static final Pattern TABLE_INSERT = Pattern.compile("(?i)\\binsert\\s+into\\s+([A-Za-z_][\\w.]*)");
     private static final Pattern COLUMN_ATTR = Pattern.compile("column\\s*=\\s*(['\"])([A-Za-z_][\\w.]*)\\1", Pattern.CASE_INSENSITIVE);
     private static final Pattern QUALIFIED_COLUMN = Pattern.compile("\\b[A-Za-z_][\\w]*\\.([A-Za-z_][\\w]*)\\b");
+    private static final Pattern TEST_ATTR = Pattern.compile("\\btest\\s*=\\s*(['\"])(.*?)\\1", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TEST_IDENTIFIER = Pattern.compile("\\b([A-Za-z_][\\w]*)\\b");
 
     public boolean supports(GraphFileEntry entry) {
         return "xml".equals(entry.language());
@@ -346,8 +348,30 @@ final class MyBatisXmlLiteParser implements GraphSourceParser {
                     lineNumber, lineNumber, "xml", "", "", 65, "lite", "statement id maps to mapper method"));
             builder.addEdge(new GraphEdge("maps_to", statementKey, methodKey, entry.relativePath(), 70,
                     "lite", "statement id maps to mapper method"));
+            addDynamicParameterEdges(builder, entry, statementKey, qualifiedName, body, lineNumber);
             addTableEdges(builder, entry, statementKey, sqlType, body, lineNumber);
             addColumnEdges(builder, entry, statementKey, body, lineNumber);
+        }
+    }
+
+    private void addDynamicParameterEdges(GraphParseResult.Builder builder, GraphFileEntry entry,
+                                          String statementKey, String statementName,
+                                          String body, int lineNumber) {
+        Matcher testMatcher = TEST_ATTR.matcher(body == null ? "" : body);
+        while (testMatcher.find()) {
+            Matcher identifierMatcher = TEST_IDENTIFIER.matcher(testMatcher.group(2));
+            while (identifierMatcher.find()) {
+                String property = identifierMatcher.group(1);
+                if (isTestKeyword(property)) {
+                    continue;
+                }
+                String parameterKey = "sql_parameter:" + statementName + ":" + property;
+                builder.addNode(new GraphNode(parameterKey, "sql_parameter", property,
+                        statementName + "#" + property, entry.relativePath(), lineNumber, lineNumber,
+                        "xml", "", "", 70, "lite", "mybatis dynamic SQL test parameter"));
+                builder.addEdge(new GraphEdge("references", statementKey, parameterKey,
+                        entry.relativePath(), 70, "lite", "dynamic SQL test parameter"));
+            }
         }
     }
 
@@ -453,6 +477,13 @@ final class MyBatisXmlLiteParser implements GraphSourceParser {
 
     private String routeKey(String method, String path) {
         return "route:" + method + ":" + normalizeWebPath(path);
+    }
+
+    private boolean isTestKeyword(String value) {
+        String normalized = value == null ? "" : value.toLowerCase(Locale.ROOT);
+        return "and".equals(normalized) || "or".equals(normalized) || "not".equals(normalized)
+                || "null".equals(normalized) || "true".equals(normalized) || "false".equals(normalized)
+                || "empty".equals(normalized);
     }
 
     private String normalizeWebPath(String raw) {

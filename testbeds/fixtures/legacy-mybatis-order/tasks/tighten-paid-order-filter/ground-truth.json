@@ -1,0 +1,79 @@
+{
+  "schema_version": "devharness-testbed-ground-truth/v1",
+  "task_id": "legacy-mybatis-order-002",
+  "fixture": "legacy-mybatis-order",
+  "project_type": "legacy-java-mybatis",
+  "initial_commit": "",
+  "required_changed_files": [
+    "src/main/java/com/acme/legacy/order/mapper/InMemoryOrderMapper.java",
+    "src/main/resources/mybatis/OrderMapper.xml",
+    "src/test/java/com/acme/legacy/order/service/OrderServiceTest.java"
+  ],
+  "allowed_changed_files": [
+    "src/main/java/com/acme/legacy/order/dto/OrderQuery.java"
+  ],
+  "forbidden_changed_files": [
+    "src/main/resources/application-prod.properties",
+    "src/main/java/com/acme/legacy/order/web/OrderController.java"
+  ],
+  "expected_impact_points": [
+    {
+      "type": "mybatis_statement",
+      "name": "OrderMapper.findOrders",
+      "file": "src/main/resources/mybatis/OrderMapper.xml",
+      "reason": "Primary SQL condition"
+    },
+    {
+      "type": "mybatis_statement",
+      "name": "OrderMapper.countOrders",
+      "file": "src/main/resources/mybatis/OrderMapper.xml",
+      "reason": "Count query must match search query"
+    },
+    {
+      "type": "java_class",
+      "name": "InMemoryOrderMapper",
+      "file": "src/main/java/com/acme/legacy/order/mapper/InMemoryOrderMapper.java",
+      "reason": "Test double must match SQL behavior"
+    },
+    {
+      "type": "dto_field",
+      "name": "OrderQuery.paidOnly",
+      "file": "src/main/java/com/acme/legacy/order/dto/OrderQuery.java",
+      "reason": "Input flag driving the condition"
+    },
+    {
+      "type": "test",
+      "name": "OrderServiceTest.filtersPaidOnlyOrders",
+      "file": "src/test/java/com/acme/legacy/order/service/OrderServiceTest.java",
+      "reason": "Regression coverage"
+    }
+  ],
+  "expected_related_tests": [
+    "src/test/java/com/acme/legacy/order/service/OrderServiceTest.java"
+  ],
+  "required_verification": [
+    {
+      "type": "command",
+      "command": "mvn -q -f testbeds/fixtures/legacy-mybatis-order/pom.xml test",
+      "required": true
+    }
+  ],
+  "manual_evidence_required": true,
+  "rollback_requirements": [
+    "Revert mapper XML, test double, and test updates together."
+  ],
+  "risk_points": [
+    "Changing only findOrders but not countOrders creates pagination mismatch.",
+    "Changing Controller is out of scope.",
+    "Production config edits are a hard failure."
+  ],
+  "scoring_notes": {
+    "impact_recall_denominator": 5,
+    "impact_precision_notes": "True positives are paidOnly condition, SQL statements, test double, and regression test.",
+    "hard_fail_conditions": [
+      "Fixture tests fail",
+      "Controller route changes",
+      "Count query no longer matches list query"
+    ]
+  }
+}

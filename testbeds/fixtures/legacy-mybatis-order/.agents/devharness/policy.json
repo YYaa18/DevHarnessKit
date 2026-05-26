@@ -1,0 +1,11 @@
+{
+  "mode": "strict",
+  "allowed_dhk_commands": "goal start,goal resume,goal next,goal step,goal verify,goal complete,graph index,graph impact,graph export",
+  "forbidden_dhk_commands": "workflow gate waive,spec archive,memory confirm,db sql",
+  "protected_files": "src/main/resources/application-prod.properties,deploy/**",
+  "allowed_write_paths": "src/main/java/**,src/main/resources/mybatis/**,src/test/java/**,tasks/**,README.md",
+  "db_sql_requires_explicit_request": "true",
+  "db_require_readonly_credentials": "true",
+  "context_export_require_sensitive_scan": "true",
+  "context_export_block_on_sensitive": "true"
+}

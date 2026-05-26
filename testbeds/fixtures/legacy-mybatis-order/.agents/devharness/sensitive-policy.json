@@ -1,0 +1,10 @@
+{
+  "email": "redact",
+  "phone": "redact",
+  "identity_number": "redact",
+  "jdbc:mysql://": "reject",
+  "password=": "reject",
+  "token=": "reject",
+  "private key block": "reject",
+  "authorization:": "reject"
+}

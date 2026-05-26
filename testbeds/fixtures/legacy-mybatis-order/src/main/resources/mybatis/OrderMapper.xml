@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.acme.legacy.order.mapper.OrderMapper">
+    <resultMap id="OrderRowMap" type="com.acme.legacy.order.dto.OrderRow">
+        <id property="orderId" column="order_id"/>
+        <result property="customerName" column="customer_name"/>
+        <result property="status" column="order_status"/>
+        <result property="totalAmount" column="total_amount"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <select id="findOrders" parameterType="com.acme.legacy.order.dto.OrderQuery" resultMap="OrderRowMap">
+        SELECT
+            o.order_id,
+            o.customer_name,
+            o.order_status,
+            o.total_amount,
+            o.created_at
+        FROM legacy_order o
+        WHERE 1 = 1
+        <if test="customerName != null and customerName != ''">
+            AND o.customer_name LIKE CONCAT('%', #{customerName}, '%')
+        </if>
+        <if test="status != null and status != ''">
+            AND o.order_status = #{status}
+        </if>
+        <if test="paidOnly != null and paidOnly">
+            AND o.order_status = 'PAID'
+        </if>
+        ORDER BY o.created_at DESC
+        LIMIT #{pageSize} OFFSET ${(pageNo - 1) * pageSize}
+    </select>
+
+    <select id="countOrders" parameterType="com.acme.legacy.order.dto.OrderQuery" resultType="int">
+        SELECT COUNT(1)
+        FROM legacy_order o
+        WHERE 1 = 1
+        <if test="customerName != null and customerName != ''">
+            AND o.customer_name LIKE CONCAT('%', #{customerName}, '%')
+        </if>
+        <if test="status != null and status != ''">
+            AND o.order_status = #{status}
+        </if>
+        <if test="paidOnly != null and paidOnly">
+            AND o.order_status = 'PAID'
+        </if>
+    </select>
+</mapper>

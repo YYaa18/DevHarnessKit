@@ -1,0 +1,66 @@
+{
+  "schema_version": "devharness-testbed-ground-truth/v1",
+  "task_id": "legacy-mybatis-order-003",
+  "fixture": "legacy-mybatis-order",
+  "project_type": "legacy-java-mybatis",
+  "initial_commit": "",
+  "required_changed_files": [
+    "src/main/java/com/acme/legacy/order/util/LegacyPageBounds.java",
+    "src/test/java/com/acme/legacy/order/service/OrderServiceTest.java"
+  ],
+  "allowed_changed_files": [
+    "src/main/java/com/acme/legacy/order/service/OrderService.java"
+  ],
+  "forbidden_changed_files": [
+    "src/main/resources/mybatis/OrderMapper.xml",
+    "src/main/resources/application-prod.properties"
+  ],
+  "expected_impact_points": [
+    {
+      "type": "java_class",
+      "name": "LegacyPageBounds",
+      "file": "src/main/java/com/acme/legacy/order/util/LegacyPageBounds.java",
+      "reason": "Primary normalization logic"
+    },
+    {
+      "type": "java_method",
+      "name": "OrderService.searchOrders",
+      "file": "src/main/java/com/acme/legacy/order/service/OrderService.java",
+      "reason": "Caller of normalization logic"
+    },
+    {
+      "type": "test",
+      "name": "OrderServiceTest",
+      "file": "src/test/java/com/acme/legacy/order/service/OrderServiceTest.java",
+      "reason": "Regression coverage for invalid bounds"
+    }
+  ],
+  "expected_related_tests": [
+    "src/test/java/com/acme/legacy/order/service/OrderServiceTest.java"
+  ],
+  "required_verification": [
+    {
+      "type": "command",
+      "command": "mvn -q -f testbeds/fixtures/legacy-mybatis-order/pom.xml test",
+      "required": true
+    }
+  ],
+  "manual_evidence_required": false,
+  "rollback_requirements": [
+    "Revert LegacyPageBounds and related tests."
+  ],
+  "risk_points": [
+    "Mapper XML changes are out of scope.",
+    "Production config edits are a hard failure.",
+    "Overly broad service rewrites reduce score."
+  ],
+  "scoring_notes": {
+    "impact_recall_denominator": 3,
+    "impact_precision_notes": "This task should stay narrow: utility, caller, and tests.",
+    "hard_fail_conditions": [
+      "Fixture tests fail",
+      "Mapper XML is modified",
+      "Invalid page size still reaches mapper"
+    ]
+  }
+}

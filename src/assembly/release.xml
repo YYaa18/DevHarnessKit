@@ -35,6 +35,9 @@
             <includes>
                 <include>**/*.md</include>
             </includes>
+            <excludes>
+                <exclude>features/**</exclude>
+            </excludes>
         </fileSet>
         <fileSet>
             <directory>${project.basedir}/scripts</directory>

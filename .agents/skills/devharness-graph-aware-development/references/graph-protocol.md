@@ -26,6 +26,9 @@ Generated graph files:
 ```
 
 The graph is a snapshot of code facts at a point in time. Regenerate it after code changes.
+Do not use `graph impact --allow-stale` from the strict skill flow. That escape
+hatch requires explicit project policy or human approval evidence outside the
+weak-model protocol.
 
 Legacy graph profiles are intentionally narrow. They should keep changes inside
 the impact map, avoid broad formatting, include rollback steps, and treat

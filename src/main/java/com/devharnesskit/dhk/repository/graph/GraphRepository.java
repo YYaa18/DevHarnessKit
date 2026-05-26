@@ -59,15 +59,15 @@ public final class GraphRepository {
 
     public GraphPruneResult pruneCompletedSnapshots(Connection connection, String projectKey, int keep)
             throws SQLException {
-        List<Long> snapshotIds = completedSnapshotIdsBeyondKeep(connection, projectKey, keep);
+        List<SnapshotRef> snapshots = completedSnapshotsBeyondKeep(connection, projectKey, keep);
         int deletedBindings = 0;
         int deletedCacheRows = 0;
         int deletedEdges = 0;
         int deletedNodes = 0;
         int deletedFiles = 0;
         int deletedSnapshots = 0;
-        for (Long snapshotId : snapshotIds) {
-            long id = snapshotId.longValue();
+        for (SnapshotRef snapshot : snapshots) {
+            long id = snapshot.id;
             deletedBindings += deleteBySnapshotId(connection,
                     "DELETE FROM goal_graph_binding WHERE snapshot_id = ?", id);
             deletedCacheRows += deleteBySnapshotId(connection,
@@ -82,7 +82,29 @@ public final class GraphRepository {
                     "DELETE FROM code_graph_snapshot WHERE id = ?", id);
         }
         return new GraphPruneResult(keep, deletedSnapshots, completedSnapshotCount(connection, projectKey),
-                deletedFiles, deletedNodes, deletedEdges, deletedCacheRows, deletedBindings);
+                deletedFiles, deletedNodes, deletedEdges, deletedCacheRows, deletedBindings,
+                false, snapshotKeys(snapshots));
+    }
+
+    public GraphPruneResult previewPruneCompletedSnapshots(Connection connection, String projectKey, int keep)
+            throws SQLException {
+        List<SnapshotRef> snapshots = completedSnapshotsBeyondKeep(connection, projectKey, keep);
+        int files = 0;
+        int nodes = 0;
+        int edges = 0;
+        int cacheRows = 0;
+        int bindings = 0;
+        for (SnapshotRef snapshot : snapshots) {
+            long id = snapshot.id;
+            bindings += countBySnapshotId(connection, "goal_graph_binding", id);
+            cacheRows += countBySnapshotId(connection, "code_graph_query_cache", id);
+            edges += countBySnapshotId(connection, "code_graph_edge", id);
+            nodes += countBySnapshotId(connection, "code_graph_node", id);
+            files += countBySnapshotId(connection, "code_graph_file", id);
+        }
+        int remaining = completedSnapshotCount(connection, projectKey) - snapshots.size();
+        return new GraphPruneResult(keep, snapshots.size(), remaining, files, nodes, edges,
+                cacheRows, bindings, true, snapshotKeys(snapshots));
     }
 
     public GraphData loadGraphData(Connection connection, GraphSnapshot snapshot) throws SQLException {
@@ -90,11 +112,11 @@ public final class GraphRepository {
                 listEdges(connection, snapshot.id()));
     }
 
-    private List<Long> completedSnapshotIdsBeyondKeep(Connection connection, String projectKey, int keep)
+    private List<SnapshotRef> completedSnapshotsBeyondKeep(Connection connection, String projectKey, int keep)
             throws SQLException {
-        List<Long> ids = new ArrayList<Long>();
+        List<SnapshotRef> snapshots = new ArrayList<SnapshotRef>();
         try (PreparedStatement statement = connection.prepareStatement(
-                "SELECT id FROM code_graph_snapshot WHERE project_key = ? AND status = 'completed' "
+                "SELECT id, snapshot_key FROM code_graph_snapshot WHERE project_key = ? AND status = 'completed' "
                         + "ORDER BY id DESC")) {
             statement.setString(1, projectKey);
             try (ResultSet resultSet = statement.executeQuery()) {
@@ -102,13 +124,13 @@ public final class GraphRepository {
                 while (resultSet.next()) {
                     long id = resultSet.getLong("id");
                     if (index >= keep) {
-                        ids.add(Long.valueOf(id));
+                        snapshots.add(new SnapshotRef(id, resultSet.getString("snapshot_key")));
                     }
                     index++;
                 }
             }
         }
-        return ids;
+        return snapshots;
     }
 
     private int completedSnapshotCount(Connection connection, String projectKey) throws SQLException {
@@ -125,6 +147,34 @@ public final class GraphRepository {
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setLong(1, snapshotId);
             return statement.executeUpdate();
+        }
+    }
+
+    private int countBySnapshotId(Connection connection, String table, long snapshotId) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT COUNT(*) FROM " + table + " WHERE snapshot_id = ?")) {
+            statement.setLong(1, snapshotId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next() ? resultSet.getInt(1) : 0;
+            }
+        }
+    }
+
+    private String[] snapshotKeys(List<SnapshotRef> snapshots) {
+        List<String> keys = new ArrayList<String>();
+        for (SnapshotRef snapshot : snapshots) {
+            keys.add(snapshot.snapshotKey);
+        }
+        return keys.toArray(new String[keys.size()]);
+    }
+
+    private static final class SnapshotRef {
+        private final long id;
+        private final String snapshotKey;
+
+        private SnapshotRef(long id, String snapshotKey) {
+            this.id = id;
+            this.snapshotKey = snapshotKey == null ? "" : snapshotKey;
         }
     }
 

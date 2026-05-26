@@ -42,14 +42,14 @@ jobs:
         run: mvn -B -DskipTests package
 
       - name: Version smoke
-        run: java -jar target/dhk-cli-0.1.0-alpha-all.jar version
+        run: java -jar target/dhk-cli-0.4.4-beta.1-all.jar version
 
       - name: Workflow smoke
         if: matrix.smoke
         run: |
           set -euo pipefail
           DEMO="$(mktemp -d)"
-          JAR="target/dhk-cli-0.1.0-alpha-all.jar"
+          JAR="target/dhk-cli-0.4.4-beta.1-all.jar"
           java -jar "$JAR" memory init --project-root "$DEMO"
           java -jar "$JAR" workflow template seed --project-root "$DEMO"
           START_OUT="$(java -jar "$JAR" workflow start --project-root "$DEMO" --workflow api-change --task "ci smoke" --module order --mode api)"
@@ -68,4 +68,4 @@ jobs:
 
       - name: Record artifacts
         if: matrix.os == 'ubuntu-latest'
-        run: ls -lh target/dhk-cli-0.1.0-alpha-all.jar target/devharnesskit-0.1.0-alpha.*
+        run: ls -lh target/dhk-cli-0.4.4-beta.1-all.jar target/devharnesskit-0.4.4-beta.1.*

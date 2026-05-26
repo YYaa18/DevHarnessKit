@@ -6,7 +6,7 @@ DevHarness Kit is a local-first CLI. It does not run a daemon, open an HTTP port
 
 | Version | Status |
 | --- | --- |
-| `0.1.0-alpha` | Developer preview. Security fixes are best-effort while the public API and schema are still stabilizing. |
+| `v0.4.4-beta.1` | Beta developer preview. Security fixes are best-effort while the public API and schema are still stabilizing. |
 
 ## Threat Model
 
@@ -58,6 +58,17 @@ Always use database credentials that have read-only privileges at the database s
 ## Workflow and Spec Safety
 
 Workflow and spec commands record manual/audit state for agents and humans. They do not execute tests automatically unless a user explicitly wires external commands around them, and they do not prove implementation correctness.
+
+## Graph Stale Snapshot Overrides
+
+Graph impact maps are snapshot-bound generated facts. `dhk graph impact` rejects
+stale snapshots by default. The `--allow-stale` escape hatch is not intended for
+weak-model self-service: by default it requires `--allow-stale-evidence`, and
+strict graph-aware skill wrappers also require an external
+`DHK_ALLOW_STALE_APPROVED=true` approval. Projects may explicitly relax this in
+`.agents/devharness/policy.json` with
+`graph_allow_stale_requires_approval=false`, but stale graph output remains
+advisory and should not replace a fresh index, tests, or human review.
 
 ## Reporting a Vulnerability
 

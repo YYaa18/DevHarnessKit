@@ -23,7 +23,7 @@ public final class DevHarnessPolicyService {
             "db_sql_requires_explicit_request", "db_require_readonly_credentials",
             "db_allowed_environments", "context_export_require_sensitive_scan",
             "context_export_block_on_sensitive", "context_export_allowed_files",
-            "context_export_forbidden_files");
+            "context_export_forbidden_files", "graph_allow_stale_requires_approval");
     private static final Set<String> MODES = set("strict", "guided", "expert");
 
     public DevHarnessPolicy load(Path projectRoot) {
@@ -47,7 +47,8 @@ public final class DevHarnessPolicyService {
                     parseBoolean(raw.get("context_export_require_sensitive_scan"), true),
                     parseBoolean(raw.get("context_export_block_on_sensitive"), true),
                     splitList(raw.get("context_export_allowed_files")),
-                    splitList(raw.get("context_export_forbidden_files")));
+                    splitList(raw.get("context_export_forbidden_files")),
+                    parseBoolean(raw.get("graph_allow_stale_requires_approval"), true));
         } catch (Exception ex) {
             return DevHarnessPolicy.defaults();
         }
@@ -86,6 +87,7 @@ public final class DevHarnessPolicyService {
         diagnoseBoolean(policyPath, raw, "db_require_readonly_credentials", diagnostics);
         diagnoseBoolean(policyPath, raw, "context_export_require_sensitive_scan", diagnostics);
         diagnoseBoolean(policyPath, raw, "context_export_block_on_sensitive", diagnostics);
+        diagnoseBoolean(policyPath, raw, "graph_allow_stale_requires_approval", diagnostics);
         diagnoseEnvironmentList(policyPath, raw.get("db_allowed_environments"), diagnostics);
         return diagnostics;
     }

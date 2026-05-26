@@ -10,4 +10,5 @@ Key points:
 - Always use read-only database credentials.
 - DB commands print a risk notice for real connections; `--json` returns the same warning as a JSON field where supported.
 - `db sql --explain` may run without the JDBC read-only hint for MySQL 8 + Connector/J 5.1 compatibility, so database-level read-only credentials matter.
+- `graph impact --allow-stale` requires explicit approval evidence by default; strict graph-aware skills must not use it by themselves.
 - Workflow and spec state are audit records, not correctness proofs.

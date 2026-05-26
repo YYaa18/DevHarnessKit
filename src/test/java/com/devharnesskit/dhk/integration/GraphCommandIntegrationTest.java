@@ -273,6 +273,22 @@ final class GraphCommandIntegrationTest {
         int filesBefore = countRows(root, "code_graph_file");
         int nodesBefore = countRows(root, "code_graph_node");
         int edgesBefore = countRows(root, "code_graph_edge");
+        String dbHashBeforeDryRun = sha256File(PathUtil.memoryDb(root));
+
+        Harness dryRunHarness = new Harness(tempDir);
+        int dryRunExit = new CommandRouter().run(new String[]{
+                "graph", "prune", "--project-root", "demo-prune", "--keep", "10", "--dry-run", "--json"
+        }, dryRunHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, dryRunExit);
+        assertTrue(dryRunHarness.stdout().contains("\"dry_run\": true"));
+        assertTrue(dryRunHarness.stdout().contains("\"would_delete_snapshots\": 10"));
+        assertTrue(dryRunHarness.stdout().contains("\"snapshot_keys\": [\"graph-"));
+        assertEquals(dbHashBeforeDryRun, sha256File(PathUtil.memoryDb(root)));
+        assertEquals(20, countRows(root, "code_graph_snapshot"));
+        assertEquals(filesBefore, countRows(root, "code_graph_file"));
+        assertEquals(nodesBefore, countRows(root, "code_graph_node"));
+        assertEquals(edgesBefore, countRows(root, "code_graph_edge"));
 
         Harness pruneHarness = new Harness(tempDir);
         int pruneExit = new CommandRouter().run(new String[]{
@@ -322,10 +338,16 @@ final class GraphCommandIntegrationTest {
                 "graph", "impact", "--project-root", "demo-stale-impact",
                 "--file", "src/main/java/com/example/App.java"
         }, rejectedImpactHarness.context());
+        Harness staleWithoutEvidenceHarness = new Harness(tempDir);
+        int staleWithoutEvidenceExit = new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", "demo-stale-impact",
+                "--file", "src/main/java/com/example/App.java", "--allow-stale"
+        }, staleWithoutEvidenceHarness.context());
         Harness allowedImpactHarness = new Harness(tempDir);
         int allowedImpactExit = new CommandRouter().run(new String[]{
                 "graph", "impact", "--project-root", "demo-stale-impact",
-                "--file", "src/main/java/com/example/App.java", "--allow-stale"
+                "--file", "src/main/java/com/example/App.java", "--allow-stale",
+                "--allow-stale-evidence", "human approved stale graph impact for emergency inspection"
         }, allowedImpactHarness.context());
 
         assertEquals(ExitCodes.SUCCESS, indexExit);
@@ -336,18 +358,51 @@ final class GraphCommandIntegrationTest {
         assertEquals(ExitCodes.RUNTIME_ERROR, rejectedImpactExit);
         assertTrue(rejectedImpactHarness.stderr().contains("STALE_GRAPH_SNAPSHOT"));
         assertTrue(rejectedImpactHarness.stderr().contains("dhk graph index"));
+        assertEquals(ExitCodes.VALIDATION_ERROR, staleWithoutEvidenceExit);
+        assertTrue(staleWithoutEvidenceHarness.stderr().contains("graph_allow_stale_requires_approval"));
         assertEquals(ExitCodes.SUCCESS, allowedImpactExit);
         assertTrue(allowedImpactHarness.stdout().contains("snapshot_stale: true"));
         assertTrue(allowedImpactHarness.stdout().contains("allow_stale: true"));
+        assertTrue(allowedImpactHarness.stdout().contains("allow_stale_evidence: provided"));
         assertTrue(allowedImpactHarness.stdout().contains("warning: STALE_GRAPH_SNAPSHOT"));
 
         String impactMap = new String(Files.readAllBytes(PathUtil.graphImpactMap(root)), "UTF-8");
         assertTrue(impactMap.contains("<snapshot-freshness>"));
         assertTrue(impactMap.contains("- status: stale_allowed"));
+        assertTrue(impactMap.contains("- allow_stale_evidence: provided"));
         assertTrue(impactMap.contains("- warning: STALE_GRAPH_SNAPSHOT"));
         assertTrue(impactMap.contains("<graph-confidence>"));
         assertTrue(impactMap.contains("- precision: heuristic"));
         assertTrue(impactMap.contains("- do_not_treat_as_correctness_proof: true"));
+    }
+
+    @Test
+    void graphImpactAllowStaleCanBeAuthorizedByProjectPolicy() throws Exception {
+        Path root = tempDir.resolve("demo-stale-policy");
+        write(root, "src/main/java/com/example/App.java",
+                "package com.example;\npublic class App { public void run() {} }\n");
+
+        Harness indexHarness = new Harness(tempDir);
+        int indexExit = new CommandRouter().run(new String[]{"graph", "index", "--project-root", "demo-stale-policy"},
+                indexHarness.context());
+        write(root, "src/main/java/com/example/App.java",
+                "package com.example;\npublic class App { public void run() { String changed = \"yes\"; } }\n");
+        write(root, ".agents/devharness/policy.json",
+                "{\n"
+                        + "  \"graph_allow_stale_requires_approval\": \"false\"\n"
+                        + "}\n");
+
+        Harness impactHarness = new Harness(tempDir);
+        int impactExit = new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", "demo-stale-policy",
+                "--file", "src/main/java/com/example/App.java", "--allow-stale"
+        }, impactHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, indexExit);
+        assertEquals(ExitCodes.SUCCESS, impactExit);
+        assertTrue(impactHarness.stdout().contains("snapshot_stale: true"));
+        assertTrue(impactHarness.stdout().contains("allow_stale: true"));
+        assertTrue(impactHarness.stdout().contains("allow_stale_evidence: policy"));
     }
 
     @Test
@@ -688,6 +743,16 @@ final class GraphCommandIntegrationTest {
     private String sha256Hex(String content) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         byte[] hash = digest.digest(content.getBytes("UTF-8"));
+        return hex(hash);
+    }
+
+    private String sha256File(Path file) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] hash = digest.digest(Files.readAllBytes(file));
+        return hex(hash);
+    }
+
+    private String hex(byte[] hash) {
         StringBuilder builder = new StringBuilder();
         for (byte b : hash) {
             String hex = Integer.toHexString(b & 0xff);

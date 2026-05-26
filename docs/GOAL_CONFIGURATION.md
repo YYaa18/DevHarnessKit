@@ -319,6 +319,28 @@ The command parser is intentionally simple and splits `compile_command` and `tes
 
 Warnings do not change fallback behavior. The runtime still uses built-in defaults when a configured profile or policy cannot be loaded and a built-in fallback exists. `dhk doctor --json` includes these warnings in `goal_config_warnings`.
 
+## Project Safety Policy
+
+Project-level safety policy lives at:
+
+```text
+.agents/devharness/policy.json
+```
+
+Graph stale overrides are denied-by-default for weak-model flows:
+
+```json
+{
+  "graph_allow_stale_requires_approval": "true"
+}
+```
+
+The default is `true`. When a caller uses `dhk graph impact --allow-stale`, the
+CLI requires `--allow-stale-evidence <evidence>` unless project policy
+explicitly sets `graph_allow_stale_requires_approval` to `false`. Strict
+graph-aware skill scripts also block `--allow-stale` unless a human or policy
+sets `DHK_ALLOW_STALE_APPROVED=true` outside the model-controlled flow.
+
 ## Financial-System Example
 
 Financial projects often need email, phone, and ID-card values in legitimate docs and test data. Keep goal checks strict, and configure sensitive-data policy separately for redaction or allow rules:

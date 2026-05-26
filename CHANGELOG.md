@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.4-beta.1
+
+Governance and release-hardening beta.
+
+- Goal Orchestration is promoted to beta developer-preview status while remaining pre-1.0 and not stable.
+- Graph Lite remains Alpha+ and heuristic; impact maps are advisory context, not correctness proofs.
+- Graph-aware Goal now carries freshness, impact, architecture, protected-file, and legacy manual-evidence checks through `goal verify`.
+- `dhk graph impact` rejects stale snapshots by default and now requires explicit approval evidence for `--allow-stale`.
+- Added project policy field `graph_allow_stale_requires_approval` with default `true`.
+- Graph-aware skill wrappers block weak-model self-service use of `--allow-stale` unless external approval sets `DHK_ALLOW_STALE_APPROVED=true`.
+- Added `dhk graph prune --dry-run` to audit snapshots/files/nodes/edges/query-cache rows/goal bindings that would be deleted without modifying SQLite.
+- Release packaging now targets `dhk-cli-0.4.4-beta.1-all.jar` and `devharnesskit-0.4.4-beta.1.{zip,tar.gz}`.
+- Full Maven test suite, package build, release archive smoke, graph stale override tests, graph prune dry-run tests, and checksum generation are required before tagging.
+
 ## 0.1.0-alpha
 
 Initial developer-preview release.

@@ -31,6 +31,11 @@ public final class GraphImpactRenderer {
         }
         builder.append("- snapshot_stale: ").append(result.snapshotStale()).append('\n');
         builder.append("- allow_stale: ").append(result.staleAllowed()).append('\n');
+        if (result.staleAllowed()) {
+            builder.append("- allow_stale_evidence: ")
+                    .append(result.request().allowStaleEvidence().length() > 0 ? "provided" : "policy")
+                    .append('\n');
+        }
         builder.append("- start_nodes: ").append(result.startNodes().size()).append('\n');
         builder.append("- impacted_nodes: ").append(result.impactedNodes().size()).append('\n');
         builder.append("- related_files: ").append(result.relatedFiles().size()).append('\n');
@@ -76,6 +81,11 @@ public final class GraphImpactRenderer {
         builder.append("- current_workspace_fingerprint: ")
                 .append(result.currentWorkspaceFingerprint()).append('\n');
         builder.append("- allow_stale: ").append(result.staleAllowed()).append('\n');
+        if (result.staleAllowed()) {
+            builder.append("- allow_stale_evidence: ")
+                    .append(result.request().allowStaleEvidence().length() > 0 ? "provided" : "policy")
+                    .append('\n');
+        }
         if (result.snapshotStale()) {
             builder.append("- warning: STALE_GRAPH_SNAPSHOT; impact map is based on an older graph snapshot\n");
             builder.append("- next_command: dhk graph index\n");

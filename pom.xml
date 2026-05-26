@@ -5,7 +5,7 @@
 
     <groupId>com.devharnesskit</groupId>
     <artifactId>dhk-cli</artifactId>
-    <version>0.1.0-alpha</version>
+    <version>0.4.4-beta.1</version>
     <packaging>jar</packaging>
 
     <name>DevHarness Kit CLI</name>

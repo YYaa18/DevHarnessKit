@@ -27,21 +27,21 @@ jobs:
         run: mvn -B clean package
 
       - name: Verify version
-        run: java -jar target/dhk-cli-0.1.0-alpha-all.jar version
+        run: java -jar target/dhk-cli-0.4.4-beta.1-all.jar version
 
       - name: Generate checksums
         run: |
           cd target
-          sha256sum dhk-cli-0.1.0-alpha-all.jar devharnesskit-0.1.0-alpha.zip devharnesskit-0.1.0-alpha.tar.gz > SHA256SUMS
+          sha256sum dhk-cli-0.4.4-beta.1-all.jar devharnesskit-0.4.4-beta.1.zip devharnesskit-0.4.4-beta.1.tar.gz > SHA256SUMS
 
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: devharnesskit-0.1.0-alpha
+          name: devharnesskit-0.4.4-beta.1
           path: |
-            target/dhk-cli-0.1.0-alpha-all.jar
-            target/devharnesskit-0.1.0-alpha.zip
-            target/devharnesskit-0.1.0-alpha.tar.gz
+            target/dhk-cli-0.4.4-beta.1-all.jar
+            target/devharnesskit-0.4.4-beta.1.zip
+            target/devharnesskit-0.4.4-beta.1.tar.gz
             target/SHA256SUMS
 
       - name: Create draft GitHub release
@@ -50,9 +50,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
-            target/dhk-cli-0.1.0-alpha-all.jar \
-            target/devharnesskit-0.1.0-alpha.zip \
-            target/devharnesskit-0.1.0-alpha.tar.gz \
+            target/dhk-cli-0.4.4-beta.1-all.jar \
+            target/devharnesskit-0.4.4-beta.1.zip \
+            target/devharnesskit-0.4.4-beta.1.tar.gz \
             target/SHA256SUMS \
             --draft \
             --title "$GITHUB_REF_NAME"

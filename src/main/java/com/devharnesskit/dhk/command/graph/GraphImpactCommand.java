@@ -8,6 +8,8 @@ import com.devharnesskit.dhk.model.graph.GraphImpactRequest;
 import com.devharnesskit.dhk.model.graph.GraphImpactResult;
 import com.devharnesskit.dhk.model.graph.GraphNode;
 import com.devharnesskit.dhk.service.graph.GraphImpactService;
+import com.devharnesskit.dhk.service.policy.PolicyHookService;
+import com.devharnesskit.dhk.service.policy.PolicyViolationException;
 import com.devharnesskit.dhk.util.JsonOutput;
 import com.devharnesskit.dhk.util.PathUtil;
 
@@ -16,13 +18,19 @@ import java.nio.file.Path;
 
 public final class GraphImpactCommand implements Command {
     private final GraphImpactService impactService;
+    private final PolicyHookService policyHookService;
 
     public GraphImpactCommand() {
-        this(new GraphImpactService());
+        this(new GraphImpactService(), new PolicyHookService());
     }
 
     GraphImpactCommand(GraphImpactService impactService) {
+        this(impactService, new PolicyHookService());
+    }
+
+    GraphImpactCommand(GraphImpactService impactService, PolicyHookService policyHookService) {
         this.impactService = impactService;
+        this.policyHookService = policyHookService;
     }
 
     public int run(CommandContext context, Args args) {
@@ -33,6 +41,7 @@ public final class GraphImpactCommand implements Command {
         }
         Path projectRoot = PathUtil.resolveProjectRoot(args, context.workingDirectory());
         try {
+            policyHookService.requireGraphImpactAllowed(projectRoot, args);
             GraphImpactResult result = impactService.impact(projectRoot, request, context.clock());
             if (JsonOutput.enabled(args)) {
                 printJson(context, result);
@@ -42,6 +51,9 @@ public final class GraphImpactCommand implements Command {
                 printText(context, result);
             }
             return result.found() ? ExitCodes.SUCCESS : ExitCodes.NOT_FOUND;
+        } catch (PolicyViolationException ex) {
+            context.err().println(ex.getMessage());
+            return ExitCodes.VALIDATION_ERROR;
         } catch (Exception ex) {
             context.err().println("ERROR graph impact failed: " + ex.getMessage());
             return ExitCodes.RUNTIME_ERROR;
@@ -62,7 +74,8 @@ public final class GraphImpactCommand implements Command {
         if (query.length() == 0) {
             return null;
         }
-        return new GraphImpactRequest(type, query, depth(args), args.hasFlag("allow-stale"));
+        return new GraphImpactRequest(type, query, depth(args), args.hasFlag("allow-stale"),
+                args.option("allow-stale-evidence", ""));
     }
 
     private int depth(Args args) {
@@ -92,6 +105,10 @@ public final class GraphImpactCommand implements Command {
         context.out().println("snapshot_key: " + result.snapshot().snapshotKey());
         context.out().println("snapshot_stale: " + result.snapshotStale());
         context.out().println("allow_stale: " + result.staleAllowed());
+        if (result.staleAllowed()) {
+            context.out().println("allow_stale_evidence: "
+                    + (result.request().allowStaleEvidence().length() > 0 ? "provided" : "policy"));
+        }
         if (result.snapshotStale()) {
             context.out().println("warning: STALE_GRAPH_SNAPSHOT");
         }
@@ -125,6 +142,8 @@ public final class GraphImpactCommand implements Command {
                 JsonOutput.stringField("snapshot_key", result.snapshot() == null ? "" : result.snapshot().snapshotKey()),
                 JsonOutput.booleanField("snapshot_stale", result.snapshotStale()),
                 JsonOutput.booleanField("allow_stale", result.staleAllowed()),
+                JsonOutput.stringField("allow_stale_evidence",
+                        result.request().allowStaleEvidence().length() > 0 ? "provided" : ""),
                 JsonOutput.stringField("current_workspace_fingerprint", result.currentWorkspaceFingerprint()),
                 JsonOutput.stringField("snapshot_workspace_fingerprint",
                         result.snapshot() == null ? "" : result.snapshot().workspaceFingerprint()),

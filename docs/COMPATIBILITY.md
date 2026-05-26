@@ -1,6 +1,6 @@
 # Compatibility Contract
 
-Current release channel: `0.1.0-alpha` developer preview.
+Current release channel: `v0.4.4-beta.1` beta developer preview.
 
 This document defines what users and scripts may cautiously depend on before
 1.0, and what remains experimental. It is a contract for release notes and
@@ -10,7 +10,7 @@ documentation, not a promise that every current behavior is stable.
 
 | Level | Meaning |
 | --- | --- |
-| Stable-ish alpha | Intended to change conservatively across `0.1.x`; breaking changes require a changelog note and migration guidance. |
+| Stable-ish alpha | Intended to change conservatively across beta patch releases; breaking changes require a changelog note and migration guidance. |
 | Beta | Useful for real workflows, but still has safety, environment, or dependency constraints that users must review. |
 | Alpha | Usable for developer preview feedback. Shape may change before 1.0 with documented release notes. |
 | Internal | Historical plans, implementation notes, tests, and helper internals. Do not build automation against these. |
@@ -74,7 +74,7 @@ machine-readable contract.
 
 ## CLI Input Contract
 
-Scripts may rely on these parser behaviors in `0.1.x`:
+Scripts may rely on these parser behaviors in beta patch releases:
 
 - long options in `--key value` and `--key=value` form;
 - boolean flags such as `--json`, `--dry-run`, `--explain`, and `--all`;
@@ -90,7 +90,7 @@ human-readable output.
 JSON output is alpha, but scripts may depend on:
 
 - valid JSON on stdout for commands listed in [JSON_OUTPUT.md](JSON_OUTPUT.md);
-- existing required field names changing conservatively in `0.1.x`;
+- existing required field names changing conservatively in beta patch releases;
 - additive fields appearing without a breaking-change label;
 - non-zero exit codes still being meaningful alongside JSON status fields.
 

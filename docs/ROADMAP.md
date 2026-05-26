@@ -2,9 +2,9 @@
 
 DevHarness Kit should stabilize by narrowing the open-source surface before adding major features.
 
-## 0.1.x
+## Beta Patch Releases
 
-Focus: Memory core readiness.
+Focus: beta release readiness without expanding major feature scope.
 
 - Stabilize `memory init/add/confirm/search/export/checkpoint/recover`.
 - Keep file/stdin inputs, JSON output, section-budgeted context export, and `memory backup` compatible across patch releases.
@@ -12,7 +12,7 @@ Focus: Memory core readiness.
 - Keep sensitive-data checks fail-closed where persistence or export is involved.
 - Keep automatic pre-migration backups covered by fixture tests.
 - Treat [COMPATIBILITY.md](COMPATIBILITY.md) as the source for stable-ish alpha, beta, and alpha contract wording.
-- Publish alpha releases with third-party notices, security notes, checksums, and release archives.
+- Publish beta developer-preview releases with third-party notices, security notes, checksums, and release archives.
 
 ## 0.2.x
 
@@ -78,7 +78,7 @@ Focus: stable CLI and schema compatibility.
 
 - Document supported schema migration paths.
 - Provide release checksums and reproducible packaging instructions.
-- Promote the `0.1.x` compatibility contract into a stricter stable command/output/schema contract.
+- Promote the beta compatibility contract into a stricter stable command/output/schema contract.
 - Define post-1.0 semantic versioning and deprecation windows before claiming stability.
 - Revisit coverage threshold enforcement using [decisions/0002-coverage-threshold-and-sql-safety-fuzz.md](decisions/0002-coverage-threshold-and-sql-safety-fuzz.md) after the CLI surface and DB safety tests stabilize.
 - Split optional modules only if dependency licensing, redistribution, package size, or user demand justifies the extra artifact surface.

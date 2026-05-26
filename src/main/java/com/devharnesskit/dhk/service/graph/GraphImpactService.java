@@ -64,7 +64,8 @@ public final class GraphImpactService {
         int requestedDepth = request.depth();
         int maxDepth = Math.max(1, config.maxImpactDepth());
         GraphImpactRequest effectiveRequest = new GraphImpactRequest(request.queryType(), request.query(),
-                Math.min(Math.max(1, requestedDepth), maxDepth), request.allowStale());
+                Math.min(Math.max(1, requestedDepth), maxDepth), request.allowStale(),
+                request.allowStaleEvidence());
         boolean depthLimited = requestedDepth > effectiveRequest.depth();
         if ("cgc".equalsIgnoreCase(config.provider())) {
             GraphImpactResult result = cgcAdapterService.impact(projectRoot, config, effectiveRequest, clock,
@@ -81,7 +82,7 @@ public final class GraphImpactService {
                     + data.snapshot().snapshotKey()
                     + " does not match the current workspace. Run `dhk graph index --project-root "
                     + projectRoot.toAbsolutePath().normalize()
-                    + "` or pass --allow-stale to continue with a warning.");
+                    + "` or pass --allow-stale with approval evidence to continue with a warning.");
         }
         List<GraphNode> startNodes = startNodes(data, effectiveRequest);
         List<GraphNode> candidates = startNodes.isEmpty() ? candidates(data, effectiveRequest.query()) : Collections.<GraphNode>emptyList();

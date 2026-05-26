@@ -2,7 +2,7 @@
 
 DevHarness Kit supports inline text for short values and file/stdin input for longer content.
 
-See [COMPATIBILITY.md](COMPATIBILITY.md) for the `0.1.x` CLI parser and output
+See [COMPATIBILITY.md](COMPATIBILITY.md) for the beta CLI parser and output
 stability policy.
 
 ## Memory Content
@@ -86,7 +86,7 @@ Search uses three layers:
 - LIKE fallback over title, content, and tags for every search.
 - Java-side scoring where tags outrank title and title outranks content.
 
-Chinese search should be treated as LIKE-based in `0.1.x`; add Chinese phrases and useful English or code tags when saving memory. Code-like terms are tokenized both as their original shape and split parts, so `orderQueryService`, `order_query_service`, and `order-query-service` can all contribute matches.
+Chinese search should be treated as LIKE-based in beta patch releases; add Chinese phrases and useful English or code tags when saving memory. Code-like terms are tokenized both as their original shape and split parts, so `orderQueryService`, `order_query_service`, and `order-query-service` can all contribute matches.
 
 ## JSON Output
 

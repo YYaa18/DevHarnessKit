@@ -25,7 +25,8 @@ In the current alpha, `policy.json` is enforced only at the hook points listed b
   "context_export_require_sensitive_scan": "true",
   "context_export_block_on_sensitive": "true",
   "context_export_allowed_files": ".agents/memory/exports/*.md",
-  "context_export_forbidden_files": ".env,application-prod.yml"
+  "context_export_forbidden_files": ".env,application-prod.yml",
+  "graph_allow_stale_requires_approval": "true"
 }
 ```
 
@@ -45,6 +46,7 @@ In the current alpha, `policy.json` is enforced only at the hook points listed b
 | `context_export_block_on_sensitive` | boolean string | Sensitive findings should block export when hooks enforce policy. |
 | `context_export_allowed_files` | project-relative globs | Export files permitted by policy. |
 | `context_export_forbidden_files` | project-relative globs | Files that should never be exported as context. |
+| `graph_allow_stale_requires_approval` | boolean string | Defaults to `true`; `graph impact --allow-stale` requires explicit evidence unless this is set to `false`. |
 
 Boolean values accept `true/false`, `yes/no`, or `1/0`.
 
@@ -80,9 +82,13 @@ The first alpha hook points are:
 | `before-goal-check` | `dhk goal check` | `forbidden_dhk_commands` or missing `allowed_dhk_commands`. `dhk goal verify` may still run its internal checks under the `goal verify` command. |
 | `before-goal-complete` | `dhk goal complete` | `forbidden_dhk_commands`, missing `allowed_dhk_commands`, or goal steps that changed `protected_files`. |
 | `before-db-sql` | `dhk db sql` | `forbidden_dhk_commands`, missing `allowed_dhk_commands`, or non-dry-run SQL without `--i-understand-db-readonly-risk` when `db_sql_requires_explicit_request` is true. |
+| `before-graph-impact` | `dhk graph impact` | `forbidden_dhk_commands`, missing `allowed_dhk_commands`, or `--allow-stale` without `--allow-stale-evidence` when `graph_allow_stale_requires_approval` is true. |
 | `before-context-export` | `dhk memory export` and goal context exports | `context_export_allowed_files`, `context_export_forbidden_files`, and sensitive matches when `context_export_block_on_sensitive` is true. |
 
-No policy file means these hooks are permissive. A configured policy file can block commands with validation errors; hooks never call a network service or daemon.
+No policy file means most hooks are permissive, but stale graph overrides still
+use the default `graph_allow_stale_requires_approval=true`. A configured policy
+file can block commands with validation errors; hooks never call a network
+service or daemon.
 
 ## Security Notes
 

@@ -72,6 +72,22 @@ public final class PolicyHookService {
         }
     }
 
+    public void requireGraphImpactAllowed(Path projectRoot, Args args) {
+        boolean hasPolicy = policyService.hasPolicy(projectRoot);
+        DevHarnessPolicy policy = policyService.load(projectRoot);
+        if (hasPolicy) {
+            PolicyDecision command = commandDecision(policy, "graph impact");
+            if (!command.allowed()) {
+                throw new PolicyViolationException("Policy blocked graph impact: " + command.reason());
+            }
+        }
+        if (args.hasFlag("allow-stale") && policy.graphAllowStaleRequiresApproval()
+                && args.option("allow-stale-evidence", "").trim().length() == 0) {
+            throw new PolicyViolationException("Policy blocked graph impact: "
+                    + "graph_allow_stale_requires_approval requires --allow-stale-evidence");
+        }
+    }
+
     public void requireContextExportAllowed(Path projectRoot, Path out, String content,
                                             List<String> sensitiveMatches) {
         if (!policyService.hasPolicy(projectRoot)) {

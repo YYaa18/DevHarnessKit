@@ -6,7 +6,7 @@ It stores durable project memory, specs, workflow state, and read-only database 
 
 ## Status
 
-This repository is `0.1.0-alpha` and should be treated as a developer preview.
+This repository is `v0.4.4-beta.1` and should be treated as a beta developer preview.
 
 | Area | Status | Notes |
 | --- | --- | --- |
@@ -14,8 +14,9 @@ This repository is `0.1.0-alpha` and should be treated as a developer preview.
 | Doctor | Stable-ish alpha | Validates project memory storage and export paths. |
 | Sensitive guard | Alpha | Best-effort heuristic guard with project-level reject/redact/allow policy. Not a complete DLP system. |
 | DB readonly | Beta | Useful for inspection, but SQL guard is not a permission boundary. Use read-only database credentials. |
-| Goal orchestration | Experimental alpha | High-level `dhk goal` protocol for start/resume/next/step/check/evaluate/verify/complete and short context export. It is the preferred harness entry for agent work, but not stable. |
-| Graph Lite | Experimental alpha | `dhk graph init/status/index/impact/export` can scan files, parse Lite nodes/edges, persist snapshot-bound graph rows, and export local index/impact/context reports. |
+| Goal orchestration | Beta | High-level `dhk goal` protocol for start/resume/next/step/check/evaluate/verify/complete and short context export. It is the preferred harness entry for agent work, but not stable. |
+| Graph Lite | Alpha+ | `dhk graph init/status/index/impact/export/prune` can scan files, parse Lite nodes/edges, persist snapshot-bound graph rows, export local graph context, and audit/prune old snapshots. |
+| Graph-aware goal | Beta preview | Graph freshness, impact-map checks, stale override approval, and prune audit are wired into the goal workflow. Graph output remains heuristic advisory context. |
 | Workflow | Alpha | Records process state for audit and context export. It is not a workflow engine. |
 | Spec | Alpha | Records change documents, tasks, acceptance, and status. Markdown is export only. |
 | Agent packaging | Alpha | Ships `.agents/skills` and `.comate/rules` helpers for agent workflows. |
@@ -93,14 +94,14 @@ target/site/jacoco/index.html
 The shaded CLI jar is generated as:
 
 ```text
-target/dhk-cli-0.1.0-alpha-all.jar
+target/dhk-cli-0.4.4-beta.1-all.jar
 ```
 
 Release archives are generated during `mvn package`:
 
 ```text
-target/devharnesskit-0.1.0-alpha.zip
-target/devharnesskit-0.1.0-alpha.tar.gz
+target/devharnesskit-0.4.4-beta.1.zip
+target/devharnesskit-0.4.4-beta.1.tar.gz
 ```
 
 The archives include the CLI jar, scripts, agent skill/rule packaging, `LICENSE`, and `THIRD_PARTY_NOTICES.md`.
@@ -118,19 +119,19 @@ scripts/perf-smoke.sh
 Check the version:
 
 ```bash
-java -jar target/dhk-cli-0.1.0-alpha-all.jar version
+java -jar target/dhk-cli-0.4.4-beta.1-all.jar version
 ```
 
 Initialize project memory:
 
 ```bash
-java -jar target/dhk-cli-0.1.0-alpha-all.jar memory init --project-root .
+java -jar target/dhk-cli-0.4.4-beta.1-all.jar memory init --project-root .
 ```
 
 Add a draft memory:
 
 ```bash
-java -jar target/dhk-cli-0.1.0-alpha-all.jar memory add \
+java -jar target/dhk-cli-0.4.4-beta.1-all.jar memory add \
   --project-root . \
   --type gateway_convention \
   --module global \
@@ -144,13 +145,13 @@ For longer content, use `--content-file` or `--content-stdin`.
 Confirm it:
 
 ```bash
-java -jar target/dhk-cli-0.1.0-alpha-all.jar memory confirm --project-root . --id 1
+java -jar target/dhk-cli-0.4.4-beta.1-all.jar memory confirm --project-root . --id 1
 ```
 
 Export current context:
 
 ```bash
-java -jar target/dhk-cli-0.1.0-alpha-all.jar memory export \
+java -jar target/dhk-cli-0.4.4-beta.1-all.jar memory export \
   --project-root . \
   --task "Implement order query endpoint" \
   --module order \
@@ -163,9 +164,9 @@ Use `--json` for machine-readable output on supported commands such as `doctor`,
 Seed workflow templates and start a run:
 
 ```bash
-java -jar target/dhk-cli-0.1.0-alpha-all.jar workflow template seed --project-root .
+java -jar target/dhk-cli-0.4.4-beta.1-all.jar workflow template seed --project-root .
 
-java -jar target/dhk-cli-0.1.0-alpha-all.jar workflow start \
+java -jar target/dhk-cli-0.4.4-beta.1-all.jar workflow start \
   --project-root . \
   --workflow api-change \
   --task "Implement order query endpoint" \
@@ -176,7 +177,7 @@ java -jar target/dhk-cli-0.1.0-alpha-all.jar workflow start \
 Create a spec change:
 
 ```bash
-java -jar target/dhk-cli-0.1.0-alpha-all.jar spec create \
+java -jar target/dhk-cli-0.4.4-beta.1-all.jar spec create \
   --project-root . \
   --change order-query-api \
   --title "Implement order query endpoint" \
@@ -188,7 +189,7 @@ java -jar target/dhk-cli-0.1.0-alpha-all.jar spec create \
 Include workflow and spec summaries in `CURRENT_CONTEXT.md`:
 
 ```bash
-java -jar target/dhk-cli-0.1.0-alpha-all.jar memory export \
+java -jar target/dhk-cli-0.4.4-beta.1-all.jar memory export \
   --project-root . \
   --task "Implement order query endpoint" \
   --module order \
@@ -199,7 +200,7 @@ java -jar target/dhk-cli-0.1.0-alpha-all.jar memory export \
 Start a goal-oriented run:
 
 ```bash
-java -jar target/dhk-cli-0.1.0-alpha-all.jar goal start \
+java -jar target/dhk-cli-0.4.4-beta.1-all.jar goal start \
   --project-root . \
   --profile java-api-change \
   --task "Implement order query endpoint" \
@@ -210,18 +211,18 @@ java -jar target/dhk-cli-0.1.0-alpha-all.jar goal start \
 Then continue through the goal protocol:
 
 ```bash
-java -jar target/dhk-cli-0.1.0-alpha-all.jar goal next --project-root . --goal <goal-key>
-java -jar target/dhk-cli-0.1.0-alpha-all.jar goal step --project-root . --goal <goal-key> \
+java -jar target/dhk-cli-0.4.4-beta.1-all.jar goal next --project-root . --goal <goal-key>
+java -jar target/dhk-cli-0.4.4-beta.1-all.jar goal step --project-root . --goal <goal-key> \
   --summary "Inspected existing controller/service/mapper/tests" \
   --evidence "existing_controller,existing_service,existing_mapper,existing_tests"
-java -jar target/dhk-cli-0.1.0-alpha-all.jar goal status --project-root . --goal <goal-key>
+java -jar target/dhk-cli-0.4.4-beta.1-all.jar goal status --project-root . --goal <goal-key>
 ```
 
 Before claiming completion, run goal verification and complete the goal:
 
 ```bash
-java -jar target/dhk-cli-0.1.0-alpha-all.jar goal verify --project-root . --goal <goal-key>
-java -jar target/dhk-cli-0.1.0-alpha-all.jar goal complete --project-root . --goal <goal-key>
+java -jar target/dhk-cli-0.4.4-beta.1-all.jar goal verify --project-root . --goal <goal-key>
+java -jar target/dhk-cli-0.4.4-beta.1-all.jar goal complete --project-root . --goal <goal-key>
 ```
 
 `goal verify` runs the required checks and evaluates readiness in one command. `goal check` and `goal evaluate` remain available for lower-level debugging.
@@ -249,6 +250,7 @@ Projects can customize goal profiles, required checks, and accepted check status
 - SQL guard and JDBC read-only mode are not database permission boundaries.
 - Always use a database account with read-only privileges.
 - Do not connect DevHarness Kit to production databases with write-capable credentials.
+- `graph impact --allow-stale` requires explicit approval evidence by default, or an expert project policy override.
 - Workflow gates are manual/audit state unless explicitly wired to commands.
 - Goal orchestration is a deterministic CLI protocol over existing modules. `goal evaluate` checks recorded evidence before `goal complete`, but the project still does not prove code correctness.
 - Goal context exports reject sensitive findings. Goal completion summaries use redaction before writing, then reject if sensitive patterns still remain after redaction.

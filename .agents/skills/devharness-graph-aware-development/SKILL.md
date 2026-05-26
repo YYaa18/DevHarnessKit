@@ -31,6 +31,7 @@ Graph facts are snapshot-bound generated facts. They are not confirmed long-term
 ## Forbidden By Default
 
 - Do not skip `GRAPH_CONTEXT.md` or `IMPACT_MAP.md` in a graph-required goal.
+- Do not use `graph impact --allow-stale` yourself. It requires explicit policy approval or human approval evidence; the wrapper blocks it unless `DHK_ALLOW_STALE_APPROVED=true` is set outside the agent flow.
 - Do not edit files outside the impact map without re-running impact and recording risk.
 - Do not treat graph output as confirmed memory.
 - Do not complete when graph or impact checks are failed, stale, or missing.

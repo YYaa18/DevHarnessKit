@@ -4,8 +4,8 @@ import com.devharnesskit.dhk.Main;
 import com.devharnesskit.dhk.db.MigrationRunner;
 
 public final class VersionInfo {
-    public static final String FALLBACK_VERSION = "0.1.0-alpha";
-    public static final String RELEASE_CHANNEL = "alpha / developer preview";
+    public static final String FALLBACK_VERSION = "0.4.4-beta.1";
+    public static final String RELEASE_CHANNEL = "beta / developer preview";
     public static final int CURRENT_SCHEMA_VERSION = MigrationRunner.V9;
 
     private VersionInfo() {

@@ -30,6 +30,7 @@ dhk graph index --project-root <path>
 dhk graph impact --file <path>|--symbol <name>|--sql-table <table> --project-root <path>
 dhk graph export --project-root <path>
 dhk graph prune --keep 10 --project-root <path>
+dhk graph prune --keep 10 --dry-run --project-root <path>
 ```
 
 `graph init` creates `.agents/graph/config.json` and generated artifact
@@ -40,6 +41,22 @@ and edge rows into SQLite. Each index run creates a new snapshot; historical
 snapshots are not silently overwritten. `graph impact` reads the latest completed
 snapshot and writes `IMPACT_MAP.md` with related files, SQL nodes, tests, risk
 nodes, recommended reads, and scoring input counts.
+
+`graph impact` rejects stale snapshots by default. `--allow-stale` is an
+explicit escape hatch and is governed by `.agents/devharness/policy.json`:
+
+```json
+{
+  "graph_allow_stale_requires_approval": "true"
+}
+```
+
+The default is `true`. With that default, callers must pass
+`--allow-stale-evidence <evidence>` when using `--allow-stale`; strict
+graph-aware skill wrappers also block stale overrides unless a human or policy
+sets `DHK_ALLOW_STALE_APPROVED=true`. A project may set
+`graph_allow_stale_requires_approval=false` to authorize stale impact maps as an
+expert-mode local policy, but graph-aware goals should still prefer re-indexing.
 
 `graph doctor` checks the local graph configuration and reports optional
 provider availability. For the default `provider=lite`, CGC is reported as
@@ -58,7 +75,9 @@ GRAPH_SNAPSHOT.json
 count. It also removes associated `code_graph_file`, `code_graph_node`,
 `code_graph_edge`, `code_graph_query_cache`, and `goal_graph_binding` rows so
 SQLite does not accumulate orphan graph data. It never deletes the latest
-completed snapshots kept by `--keep`.
+completed snapshots kept by `--keep`. Add `--dry-run` to print the snapshots and
+row counts that would be deleted without modifying SQLite; this is intended for
+release and CI audits before real pruning.
 
 `GRAPH_CONTEXT.md` section order:
 

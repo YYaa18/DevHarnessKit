@@ -35,14 +35,14 @@ final class CommandRouterTest {
     }
 
     @Test
-    void versionCommandReturnsAlphaVersion() {
+    void versionCommandReturnsBetaVersion() {
         Harness harness = new Harness();
 
         int exitCode = new CommandRouter().run(new String[]{"version"}, harness.context());
 
         assertEquals(ExitCodes.SUCCESS, exitCode);
-        assertTrue(harness.stdout().contains("DevHarness Kit 0.1.0-alpha"));
-        assertTrue(harness.stdout().contains("release_channel: alpha / developer preview"));
+        assertTrue(harness.stdout().contains("DevHarness Kit 0.4.4-beta.1"));
+        assertTrue(harness.stdout().contains("release_channel: beta / developer preview"));
         assertTrue(harness.stdout().contains("schema_version: 9"));
     }
 
@@ -53,7 +53,7 @@ final class CommandRouterTest {
         int exitCode = new CommandRouter().run(new String[]{"--version"}, harness.context());
 
         assertEquals(ExitCodes.SUCCESS, exitCode);
-        assertTrue(harness.stdout().contains("DevHarness Kit 0.1.0-alpha"));
+        assertTrue(harness.stdout().contains("DevHarness Kit 0.4.4-beta.1"));
     }
 
     private static final class Harness {

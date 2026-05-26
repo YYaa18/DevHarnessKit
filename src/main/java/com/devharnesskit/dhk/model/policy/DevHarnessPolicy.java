@@ -13,6 +13,7 @@ public final class DevHarnessPolicy {
     private final boolean contextExportBlockOnSensitive;
     private final String[] contextExportAllowedFiles;
     private final String[] contextExportForbiddenFiles;
+    private final boolean graphAllowStaleRequiresApproval;
 
     public DevHarnessPolicy(String mode, String[] allowedDhkCommands, String[] forbiddenDhkCommands,
                             String[] protectedFiles, String[] allowedWritePaths,
@@ -20,6 +21,18 @@ public final class DevHarnessPolicy {
                             String[] dbAllowedEnvironments, boolean contextExportRequireSensitiveScan,
                             boolean contextExportBlockOnSensitive, String[] contextExportAllowedFiles,
                             String[] contextExportForbiddenFiles) {
+        this(mode, allowedDhkCommands, forbiddenDhkCommands, protectedFiles, allowedWritePaths,
+                dbSqlRequiresExplicitRequest, dbRequireReadonlyCredentials, dbAllowedEnvironments,
+                contextExportRequireSensitiveScan, contextExportBlockOnSensitive, contextExportAllowedFiles,
+                contextExportForbiddenFiles, true);
+    }
+
+    public DevHarnessPolicy(String mode, String[] allowedDhkCommands, String[] forbiddenDhkCommands,
+                            String[] protectedFiles, String[] allowedWritePaths,
+                            boolean dbSqlRequiresExplicitRequest, boolean dbRequireReadonlyCredentials,
+                            String[] dbAllowedEnvironments, boolean contextExportRequireSensitiveScan,
+                            boolean contextExportBlockOnSensitive, String[] contextExportAllowedFiles,
+                            String[] contextExportForbiddenFiles, boolean graphAllowStaleRequiresApproval) {
         this.mode = value(mode, "guided");
         this.allowedDhkCommands = array(allowedDhkCommands);
         this.forbiddenDhkCommands = array(forbiddenDhkCommands);
@@ -32,6 +45,7 @@ public final class DevHarnessPolicy {
         this.contextExportBlockOnSensitive = contextExportBlockOnSensitive;
         this.contextExportAllowedFiles = array(contextExportAllowedFiles);
         this.contextExportForbiddenFiles = array(contextExportForbiddenFiles);
+        this.graphAllowStaleRequiresApproval = graphAllowStaleRequiresApproval;
     }
 
     public static DevHarnessPolicy defaults() {
@@ -52,6 +66,7 @@ public final class DevHarnessPolicy {
     public boolean contextExportBlockOnSensitive() { return contextExportBlockOnSensitive; }
     public String[] contextExportAllowedFiles() { return contextExportAllowedFiles; }
     public String[] contextExportForbiddenFiles() { return contextExportForbiddenFiles; }
+    public boolean graphAllowStaleRequiresApproval() { return graphAllowStaleRequiresApproval; }
 
     private static String value(String value, String defaultValue) {
         if (value == null || value.trim().length() == 0) {

@@ -123,8 +123,15 @@ public final class GraphService {
     }
 
     public GraphPruneResult prune(Path projectRoot, int keep, Clock clock) throws Exception {
+        return prune(projectRoot, keep, clock, false);
+    }
+
+    public GraphPruneResult prune(Path projectRoot, int keep, Clock clock, final boolean dryRun) throws Exception {
         if (keep < 1) {
             throw new IllegalArgumentException("--keep must be >= 1");
+        }
+        if (dryRun) {
+            return previewPrune(projectRoot, keep);
         }
         PathUtil.createMemoryDirectories(projectRoot);
         PathUtil.createGraphDirectories(projectRoot);
@@ -137,6 +144,17 @@ public final class GraphService {
                     return graphRepository.pruneCompletedSnapshots(connection, project.projectKey(), keep);
                 }
             });
+        }
+    }
+
+    private GraphPruneResult previewPrune(Path projectRoot, int keep) throws Exception {
+        if (!Files.isRegularFile(PathUtil.memoryDb(projectRoot))
+                || !Files.isRegularFile(PathUtil.projectJson(projectRoot))) {
+            return new GraphPruneResult(keep, 0, 0, 0, 0, 0, 0, 0, true, new String[0]);
+        }
+        Project project = projectService.readProject(PathUtil.projectJson(projectRoot));
+        try (Connection connection = connectionFactory.open(projectRoot)) {
+            return graphRepository.previewPruneCompletedSnapshots(connection, project.projectKey(), keep);
         }
     }
 

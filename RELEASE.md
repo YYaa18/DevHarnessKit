@@ -1,6 +1,6 @@
 # Release Checklist
 
-Current release channel: `alpha / developer preview`.
+Current release channel: `beta / developer preview`.
 
 ## Before Tagging
 
@@ -15,7 +15,7 @@ Current release channel: `alpha / developer preview`.
 
    ```bash
    mvn -B clean package
-   java -jar target/dhk-cli-0.1.0-alpha-all.jar version
+   java -jar target/dhk-cli-0.4.4-beta.1-all.jar version
    ```
 
    `mvn test` and `mvn package` generate the JaCoCo report under `target/site/jacoco/`.
@@ -23,31 +23,31 @@ Current release channel: `alpha / developer preview`.
 4. Confirm release artifacts exist:
 
    ```text
-   target/dhk-cli-0.1.0-alpha-all.jar
-   target/devharnesskit-0.1.0-alpha.zip
-   target/devharnesskit-0.1.0-alpha.tar.gz
+   target/dhk-cli-0.4.4-beta.1-all.jar
+   target/devharnesskit-0.4.4-beta.1.zip
+   target/devharnesskit-0.4.4-beta.1.tar.gz
    ```
 
 5. Confirm archive contents:
 
    ```bash
-   unzip -l target/devharnesskit-0.1.0-alpha.zip | grep 'lib/dhk.jar'
-   unzip -l target/devharnesskit-0.1.0-alpha.zip | grep 'LICENSE'
-   unzip -l target/devharnesskit-0.1.0-alpha.zip | grep 'THIRD_PARTY_NOTICES.md'
-   unzip -l target/devharnesskit-0.1.0-alpha.zip | grep '.agents/skills/devharness-goal-development/SKILL.md'
-   unzip -l target/devharnesskit-0.1.0-alpha.zip | grep '.agents/skills/devharness-goal-development/scripts/goal-start.sh'
-   unzip -l target/devharnesskit-0.1.0-alpha.zip | grep '.agents/skills/devharness-goal-development/scripts/goal-start.bat'
-   unzip -l target/devharnesskit-0.1.0-alpha.zip | grep '.comate/rules/java-development-guard.mdr'
-   tar -tzf target/devharnesskit-0.1.0-alpha.tar.gz | grep 'lib/dhk.jar'
+   unzip -l target/devharnesskit-0.4.4-beta.1.zip | grep 'lib/dhk.jar'
+   unzip -l target/devharnesskit-0.4.4-beta.1.zip | grep 'LICENSE'
+   unzip -l target/devharnesskit-0.4.4-beta.1.zip | grep 'THIRD_PARTY_NOTICES.md'
+   unzip -l target/devharnesskit-0.4.4-beta.1.zip | grep '.agents/skills/devharness-goal-development/SKILL.md'
+   unzip -l target/devharnesskit-0.4.4-beta.1.zip | grep '.agents/skills/devharness-goal-development/scripts/goal-start.sh'
+   unzip -l target/devharnesskit-0.4.4-beta.1.zip | grep '.agents/skills/devharness-goal-development/scripts/goal-start.bat'
+   unzip -l target/devharnesskit-0.4.4-beta.1.zip | grep '.comate/rules/java-development-guard.mdr'
+   tar -tzf target/devharnesskit-0.4.4-beta.1.tar.gz | grep 'lib/dhk.jar'
    ```
 
 6. Confirm the archive jar and Unix wrapper can run:
 
    ```bash
    ARCHIVE_ROOT="$(mktemp -d)"
-   unzip -q target/devharnesskit-0.1.0-alpha.zip -d "$ARCHIVE_ROOT"
-   java -jar "$ARCHIVE_ROOT/devharnesskit-0.1.0-alpha/lib/dhk.jar" version
-   "$ARCHIVE_ROOT/devharnesskit-0.1.0-alpha/.agents/skills/devharness-goal-development/scripts/dhk.sh" version
+   unzip -q target/devharnesskit-0.4.4-beta.1.zip -d "$ARCHIVE_ROOT"
+   java -jar "$ARCHIVE_ROOT/devharnesskit-0.4.4-beta.1/lib/dhk.jar" version
+   "$ARCHIVE_ROOT/devharnesskit-0.4.4-beta.1/.agents/skills/devharness-goal-development/scripts/dhk.sh" version
    ```
 
    Windows `.bat` wrappers are verified by archive presence in this local checklist. Run them on Windows before a release promoted beyond alpha.
@@ -56,7 +56,7 @@ Current release channel: `alpha / developer preview`.
 
    ```bash
    SMOKE_ROOT="$(mktemp -d)"
-   JAR="target/dhk-cli-0.1.0-alpha-all.jar"
+   JAR="target/dhk-cli-0.4.4-beta.1-all.jar"
    java -jar "$JAR" memory init --project-root "$SMOKE_ROOT"
    java -jar "$JAR" doctor --project-root "$SMOKE_ROOT" --json | grep '"command": "doctor"'
    java -jar "$JAR" memory export --project-root "$SMOKE_ROOT" --task "release smoke" --module global --json | grep '"command": "memory export"'
@@ -68,7 +68,7 @@ Current release channel: `alpha / developer preview`.
 8. Confirm alpha wording:
 
    ```bash
-   grep -n "0.1.0-alpha" README.md
+   grep -n "0.4.4-beta.1" README.md
    grep -n "developer preview" README.md RELEASE.md
    grep -n "not.*stable\\|Do not publish.*stable" README.md
    grep -n "stable-ish alpha" docs/COMPATIBILITY.md
@@ -79,14 +79,14 @@ Current release channel: `alpha / developer preview`.
 
    ```bash
    cd target
-   sha256sum dhk-cli-0.1.0-alpha-all.jar devharnesskit-0.1.0-alpha.zip devharnesskit-0.1.0-alpha.tar.gz > SHA256SUMS
+   sha256sum dhk-cli-0.4.4-beta.1-all.jar devharnesskit-0.4.4-beta.1.zip devharnesskit-0.4.4-beta.1.tar.gz > SHA256SUMS
    ```
 
    On macOS:
 
    ```bash
    cd target
-   shasum -a 256 dhk-cli-0.1.0-alpha-all.jar devharnesskit-0.1.0-alpha.zip devharnesskit-0.1.0-alpha.tar.gz > SHA256SUMS
+   shasum -a 256 dhk-cli-0.4.4-beta.1-all.jar devharnesskit-0.4.4-beta.1.zip devharnesskit-0.4.4-beta.1.tar.gz > SHA256SUMS
    ```
 
 ## GitHub Release

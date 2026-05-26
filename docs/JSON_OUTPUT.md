@@ -2,7 +2,7 @@
 
 DevHarness Kit supports alpha JSON output for scripts and agents.
 
-JSON output is an alpha contract in `0.1.x`: supported commands and existing field names should change conservatively, but fields may be added before 1.0.
+JSON output is an alpha contract in beta patch releases: supported commands and existing field names should change conservatively, but fields may be added before 1.0.
 See [COMPATIBILITY.md](COMPATIBILITY.md) for the broader command and output stability policy.
 
 Use `--json` for command status output. Use `--format json` only where a command explicitly documents JSON data output, such as `dhk db sql` query results.

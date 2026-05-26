@@ -4,7 +4,7 @@ set "SCRIPT_DIR=%~dp0"
 for %%I in ("%SCRIPT_DIR%..\..\..\..") do set "PROJECT_ROOT=%%~fI"
 set "JAR=%PROJECT_ROOT%\.agents\tools\devharness-kit\dhk.jar"
 if not exist "%JAR%" set "JAR=%PROJECT_ROOT%\lib\dhk.jar"
-if not exist "%JAR%" set "JAR=%PROJECT_ROOT%\target\dhk-cli-0.1.0-alpha-all.jar"
+if not exist "%JAR%" set "JAR=%PROJECT_ROOT%\target\dhk-cli-0.4.4-beta.1-all.jar"
 if not exist "%JAR%" (
   echo DevHarness Kit jar not found. Run: mvn -DskipTests package 1>&2
   exit /b 4

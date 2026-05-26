@@ -20,6 +20,9 @@ public final class GraphImpactResult {
     private final List<String> recommendedReadFiles;
     private final List<GraphNode> candidates;
     private final Path impactMapPath;
+    private final int requestedDepth;
+    private final int maxImpactDepth;
+    private final boolean depthLimited;
 
     public GraphImpactResult(GraphImpactRequest request, GraphSnapshot snapshot, boolean found,
                              List<GraphNode> startNodes, List<GraphNode> impactedNodes,
@@ -28,6 +31,18 @@ public final class GraphImpactResult {
                              List<String> relatedTests, List<GraphNode> riskNodes,
                              List<String> recommendedReadFiles, List<GraphNode> candidates,
                              Path impactMapPath) {
+        this(request, snapshot, found, startNodes, impactedNodes, directCallers, directCallees,
+                relatedFiles, relatedSql, relatedTests, riskNodes, recommendedReadFiles, candidates,
+                impactMapPath, request.depth(), request.depth(), false);
+    }
+
+    public GraphImpactResult(GraphImpactRequest request, GraphSnapshot snapshot, boolean found,
+                             List<GraphNode> startNodes, List<GraphNode> impactedNodes,
+                             List<GraphEdge> directCallers, List<GraphEdge> directCallees,
+                             List<String> relatedFiles, List<GraphNode> relatedSql,
+                             List<String> relatedTests, List<GraphNode> riskNodes,
+                             List<String> recommendedReadFiles, List<GraphNode> candidates,
+                             Path impactMapPath, int requestedDepth, int maxImpactDepth, boolean depthLimited) {
         this.request = request;
         this.snapshot = snapshot;
         this.found = found;
@@ -42,6 +57,9 @@ public final class GraphImpactResult {
         this.recommendedReadFiles = copyStrings(recommendedReadFiles);
         this.candidates = copyNodes(candidates);
         this.impactMapPath = impactMapPath;
+        this.requestedDepth = requestedDepth;
+        this.maxImpactDepth = maxImpactDepth;
+        this.depthLimited = depthLimited;
     }
 
     public GraphImpactRequest request() {
@@ -98,6 +116,18 @@ public final class GraphImpactResult {
 
     public Path impactMapPath() {
         return impactMapPath;
+    }
+
+    public int requestedDepth() {
+        return requestedDepth;
+    }
+
+    public int maxImpactDepth() {
+        return maxImpactDepth;
+    }
+
+    public boolean depthLimited() {
+        return depthLimited;
     }
 
     private static List<GraphNode> copyNodes(List<GraphNode> values) {

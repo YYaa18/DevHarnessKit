@@ -15,6 +15,7 @@ import com.devharnesskit.dhk.repository.ProjectRepository;
 import com.devharnesskit.dhk.repository.graph.GraphRepository;
 import com.devharnesskit.dhk.service.ProjectService;
 import com.devharnesskit.dhk.service.goal.WorkspaceFingerprintService;
+import com.devharnesskit.dhk.service.policy.DevHarnessPolicyService;
 import com.devharnesskit.dhk.util.Clock;
 import com.devharnesskit.dhk.util.PathUtil;
 
@@ -43,18 +44,20 @@ public final class GraphService {
     private final GraphRepository graphRepository;
     private final TransactionTemplate transactionTemplate;
     private final WorkspaceFingerprintService fingerprintService;
+    private final DevHarnessPolicyService policyService;
 
     public GraphService() {
         this(new GraphConfigService(), new GraphFileScanner(), new GraphLiteParser(), new GraphIndexReportRenderer(),
                 new DbConnectionFactory(), new MigrationRunner(), new ProjectService(), new ProjectRepository(),
-                new GraphRepository(), new TransactionTemplate(), new WorkspaceFingerprintService());
+                new GraphRepository(), new TransactionTemplate(), new WorkspaceFingerprintService(),
+                new DevHarnessPolicyService());
     }
 
     GraphService(GraphConfigService configService, GraphFileScanner scanner, GraphLiteParser parser,
                  GraphIndexReportRenderer renderer, DbConnectionFactory connectionFactory,
                  MigrationRunner migrationRunner, ProjectService projectService, ProjectRepository projectRepository,
                  GraphRepository graphRepository, TransactionTemplate transactionTemplate,
-                 WorkspaceFingerprintService fingerprintService) {
+                 WorkspaceFingerprintService fingerprintService, DevHarnessPolicyService policyService) {
         this.configService = configService;
         this.scanner = scanner;
         this.parser = parser;
@@ -66,6 +69,7 @@ public final class GraphService {
         this.graphRepository = graphRepository;
         this.transactionTemplate = transactionTemplate;
         this.fingerprintService = fingerprintService;
+        this.policyService = policyService;
     }
 
     public GraphInitResult init(Path projectRoot) throws IOException {
@@ -115,7 +119,7 @@ public final class GraphService {
     }
 
     private GraphScanReport scan(Path projectRoot, GraphConfig config, GraphSnapshot latestSnapshot) {
-        GraphScanReport scanReport = scanner.scan(projectRoot, config);
+        GraphScanReport scanReport = scanner.scan(projectRoot, config, policyService.load(projectRoot).protectedFiles());
         GraphParseResult parseResult = parser.parse(projectRoot, scanReport.entries());
         return new GraphScanReport(projectRoot, config, scanReport.entries(), parseResult, latestSnapshot);
     }

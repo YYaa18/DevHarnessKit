@@ -295,7 +295,7 @@ public final class GraphRepository {
     }
 
     private boolean isProtected(GraphFileEntry entry) {
-        return "sensitive_filename".equals(entry.skipReason());
+        return "sensitive_filename".equals(entry.skipReason()) || "protected_file".equals(entry.skipReason());
     }
 
     private String nodeMetadata(GraphNode node, String createdAt) {

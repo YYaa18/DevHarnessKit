@@ -114,6 +114,8 @@ build/**
 
 Protected or sensitive file content should not be copied into graph exports.
 Implementations may record skipped metadata such as path, reason, and size.
+See [GRAPH_LIMITS.md](GRAPH_LIMITS.md) for default limits, skipped reasons, and
+truncation reporting.
 
 ## Lite Parser Scope
 
@@ -189,3 +191,6 @@ Graph rows describe the code state identified by `workspace_fingerprint`. They
 become stale when the workspace changes. Do not confirm graph rows into memory
 without human review. Markdown graph exports are generated context artifacts and
 can be regenerated from SQLite with the matching CLI.
+
+See [GRAPH_CONTEXT_LAYER.md](GRAPH_CONTEXT_LAYER.md) for the agent-facing graph
+context contract.

@@ -65,6 +65,8 @@ Internal/experimental:
 - Graph Lite SQLite tables, `.agents/graph/config.json`, snapshot rows, and
   generated graph exports beyond `GRAPH_INDEX_REPORT.md`, `IMPACT_MAP.md`,
   `GRAPH_CONTEXT.md`, and `GRAPH_SNAPSHOT.json`.
+- Graph Lite limits, skipped metadata, and truncation semantics are alpha and
+  documented in [GRAPH_LIMITS.md](GRAPH_LIMITS.md).
 
 Human-readable stdout is intended for people and examples. Do not parse it as a
 stable API unless a document explicitly names the fields and command as a

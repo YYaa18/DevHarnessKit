@@ -86,6 +86,57 @@ final class GraphCommandIntegrationTest {
     }
 
     @Test
+    void graphReportsLimitsTruncationAndProtectedFileSkips() throws Exception {
+        Path root = tempDir.resolve("demo-limits");
+        write(root, "src/main/java/com/example/App.java",
+                "package com.example;\npublic class App { public void run() {} }\n");
+        write(root, "src/main/java/com/example/Extra.java",
+                "package com.example;\npublic class Extra { public void run() {} }\n");
+        write(root, "src/main/resources/application-prod.yml", "password: raw-secret\n");
+        write(root, ".agents/graph/config.json",
+                "{\n"
+                        + "  \"limits\": {\n"
+                        + "    \"max_indexed_files\": 1,\n"
+                        + "    \"max_impact_depth\": 1,\n"
+                        + "    \"max_export_nodes\": 1\n"
+                        + "  }\n"
+                        + "}\n");
+        write(root, ".agents/devharness/policy.json",
+                "{\n"
+                        + "  \"protected_files\": \"src/main/resources/application-prod.yml\"\n"
+                        + "}\n");
+
+        Harness indexHarness = new Harness(tempDir);
+        int indexExit = new CommandRouter().run(new String[]{"graph", "index", "--project-root", "demo-limits"},
+                indexHarness.context());
+        Harness exportHarness = new Harness(tempDir);
+        int exportExit = new CommandRouter().run(new String[]{"graph", "export", "--project-root", "demo-limits"},
+                exportHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, indexExit);
+        assertEquals(ExitCodes.SUCCESS, exportExit);
+        assertTrue(indexHarness.stdout().contains("max_indexed_files: 1"));
+        assertTrue(indexHarness.stdout().contains("max_impact_depth: 1"));
+        assertTrue(indexHarness.stdout().contains("max_export_nodes: 1"));
+
+        String report = new String(Files.readAllBytes(PathUtil.graphIndexReport(root)), "UTF-8");
+        assertTrue(report.contains("<limits>"));
+        assertTrue(report.contains("src/main/resources/application-prod.yml [protected_file]"));
+        assertTrue(report.contains("- skipped_max_indexed_files: 1"));
+        assertTrue(report.contains("- skipped_protected_file: 1"));
+        assertTrue(report.contains("<truncation-report>"));
+        assertFalse(report.contains("raw-secret"));
+
+        String context = new String(Files.readAllBytes(PathUtil.graphContext(root)), "UTF-8");
+        String snapshot = new String(Files.readAllBytes(PathUtil.graphSnapshotJson(root)), "UTF-8");
+        assertTrue(context.contains("<limits>"));
+        assertTrue(context.contains("<truncation-report>"));
+        assertTrue(snapshot.contains("\"max_export_nodes\": 1"));
+        assertFalse(context.contains("raw-secret"));
+        assertFalse(snapshot.contains("raw-secret"));
+    }
+
+    @Test
     void graphIndexPersistsSnapshotsAndStatusShowsLatestSnapshot() throws Exception {
         Path root = tempDir.resolve("demo-index");
         write(root, "src/main/java/com/example/App.java",
@@ -161,6 +212,12 @@ final class GraphCommandIntegrationTest {
     @Test
     void graphImpactCoversLegacyMybatisOrderSearchFlow() throws Exception {
         Path fixture = copyFixture("legacy-mybatis-order", tempDir.resolve("legacy-impact"));
+        write(fixture, ".agents/graph/config.json",
+                "{\n"
+                        + "  \"limits\": {\n"
+                        + "    \"max_impact_depth\": 6\n"
+                        + "  }\n"
+                        + "}\n");
 
         Harness indexHarness = new Harness(tempDir);
         int indexExit = new CommandRouter().run(new String[]{"graph", "index", "--project-root", "legacy-impact"},
@@ -208,6 +265,36 @@ final class GraphCommandIntegrationTest {
         String impactMap = new String(Files.readAllBytes(PathUtil.graphImpactMap(fixture)), "UTF-8");
         assertTrue(impactMap.contains("<candidate-suggestions>"));
         assertTrue(impactMap.contains("OrderService"));
+    }
+
+    @Test
+    void graphImpactReportsConfiguredDepthLimit() throws Exception {
+        Path fixture = copyFixture("legacy-mybatis-order", tempDir.resolve("legacy-depth-limit"));
+        write(fixture, ".agents/graph/config.json",
+                "{\n"
+                        + "  \"limits\": {\n"
+                        + "    \"max_impact_depth\": 1\n"
+                        + "  }\n"
+                        + "}\n");
+
+        Harness indexHarness = new Harness(tempDir);
+        int indexExit = new CommandRouter().run(new String[]{"graph", "index", "--project-root", "legacy-depth-limit"},
+                indexHarness.context());
+        Harness impactHarness = new Harness(tempDir);
+        int impactExit = new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", "legacy-depth-limit", "--sql-table", "legacy_order", "--depth", "8"
+        }, impactHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, indexExit);
+        assertEquals(ExitCodes.SUCCESS, impactExit);
+        assertTrue(impactHarness.stdout().contains("depth: 1"));
+        assertTrue(impactHarness.stdout().contains("requested_depth: 8"));
+        assertTrue(impactHarness.stdout().contains("max_impact_depth: 1"));
+        assertTrue(impactHarness.stdout().contains("depth_limited: true"));
+        String impactMap = new String(Files.readAllBytes(PathUtil.graphImpactMap(fixture)), "UTF-8");
+        assertTrue(impactMap.contains("- requested_depth: 8"));
+        assertTrue(impactMap.contains("- max_impact_depth: 1"));
+        assertTrue(impactMap.contains("- depth_limited: true"));
     }
 
     private void write(Path root, String relativePath, String content) throws Exception {

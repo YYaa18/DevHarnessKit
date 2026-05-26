@@ -93,6 +93,9 @@ public final class GraphImpactCommand implements Command {
         context.out().println("query_type: " + result.request().queryType());
         context.out().println("query: " + result.request().query());
         context.out().println("depth: " + result.request().depth());
+        context.out().println("requested_depth: " + result.requestedDepth());
+        context.out().println("max_impact_depth: " + result.maxImpactDepth());
+        context.out().println("depth_limited: " + result.depthLimited());
         context.out().println("related_files: " + result.relatedFiles().size());
         context.out().println("related_sql: " + result.relatedSql().size());
         context.out().println("related_tests: " + result.relatedTests().size());
@@ -111,6 +114,9 @@ public final class GraphImpactCommand implements Command {
                 JsonOutput.stringField("query_type", result.request().queryType()),
                 JsonOutput.stringField("query", result.request().query()),
                 JsonOutput.numberField("depth", result.request().depth()),
+                JsonOutput.numberField("requested_depth", result.requestedDepth()),
+                JsonOutput.numberField("max_impact_depth", result.maxImpactDepth()),
+                JsonOutput.booleanField("depth_limited", result.depthLimited()),
                 JsonOutput.stringField("snapshot_key", result.snapshot() == null ? "" : result.snapshot().snapshotKey()),
                 JsonOutput.numberField("related_files", result.relatedFiles().size()),
                 JsonOutput.numberField("related_sql", result.relatedSql().size()),

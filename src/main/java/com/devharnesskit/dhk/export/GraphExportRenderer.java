@@ -12,8 +12,13 @@ import java.util.Map;
 
 public final class GraphExportRenderer {
     public String renderContext(GraphData data, Instant generatedAt) {
+        return renderContext(data, generatedAt, 500);
+    }
+
+    public String renderContext(GraphData data, Instant generatedAt, int exportLimit) {
         StringBuilder builder = new StringBuilder();
         GraphSnapshot snapshot = data.snapshot();
+        int limit = Math.max(1, exportLimit);
         builder.append("# GRAPH_CONTEXT\n\n");
         builder.append("<generated-at>").append(generatedAt.toString()).append("</generated-at>\n\n");
         builder.append("<boundary>\n");
@@ -32,9 +37,11 @@ public final class GraphExportRenderer {
         builder.append("- edge_count: ").append(snapshot.edgeCount()).append('\n');
         builder.append("- summary: ").append(safe(snapshot.summary())).append('\n');
         builder.append("</snapshot>\n\n");
-        appendFileHashes(builder, data);
+        appendLimits(builder, snapshot, limit);
+        appendFileHashes(builder, data, limit);
         appendNodeKinds(builder, data);
-        appendRiskNodes(builder, data);
+        appendRiskNodes(builder, data, limit);
+        appendTruncationReport(builder, data, limit);
         builder.append("<agent-instructions>\n");
         builder.append("- read IMPACT_MAP.md for task-specific impact before editing\n");
         builder.append("- do not treat graph facts as confirmed memory without human review\n");
@@ -44,7 +51,12 @@ public final class GraphExportRenderer {
     }
 
     public String renderSnapshotJson(GraphData data, Instant generatedAt) {
+        return renderSnapshotJson(data, generatedAt, 500);
+    }
+
+    public String renderSnapshotJson(GraphData data, Instant generatedAt, int exportLimit) {
         GraphSnapshot snapshot = data.snapshot();
+        int limit = Math.max(1, exportLimit);
         StringBuilder builder = new StringBuilder();
         builder.append("{\n");
         appendJsonField(builder, "schema_version", "devharness-graph-snapshot/v1", true);
@@ -60,9 +72,22 @@ public final class GraphExportRenderer {
         appendJsonNumber(builder, "file_count", snapshot.fileCount(), true);
         appendJsonNumber(builder, "node_count", snapshot.nodeCount(), true);
         appendJsonNumber(builder, "edge_count", snapshot.edgeCount(), true);
+        appendJsonNumber(builder, "max_file_bytes", snapshot.maxFileBytes(), true);
+        appendJsonNumber(builder, "max_indexed_files", snapshot.maxIndexedFiles(), true);
+        appendJsonNumber(builder, "max_export_nodes", limit, true);
+        appendJsonBoolean(builder, "file_hashes_truncated", indexedFileCount(data) > limit, true);
+        appendJsonBoolean(builder, "risk_nodes_truncated", riskNodeCount(data) > limit, true);
         builder.append("  \"file_hashes\": [\n");
+        int exported = 0;
+        boolean first = true;
         for (int i = 0; i < data.files().size(); i++) {
             GraphFileEntry file = data.files().get(i);
+            if (file.indexed() && exported >= limit) {
+                continue;
+            }
+            if (!first) {
+                builder.append(",\n");
+            }
             builder.append("    {")
                     .append("\"path\": ").append(JsonOutput.quote(file.relativePath())).append(", ")
                     .append("\"language\": ").append(JsonOutput.quote(file.language())).append(", ")
@@ -71,9 +96,12 @@ public final class GraphExportRenderer {
                     .append("\"hash\": ").append(JsonOutput.quote(file.contentHash())).append(", ")
                     .append("\"skip_reason\": ").append(JsonOutput.quote(file.skipReason()))
                     .append("}");
-            if (i + 1 < data.files().size()) {
-                builder.append(',');
+            first = false;
+            if (file.indexed()) {
+                exported++;
             }
+        }
+        if (!first) {
             builder.append('\n');
         }
         builder.append("  ]\n");
@@ -81,7 +109,16 @@ public final class GraphExportRenderer {
         return builder.toString();
     }
 
-    private void appendFileHashes(StringBuilder builder, GraphData data) {
+    private void appendLimits(StringBuilder builder, GraphSnapshot snapshot, int limit) {
+        builder.append("<limits>\n");
+        builder.append("- max_file_bytes: ").append(snapshot.maxFileBytes()).append('\n');
+        builder.append("- max_indexed_files: ").append(snapshot.maxIndexedFiles()).append('\n');
+        builder.append("- max_export_nodes: ").append(limit).append('\n');
+        builder.append("- skipped_files: ").append(snapshot.skippedFileCount()).append('\n');
+        builder.append("</limits>\n\n");
+    }
+
+    private void appendFileHashes(StringBuilder builder, GraphData data, int limit) {
         builder.append("<file-hashes>\n");
         int count = 0;
         for (GraphFileEntry file : data.files()) {
@@ -94,8 +131,12 @@ public final class GraphExportRenderer {
                     .append(", ").append(file.contentHash())
                     .append("]\n");
             count++;
-            if (count >= 50) {
-                builder.append("- truncated: file hash list limited to 50 entries\n");
+            if (count >= limit) {
+                int remaining = indexedFileCount(data) - count;
+                if (remaining > 0) {
+                    builder.append("- truncated: ").append(remaining)
+                            .append(" indexed file hashes not shown due to max_export_nodes\n");
+                }
                 break;
             }
         }
@@ -115,7 +156,7 @@ public final class GraphExportRenderer {
         builder.append("</node-kinds>\n\n");
     }
 
-    private void appendRiskNodes(StringBuilder builder, GraphData data) {
+    private void appendRiskNodes(StringBuilder builder, GraphData data, int limit) {
         builder.append("<risk-nodes>\n");
         int count = 0;
         for (GraphNode node : data.nodes()) {
@@ -130,12 +171,49 @@ public final class GraphExportRenderer {
                     .append(", evidence=").append(safe(node.evidence()))
                     .append("]\n");
             count++;
-            if (count >= 50) {
-                builder.append("- truncated: risk node list limited to 50 entries\n");
+            if (count >= limit) {
+                int remaining = riskNodeCount(data) - count;
+                if (remaining > 0) {
+                    builder.append("- truncated: ").append(remaining)
+                            .append(" risk nodes not shown due to max_export_nodes\n");
+                }
                 break;
             }
         }
         builder.append("</risk-nodes>\n\n");
+    }
+
+    private void appendTruncationReport(StringBuilder builder, GraphData data, int limit) {
+        int indexedFiles = indexedFileCount(data);
+        int riskNodes = riskNodeCount(data);
+        builder.append("<truncation-report>\n");
+        builder.append("- indexed_files_total: ").append(indexedFiles).append('\n');
+        builder.append("- indexed_file_hashes_exported: ").append(Math.min(indexedFiles, limit)).append('\n');
+        builder.append("- indexed_file_hashes_truncated: ").append(indexedFiles > limit).append('\n');
+        builder.append("- risk_nodes_total: ").append(riskNodes).append('\n');
+        builder.append("- risk_nodes_exported: ").append(Math.min(riskNodes, limit)).append('\n');
+        builder.append("- risk_nodes_truncated: ").append(riskNodes > limit).append('\n');
+        builder.append("</truncation-report>\n\n");
+    }
+
+    private int indexedFileCount(GraphData data) {
+        int count = 0;
+        for (GraphFileEntry file : data.files()) {
+            if (file.indexed()) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private int riskNodeCount(GraphData data) {
+        int count = 0;
+        for (GraphNode node : data.nodes()) {
+            if (isRiskNode(node)) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private boolean isRiskNode(GraphNode node) {
@@ -154,6 +232,14 @@ public final class GraphExportRenderer {
     }
 
     private void appendJsonNumber(StringBuilder builder, String name, long value, boolean comma) {
+        builder.append("  ").append(JsonOutput.quote(name)).append(": ").append(value);
+        if (comma) {
+            builder.append(',');
+        }
+        builder.append('\n');
+    }
+
+    private void appendJsonBoolean(StringBuilder builder, String name, boolean value, boolean comma) {
         builder.append("  ").append(JsonOutput.quote(name)).append(": ").append(value);
         if (comma) {
             builder.append(',');

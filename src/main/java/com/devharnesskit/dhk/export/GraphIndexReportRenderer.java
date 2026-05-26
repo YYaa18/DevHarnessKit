@@ -32,7 +32,11 @@ public final class GraphIndexReportRenderer {
         }
         builder.append("- max_file_bytes: ").append(report.config().maxFileBytes()).append('\n');
         builder.append("- max_indexed_files: ").append(report.config().maxIndexedFiles()).append('\n');
+        builder.append("- max_impact_depth: ").append(report.config().maxImpactDepth()).append('\n');
+        builder.append("- max_export_nodes: ").append(report.config().maxExportNodes()).append('\n');
         builder.append("</summary>\n\n");
+
+        appendLimits(builder, report);
 
         builder.append("<languages>\n");
         for (Map.Entry<String, Integer> entry : report.languageCounts().entrySet()) {
@@ -68,7 +72,21 @@ public final class GraphIndexReportRenderer {
         appendNodes(builder, report.parseResult().nodes(), report.config().maxExportNodes());
         appendEdges(builder, report.parseResult().edges(), report.config().maxExportNodes());
         appendErrors(builder, report.parseResult().errors());
+        appendTruncationReport(builder, report);
         return builder.toString();
+    }
+
+    private void appendLimits(StringBuilder builder, GraphScanReport report) {
+        builder.append("<limits>\n");
+        builder.append("- max_file_bytes: ").append(report.config().maxFileBytes()).append('\n');
+        builder.append("- max_indexed_files: ").append(report.config().maxIndexedFiles()).append('\n');
+        builder.append("- max_impact_depth: ").append(report.config().maxImpactDepth()).append('\n');
+        builder.append("- max_export_nodes: ").append(report.config().maxExportNodes()).append('\n');
+        builder.append("- skipped_max_file_bytes: ").append(report.skippedFiles("max_file_bytes")).append('\n');
+        builder.append("- skipped_max_indexed_files: ").append(report.skippedFiles("max_indexed_files")).append('\n');
+        builder.append("- skipped_sensitive_filename: ").append(report.skippedFiles("sensitive_filename")).append('\n');
+        builder.append("- skipped_protected_file: ").append(report.skippedFiles("protected_file")).append('\n');
+        builder.append("</limits>\n\n");
     }
 
     private void appendNodes(StringBuilder builder, List<GraphNode> nodes, int limit) {
@@ -121,6 +139,20 @@ public final class GraphIndexReportRenderer {
                     .append("]\n");
         }
         builder.append("</parse-errors>\n");
+    }
+
+    private void appendTruncationReport(StringBuilder builder, GraphScanReport report) {
+        int limit = report.config().maxExportNodes();
+        int nodesTotal = report.parseResult().nodes().size();
+        int edgesTotal = report.parseResult().edges().size();
+        builder.append("\n<truncation-report>\n");
+        builder.append("- graph_nodes_total: ").append(nodesTotal).append('\n');
+        builder.append("- graph_nodes_exported: ").append(Math.min(nodesTotal, limit)).append('\n');
+        builder.append("- graph_nodes_truncated: ").append(nodesTotal > limit).append('\n');
+        builder.append("- graph_edges_total: ").append(edgesTotal).append('\n');
+        builder.append("- graph_edges_exported: ").append(Math.min(edgesTotal, limit)).append('\n');
+        builder.append("- graph_edges_truncated: ").append(edgesTotal > limit).append('\n');
+        builder.append("</truncation-report>\n");
     }
 
     private String displayName(GraphNode node) {

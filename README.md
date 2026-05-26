@@ -269,6 +269,9 @@ Read [SECURITY.md](SECURITY.md) before using DB readonly features.
 - [docs/DEVHARNESS_SKILLS_REDESIGN_PLAN.md](docs/DEVHARNESS_SKILLS_REDESIGN_PLAN.md): goal-first skill redesign plan.
 - [docs/GOAL_CONFIGURATION.md](docs/GOAL_CONFIGURATION.md): project-level goal profile and check policy configuration.
 - [docs/GOAL_SYNC_STRICTNESS.md](docs/GOAL_SYNC_STRICTNESS.md): goal-controlled workflow/spec synchronization model and alpha boundaries.
+- [docs/GRAPH_CONTEXT_LAYER.md](docs/GRAPH_CONTEXT_LAYER.md): Graph Lite context layer, export boundary, and agent usage.
+- [docs/GRAPH_LIMITS.md](docs/GRAPH_LIMITS.md): Graph Lite safety limits, skipped metadata, and truncation reports.
+- [docs/GRAPH_SCHEMA.md](docs/GRAPH_SCHEMA.md): Graph Lite alpha schema, config, and SQLite table contract.
 - [docs/JSON_OUTPUT.md](docs/JSON_OUTPUT.md): alpha JSON output commands and required fields.
 - [docs/MIGRATIONS.md](docs/MIGRATIONS.md): SQLite schema compatibility and recovery policy.
 - [docs/POLICY.md](docs/POLICY.md): project policy hooks for protected paths, command guards, DB SQL, export, and goal lifecycle checks.

@@ -17,6 +17,10 @@ import java.util.regex.Pattern;
 
 public final class GraphFileScanner {
     public GraphScanReport scan(final Path projectRoot, final GraphConfig config) {
+        return scan(projectRoot, config, new String[0]);
+    }
+
+    public GraphScanReport scan(final Path projectRoot, final GraphConfig config, final String[] protectedGlobs) {
         final List<GraphFileEntry> entries = new ArrayList<GraphFileEntry>();
         final int[] indexed = new int[]{0};
         try {
@@ -32,7 +36,7 @@ public final class GraphFileScanner {
 
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-                    consider(projectRoot, file, attrs, config, entries, indexed);
+                    consider(projectRoot, file, attrs, config, protectedGlobs, entries, indexed);
                     return FileVisitResult.CONTINUE;
                 }
             });
@@ -44,16 +48,21 @@ public final class GraphFileScanner {
     }
 
     private void consider(Path projectRoot, Path file, BasicFileAttributes attrs, GraphConfig config,
-                          List<GraphFileEntry> entries, int[] indexed) {
+                          String[] protectedGlobs, List<GraphFileEntry> entries, int[] indexed) {
         String relative = relative(projectRoot, file);
         boolean included = matchesAny(relative, config.include());
         boolean sensitive = isSensitivePath(relative);
+        boolean protectedFile = matchesAny(relative, protectedGlobs == null ? new String[0] : protectedGlobs);
         boolean excluded = matchesAny(relative, config.exclude()) || isBinaryPath(relative);
-        if (!included && !sensitive) {
+        if (!included && !sensitive && !protectedFile) {
             return;
         }
         String language = language(relative);
         String fileKind = fileKind(relative);
+        if (protectedFile) {
+            entries.add(skipped(relative, language, fileKind, attrs.size(), "protected_file"));
+            return;
+        }
         if (sensitive) {
             entries.add(skipped(relative, language, fileKind, attrs.size(), "sensitive_filename"));
             return;
@@ -99,6 +108,15 @@ public final class GraphFileScanner {
     }
 
     private boolean matchesAny(String relative, List<String> patterns) {
+        for (String pattern : patterns) {
+            if (matches(relative, pattern)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean matchesAny(String relative, String[] patterns) {
         for (String pattern : patterns) {
             if (matches(relative, pattern)) {
                 return true;

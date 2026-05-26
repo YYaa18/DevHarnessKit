@@ -38,6 +38,10 @@ public final class GraphIndexCommand implements Command {
                         JsonOutput.numberField("files_considered", result.report().filesConsidered()),
                         JsonOutput.numberField("indexed_files", result.report().indexedFiles()),
                         JsonOutput.numberField("skipped_files", result.report().skippedFiles()),
+                        JsonOutput.numberField("max_file_bytes", result.report().config().maxFileBytes()),
+                        JsonOutput.numberField("max_indexed_files", result.report().config().maxIndexedFiles()),
+                        JsonOutput.numberField("max_impact_depth", result.report().config().maxImpactDepth()),
+                        JsonOutput.numberField("max_export_nodes", result.report().config().maxExportNodes()),
                         JsonOutput.numberField("graph_nodes", snapshot.nodeCount()),
                         JsonOutput.numberField("graph_edges", snapshot.edgeCount()),
                         JsonOutput.stringField("report_path", result.reportPath().toString())
@@ -51,6 +55,10 @@ public final class GraphIndexCommand implements Command {
                 context.out().println("files_considered: " + result.report().filesConsidered());
                 context.out().println("indexed_files: " + result.report().indexedFiles());
                 context.out().println("skipped_files: " + result.report().skippedFiles());
+                context.out().println("max_file_bytes: " + result.report().config().maxFileBytes());
+                context.out().println("max_indexed_files: " + result.report().config().maxIndexedFiles());
+                context.out().println("max_impact_depth: " + result.report().config().maxImpactDepth());
+                context.out().println("max_export_nodes: " + result.report().config().maxExportNodes());
                 context.out().println("graph_nodes: " + snapshot.nodeCount());
                 context.out().println("graph_edges: " + snapshot.edgeCount());
                 context.out().println("report_path: " + result.reportPath());

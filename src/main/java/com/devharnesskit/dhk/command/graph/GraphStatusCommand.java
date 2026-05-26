@@ -38,6 +38,10 @@ public final class GraphStatusCommand implements Command {
                         JsonOutput.numberField("files_considered", report.filesConsidered()),
                         JsonOutput.numberField("indexed_files", report.indexedFiles()),
                         JsonOutput.numberField("skipped_files", report.skippedFiles()),
+                        JsonOutput.numberField("max_file_bytes", report.config().maxFileBytes()),
+                        JsonOutput.numberField("max_indexed_files", report.config().maxIndexedFiles()),
+                        JsonOutput.numberField("max_impact_depth", report.config().maxImpactDepth()),
+                        JsonOutput.numberField("max_export_nodes", report.config().maxExportNodes()),
                         JsonOutput.numberField("graph_nodes", report.parseResult().nodes().size()),
                         JsonOutput.numberField("graph_edges", report.parseResult().edges().size()),
                         JsonOutput.numberField("parse_errors", report.parseResult().errors().size()),
@@ -53,6 +57,10 @@ public final class GraphStatusCommand implements Command {
                 context.out().println("files_considered: " + report.filesConsidered());
                 context.out().println("indexed_files: " + report.indexedFiles());
                 context.out().println("skipped_files: " + report.skippedFiles());
+                context.out().println("max_file_bytes: " + report.config().maxFileBytes());
+                context.out().println("max_indexed_files: " + report.config().maxIndexedFiles());
+                context.out().println("max_impact_depth: " + report.config().maxImpactDepth());
+                context.out().println("max_export_nodes: " + report.config().maxExportNodes());
                 context.out().println("graph_nodes: " + report.parseResult().nodes().size());
                 context.out().println("graph_edges: " + report.parseResult().edges().size());
                 context.out().println("parse_errors: " + report.parseResult().errors().size());

@@ -3,6 +3,7 @@ package com.devharnesskit.dhk.service.graph;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.export.GraphImpactRenderer;
 import com.devharnesskit.dhk.model.Project;
+import com.devharnesskit.dhk.model.graph.GraphConfig;
 import com.devharnesskit.dhk.model.graph.GraphData;
 import com.devharnesskit.dhk.model.graph.GraphEdge;
 import com.devharnesskit.dhk.model.graph.GraphFileEntry;
@@ -35,34 +36,44 @@ public final class GraphImpactService {
     private final ProjectService projectService;
     private final GraphRepository graphRepository;
     private final GraphImpactRenderer renderer;
+    private final GraphConfigService configService;
 
     public GraphImpactService() {
-        this(new DbConnectionFactory(), new ProjectService(), new GraphRepository(), new GraphImpactRenderer());
+        this(new DbConnectionFactory(), new ProjectService(), new GraphRepository(), new GraphImpactRenderer(),
+                new GraphConfigService());
     }
 
     GraphImpactService(DbConnectionFactory connectionFactory, ProjectService projectService,
-                       GraphRepository graphRepository, GraphImpactRenderer renderer) {
+                       GraphRepository graphRepository, GraphImpactRenderer renderer, GraphConfigService configService) {
         this.connectionFactory = connectionFactory;
         this.projectService = projectService;
         this.graphRepository = graphRepository;
         this.renderer = renderer;
+        this.configService = configService;
     }
 
     public GraphImpactResult impact(Path projectRoot, GraphImpactRequest request, Clock clock) throws Exception {
         PathUtil.createGraphDirectories(projectRoot);
+        GraphConfig config = configService.load(projectRoot);
+        int requestedDepth = request.depth();
+        int maxDepth = Math.max(1, config.maxImpactDepth());
+        GraphImpactRequest effectiveRequest = new GraphImpactRequest(request.queryType(), request.query(),
+                Math.min(Math.max(1, requestedDepth), maxDepth));
+        boolean depthLimited = requestedDepth > effectiveRequest.depth();
         GraphData data = loadData(projectRoot);
-        List<GraphNode> startNodes = startNodes(data, request);
-        List<GraphNode> candidates = startNodes.isEmpty() ? candidates(data, request.query()) : Collections.<GraphNode>emptyList();
+        List<GraphNode> startNodes = startNodes(data, effectiveRequest);
+        List<GraphNode> candidates = startNodes.isEmpty() ? candidates(data, effectiveRequest.query()) : Collections.<GraphNode>emptyList();
         GraphImpactResult result;
         if (startNodes.isEmpty()) {
-            result = new GraphImpactResult(request, data.snapshot(), false, startNodes,
+            result = new GraphImpactResult(effectiveRequest, data.snapshot(), false, startNodes,
                     Collections.<GraphNode>emptyList(), Collections.<GraphEdge>emptyList(),
                     Collections.<GraphEdge>emptyList(), Collections.<String>emptyList(),
                     Collections.<GraphNode>emptyList(), Collections.<String>emptyList(),
                     Collections.<GraphNode>emptyList(), Collections.<String>emptyList(), candidates,
-                    PathUtil.graphImpactMap(projectRoot));
+                    PathUtil.graphImpactMap(projectRoot), requestedDepth, maxDepth, depthLimited);
         } else {
-            result = buildResult(projectRoot, data, request, startNodes);
+            result = buildResult(projectRoot, data, effectiveRequest, startNodes, requestedDepth, maxDepth,
+                    depthLimited);
         }
         Files.write(PathUtil.graphImpactMap(projectRoot),
                 renderer.render(result, clock.now()).getBytes("UTF-8"));
@@ -84,7 +95,8 @@ public final class GraphImpactService {
     }
 
     private GraphImpactResult buildResult(Path projectRoot, GraphData data, GraphImpactRequest request,
-                                          List<GraphNode> startNodes) {
+                                          List<GraphNode> startNodes, int requestedDepth, int maxImpactDepth,
+                                          boolean depthLimited) {
         Map<String, GraphNode> nodesByKey = nodesByKey(data.nodes());
         Map<String, List<GraphEdge>> outgoing = new LinkedHashMap<String, List<GraphEdge>>();
         Map<String, List<GraphEdge>> incoming = new LinkedHashMap<String, List<GraphEdge>>();
@@ -105,7 +117,7 @@ public final class GraphImpactService {
 
         return new GraphImpactResult(request, data.snapshot(), true, startNodes, impactedNodes, callers,
                 callees, relatedFiles, sql, tests, risks, recommended, Collections.<GraphNode>emptyList(),
-                PathUtil.graphImpactMap(projectRoot));
+                PathUtil.graphImpactMap(projectRoot), requestedDepth, maxImpactDepth, depthLimited);
     }
 
     private List<GraphNode> startNodes(GraphData data, GraphImpactRequest request) {

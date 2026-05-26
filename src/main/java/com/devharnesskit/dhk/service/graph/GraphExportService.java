@@ -23,27 +23,30 @@ public final class GraphExportService {
     private final GraphRepository graphRepository;
     private final GraphExportRenderer renderer;
     private final SensitiveDataGuard sensitiveDataGuard;
+    private final GraphConfigService configService;
 
     public GraphExportService() {
         this(new DbConnectionFactory(), new ProjectService(), new GraphRepository(), new GraphExportRenderer(),
-                new SensitiveDataGuard());
+                new SensitiveDataGuard(), new GraphConfigService());
     }
 
     GraphExportService(DbConnectionFactory connectionFactory, ProjectService projectService,
                        GraphRepository graphRepository, GraphExportRenderer renderer,
-                       SensitiveDataGuard sensitiveDataGuard) {
+                       SensitiveDataGuard sensitiveDataGuard, GraphConfigService configService) {
         this.connectionFactory = connectionFactory;
         this.projectService = projectService;
         this.graphRepository = graphRepository;
         this.renderer = renderer;
         this.sensitiveDataGuard = sensitiveDataGuard;
+        this.configService = configService;
     }
 
     public GraphExportResult export(Path projectRoot, Clock clock) throws Exception {
         PathUtil.createGraphDirectories(projectRoot);
         GraphData data = loadData(projectRoot);
-        String context = guard(renderer.renderContext(data, clock.now()));
-        String snapshot = guard(renderer.renderSnapshotJson(data, clock.now()));
+        int exportLimit = Math.max(1, configService.load(projectRoot).maxExportNodes());
+        String context = guard(renderer.renderContext(data, clock.now(), exportLimit));
+        String snapshot = guard(renderer.renderSnapshotJson(data, clock.now(), exportLimit));
         Files.write(PathUtil.graphContext(projectRoot), context.getBytes("UTF-8"));
         Files.write(PathUtil.graphSnapshotJson(projectRoot), snapshot.getBytes("UTF-8"));
         return new GraphExportResult(data, PathUtil.graphContext(projectRoot), PathUtil.graphSnapshotJson(projectRoot));

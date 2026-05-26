@@ -70,6 +70,16 @@ public final class GraphScanReport {
         return filesConsidered() - indexedFiles();
     }
 
+    public int skippedFiles(String reason) {
+        int count = 0;
+        for (GraphFileEntry entry : entries) {
+            if (!entry.indexed() && reason.equals(entry.skipReason())) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     public Map<String, Integer> languageCounts() {
         Map<String, Integer> counts = new LinkedHashMap<String, Integer>();
         for (GraphFileEntry entry : entries) {

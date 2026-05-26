@@ -14,7 +14,10 @@ public final class GraphImpactRenderer {
         builder.append("<summary>\n");
         builder.append("- query_type: ").append(result.request().queryType()).append('\n');
         builder.append("- query: ").append(safe(result.request().query())).append('\n');
-        builder.append("- depth: ").append(result.request().depth()).append('\n');
+        builder.append("- effective_depth: ").append(result.request().depth()).append('\n');
+        builder.append("- requested_depth: ").append(result.requestedDepth()).append('\n');
+        builder.append("- max_impact_depth: ").append(result.maxImpactDepth()).append('\n');
+        builder.append("- depth_limited: ").append(result.depthLimited()).append('\n');
         builder.append("- found: ").append(result.found()).append('\n');
         if (result.snapshot() != null) {
             builder.append("- snapshot_key: ").append(result.snapshot().snapshotKey()).append('\n');

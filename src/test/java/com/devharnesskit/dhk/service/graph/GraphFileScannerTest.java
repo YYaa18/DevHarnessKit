@@ -61,6 +61,19 @@ final class GraphFileScannerTest {
         assertTrue(hasSkipReason(report, "max_indexed_files"));
     }
 
+    @Test
+    void skipsProtectedFilesAsMetadataOnly() throws Exception {
+        write("src/main/resources/application-prod.yml", "password: raw-secret\n");
+        write("src/main/java/App.java", "class App {}\n");
+
+        GraphScanReport report = new GraphFileScanner().scan(tempDir, GraphConfig.defaults(),
+                new String[]{"src/main/resources/application-prod.yml"});
+
+        assertEquals(1, report.indexedFiles());
+        assertSkipped(report, "src/main/resources/application-prod.yml", "protected_file");
+        assertEquals(1, report.skippedFiles("protected_file"));
+    }
+
     private void write(String relativePath, String content) throws Exception {
         Path file = tempDir.resolve(relativePath);
         Files.createDirectories(file.getParent());

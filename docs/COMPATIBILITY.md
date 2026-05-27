@@ -37,6 +37,13 @@ Beta core:
 
 Stable-candidate beta:
 
+- `dhk configure init`
+- `dhk configure show`
+- `dhk configure doctor`
+- `dhk configure explain`
+- `dhk status`
+- `dhk readiness`
+- `dhk quickstart`
 - `dhk goal start`
 - `dhk goal resume`
 - `dhk goal next`
@@ -67,7 +74,6 @@ Alpha:
 - `dhk graph impact`
 - `dhk graph export`
 - `dhk graph prune`
-- `dhk configure ...`
 - `dhk bdd init`
 - `dhk bdd add`
 - `dhk bdd list`
@@ -128,7 +134,9 @@ human-readable output.
 
 ## JSON Output Contract
 
-JSON output is alpha, but scripts may depend on:
+JSON output remains conservative before 1.0. The minimum stable-beta JSON fields
+for stable-beta commands are listed in [STABLE_CONTRACT.md](STABLE_CONTRACT.md).
+Other JSON output is alpha, but scripts may depend on:
 
 - valid JSON on stdout for commands listed in [JSON_OUTPUT.md](JSON_OUTPUT.md);
 - existing required field names changing conservatively in beta patch releases;
@@ -147,11 +155,12 @@ Beta exports:
 
 - `CURRENT_CONTEXT.md`
 - `RECOVERY_CONTEXT.md`
+- `GOAL_CONTEXT.md`
+- `GOAL_SUMMARY.md`
+- `ARTIFACT_PASSPORT.json`
 
 Alpha exports:
 
-- `GOAL_CONTEXT.md`
-- `GOAL_SUMMARY.md`
 - `WORKFLOW_CONTEXT.md`
 - `SPEC_CONTEXT.md`
 - `SQL_RESULT.md`
@@ -200,9 +209,9 @@ Unsupported:
 If downgrade support is added later, it must be explicit in release notes and
 migration docs. Until then, recover by restoring a pre-migration backup.
 
-## DB Readonly Contract
+## DB Inspection Contract
 
-DB readonly remains beta because it depends on real database versions, driver
+DB inspection remains beta because it depends on real database versions, driver
 behavior, credentials, permissions, schemas, views, and server configuration.
 
 The compatibility floor is documented in [DB_COMPATIBILITY.md](DB_COMPATIBILITY.md):
@@ -212,7 +221,10 @@ The compatibility floor is documented in [DB_COMPATIBILITY.md](DB_COMPATIBILITY.
 - default driver: `mysql:mysql-connector-java:5.1.49`.
 
 The SQL guard and JDBC read-only hint are guardrails, not a database permission
-boundary. Always use database-level read-only credentials.
+boundary. DevHarness Kit is a developer toolkit for trusted local/personal
+development environments, so it does not force read-only database credentials.
+Use credentials that match your environment risk; lower privileges are
+recommended when practical.
 
 ## Deprecation Policy
 

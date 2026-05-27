@@ -95,10 +95,12 @@ require_file "THIRD_PARTY_NOTICES.md"
 require_file "README.md"
 require_file "docs/COMPATIBILITY.md"
 require_file "docs/INDEX.md"
+require_file "docs/STABLE_CONTRACT.md"
 require_file "docs/STABLE_CANDIDATE.md"
 require_file "scripts/check-version-metadata.sh"
 require_file "scripts/check-coverage-threshold.sh"
 require_file "scripts/check-module-boundaries.sh"
+require_file "scripts/check-class-size.sh"
 require_file "scripts/release-thresholds.env"
 
 log "checking version smoke"
@@ -113,6 +115,9 @@ scripts/check-coverage-threshold.sh "$DHK_MIN_LINE_COVERAGE" >/dev/null
 log "checking module boundaries"
 scripts/check-module-boundaries.sh >/dev/null
 
+log "checking class size boundaries"
+scripts/check-class-size.sh >/dev/null
+
 log "checking status wording"
 grep -n "developer preview" README.md RELEASE.md >/dev/null || fail "developer preview wording missing"
 grep -n "not production-ready" README.md >/dev/null \
@@ -123,6 +128,14 @@ grep -ni "Stable candidate surface" docs/STABLE_CANDIDATE.md >/dev/null \
   || fail "stable candidate contract missing"
 grep -ni "Experimental surface" docs/STABLE_CANDIDATE.md >/dev/null \
   || fail "experimental surface contract missing"
+grep -ni "Stable-Beta Surface" docs/STABLE_CONTRACT.md >/dev/null \
+  || fail "stable-beta surface contract missing"
+grep -ni "Stable JSON Fields" docs/STABLE_CONTRACT.md >/dev/null \
+  || fail "stable JSON contract missing"
+grep -ni "Stable Markdown Export Anchors" docs/STABLE_CONTRACT.md >/dev/null \
+  || fail "stable Markdown export contract missing"
+grep -ni "Experimental Outside The Contract" docs/STABLE_CONTRACT.md >/dev/null \
+  || fail "stable contract experimental boundary missing"
 
 log "checking wrapper version fallback"
 check_no_hardcoded_wrapper_version
@@ -145,9 +158,11 @@ for entry in \
   ".comate/rules/devharness-goal-protocol.mdr" \
   ".comate/rules/devharness-graph-aware-protocol.mdr" \
   "docs/INDEX.md" \
+  "docs/STABLE_CONTRACT.md" \
   "scripts/check-version-metadata.sh" \
   "scripts/check-coverage-threshold.sh" \
   "scripts/check-module-boundaries.sh" \
+  "scripts/check-class-size.sh" \
   "scripts/release-thresholds.env" \
   "scripts/devharness-control-panel.sh" \
   "scripts/install-agent-adapters.sh"

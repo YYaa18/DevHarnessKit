@@ -19,6 +19,11 @@ if ! command -v sqlite3 >/dev/null 2>&1; then
   exit 4
 fi
 
+if ! command -v perl >/dev/null 2>&1; then
+  echo "perl is required for millisecond perf timing." >&2
+  exit 4
+fi
+
 ROOT="${TMPDIR:-/tmp}/dhk-perf-smoke-$$"
 mkdir -p "$ROOT"
 cleanup() {
@@ -26,17 +31,46 @@ cleanup() {
 }
 trap cleanup EXIT
 
-run_timed() {
-  label="$1"
-  shift
-  start="$(date +%s)"
-  "$@" >/dev/null
-  end="$(date +%s)"
-  echo "$label: $((end - start))s"
+MAX_HELP_MS="${DHK_PERF_MAX_HELP_MS:-1500}"
+MAX_DOCTOR_MS="${DHK_PERF_MAX_DOCTOR_MS:-2000}"
+MAX_MEMORY_SEARCH_MS="${DHK_PERF_MAX_MEMORY_SEARCH_MS:-1000}"
+MAX_MEMORY_EXPORT_MS="${DHK_PERF_MAX_MEMORY_EXPORT_MS:-2000}"
+JAR_WARN_BYTES="${DHK_PERF_JAR_WARN_BYTES:-26214400}"
+JAR_MAX_BYTES="${DHK_PERF_JAR_MAX_BYTES:-36700160}"
+
+now_ms() {
+  perl -MTime::HiRes=time -e 'printf "%.0f\n", time() * 1000'
 }
 
-run_timed "help" java -jar "$JAR" help
-run_timed "memory init" java -jar "$JAR" memory init --project-root "$ROOT"
+run_timed() {
+  label="$1"
+  max_ms="$2"
+  shift
+  shift
+  start="$(now_ms)"
+  "$@" >/dev/null
+  end="$(now_ms)"
+  elapsed_ms=$((end - start))
+  echo "$label: ${elapsed_ms}ms (max ${max_ms}ms)"
+  if [ "$elapsed_ms" -gt "$max_ms" ]; then
+    echo "ERROR: $label exceeded performance budget: ${elapsed_ms}ms > ${max_ms}ms" >&2
+    exit 1
+  fi
+}
+
+jar_size="$(wc -c < "$JAR" | tr -d ' ')"
+echo "jar size: ${jar_size} bytes"
+if [ "$jar_size" -gt "$JAR_MAX_BYTES" ]; then
+  echo "ERROR: jar size exceeds maximum budget: ${jar_size} bytes > ${JAR_MAX_BYTES} bytes" >&2
+  exit 1
+fi
+if [ "$jar_size" -gt "$JAR_WARN_BYTES" ]; then
+  echo "WARNING: jar size exceeds target budget: ${jar_size} bytes > ${JAR_WARN_BYTES} bytes" >&2
+fi
+
+run_timed "help" "$MAX_HELP_MS" java -jar "$JAR" help
+run_timed "memory init" "$MAX_DOCTOR_MS" java -jar "$JAR" memory init --project-root "$ROOT"
+run_timed "doctor" "$MAX_DOCTOR_MS" java -jar "$JAR" doctor --project-root "$ROOT"
 
 PROJECT_KEY="$(sed -n 's/.*"project_key"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$ROOT/.agents/memory/project.json")"
 NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -61,8 +95,8 @@ FROM seq;
 COMMIT;
 SQL
 
-run_timed "memory search 1000" java -jar "$JAR" memory search --project-root "$ROOT" --q gateway-special --status confirmed
-run_timed "memory export 1000" java -jar "$JAR" memory export --project-root "$ROOT" --task "perf smoke" --keywords gateway-special
+run_timed "memory search 1000" "$MAX_MEMORY_SEARCH_MS" java -jar "$JAR" memory search --project-root "$ROOT" --q gateway-special --status confirmed
+run_timed "memory export 1000" "$MAX_MEMORY_EXPORT_MS" java -jar "$JAR" memory export --project-root "$ROOT" --task "perf smoke" --keywords gateway-special
 
 if pgrep -fl "dhk-cli|devharnesskit|dhk.jar|java -jar $JAR" >/dev/null 2>&1; then
   echo "Possible lingering dhk Java process detected." >&2

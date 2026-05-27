@@ -34,4 +34,25 @@ grep -F "v$VERSION" "docs/releases/v$VERSION.md" >/dev/null || {
   exit 1
 }
 
+grep -F "\`$VERSION\`" SECURITY.md >/dev/null || {
+  echo "ERROR: SECURITY.md is missing supported version: $VERSION" >&2
+  exit 1
+}
+
+grep -F 'dhk-cli-${DHK_VERSION}-all.jar' CONTRIBUTING.md >/dev/null || {
+  echo "ERROR: CONTRIBUTING.md should use the Maven-derived DHK_VERSION jar name" >&2
+  exit 1
+}
+
+grep -F 'dhk-cli-<version>-all.jar' THIRD_PARTY_NOTICES.md >/dev/null || {
+  echo "ERROR: THIRD_PARTY_NOTICES.md should use a version placeholder for the shaded jar" >&2
+  exit 1
+}
+
+if grep -E 'v0\.4\.4-beta\.1|dhk-cli-0\.1\.0-alpha-all\.jar' \
+  SECURITY.md CONTRIBUTING.md THIRD_PARTY_NOTICES.md >/dev/null; then
+  echo "ERROR: stale hard-coded version reference found in release governance docs" >&2
+  exit 1
+fi
+
 echo "version metadata ok: $VERSION"

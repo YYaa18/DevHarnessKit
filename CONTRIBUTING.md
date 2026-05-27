@@ -14,7 +14,8 @@ Run:
 ```bash
 mvn clean test
 mvn -DskipTests package
-java -jar target/dhk-cli-0.1.0-alpha-all.jar version
+DHK_VERSION="$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)"
+java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" version
 ```
 
 ## Pull Request Expectations

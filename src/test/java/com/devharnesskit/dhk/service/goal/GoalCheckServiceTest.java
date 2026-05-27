@@ -16,7 +16,7 @@ class GoalCheckServiceTest {
 
     @Test
     void defaultRunnerRegistryExposesKnownCheckKeys() {
-        GoalCheckRunnerRegistry registry = GoalCheckRunnerRegistry.defaultRegistry(new GoalCheckService());
+        GoalCheckRunnerRegistry registry = new GoalCheckService().runnerRegistry();
 
         assertNotNull(registry.find("compile"));
         assertNotNull(registry.find("test"));
@@ -39,9 +39,9 @@ class GoalCheckServiceTest {
 
     @Test
     void executeTruncatesLargeOutputAndRecordsMetadata() throws Exception {
-        GoalCheckService service = new GoalCheckService();
+        GoalCheckCommandExecutor executor = new GoalCheckCommandExecutor();
 
-        GoalCheckService.CommandResult result = service.execute(tempDir,
+        GoalCheckCommandResult result = executor.execute(tempDir,
                 fixtureCommand("output"), 10);
 
         assertEquals(0, result.exitCode());
@@ -54,15 +54,15 @@ class GoalCheckServiceTest {
         assertTrue(result.output().contains("timeout: false"));
         assertTrue(result.output().contains("output_truncated: true"));
         assertTrue(result.output().contains("COMMAND OUTPUT TRUNCATED after "
-                + GoalCheckService.MAX_COMMAND_LOG_BYTES + " bytes"));
+                + GoalCheckCommandExecutor.MAX_COMMAND_LOG_BYTES + " bytes"));
         assertTrue(result.output().length() < 280 * 1024);
     }
 
     @Test
     void executeTerminatesTimedOutProcessAndRecordsTimeout() throws Exception {
-        GoalCheckService service = new GoalCheckService();
+        GoalCheckCommandExecutor executor = new GoalCheckCommandExecutor();
 
-        GoalCheckService.CommandResult result = service.execute(tempDir,
+        GoalCheckCommandResult result = executor.execute(tempDir,
                 fixtureCommand("timeout"), 1);
 
         assertEquals(124, result.exitCode());

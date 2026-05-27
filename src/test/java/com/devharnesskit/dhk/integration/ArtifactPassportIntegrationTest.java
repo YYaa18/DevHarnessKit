@@ -57,6 +57,11 @@ final class ArtifactPassportIntegrationTest {
         assertEquals(ExitCodes.SUCCESS, verifyExit);
         assertTrue(verify.stdout().contains("ready_to_complete: true"));
 
+        Path root = tempDir.resolve("demo-passport");
+        updateRows(root, "UPDATE goal_check SET check_fingerprint = '"
+                + "check:138001380001380013800138001380001380013800138001380001380013800"
+                + "' WHERE goal_key = '" + goalKey + "'");
+
         Harness complete = new Harness(tempDir);
         int completeExit = new CommandRouter().run(new String[]{
                 "goal", "complete",
@@ -65,7 +70,6 @@ final class ArtifactPassportIntegrationTest {
         }, complete.context());
         assertEquals(ExitCodes.SUCCESS, completeExit, complete.stdout() + complete.stderr());
 
-        Path root = tempDir.resolve("demo-passport");
         Path summaryPath = PathUtil.goalSummary(root);
         assertTrue(Files.isRegularFile(summaryPath));
         String summary = new String(Files.readAllBytes(summaryPath), "UTF-8");

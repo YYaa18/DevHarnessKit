@@ -13,6 +13,8 @@ contracts, experimental surfaces, release material, and historical design notes.
   by maturity level.
 - [STABLE_CANDIDATE](STABLE_CANDIDATE.md): the narrow surface considered for
   stable-candidate work.
+- [STABLE_CONTRACT](STABLE_CONTRACT.md): stable-beta CLI, JSON, export, and
+  blocker-category contract for testing.
 - [SECURITY](../SECURITY.md): security model, limitations, and reporting.
 
 ## Daily Usage
@@ -52,6 +54,14 @@ contracts, experimental surfaces, release material, and historical design notes.
 - [EXPORT_CONTRACTS](EXPORT_CONTRACTS.md): generated Markdown export shapes.
 - [JSON_OUTPUT](JSON_OUTPUT.md): JSON command output contracts.
 - [THIRD_PARTY_NOTICES](../THIRD_PARTY_NOTICES.md): dependency license notices.
+- [God Class Decomposition Baseline](decisions/god-class-decomposition-baseline.md):
+  V0.8.4 service split contracts and size targets.
+- [Secondary Goal Service Audit](decisions/goal-secondary-god-class-audit.md):
+  remaining large goal/graph service boundaries.
+- [Goal Orchestration Decomposition Baseline](decisions/goal-orchestration-decomposition-baseline.md):
+  V0.8.5 goal coordinator and sync split contracts.
+- [Graph Impact Service Audit](decisions/graph-impact-service-decomposition-audit.md):
+  remaining graph impact service boundary proposal.
 
 ## Release Notes
 

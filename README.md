@@ -2,7 +2,7 @@
 
 DevHarness Kit is a local-first development harness for coding agents.
 
-It stores durable project memory, specs, workflow state, and read-only database inspection results locally, then exports short Markdown context for agents. The goal is not to make a model remember an entire project. The goal is to let the project keep auditable context in local SQLite and files, then give the agent only the context it needs for the current task.
+It stores durable project memory, specs, workflow state, and database inspection results locally, then exports short Markdown context for agents. The goal is not to make a model remember an entire project. The goal is to let the project keep auditable context in local SQLite and files, then give the agent only the context it needs for the current task.
 
 ## Status
 
@@ -17,8 +17,9 @@ README, changelog, or release note for that version drift.
 | --- | --- | --- |
 | Memory core | Beta | Usable for local project memory, draft confirmation, search, export, checkpoint, and recovery. |
 | Doctor | Beta | Validates project memory storage and export paths. |
+| Onboarding/status | Stable-candidate beta | `configure`, `status`, `readiness`, and `quickstart` are the preferred setup and troubleshooting entrypoints for stable-beta testing. |
 | Sensitive guard | Beta | Best-effort heuristic guard with project-level reject/redact/allow policy. It reviews persisted/exported content; users still review outputs because it is not a complete DLP system. |
-| DB readonly | Beta | Useful for inspection, but SQL guard is not a permission boundary. Use read-only database credentials. |
+| DB inspection | Beta | Useful for personal development database inspection. SQL guard is not a permission boundary; use credentials appropriate to your trusted development environment, with lower privileges recommended when practical. |
 | Goal core | Stable-candidate beta | High-level `dhk goal` protocol for start/resume/next/step/status/export/verify/complete/audit/recheck and short context export. It is the preferred harness entry for agent work, but not stable. |
 | Goal debug checks | Alpha | Lower-level `goal check` and `goal evaluate` remain available for diagnostics and may change before 1.0. |
 | Graph Lite | Alpha+ | `dhk graph init/status/index/impact/export/prune` can scan files, parse Lite nodes/edges, persist snapshot-bound graph rows, export local graph context, and audit/prune old snapshots. |
@@ -30,10 +31,11 @@ README, changelog, or release note for that version drift.
 | SQLite schema | Alpha | Current schema version is v13. Compatibility policy is documented, but not yet guaranteed as stable. |
 
 Stable-candidate work is now being narrowed around memory core, doctor, goal
-core, migration recovery, and release packaging. DB readonly remains beta.
+core, migration recovery, and release packaging. DB inspection remains beta.
 Graph, BDD, Skill Contract, Policy/Governance, Routine, and ECC Control Panel
 remain experimental surfaces until their contracts are separately stabilized.
-See [docs/STABLE_CANDIDATE.md](docs/STABLE_CANDIDATE.md).
+See [docs/STABLE_CANDIDATE.md](docs/STABLE_CANDIDATE.md) and
+[docs/STABLE_CONTRACT.md](docs/STABLE_CONTRACT.md).
 
 ## Core Principles
 
@@ -53,7 +55,7 @@ See [docs/STABLE_CANDIDATE.md](docs/STABLE_CANDIDATE.md).
 ```text
 DevHarnessKit
 |-- memory core      project facts, short context export, checkpoint/recovery
-|-- db readonly      optional business database inspection
+|-- db inspection    optional developer database inspection
 |-- goal             high-level task orchestration over memory/workflow/spec
 |-- graph lite       snapshot-bound file graph context for impact analysis
 |-- bdd              specification-level acceptance scenarios and evidence
@@ -71,7 +73,7 @@ Agent skill or rule
 DevHarness Kit CLI
         |
         v
-SQLite memory.db + controlled readonly DB query
+SQLite memory.db + controlled DB inspection
         |
         v
 CURRENT_CONTEXT.md / GOAL_CONTEXT.md / GOAL_SUMMARY.md
@@ -128,6 +130,8 @@ scripts/perf-smoke.sh
 ```
 
 `scripts/perf-smoke.sh` is a developer validation helper and requires the `sqlite3` CLI to bulk-load sample rows. The packaged CLI does not require `sqlite3` at runtime.
+CI runs the same smoke on the Ubuntu Java 17 smoke leg and fails if the core
+help, doctor, memory search, memory export, or jar-size budgets are exceeded.
 
 ## Quick Start
 
@@ -188,10 +192,11 @@ scripts/devharness-control-panel.sh status --project-root .
 scripts/devharness-control-panel.sh doctor --project-root .
 ```
 
-`dhk status` is a read-only project snapshot for "what should I do next";
+`dhk status` is the human-facing read-only project snapshot for "what should I do next";
 `dhk doctor` remains the environment/configuration diagnostic command.
-`dhk readiness --exit-code` returns a non-zero exit code when the snapshot is
-not ready, which is useful for CI and release gates.
+`dhk readiness` uses the same snapshot implementation but is the automation
+alias: combine it with `--exit-code`, `--markdown`, or `--write` for CI and
+release gates.
 
 For a shorter first run, `quickstart` creates the project config when missing,
 starts or reuses the first open goal, and prints the exact next command. It does
@@ -361,7 +366,7 @@ Use `--json` for machine-readable output on supported commands such as
 - Goal check freshness includes goal step count and workspace/context fingerprints so completion cannot silently reuse stale verification after later changes.
 - DevHarness Kit records development process state; it does not prove code correctness.
 
-Read [SECURITY.md](SECURITY.md) before using DB readonly features.
+Read [SECURITY.md](SECURITY.md) before using DB inspection features.
 
 ## Documentation
 

@@ -10,6 +10,9 @@ The first stable-candidate track should be limited to:
 
 - `dhk help` and `dhk version`;
 - `dhk doctor`;
+- configure/status onboarding commands: `configure init`, `configure show`,
+  `configure doctor`, `configure explain`, `status`, `readiness`, and
+  `quickstart`;
 - memory core commands: `init`, `add`, `confirm`, `search`, `export`,
   `checkpoint`, `recover`, and `backup`;
 - goal core commands: `start`, `resume`, `next`, `step`, `status`, `export`,
@@ -27,14 +30,17 @@ them.
 
 ## Beta Surface
 
-DB readonly remains beta:
+DB inspection remains beta:
 
 - SQL safety is a guardrail, not a permission boundary.
-- Production use must rely on database-level read-only credentials.
+- DevHarness Kit is a developer toolkit aimed at trusted local development
+  environments. It does not force read-only database credentials.
+- Use credentials that match the risk of the development environment; lower
+  privilege accounts are recommended when practical.
 - MySQL compatibility currently keeps Connector/J 5.1 as the default because the
   production floor includes MySQL Server 5.1.
-- DB readonly cannot move beyond beta until deterministic SQL guard fuzz tests
-  and real-version compatibility checks are stronger.
+- DB inspection should remain beta until deterministic SQL guard fuzz tests and
+  real-version compatibility checks are stronger.
 
 ## Experimental Surface
 
@@ -70,7 +76,7 @@ Before a stable-candidate tag:
 4. Checksums must be generated from the packaged artifacts.
 5. Migration tests must cover the documented upgrade paths, and automatic
    pre-migration backup must remain fail-closed.
-6. Security-sensitive guards must have targeted tests, especially SQL readonly
+6. Security-sensitive guards must have targeted tests, especially SQL safety
    and sensitive-data policy behavior.
 7. `scripts/check-module-boundaries.sh` must pass so stable core packages do
    not accidentally import CLI command implementations. Known goal-to-graph,
@@ -83,5 +89,5 @@ Before a stable-candidate tag:
 - Do not treat BDD scenarios as executable test proof without evidence.
 - Do not make SQLite tables a public write API.
 - Do not add network services, daemons, or cloud sync.
-- Do not make DB readonly stable until database permissions, SQL safety tests,
-  and compatibility checks are stronger.
+- Do not make DB inspection stable until SQL safety tests, compatibility checks,
+  and development-environment risk guidance are stronger.

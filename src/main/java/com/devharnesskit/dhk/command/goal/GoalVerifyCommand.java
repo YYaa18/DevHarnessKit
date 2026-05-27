@@ -50,6 +50,7 @@ public final class GoalVerifyCommand implements Command {
     private void printText(CommandContext context, Path projectRoot, GoalRun goal, List<GoalCheck> checks,
                            GoalEvaluation evaluation, String level, String[] selectedChecks,
                            ReleaseChecks releaseChecks) {
+        List<BlockerDetail> blockers = blockerDetails(goal, checks, evaluation);
         context.out().println("goal_key: " + goal.goalKey());
         context.out().println("level: " + level);
         context.out().println("check_scope: " + ("standard".equals(level) ? "all_required" : level));
@@ -69,6 +70,11 @@ public final class GoalVerifyCommand implements Command {
         printArray(context, evaluation.missing());
         context.out().println("completion_blockers:");
         printArray(context, evaluation.missing());
+        context.out().println("blocker_summary: " + blockerSummary(blockers));
+        context.out().println("blocker_categories:");
+        printArray(context, blockerCategories(blockers));
+        context.out().println("blocker_details:");
+        printBlockers(context, blockers);
         context.out().println("stale_checks:");
         printArray(context, evaluation.staleChecks());
         printReleaseChecks(context, releaseChecks);
@@ -93,6 +99,7 @@ public final class GoalVerifyCommand implements Command {
                     JsonOutput.stringField("evidence_path", check.evidencePath())
             ).trim());
         }
+        List<BlockerDetail> blockers = blockerDetails(goal, checks, evaluation);
         context.out().print(JsonOutput.object(
                 JsonOutput.stringField("command", "goal verify"),
                 JsonOutput.stringField("goal_key", goal.goalKey()),
@@ -110,6 +117,9 @@ public final class GoalVerifyCommand implements Command {
                 JsonOutput.rawField("missing", JsonOutput.stringArray(evaluation.missing())),
                 JsonOutput.numberField("completion_blocker_count", evaluation.missing().length),
                 JsonOutput.rawField("completion_blockers", JsonOutput.stringArray(evaluation.missing())),
+                JsonOutput.stringField("blocker_summary", blockerSummary(blockers)),
+                JsonOutput.rawField("blocker_categories", JsonOutput.stringArray(blockerCategories(blockers))),
+                JsonOutput.rawField("blocker_details", JsonOutput.array(blockerJson(blockers))),
                 JsonOutput.numberField("stale_count", evaluation.staleChecks().length),
                 JsonOutput.rawField("stale_checks", JsonOutput.stringArray(evaluation.staleChecks())),
                 JsonOutput.rawField("release_checks", releaseChecks.json()),
@@ -243,6 +253,205 @@ public final class GoalVerifyCommand implements Command {
         return evaluation.staleChecks().length == 0 ? "fresh" : "stale";
     }
 
+    private List<BlockerDetail> blockerDetails(GoalRun goal, List<GoalCheck> checks, GoalEvaluation evaluation) {
+        List<BlockerDetail> blockers = new ArrayList<BlockerDetail>();
+        for (String missing : evaluation.missing()) {
+            String checkKey = checkKey(missing);
+            GoalCheck check = checkKey.length() == 0 ? null : findCheck(checks, checkKey);
+            String status = check == null ? statusFromMissing(missing) : check.status();
+            blockers.add(new BlockerDetail(category(missing, checkKey, check, evaluation),
+                    checkKey, status, missing, explanation(missing, checkKey, check),
+                    nextCommand(goal, missing, checkKey)));
+        }
+        return blockers;
+    }
+
+    private String blockerSummary(List<BlockerDetail> blockers) {
+        if (blockers.isEmpty()) {
+            return "none";
+        }
+        return blockers.get(0).category + ": " + blockers.get(0).message;
+    }
+
+    private String[] blockerCategories(List<BlockerDetail> blockers) {
+        Set<String> categories = new LinkedHashSet<String>();
+        for (BlockerDetail blocker : blockers) {
+            categories.add(blocker.category);
+        }
+        return categories.toArray(new String[categories.size()]);
+    }
+
+    private List<String> blockerJson(List<BlockerDetail> blockers) {
+        List<String> raw = new ArrayList<String>();
+        for (BlockerDetail blocker : blockers) {
+            raw.add(JsonOutput.object(
+                    JsonOutput.stringField("category", blocker.category),
+                    JsonOutput.stringField("check_key", blocker.checkKey),
+                    JsonOutput.stringField("status", blocker.status),
+                    JsonOutput.stringField("message", blocker.message),
+                    JsonOutput.stringField("explanation", blocker.explanation),
+                    JsonOutput.stringField("next_command", blocker.nextCommand)
+            ).trim());
+        }
+        return raw;
+    }
+
+    private void printBlockers(CommandContext context, List<BlockerDetail> blockers) {
+        if (blockers.isEmpty()) {
+            context.out().println("  - none");
+            return;
+        }
+        for (BlockerDetail blocker : blockers) {
+            context.out().println("  - category: " + blocker.category);
+            if (blocker.checkKey.length() > 0) {
+                context.out().println("    check_key: " + blocker.checkKey);
+            }
+            if (blocker.status.length() > 0) {
+                context.out().println("    status: " + blocker.status);
+            }
+            context.out().println("    message: " + blocker.message);
+            context.out().println("    explanation: " + blocker.explanation);
+            context.out().println("    next_command: " + blocker.nextCommand);
+        }
+    }
+
+    private String category(String missing, String checkKey, GoalCheck check, GoalEvaluation evaluation) {
+        String lower = missing.toLowerCase(java.util.Locale.ROOT);
+        if (missing.startsWith("goal steps incomplete")) {
+            return "incomplete_goal_steps";
+        }
+        if (missing.startsWith("context export is not ready")) {
+            return "context_export_not_ready";
+        }
+        if (missing.startsWith("goal status is ")) {
+            return "goal_status_blocked";
+        }
+        if (lower.contains(" is stale") || contains(evaluation.staleChecks(), checkKey)) {
+            return "stale_check";
+        }
+        if (checkKey.length() > 0 && "pending".equals(statusFromMissing(missing))) {
+            return "pending_check";
+        }
+        String summary = check == null ? "" : check.resultSummary().toLowerCase(java.util.Locale.ROOT);
+        if ("workflow".equals(checkKey) && summary.contains("pending hard gates")) {
+            return "pending_workflow_gate";
+        }
+        if ("spec".equals(checkKey)
+                && (lower.contains("spec is skipped")
+                || summary.contains("no spec change")
+                || summary.contains("spec required")
+                || summary.contains("spec has no tasks")
+                || summary.contains("spec has no acceptance"))) {
+            return "missing_spec";
+        }
+        if (lower.contains("evidence missing") || lower.contains("missing required")
+                || lower.contains("lacks ") || lower.contains("scope_justification")) {
+            return "missing_evidence";
+        }
+        if ("skipped".equals(statusFromMissing(missing)) || (check != null && "skipped".equals(check.status()))) {
+            return "skipped_required_check";
+        }
+        if ("failed".equals(statusFromMissing(missing)) || (check != null && "failed".equals(check.status()))) {
+            return "failed_check";
+        }
+        return "goal_blocker";
+    }
+
+    private String explanation(String missing, String checkKey, GoalCheck check) {
+        if (missing.startsWith("goal steps incomplete")) {
+            return "Run goal next, finish the current action, and record goal step evidence.";
+        }
+        if (missing.startsWith("context export is not ready")) {
+            return "Resume the goal so DevHarnessKit can regenerate GOAL_CONTEXT before continuing.";
+        }
+        if ("workflow".equals(checkKey) && check != null
+                && check.resultSummary().toLowerCase(java.util.Locale.ROOT).contains("pending hard gates")) {
+            return "A hard workflow gate is still open; record mapped goal evidence or run the relevant workflow check path.";
+        }
+        if ("spec".equals(checkKey) && check != null
+                && check.resultSummary().toLowerCase(java.util.Locale.ROOT).contains("no spec change")) {
+            return "This profile requires spec evidence, but the goal has no spec change bound.";
+        }
+        if (missing.contains(" is stale")) {
+            return "A required check was recorded before the latest goal step or workspace state; rerun that check.";
+        }
+        if (missing.contains(" is pending")) {
+            return "A required check has not been recorded yet.";
+        }
+        if (missing.contains(" is skipped")) {
+            return "This profile does not accept skipped status for the required check.";
+        }
+        if (missing.contains("evidence missing") || missing.contains("lacks ")) {
+            return "Add structured goal step evidence for the requested key, then rerun goal verify.";
+        }
+        if (checkKey.length() > 0) {
+            return "The required check is not accepted by the active goal check policy.";
+        }
+        return "Resolve the blocker shown in the message, then rerun goal verify.";
+    }
+
+    private String nextCommand(GoalRun goal, String missing, String checkKey) {
+        if (missing.startsWith("goal steps incomplete")) {
+            return "dhk goal next --goal " + goal.goalKey();
+        }
+        if (missing.startsWith("context export is not ready")) {
+            return "dhk goal resume --goal " + goal.goalKey();
+        }
+        if (checkKey.length() > 0) {
+            return "dhk goal check --goal " + goal.goalKey() + " --check " + checkKey;
+        }
+        return "dhk goal status --goal " + goal.goalKey();
+    }
+
+    private GoalCheck findCheck(List<GoalCheck> checks, String checkKey) {
+        for (GoalCheck check : checks) {
+            if (checkKey.equals(check.checkKey())) {
+                return check;
+            }
+        }
+        return null;
+    }
+
+    private String checkKey(String missing) {
+        if (!missing.startsWith("check ")) {
+            return "";
+        }
+        int marker = missing.indexOf(" is ", 6);
+        if (marker <= 6) {
+            return "";
+        }
+        return missing.substring(6, marker);
+    }
+
+    private String statusFromMissing(String missing) {
+        int marker = missing.indexOf(" is ");
+        if (marker < 0) {
+            return "";
+        }
+        int start = marker + 4;
+        int end = missing.indexOf(':', start);
+        int semicolon = missing.indexOf(';', start);
+        if (end < 0 || (semicolon >= 0 && semicolon < end)) {
+            end = semicolon;
+        }
+        if (end < 0) {
+            end = missing.length();
+        }
+        return missing.substring(start, end).trim();
+    }
+
+    private boolean contains(String[] values, String value) {
+        if (value.length() == 0) {
+            return false;
+        }
+        for (String candidate : values) {
+            if (value.equals(candidate)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void printReleaseChecks(CommandContext context, ReleaseChecks releaseChecks) {
         if (!releaseChecks.enabled) {
             return;
@@ -280,6 +489,25 @@ public final class GoalVerifyCommand implements Command {
                     JsonOutput.stringField("artifact_passport", artifactPassport),
                     JsonOutput.stringField("export_contract", exportContract)
             );
+        }
+    }
+
+    private static final class BlockerDetail {
+        private final String category;
+        private final String checkKey;
+        private final String status;
+        private final String message;
+        private final String explanation;
+        private final String nextCommand;
+
+        private BlockerDetail(String category, String checkKey, String status, String message,
+                              String explanation, String nextCommand) {
+            this.category = category == null ? "" : category;
+            this.checkKey = checkKey == null ? "" : checkKey;
+            this.status = status == null ? "" : status;
+            this.message = message == null ? "" : message;
+            this.explanation = explanation == null ? "" : explanation;
+            this.nextCommand = nextCommand == null ? "" : nextCommand;
         }
     }
 }

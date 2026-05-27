@@ -17,22 +17,26 @@ public final class SkillDisciplineGateService {
                                                        List<GoalStep> steps) {
         List<String> failures = new ArrayList<String>();
         StringBuilder output = new StringBuilder();
-        GoalStep inspect = firstStep(steps, "inspect_existing_code");
         GoalStep plan = firstStep(steps, "create_change_plan");
         GoalStep implementation = firstActionContaining(steps, "implement");
+        GoalStep inspect = firstStep(steps, "inspect_existing_code");
+        GoalStep preCoding = inspect == null && !profileHasAction(profile, "inspect_existing_code")
+                ? firstPreCodingStep(steps, implementation) : inspect;
 
         output.append("goal_key: ").append(goal.goalKey()).append('\n');
         output.append("profile: ").append(goal.profileKey()).append('\n');
         output.append("inspect_step: ").append(inspect == null ? "missing" : inspect.stepIndex()).append('\n');
+        output.append("pre_coding_step: ")
+                .append(preCoding == null ? "missing" : preCoding.stepIndex()).append('\n');
         output.append("plan_step: ").append(plan == null ? "missing" : plan.stepIndex()).append('\n');
         output.append("implementation_step: ")
                 .append(implementation == null ? "missing" : implementation.stepIndex()).append('\n');
 
-        if (inspect == null) {
+        if (preCoding == null) {
             failures.add("inspect_existing_code step missing before coding");
         }
-        if (implementation != null && inspect != null && inspect.stepIndex() > implementation.stepIndex()) {
-            failures.add("inspect_existing_code was recorded after implementation");
+        if (implementation != null && preCoding != null && preCoding.stepIndex() > implementation.stepIndex()) {
+            failures.add("pre-coding evidence was recorded after implementation");
         }
         if (implementation != null && plan != null && plan.stepIndex() > implementation.stepIndex()) {
             failures.add("create_change_plan was recorded after implementation");
@@ -236,6 +240,38 @@ public final class SkillDisciplineGateService {
             }
         }
         return null;
+    }
+
+    private GoalStep firstPreCodingStep(List<GoalStep> steps, GoalStep implementation) {
+        if (steps == null) {
+            return null;
+        }
+        for (GoalStep step : steps) {
+            if (implementation != null && step.stepIndex() >= implementation.stepIndex()) {
+                break;
+            }
+            if (step.actionKey().indexOf("verify") >= 0) {
+                continue;
+            }
+            if (step.actionKey().indexOf("implement") >= 0) {
+                continue;
+            }
+            return step;
+        }
+        return null;
+    }
+
+    private boolean profileHasAction(GoalProfile profile, String actionKey) {
+        if (profile == null || actionKey == null) {
+            return false;
+        }
+        String[] actions = profile.actions();
+        for (String action : actions) {
+            if (actionKey.equals(action)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String firstEvidenceValue(List<GoalStep> steps, GoalStep beforeStep, String[] keys) {

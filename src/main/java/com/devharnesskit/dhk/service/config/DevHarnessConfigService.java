@@ -26,7 +26,7 @@ public final class DevHarnessConfigService {
             "verification.test.mode", "verification.test.command",
             "verification.test.reason", "verification.test.manual_trigger",
             "verification.test.expected_duration", "verification.test.required_evidence",
-            "verification.graph.required", "verification.graph.fresh_snapshot_required",
+            "verification.graph.mode", "verification.graph.required", "verification.graph.fresh_snapshot_required",
             "verification.graph.impact_map_required", "verification.graph.allow_stale_requires_approval",
             "verification.architecture.mode", "verification.rollback.required_when_auto_tests_unavailable",
             "adapter.target");
@@ -34,6 +34,13 @@ public final class DevHarnessConfigService {
     public ConfigureInitResult init(Path projectRoot, String preset, boolean force,
                                     String compileOverride, String testOverride,
                                     String graphOverride, String adapterTarget) throws IOException {
+        return init(projectRoot, preset, force, compileOverride, testOverride, graphOverride, adapterTarget, false);
+    }
+
+    public ConfigureInitResult init(Path projectRoot, String preset, boolean force,
+                                    String compileOverride, String testOverride,
+                                    String graphOverride, String adapterTarget,
+                                    boolean dryRun) throws IOException {
         String normalizedPreset = normalizePreset(preset);
         Map<String, String> values = presetValues(normalizedPreset);
         applyModeOverride(values, "verification.compile.mode", compileOverride);
@@ -44,6 +51,11 @@ public final class DevHarnessConfigService {
         }
 
         Path configPath = PathUtil.devharnessConfig(projectRoot);
+        boolean exists = Files.exists(configPath);
+        if (dryRun) {
+            return new ConfigureInitResult(configPath, normalizedPreset, false, new DevHarnessConfig(values),
+                    true, !exists || force, exists && !force);
+        }
         if (Files.exists(configPath) && !force) {
             throw new IllegalStateException(configPath + " already exists. Use --force to overwrite.");
         }
@@ -87,6 +99,7 @@ public final class DevHarnessConfigService {
         warnUnknown(values, warnings);
         diagnoseMode(values, "verification.compile.mode", warnings);
         diagnoseMode(values, "verification.test.mode", warnings);
+        diagnoseGraphMode(values, warnings);
         diagnoseBoolean(values, "verification.graph.required", warnings);
         diagnoseBoolean(values, "verification.graph.fresh_snapshot_required", warnings);
         diagnoseBoolean(values, "verification.graph.impact_map_required", warnings);
@@ -119,6 +132,10 @@ public final class DevHarnessConfigService {
         if ("verification.graph.required".equals(normalized)) {
             return "verification.graph.required tells goal flows to use graph-aware preflight and impact evidence.";
         }
+        if ("verification.graph.mode".equals(normalized)) {
+            return "verification.graph.mode is off, advisory, or required. Advisory lets tools surface graph context "
+                    + "without making graph checks completion gates.";
+        }
         if ("verification.graph.allow_stale_requires_approval".equals(normalized)) {
             return "verification.graph.allow_stale_requires_approval defaults to true; weak-model skills must not "
                     + "use --allow-stale without explicit policy or human approval evidence.";
@@ -137,6 +154,7 @@ public final class DevHarnessConfigService {
             values.put("verification.test.mode", "auto");
             values.put("verification.test.command", "mvn -q test");
             values.put("verification.test.expected_duration", "fast");
+            values.put("verification.graph.mode", "off");
             values.put("verification.graph.required", "false");
             values.put("verification.graph.fresh_snapshot_required", "false");
             values.put("verification.graph.impact_map_required", "false");
@@ -157,6 +175,7 @@ public final class DevHarnessConfigService {
             values.put("verification.test.expected_duration", "10m+ per test");
             values.put("verification.test.required_evidence",
                     "manual_evidence_status=passed,test_scope,manual_evidence_path");
+            values.put("verification.graph.mode", "required");
             values.put("verification.graph.required", "true");
             values.put("verification.graph.fresh_snapshot_required", "true");
             values.put("verification.graph.impact_map_required", "true");
@@ -184,15 +203,26 @@ public final class DevHarnessConfigService {
             values.put("verification.test.manual_trigger", "manual regression or CI evidence");
             values.put("verification.test.required_evidence",
                     "manual_evidence_status=passed,test_scope,manual_evidence_path");
+            values.put("verification.graph.mode", "required");
             values.put("verification.graph.required", "true");
             values.put("verification.graph.fresh_snapshot_required", "true");
             values.put("verification.graph.impact_map_required", "true");
             values.put("verification.rollback.required_when_auto_tests_unavailable", "true");
             return values;
         }
+        if ("graph-advisory".equals(normalized)) {
+            Map<String, String> values = presetValues("springboot-auto-test");
+            values.put("preset", normalized);
+            values.put("verification.graph.mode", "advisory");
+            values.put("verification.graph.required", "false");
+            values.put("verification.graph.fresh_snapshot_required", "false");
+            values.put("verification.graph.impact_map_required", "false");
+            return values;
+        }
         if ("safe-refactor-graph".equals(normalized)) {
             Map<String, String> values = presetValues("springboot-auto-test");
             values.put("preset", normalized);
+            values.put("verification.graph.mode", "required");
             values.put("verification.graph.required", "true");
             values.put("verification.graph.fresh_snapshot_required", "true");
             values.put("verification.graph.impact_map_required", "true");
@@ -212,6 +242,7 @@ public final class DevHarnessConfigService {
         values.put("verification.compile.command", "mvn -q -DskipTests compile");
         values.put("verification.test.mode", "auto");
         values.put("verification.test.command", "mvn -q test");
+        values.put("verification.graph.mode", "off");
         values.put("verification.graph.required", "false");
         values.put("verification.graph.fresh_snapshot_required", "false");
         values.put("verification.graph.impact_map_required", "false");
@@ -225,7 +256,11 @@ public final class DevHarnessConfigService {
         if (preset == null || preset.trim().length() == 0 || "auto".equalsIgnoreCase(preset.trim())) {
             return "springboot-manual-ide-test";
         }
-        return preset.trim().toLowerCase(Locale.ROOT);
+        String normalized = preset.trim().toLowerCase(Locale.ROOT);
+        if ("manual-ide-test".equals(normalized)) {
+            return "springboot-manual-ide-test";
+        }
+        return normalized;
     }
 
     private void applyModeOverride(Map<String, String> values, String key, String mode) {
@@ -245,19 +280,22 @@ public final class DevHarnessConfigService {
         }
         String normalized = graph.trim().toLowerCase(Locale.ROOT);
         if ("required".equals(normalized)) {
+            values.put("verification.graph.mode", "required");
             values.put("verification.graph.required", "true");
             values.put("verification.graph.fresh_snapshot_required", "true");
             values.put("verification.graph.impact_map_required", "true");
-        } else if ("optional".equals(normalized)) {
+        } else if ("advisory".equals(normalized) || "optional".equals(normalized)) {
+            values.put("verification.graph.mode", "advisory");
             values.put("verification.graph.required", "false");
             values.put("verification.graph.fresh_snapshot_required", "false");
             values.put("verification.graph.impact_map_required", "false");
         } else if ("off".equals(normalized) || "disabled".equals(normalized)) {
+            values.put("verification.graph.mode", "off");
             values.put("verification.graph.required", "false");
             values.put("verification.graph.fresh_snapshot_required", "false");
             values.put("verification.graph.impact_map_required", "false");
         } else {
-            throw new IllegalArgumentException("--graph must be required, optional, or off");
+            throw new IllegalArgumentException("--graph must be required, advisory, optional, or off");
         }
     }
 
@@ -299,6 +337,16 @@ public final class DevHarnessConfigService {
         String normalized = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
         return "true".equals(normalized) || "yes".equals(normalized) || "1".equals(normalized)
                 || "false".equals(normalized) || "no".equals(normalized) || "0".equals(normalized);
+    }
+
+    private void diagnoseGraphMode(Map<String, String> values, List<String> warnings) {
+        if (!values.containsKey("verification.graph.mode")) {
+            return;
+        }
+        String mode = value(values, "verification.graph.mode", "").toLowerCase(Locale.ROOT);
+        if (!"off".equals(mode) && !"advisory".equals(mode) && !"required".equals(mode)) {
+            warnings.add("verification.graph.mode should be one of: off,advisory,required");
+        }
     }
 
     private void warnUnknown(Map<String, String> values, List<String> warnings) {

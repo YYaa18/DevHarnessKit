@@ -163,6 +163,7 @@ objects:
   "verification.compile.manual_trigger": "IDE build action",
   "verification.test.mode": "manual",
   "verification.test.manual_trigger": "IDE test button",
+  "verification.graph.mode": "required",
   "verification.test.cost": "slow",
   "verification.rollback.required_if_test_not_run": "true"
 }
@@ -171,6 +172,7 @@ objects:
 Create one with:
 
 ```bash
+dhk configure init --preset springboot-manual-ide-test --dry-run
 dhk configure init --preset springboot-manual-ide-test --force
 dhk configure show
 dhk configure doctor
@@ -181,8 +183,10 @@ Supported starter presets:
 
 | Preset | Intent |
 | --- | --- |
+| `manual-ide-test` | Alias for `springboot-manual-ide-test`, useful when the project type is less important than manual verification capability. |
 | `springboot-manual-ide-test` | Spring Boot or company-runtime projects where compile/test evidence comes from IDE, CI, or another manual source. |
 | `springboot-auto-test` | Projects where CLI compile/test commands are expected to run locally. |
+| `graph-advisory` | CLI compile/test remains automatic, while graph configuration is advisory and does not become a completion gate. |
 | `legacy-java-small-fix` | High-risk legacy maintenance where auto compile/test may be unavailable and rollback evidence is required. |
 
 `verification.compile.mode` and `verification.test.mode` accept:
@@ -192,6 +196,19 @@ Supported starter presets:
 | `auto` | `goal verify` runs configured compile/test commands. |
 | `manual` | `goal verify` does not run the command and instead requires manual evidence. |
 | `disabled` | The direct check is replaced with `verification-risk`, which requires waiver, approver, risk scope, and rollback evidence. |
+
+`verification.graph.mode` accepts:
+
+| Mode | Runtime behavior |
+| --- | --- |
+| `off` | Graph is not part of the project verification policy. |
+| `advisory` | Graph artifacts may be generated for context, but graph/impact checks are not completion gates. |
+| `required` | Graph freshness and impact artifacts are required by graph-aware profiles and checks. |
+
+`configure init --dry-run` prints the config path, selected preset, effective
+verification modes, graph mode, and whether writing would require `--force`.
+It does not create `.agents/devharness/config.json` and is intended for
+quickstart/control-panel planning.
 
 Manual verification is not skipped verification. Missing evidence blocks
 completion. A manual compile check requires the latest goal-step evidence to

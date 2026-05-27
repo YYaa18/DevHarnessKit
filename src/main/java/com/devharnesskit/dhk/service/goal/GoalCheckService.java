@@ -72,6 +72,7 @@ public final class GoalCheckService {
     private final BddBindingRepository bddBindingRepository;
     private final BddService bddService;
     private final BddVerificationService bddVerificationService;
+    private final GoalCheckRunnerRegistry runnerRegistry;
 
     public GoalCheckService() {
         this(new GoalCheckRepository(), new SpecTaskRepository(), new SpecAcceptanceRepository(),
@@ -128,6 +129,7 @@ public final class GoalCheckService {
         this.bddBindingRepository = bddBindingRepository;
         this.bddService = bddService;
         this.bddVerificationService = bddVerificationService;
+        this.runnerRegistry = GoalCheckRunnerRegistry.defaultRegistry(this);
     }
 
     public GoalCheck run(Connection connection, Path projectRoot, GoalRun goal,
@@ -138,60 +140,11 @@ public final class GoalCheckService {
     public GoalCheck run(Connection connection, Path projectRoot, GoalRun goal,
                          String checkKey, String now, GoalCheckPolicy policy) throws Exception {
         GoalProfile profile = profileService.find(projectRoot, goal.profileKey());
-        if ("compile".equals(checkKey)) {
-            return runMavenCheck(connection, projectRoot, goal, checkKey, policy.compileCommand(), now);
+        GoalCheckRunner runner = runnerRegistry.find(checkKey);
+        if (runner == null) {
+            throw new IllegalArgumentException("Unknown goal check: " + checkKey);
         }
-        if ("test".equals(checkKey)) {
-            return runMavenCheck(connection, projectRoot, goal, checkKey, policy.testCommand(), now);
-        }
-        if ("manual-compile".equals(checkKey)) {
-            return runManualVerificationCheck(connection, projectRoot, goal, checkKey,
-                    "compile_scope", now);
-        }
-        if ("manual-test".equals(checkKey)) {
-            return runManualVerificationCheck(connection, projectRoot, goal, checkKey,
-                    "test_scope", now);
-        }
-        if ("verification-risk".equals(checkKey)) {
-            return runVerificationRiskCheck(connection, projectRoot, goal, now);
-        }
-        if ("sensitive".equals(checkKey)) {
-            return runSensitiveCheck(connection, projectRoot, goal, now);
-        }
-        if ("spec".equals(checkKey)) {
-            return runSpecCheck(connection, projectRoot, goal, profile, now);
-        }
-        if ("workflow".equals(checkKey)) {
-            return runWorkflowCheck(connection, projectRoot, goal, now, policy, profile);
-        }
-        if ("graph".equals(checkKey)) {
-            return runGraphCheck(connection, projectRoot, goal, profile, now);
-        }
-        if ("impact".equals(checkKey)) {
-            return runImpactCheck(connection, projectRoot, goal, profile, now);
-        }
-        if ("legacy".equals(checkKey)) {
-            return runLegacyCheck(connection, projectRoot, goal, profile, now);
-        }
-        if ("architecture".equals(checkKey)) {
-            return runArchitectureCheck(connection, projectRoot, goal, now);
-        }
-        if ("bdd".equals(checkKey)) {
-            return runBddCheck(connection, projectRoot, goal, profile, policy, now);
-        }
-        if ("think-before-coding".equals(checkKey)) {
-            return runDisciplineGateCheck(connection, projectRoot, goal, profile, checkKey, now);
-        }
-        if ("goal-driven".equals(checkKey)) {
-            return runDisciplineGateCheck(connection, projectRoot, goal, profile, checkKey, now);
-        }
-        if ("simplicity".equals(checkKey)) {
-            return runDisciplineGateCheck(connection, projectRoot, goal, profile, checkKey, now);
-        }
-        if ("surgical-change".equals(checkKey)) {
-            return runDisciplineGateCheck(connection, projectRoot, goal, profile, checkKey, now);
-        }
-        throw new IllegalArgumentException("Unknown goal check: " + checkKey);
+        return runner.run(new GoalCheckContext(connection, projectRoot, goal, checkKey, now, policy, profile));
     }
 
     public List<GoalCheck> runAll(Connection connection, Path projectRoot, GoalRun goal,
@@ -204,8 +157,8 @@ public final class GoalCheckService {
         return results;
     }
 
-    private GoalCheck runMavenCheck(Connection connection, Path projectRoot, GoalRun goal,
-                                    String checkKey, String[] command, String now) throws Exception {
+    GoalCheck runMavenCheck(Connection connection, Path projectRoot, GoalRun goal,
+                            String checkKey, String[] command, String now) throws Exception {
         Path log = logPath(projectRoot, goal, checkKey);
         String commandText = join(command);
         if (!Files.isRegularFile(projectRoot.resolve("pom.xml"))) {
@@ -222,8 +175,8 @@ public final class GoalCheckService {
         return save(connection, projectRoot, goal, checkKey, "command", commandText, status, summary, log, now);
     }
 
-    private GoalCheck runManualVerificationCheck(Connection connection, Path projectRoot, GoalRun goal,
-                                                 String checkKey, String scopeKey, String now) throws Exception {
+    GoalCheck runManualVerificationCheck(Connection connection, Path projectRoot, GoalRun goal,
+                                         String checkKey, String scopeKey, String now) throws Exception {
         Path log = logPath(projectRoot, goal, checkKey);
         List<GoalStep> steps = stepRepository.listByGoal(connection, goal.goalKey());
         List<String> failures = new ArrayList<String>();
@@ -262,8 +215,8 @@ public final class GoalCheckService {
         return save(connection, projectRoot, goal, checkKey, "manual", "", status, summary, log, now);
     }
 
-    private GoalCheck runVerificationRiskCheck(Connection connection, Path projectRoot, GoalRun goal,
-                                              String now) throws Exception {
+    GoalCheck runVerificationRiskCheck(Connection connection, Path projectRoot, GoalRun goal,
+                                      String now) throws Exception {
         Path log = logPath(projectRoot, goal, "verification-risk");
         List<GoalStep> steps = stepRepository.listByGoal(connection, goal.goalKey());
         List<String> failures = new ArrayList<String>();
@@ -301,8 +254,8 @@ public final class GoalCheckService {
         return save(connection, projectRoot, goal, "verification-risk", "risk", "", status, summary, log, now);
     }
 
-    private GoalCheck runSensitiveCheck(Connection connection, Path projectRoot, GoalRun goal,
-                                        String now) throws Exception {
+    GoalCheck runSensitiveCheck(Connection connection, Path projectRoot, GoalRun goal,
+                                String now) throws Exception {
         Path log = logPath(projectRoot, goal, "sensitive");
         Path[] files = new Path[]{
                 PathUtil.currentContext(projectRoot),
@@ -336,8 +289,8 @@ public final class GoalCheckService {
         return save(connection, projectRoot, goal, "sensitive", "sensitive", "", status, summary, log, now);
     }
 
-    private GoalCheck runSpecCheck(Connection connection, Path projectRoot, GoalRun goal, GoalProfile profile,
-                                   String now) throws Exception {
+    GoalCheck runSpecCheck(Connection connection, Path projectRoot, GoalRun goal, GoalProfile profile,
+                           String now) throws Exception {
         Path log = null;
         if (goal.specChangeKey().length() == 0) {
             if (profile != null && profile.specRequired()) {
@@ -374,8 +327,8 @@ public final class GoalCheckService {
         return save(connection, projectRoot, goal, "spec", "spec", "", status, summary, log, now);
     }
 
-    private GoalCheck runWorkflowCheck(Connection connection, Path projectRoot, GoalRun goal, String now,
-                                       GoalCheckPolicy policy, GoalProfile profile) throws Exception {
+    GoalCheck runWorkflowCheck(Connection connection, Path projectRoot, GoalRun goal, String now,
+                               GoalCheckPolicy policy, GoalProfile profile) throws Exception {
         if (goal.workflowRunKey().length() == 0) {
             return save(connection, projectRoot, goal, "workflow", "workflow", "", "skipped",
                     "goal has no workflow run", null, now);
@@ -418,8 +371,8 @@ public final class GoalCheckService {
                         + " pending_completion_gates=" + pendingCompletionHard, null, now);
     }
 
-    private GoalCheck runGraphCheck(Connection connection, Path projectRoot, GoalRun goal, GoalProfile profile,
-                                    String now) throws Exception {
+    GoalCheck runGraphCheck(Connection connection, Path projectRoot, GoalRun goal, GoalProfile profile,
+                            String now) throws Exception {
         Path log = logPath(projectRoot, goal, "graph");
         String command = graphRefreshCommand(projectRoot);
         if (profile == null || !profile.graphRequired()) {
@@ -471,8 +424,8 @@ public final class GoalCheckService {
         return save(connection, projectRoot, goal, "graph", "graph", command, status, summary, log, now);
     }
 
-    private GoalCheck runImpactCheck(Connection connection, Path projectRoot, GoalRun goal, GoalProfile profile,
-                                     String now) throws Exception {
+    GoalCheck runImpactCheck(Connection connection, Path projectRoot, GoalRun goal, GoalProfile profile,
+                             String now) throws Exception {
         Path log = logPath(projectRoot, goal, "impact");
         String command = impactRefreshCommand(projectRoot, connection, goal);
         if (profile == null || !profile.graphRequired() || !profile.graphRequireImpactMap()) {
@@ -666,8 +619,8 @@ public final class GoalCheckService {
         return second == null ? "" : second;
     }
 
-    private GoalCheck runLegacyCheck(Connection connection, Path projectRoot, GoalRun goal, GoalProfile profile,
-                                     String now) throws Exception {
+    GoalCheck runLegacyCheck(Connection connection, Path projectRoot, GoalRun goal, GoalProfile profile,
+                             String now) throws Exception {
         Path log = logPath(projectRoot, goal, "legacy");
         List<String> failures = new ArrayList<String>();
         StringBuilder output = new StringBuilder();
@@ -737,8 +690,8 @@ public final class GoalCheckService {
         return save(connection, projectRoot, goal, "legacy", "legacy", "", status, summary, log, now);
     }
 
-    private GoalCheck runArchitectureCheck(Connection connection, Path projectRoot, GoalRun goal,
-                                           String now) throws Exception {
+    GoalCheck runArchitectureCheck(Connection connection, Path projectRoot, GoalRun goal,
+                                   String now) throws Exception {
         Path log = logPath(projectRoot, goal, "architecture");
         GraphArchitectureCheckResult result = architectureCheckService.check(connection, projectRoot);
         writeLog(log, result.output());
@@ -746,8 +699,8 @@ public final class GoalCheckService {
                 result.summary(), log, now);
     }
 
-    private GoalCheck runBddCheck(Connection connection, Path projectRoot, GoalRun goal, GoalProfile profile,
-                                  GoalCheckPolicy policy, String now) throws Exception {
+    GoalCheck runBddCheck(Connection connection, Path projectRoot, GoalRun goal, GoalProfile profile,
+                          GoalCheckPolicy policy, String now) throws Exception {
         Path log = logPath(projectRoot, goal, "bdd");
         if (profile == null || !profile.bddRequired()) {
             String summary = "bdd not required by goal profile";
@@ -842,8 +795,8 @@ public final class GoalCheckService {
         return save(connection, projectRoot, goal, "bdd", "bdd", "", status, summary, log, now);
     }
 
-    private GoalCheck runDisciplineGateCheck(Connection connection, Path projectRoot, GoalRun goal,
-                                             GoalProfile profile, String gateKey, String now) throws Exception {
+    GoalCheck runDisciplineGateCheck(Connection connection, Path projectRoot, GoalRun goal,
+                                     GoalProfile profile, String gateKey, String now) throws Exception {
         Path log = logPath(projectRoot, goal, gateKey);
         List<GoalStep> steps = stepRepository.listByGoal(connection, goal.goalKey());
         SkillDisciplineGateResult result;

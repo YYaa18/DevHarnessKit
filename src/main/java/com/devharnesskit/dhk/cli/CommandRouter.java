@@ -1,7 +1,10 @@
 package com.devharnesskit.dhk.cli;
 
 import com.devharnesskit.dhk.command.HelpCommand;
+import com.devharnesskit.dhk.command.CompletionCommand;
 import com.devharnesskit.dhk.command.DoctorCommand;
+import com.devharnesskit.dhk.command.QuickstartCommand;
+import com.devharnesskit.dhk.command.StatusCommand;
 import com.devharnesskit.dhk.command.VersionCommand;
 import com.devharnesskit.dhk.command.artifact.ArtifactCommand;
 import com.devharnesskit.dhk.command.bdd.BddCommand;
@@ -20,6 +23,7 @@ import com.devharnesskit.dhk.util.PathUtil;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -42,6 +46,26 @@ public final class CommandRouter {
         this.commands.put("doctor", new Supplier<Command>() {
             public Command get() {
                 return new DoctorCommand();
+            }
+        });
+        this.commands.put("status", new Supplier<Command>() {
+            public Command get() {
+                return new StatusCommand("status");
+            }
+        });
+        this.commands.put("readiness", new Supplier<Command>() {
+            public Command get() {
+                return new StatusCommand("readiness");
+            }
+        });
+        this.commands.put("quickstart", new Supplier<Command>() {
+            public Command get() {
+                return new QuickstartCommand();
+            }
+        });
+        this.commands.put("completion", new Supplier<Command>() {
+            public Command get() {
+                return new CompletionCommand();
             }
         });
         this.commands.put("memory", new Supplier<Command>() {
@@ -106,13 +130,16 @@ public final class CommandRouter {
         Path projectRoot = PathUtil.resolveProjectRoot(parsedArgs, context.workingDirectory());
         SensitiveDataGuard.useProjectPolicy(projectRoot);
         try {
+            if (isVersionRequest(parsedArgs)) {
+                return command("version").run(context, parsedArgs);
+            }
+            if (isHelpRequest(parsedArgs)) {
+                return command("help").run(context, parsedArgs);
+            }
+            if (rejectSensitiveCommandArguments(parsedArgs, context)) {
+                return ExitCodes.VALIDATION_ERROR;
+            }
             Args args = argsForCommand(parsedArgs);
-            if (isVersionRequest(args)) {
-                return command("version").run(context, args);
-            }
-            if (isHelpRequest(args)) {
-                return command("help").run(context, args);
-            }
 
             Supplier<Command> command = commands.get(args.primaryCommand());
             if (command == null) {
@@ -125,6 +152,35 @@ public final class CommandRouter {
         } finally {
             SensitiveDataGuard.clearProjectPolicy();
         }
+    }
+
+    private boolean rejectSensitiveCommandArguments(Args parsedArgs, CommandContext context) {
+        if ("db".equals(parsedArgs.primaryCommand())) {
+            return false;
+        }
+        SensitiveDataGuard guard = new SensitiveDataGuard();
+        String originalText = parsedArgs.sensitiveScanText(redactionExcludedOptions());
+        List<String> originalMatches = guard.findMatches(originalText);
+        if (originalMatches.isEmpty()) {
+            return false;
+        }
+        List<String> redactedMatches = guard.findMatches(guard.redact(originalText));
+        if (redactedMatches.containsAll(originalMatches)) {
+            return false;
+        }
+        context.err().println("Sensitive data rejected in command arguments before redaction: "
+                + missingMatches(originalMatches, redactedMatches));
+        return true;
+    }
+
+    private List<String> missingMatches(List<String> originalMatches, List<String> redactedMatches) {
+        java.util.ArrayList<String> missing = new java.util.ArrayList<String>();
+        for (String match : originalMatches) {
+            if (!redactedMatches.contains(match)) {
+                missing.add(match);
+            }
+        }
+        return missing;
     }
 
     private Args argsForCommand(Args parsedArgs) {
@@ -149,6 +205,7 @@ public final class CommandRouter {
         excluded.add("user");
         excluded.add("port");
         excluded.add("path");
+        excluded.add("write");
         return excluded;
     }
 

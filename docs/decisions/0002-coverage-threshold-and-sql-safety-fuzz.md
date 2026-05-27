@@ -1,8 +1,9 @@
 # Decision 0002: Coverage Threshold and SQL Safety Fuzz Backlog
 
 Date: 2026-05-25
+Updated: 2026-05-27
 
-Status: Accepted for `0.1.x`; revisit before stable CLI claims.
+Status: Updated for `0.4.6-beta.1`.
 
 ## Context
 
@@ -24,11 +25,11 @@ is:
 | Branch coverage | 62.14% |
 | Complexity coverage | 62.38% |
 
-The baseline is useful, but not yet a stable quality gate. The CLI surface has
-recently grown across memory, DB readonly, goal, workflow, spec, release
-packaging, and agent skills. A global threshold added too early would be easy to
-game, brittle across Java/OS matrix jobs, and noisy for packaging or CLI-entry
-classes that are better covered by smoke tests.
+The baseline is useful, but the CLI surface is still growing across memory, DB
+readonly, goal, graph, BDD, workflow, spec, release packaging, and agent skills.
+A high global threshold added too early would be easy to game, brittle across
+Java/OS matrix jobs, and noisy for packaging or CLI-entry classes that are
+better covered by smoke tests.
 
 SQL safety is more important than a single aggregate coverage number. The
 current `SqlSafetyGuardTest` covers core examples, but does not yet exercise
@@ -37,7 +38,15 @@ identifier quoting, and mutation keywords.
 
 ## Decision
 
-Do not add a JaCoCo `check` threshold to CI in `0.1.x`.
+Add a conservative release/CI line-coverage gate for beta packaging:
+
+```bash
+scripts/check-coverage-threshold.sh 60
+```
+
+This is not a 1.0-quality claim. It is a regression tripwire that prevents the
+beta package from drifting below a modest floor while targeted tests continue to
+matter more than the aggregate number.
 
 Keep CI stable with:
 
@@ -47,8 +56,8 @@ mvn -B -DskipTests package
 ```
 
 Continue generating JaCoCo reports on every test run, document the current
-baseline, and revisit threshold enforcement after the 1.0 compatibility contract
-is closer to stable.
+baseline, and revisit stricter threshold enforcement after the 1.0 compatibility
+contract is closer to stable.
 
 For SQL safety, create an explicit fuzz/property-test backlog instead of adding
 ad hoc random tests immediately.
@@ -56,8 +65,8 @@ ad hoc random tests immediately.
 ## Rationale
 
 Coverage gates are most useful when the public surface is stable enough that
-failures signal real quality regressions. In `0.1.x`, a hard gate would mostly
-penalize expected alpha churn:
+failures signal real quality regressions. In the beta line, the first threshold
+is intentionally low and release-focused because:
 
 - DB command coverage depends on real database behavior that CI intentionally
   avoids for safety and portability.
@@ -67,8 +76,9 @@ penalize expected alpha churn:
   one global threshold would either be toothless or noisy.
 - Security-sensitive code needs targeted tests, not only aggregate coverage.
 
-The right next step is to preserve the baseline and improve high-risk targeted
-coverage before enforcing a global threshold.
+The right next step is to preserve the higher observed baseline, keep the 60%
+floor as a release tripwire, and improve high-risk targeted coverage before
+raising the global threshold.
 
 ## Future Coverage Gate Shape
 
@@ -82,9 +92,9 @@ Revisit coverage enforcement when:
 
 Candidate future policy:
 
-- start with report-only baseline checks in release review;
-- add a line or instruction threshold only after two consecutive releases remain
-  above the candidate threshold;
+- start with the 60% line-coverage release gate in `0.4.6-beta.1`;
+- raise the line or instruction threshold only after two consecutive releases
+  remain above the candidate threshold;
 - avoid branch/complexity gates until command routing and DB paths have more
   targeted coverage;
 - prefer package-specific gates for core services before global gates;
@@ -95,6 +105,11 @@ Candidate future policy:
 
 Add deterministic fuzz/property tests for `SqlSafetyGuard` before treating DB
 readonly as anything stronger than beta.
+
+Current stable-candidate status: deterministic `SqlSafetyGuardTest` coverage now
+exercises the backlog below without connecting to a real database. DB readonly
+still remains beta because SQL guard checks are guardrails, not a database
+permission boundary, and real-version compatibility checks still matter.
 
 Suggested test scope:
 
@@ -125,10 +140,11 @@ Implementation guidance:
 
 ## Consequences
 
-For `0.1.x`:
+For `0.4.6-beta.1`:
 
-- CI remains stable and does not fail on coverage percentage changes alone.
-- Release review should inspect the JaCoCo report and watch large drops.
+- CI and the local release gate fail when JaCoCo line coverage drops below 60%.
+- Release review should inspect the JaCoCo report and watch large drops above
+  that floor.
 - SQL safety improvement is tracked as targeted follow-up work.
 
 For 1.0 readiness:

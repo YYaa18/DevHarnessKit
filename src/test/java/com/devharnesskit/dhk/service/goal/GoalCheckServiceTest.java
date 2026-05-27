@@ -7,11 +7,35 @@ import java.io.File;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GoalCheckServiceTest {
     @TempDir
     Path tempDir;
+
+    @Test
+    void defaultRunnerRegistryExposesKnownCheckKeys() {
+        GoalCheckRunnerRegistry registry = GoalCheckRunnerRegistry.defaultRegistry(new GoalCheckService());
+
+        assertNotNull(registry.find("compile"));
+        assertNotNull(registry.find("test"));
+        assertNotNull(registry.find("manual-compile"));
+        assertNotNull(registry.find("manual-test"));
+        assertNotNull(registry.find("verification-risk"));
+        assertNotNull(registry.find("sensitive"));
+        assertNotNull(registry.find("workflow"));
+        assertNotNull(registry.find("spec"));
+        assertNotNull(registry.find("graph"));
+        assertNotNull(registry.find("impact"));
+        assertNotNull(registry.find("legacy"));
+        assertNotNull(registry.find("architecture"));
+        assertNotNull(registry.find("bdd"));
+        assertNotNull(registry.find("think-before-coding"));
+        assertNotNull(registry.find("goal-driven"));
+        assertNotNull(registry.find("simplicity"));
+        assertNotNull(registry.find("surgical-change"));
+    }
 
     @Test
     void executeTruncatesLargeOutputAndRecordsMetadata() throws Exception {

@@ -41,8 +41,10 @@ final class ConfigureCommandIntegrationTest {
         assertTrue(configText.contains("\"verification.compile.mode\": \"manual\""));
         assertTrue(configText.contains("\"verification.test.mode\": \"manual\""));
         assertTrue(configText.contains("\"verification.test.manual_trigger\": \"IDE test button\""));
+        assertTrue(configText.contains("\"verification.graph.mode\": \"required\""));
         assertTrue(init.stdout().contains("compile_mode: manual"));
         assertTrue(init.stdout().contains("test_mode: manual"));
+        assertTrue(init.stdout().contains("graph_mode: required"));
         assertTrue(init.stdout().contains("graph_required: true"));
 
         Harness show = new Harness(tempDir);
@@ -88,7 +90,75 @@ final class ConfigureCommandIntegrationTest {
         assertTrue(init.stdout().contains("\"command\": \"configure init\""));
         assertTrue(init.stdout().contains("\"compile_mode\": \"auto\""));
         assertTrue(init.stdout().contains("\"test_mode\": \"auto\""));
+        assertTrue(init.stdout().contains("\"graph_mode\": \"off\""));
         assertTrue(init.stdout().contains("\"graph_required\": false"));
+    }
+
+    @Test
+    void configureInitDryRunPrintsPlanWithoutWritingConfig() throws Exception {
+        Harness dryRun = new Harness(tempDir);
+        int dryRunExit = new CommandRouter().run(new String[]{
+                "configure", "init",
+                "--project-root", "dry-run-demo",
+                "--preset", "springboot-manual-ide-test",
+                "--dry-run",
+                "--json"
+        }, dryRun.context());
+
+        Path root = tempDir.resolve("dry-run-demo");
+        assertEquals(ExitCodes.SUCCESS, dryRunExit);
+        assertTrue(dryRun.stdout().contains("\"command\": \"configure init dry-run\""));
+        assertTrue(dryRun.stdout().contains("\"dry_run\": true"));
+        assertTrue(dryRun.stdout().contains("\"would_write\": true"));
+        assertTrue(dryRun.stdout().contains("\"config_created\": false"));
+        assertTrue(Files.notExists(PathUtil.devharnessConfig(root)));
+
+        Harness init = new Harness(tempDir);
+        int initExit = new CommandRouter().run(new String[]{
+                "configure", "init",
+                "--project-root", "dry-run-demo",
+                "--preset", "springboot-manual-ide-test"
+        }, init.context());
+        assertEquals(ExitCodes.SUCCESS, initExit);
+
+        Harness overwritePlan = new Harness(tempDir);
+        int overwritePlanExit = new CommandRouter().run(new String[]{
+                "configure", "init",
+                "--project-root", "dry-run-demo",
+                "--preset", "springboot-auto-test",
+                "--dry-run"
+        }, overwritePlan.context());
+        assertEquals(ExitCodes.SUCCESS, overwritePlanExit);
+        assertTrue(overwritePlan.stdout().contains("configure init dry-run"));
+        assertTrue(overwritePlan.stdout().contains("would_write: false"));
+        assertTrue(overwritePlan.stdout().contains("force_required: true"));
+    }
+
+    @Test
+    void configureInitSupportsManualAliasAndGraphAdvisoryPreset() throws Exception {
+        Harness manualAlias = new Harness(tempDir);
+        int manualAliasExit = new CommandRouter().run(new String[]{
+                "configure", "init",
+                "--project-root", "manual-alias-demo",
+                "--preset", "manual-ide-test",
+                "--force"
+        }, manualAlias.context());
+        assertEquals(ExitCodes.SUCCESS, manualAliasExit);
+        assertTrue(manualAlias.stdout().contains("preset: springboot-manual-ide-test"));
+        assertTrue(manualAlias.stdout().contains("compile_mode: manual"));
+        assertTrue(manualAlias.stdout().contains("test_mode: manual"));
+
+        Harness graphAdvisory = new Harness(tempDir);
+        int graphAdvisoryExit = new CommandRouter().run(new String[]{
+                "configure", "init",
+                "--project-root", "graph-advisory-demo",
+                "--preset", "graph-advisory",
+                "--force"
+        }, graphAdvisory.context());
+        assertEquals(ExitCodes.SUCCESS, graphAdvisoryExit);
+        assertTrue(graphAdvisory.stdout().contains("preset: graph-advisory"));
+        assertTrue(graphAdvisory.stdout().contains("graph_mode: advisory"));
+        assertTrue(graphAdvisory.stdout().contains("graph_required: false"));
     }
 
     @Test

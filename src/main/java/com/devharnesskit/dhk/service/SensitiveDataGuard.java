@@ -182,7 +182,16 @@ public final class SensitiveDataGuard {
         }
 
         private static String normalizeName(String value) {
-            String normalized = value == null ? "" : value.trim().toLowerCase(Locale.ROOT)
+            String raw = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+            if ("api_key".equals(raw) || "api-key".equals(raw)
+                    || "api_key=".equals(raw) || "api-key=".equals(raw)) {
+                return "api_key=";
+            }
+            if ("private_key".equals(raw) || "private-key".equals(raw)
+                    || "private_key=".equals(raw) || "private-key=".equals(raw)) {
+                return "private_key=";
+            }
+            String normalized = raw
                     .replace('_', ' ')
                     .replace('-', ' ');
             normalized = normalized.replaceAll("\\s+", " ");
@@ -198,8 +207,11 @@ public final class SensitiveDataGuard {
             if ("mail".equals(normalized) || "e mail".equals(normalized)) {
                 return "email";
             }
-            if ("api key".equals(normalized)) {
+            if ("api key".equals(normalized) || "api key=".equals(normalized)) {
                 return "api_key=";
+            }
+            if ("private key=".equals(normalized)) {
+                return "private_key=";
             }
             if ("private key".equals(normalized)) {
                 return "private key block";

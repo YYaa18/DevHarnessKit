@@ -23,10 +23,12 @@ Current schema version: `13`.
 | v9 | Graph Lite snapshot, file, node, edge, query cache, and goal binding tables. |
 | v10 | BDD specification features, scenarios, steps, bindings, evidence, and quality issue tables. |
 | v11 | Skill contract metadata for local skill governance. |
+| v12 | Human checkpoint approvals for policy-controlled goal completion. |
+| v13 | Skill trust source hashes and trust review status. |
 
 ## Alpha Compatibility Policy
 
-`0.4.4-beta.1` initializes and migrates project databases in place. The schema is not yet a stable public contract.
+The current beta CLI initializes and migrates project databases in place. The schema is not yet a stable public contract.
 See [COMPATIBILITY.md](COMPATIBILITY.md) for the overall CLI, schema, JSON, and export contract.
 
 When an existing non-empty database is below the current schema version, DevHarness Kit creates an automatic pre-migration backup under:
@@ -46,15 +48,60 @@ v2-workflow-before-artifacts.sql
 v4-before-goal.sql       pre-goal schema with existing spec state
 v5-goal-before-step-count.sql
                          goal schema before check freshness metadata
+v9-graph-before-bdd.sql  Graph Lite snapshot rows before BDD tables
+v10-bdd-before-skill.sql BDD rows before skill contract tables
+v11-skill-before-trust.sql
+                         skill contract rows before trust source hashes
+v12-human-checkpoint-before-skill-trust.sql
+                         human checkpoint rows before skill trust source hashes
+v13-current-minimal.sql current-version fixture used to verify idempotent
+                         v13 migration without pre-migration backup churn
 ```
 
-These fixtures verify that old databases are backed up before upgrade, important rows are preserved, and the current v11 schema is created.
+These fixtures verify that old databases are backed up before upgrade, important rows are preserved, and the current v13 schema is created.
 
-The workflow fixture verifies that v2 `workflow_template`, `workflow_run`, `workflow_phase_run`, `workflow_gate_run`, and `workflow_event` rows survive upgrade while v3 artifact binding tables, v4 spec tables, v5 goal tables, v6 check metadata, v7 export recovery state, v8 fingerprint columns, v9 graph tables, v10 BDD tables, and v11 skill contract tables are added.
+The workflow fixture verifies that v2 `workflow_template`, `workflow_run`, `workflow_phase_run`, `workflow_gate_run`, and `workflow_event` rows survive upgrade while v3 artifact binding tables, v4 spec tables, v5 goal tables, v6 check metadata, v7 export recovery state, v8 fingerprint columns, v9 graph tables, v10 BDD tables, v11 skill contract tables, v12 human checkpoint tables, and v13 skill trust fields are added.
 
-The spec fixture verifies that v4 `spec_change`, `spec_document`, `spec_task`, `spec_acceptance`, `workflow_spec_binding`, and `spec_event` rows survive upgrade while v5 goal tables, v6 check metadata, v7 export recovery state, v8 fingerprint columns, v9 graph tables, v10 BDD tables, and v11 skill contract tables are added.
+The spec fixture verifies that v4 `spec_change`, `spec_document`, `spec_task`, `spec_acceptance`, `workflow_spec_binding`, and `spec_event` rows survive upgrade while v5 goal tables, v6 check metadata, v7 export recovery state, v8 fingerprint columns, v9 graph tables, v10 BDD tables, v11 skill contract tables, v12 human checkpoint tables, and v13 skill trust fields are added.
 
-The goal fixture verifies that v5 `goal_check` rows survive upgrade, receive a default `step_count_at_check = 0` value, can be extended with v8 fingerprint metadata, and receives v9 graph tables, v10 BDD tables, and v11 skill contract tables without losing rows.
+The goal fixture verifies that v5 `goal_check` rows survive upgrade, receive a default `step_count_at_check = 0` value, can be extended with v8 fingerprint metadata, and receives v9 graph tables, v10 BDD tables, v11 skill contract tables, v12 human checkpoint tables, and v13 skill trust fields without losing rows.
+
+The Graph fixture verifies that v9 `code_graph_snapshot`, `code_graph_file`, `code_graph_node`, `code_graph_edge`, `code_graph_query_cache`, and `goal_graph_binding` rows survive upgrade while BDD, skill contract, human checkpoint, and skill trust schema is added.
+
+The BDD fixture verifies that v10 `bdd_feature`, `bdd_scenario`, `bdd_step`, `bdd_binding`, `bdd_evidence`, and `bdd_quality_issue` rows survive upgrade while skill contract, human checkpoint, and skill trust schema is added.
+
+The skill fixture verifies that v11 `skill_contract` rows survive upgrade and receive default v13 trust columns (`source_hash`, `trusted_source_hash`, `trust_status`).
+
+The human checkpoint fixture verifies that v12 `human_checkpoint` rows survive upgrade while existing skill contract rows receive v13 trust columns.
+
+The current-version fixture verifies that a database already reporting schema
+v13 can be migrated repeatedly without duplicate `schema_version` rows or
+automatic pre-migration backup churn.
+
+## MigrationStep Mapping
+
+`MigrationRunner` now executes an ordered `MigrationStep` contract. The runner
+keeps transaction control, pre-upgrade backup, rollback, and optional FTS setup;
+each version remains isolated behind a versioned step entry.
+
+| Version | MigrationStep description | Implementation method |
+| --- | --- | --- |
+| v1 | `MVP memory schema` | `MigrationRunner.migrateV1` |
+| v2 | `V0.2 workflow persistence schema` | `MigrationRunner.migrateV2` |
+| v3 | `V0.2-B workflow artifact binding schema` | `MigrationRunner.migrateV3` |
+| v4 | `V0.3 spec persistence schema` | `MigrationRunner.migrateV4` |
+| v5 | `V0.4 goal orchestration schema` | `MigrationRunner.migrateV5` |
+| v6 | `V0.4 goal check freshness schema` | `MigrationRunner.migrateV6` |
+| v7 | `V0.4 goal context export failure schema` | `MigrationRunner.migrateV7` |
+| v8 | `V0.4 goal workflow/spec sync schema` | `MigrationRunner.migrateV8` |
+| v9 | `V0.4 graph lite schema` | `MigrationRunner.migrateV9` |
+| v10 | `V0.4 BDD acceptance schema` | `MigrationRunner.migrateV10` |
+| v11 | `V0.4 skill contract schema` | `MigrationRunner.migrateV11` |
+| v12 | `V0.4 human checkpoint schema` | `MigrationRunner.migrateV12` |
+| v13 | `V0.4 skill trust hardening schema` | `MigrationRunner.migrateV13` |
+
+Adding a future migration should add one `MigrationStep` entry, one fixture or
+upgrade test, and one row in this table.
 
 Graph Lite v9 tables are additive. They store snapshot-bound machine facts:
 
@@ -95,6 +142,14 @@ skill_contract
 They store parsed `contract.json` metadata for future `dhk skill` lint, verify,
 trust, and audit commands. They do not execute scripts or mark any skill trusted
 by default. See [SKILL_CONTRACT.md](SKILL_CONTRACT.md).
+
+Human checkpoint v12 tables are additive beta storage for explicit approval steps:
+
+```text
+human_checkpoint
+```
+
+They preserve local approval decisions for policy-controlled goal completion.
 
 Schema v13 adds source-hash trust fields to `skill_contract`:
 

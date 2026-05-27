@@ -74,6 +74,31 @@ final class SkillGateIntegrationTest {
     }
 
     @Test
+    void thinkBeforeCodingGateAcceptsBugfixPreCodingEvidence() throws Exception {
+        String goalKey = startGoal("demo-bugfix", "bugfix");
+        recordStep("demo-bugfix", goalKey, "Collected release hardening symptoms", "",
+                "goal_understanding=Fix release version drift; assumptions=No product behavior change; "
+                        + "failing_symptom=release workflow hardcodes artifact version; "
+                        + "reproduction_or_log=rg finds hardcoded version");
+        recordStep("demo-bugfix", goalKey, "Listed release hardening hypothesis", "",
+                "root_cause_hypothesis=release scripts do not read project.version; "
+                        + "supporting_evidence=pom uses project.version for artifact names");
+        recordStep("demo-bugfix", goalKey, "Implemented release hardening fix",
+                "RELEASE.md,scripts/release-gate.sh",
+                "fix_summary=Use Maven project.version and release gate");
+
+        Harness think = new Harness(tempDir);
+        int thinkExit = new CommandRouter().run(new String[]{
+                "skill", "gate", "think-before-coding",
+                "--project-root", "demo-bugfix",
+                "--goal", goalKey
+        }, think.context());
+
+        assertEquals(ExitCodes.SUCCESS, thinkExit);
+        assertTrue(think.stdout().contains("status: passed"));
+    }
+
+    @Test
     void goalDrivenGateAllowsAdditionalVerifyEvidenceStep() throws Exception {
         String goalKey = startGoal("demo-repeat-action");
         recordInspectStep("demo-repeat-action", goalKey,
@@ -218,11 +243,15 @@ final class SkillGateIntegrationTest {
     }
 
     private String startGoal(String projectRoot) throws Exception {
+        return startGoal(projectRoot, "java-api-change");
+    }
+
+    private String startGoal(String projectRoot, String profile) throws Exception {
         Harness start = new Harness(tempDir);
         int exit = new CommandRouter().run(new String[]{
                 "goal", "start",
                 "--project-root", projectRoot,
-                "--profile", "java-api-change",
+                "--profile", profile,
                 "--task", "Implement order query API",
                 "--module", "order",
                 "--mode", "api",

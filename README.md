@@ -6,24 +6,34 @@ It stores durable project memory, specs, workflow state, and read-only database 
 
 ## Status
 
-This repository is `v0.4.4-beta.1` and should be treated as a beta developer preview.
+This is a beta developer preview. It is not production-ready; do not describe it
+as stable or 1.0-ready.
+
+Current beta release target: `0.4.6-beta.1`. Maven `project.version` is the
+artifact source of truth; CI and `scripts/check-version-metadata.sh` fail if the
+README, changelog, or release note for that version drift.
 
 | Area | Status | Notes |
 | --- | --- | --- |
-| Memory core | Stable-ish alpha | Usable for local project memory, draft confirmation, search, export, checkpoint, and recovery. |
-| Doctor | Stable-ish alpha | Validates project memory storage and export paths. |
-| Sensitive guard | Alpha | Best-effort heuristic guard with project-level reject/redact/allow policy. Not a complete DLP system. |
+| Memory core | Beta | Usable for local project memory, draft confirmation, search, export, checkpoint, and recovery. |
+| Doctor | Beta | Validates project memory storage and export paths. |
+| Sensitive guard | Beta | Best-effort heuristic guard with project-level reject/redact/allow policy. It reviews persisted/exported content; users still review outputs because it is not a complete DLP system. |
 | DB readonly | Beta | Useful for inspection, but SQL guard is not a permission boundary. Use read-only database credentials. |
-| Goal orchestration | Beta | High-level `dhk goal` protocol for start/resume/next/step/check/evaluate/verify/complete and short context export. It is the preferred harness entry for agent work, but not stable. |
+| Goal core | Stable-candidate beta | High-level `dhk goal` protocol for start/resume/next/step/status/export/verify/complete/audit/recheck and short context export. It is the preferred harness entry for agent work, but not stable. |
+| Goal debug checks | Alpha | Lower-level `goal check` and `goal evaluate` remain available for diagnostics and may change before 1.0. |
 | Graph Lite | Alpha+ | `dhk graph init/status/index/impact/export/prune` can scan files, parse Lite nodes/edges, persist snapshot-bound graph rows, export local graph context, and audit/prune old snapshots. |
-| Graph-aware goal | Beta preview | Graph freshness, impact-map checks, stale override approval, and prune audit are wired into the goal workflow. Graph output remains heuristic advisory context. |
+| Graph-aware goal | Experimental beta preview | Graph freshness, impact-map checks, stale override approval, and prune audit are wired into the goal workflow. Graph output remains heuristic advisory context and is outside the stable-candidate promise. |
 | BDD acceptance harness | Internal alpha | `dhk bdd init/add/list/show/export/lint/evidence/verify/coverage/bind-spec/bind-goal/bind-graph` can record, export, lint, verify, cover, and trace specification-level BDD features, scenarios, Given/When/Then steps, evidence, spec acceptance rows, goal runs, and Graph Lite impact inputs. BDD-required goal profiles can block completion on missing scenario evidence. Executable adapters are not enabled yet. |
 | Workflow | Alpha | Records process state for audit and context export. It is not a workflow engine. |
 | Spec | Alpha | Records change documents, tasks, acceptance, and status. Markdown is export only. |
 | Agent packaging | Alpha | Ships `.agents/skills` and `.comate/rules` helpers for agent workflows. |
 | SQLite schema | Alpha | Current schema version is v13. Compatibility policy is documented, but not yet guaranteed as stable. |
 
-Do not publish or describe the current build as stable or 1.0-ready.
+Stable-candidate work is now being narrowed around memory core, doctor, goal
+core, migration recovery, and release packaging. DB readonly remains beta.
+Graph, BDD, Skill Contract, Policy/Governance, Routine, and ECC Control Panel
+remain experimental surfaces until their contracts are separately stabilized.
+See [docs/STABLE_CANDIDATE.md](docs/STABLE_CANDIDATE.md).
 
 ## Core Principles
 
@@ -99,14 +109,14 @@ target/site/jacoco/index.html
 The shaded CLI jar is generated as:
 
 ```text
-target/dhk-cli-0.4.4-beta.1-all.jar
+target/dhk-cli-<version>-all.jar
 ```
 
 Release archives are generated during `mvn package`:
 
 ```text
-target/devharnesskit-0.4.4-beta.1.zip
-target/devharnesskit-0.4.4-beta.1.tar.gz
+target/devharnesskit-<version>.zip
+target/devharnesskit-<version>.tar.gz
 ```
 
 The archives include the CLI jar, scripts, agent skill/rule packaging, `LICENSE`, and `THIRD_PARTY_NOTICES.md`.
@@ -124,7 +134,8 @@ scripts/perf-smoke.sh
 Check the version:
 
 ```bash
-java -jar target/dhk-cli-0.4.4-beta.1-all.jar version
+DHK_VERSION="$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)"
+java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" version
 ```
 
 Create a project-level DevHarness configuration and install generated agent
@@ -132,6 +143,14 @@ adapters through the local control panel. For Spring Boot projects where
 compile/test must be run from the IDE or company runtime, use the manual preset:
 
 ```bash
+java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" configure init \
+  --project-root . \
+  --preset springboot-manual-ide-test \
+  --compile manual \
+  --test manual \
+  --graph required \
+  --dry-run
+
 scripts/devharness-control-panel.sh configure \
   --project-root . \
   --preset springboot-manual-ide-test \
@@ -154,12 +173,50 @@ scripts/devharness-control-panel.sh configure \
   --force
 ```
 
+`configure init --dry-run` prints the effective config plan without writing
+`.agents/devharness/config.json`. Presets describe verification capability, not
+only project type: `manual-ide-test` is an alias for manual compile/test
+evidence, while `graph-advisory` enables graph context without making graph
+checks completion gates.
+
 Inspect local readiness:
 
 ```bash
+java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" status --project-root .
+java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" readiness --project-root . --markdown --write .agents/devharness/READINESS.md
 scripts/devharness-control-panel.sh status --project-root .
 scripts/devharness-control-panel.sh doctor --project-root .
 ```
+
+`dhk status` is a read-only project snapshot for "what should I do next";
+`dhk doctor` remains the environment/configuration diagnostic command.
+`dhk readiness --exit-code` returns a non-zero exit code when the snapshot is
+not ready, which is useful for CI and release gates.
+
+For a shorter first run, `quickstart` creates the project config when missing,
+starts or reuses the first open goal, and prints the exact next command. It does
+not install adapters, execute a goal step, run verification, or complete work:
+
+```bash
+java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" quickstart \
+  --project-root . \
+  --preset springboot-manual-ide-test \
+  --task "Implement order query endpoint" \
+  --module order \
+  --graph required \
+  --dry-run
+
+java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" quickstart \
+  --project-root . \
+  --preset springboot-manual-ide-test \
+  --task "Implement order query endpoint" \
+  --module order \
+  --graph required
+```
+
+If adapters are not installed yet, quickstart still creates the goal but reports
+`readiness: ready_with_warnings` and prints an `adapter_next_command` so setup
+can be audited through the control panel.
 
 The control panel writes `.agents/devharness/config.json`,
 `.agents/devharness/policy.json`, `.agents/devharness/agent-manifest.json`,
@@ -172,16 +229,31 @@ To preview the plan without writing files:
 scripts/devharness-control-panel.sh plan --project-root . --target all --dry-run
 ```
 
-`scripts/install-agent-adapters.sh` remains as a compatibility wrapper for
-`scripts/devharness-control-panel.sh install`. New projects should use the
-control panel because it records install state and can report readiness drift.
+`scripts/install-agent-adapters.sh` is deprecated as a direct user entry. It
+remains as a compatibility wrapper for
+`scripts/devharness-control-panel.sh install` through this beta line. New
+projects should use the control panel because it records install state and can
+report readiness drift.
 The generated adapters point to the goal protocol and remove the old
 `devharness-java-development` memory-first skill by default.
 
-Start every code task through `goal`:
+Optional static shell completion is available without reading SQLite or remote
+state:
 
 ```bash
-java -jar target/dhk-cli-0.4.4-beta.1-all.jar goal start \
+java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" completion bash > /tmp/dhk.bash
+source /tmp/dhk.bash
+
+java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" completion zsh > "${fpath[1]}/_dhk"
+java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" completion fish > ~/.config/fish/completions/dhk.fish
+```
+
+Start every code task through `goal`. The raw jar form below is useful when
+testing the repository build; after installing adapters, use the generated
+wrapper scripts because they pass `--project-root` for you.
+
+```bash
+java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" goal start \
   --project-root . \
   --profile java-api-change \
   --task "Implement order query endpoint" \
@@ -189,12 +261,12 @@ java -jar target/dhk-cli-0.4.4-beta.1-all.jar goal start \
   --mode api
 ```
 
-Then continue through the goal protocol:
+Then continue through the core goal path:
 
 ```bash
-java -jar target/dhk-cli-0.4.4-beta.1-all.jar goal next --project-root . --goal <goal-key>
+java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" goal next --project-root . --goal <goal-key>
 cat .agents/memory/exports/GOAL_CONTEXT.md
-java -jar target/dhk-cli-0.4.4-beta.1-all.jar goal step --project-root . --goal <goal-key> \
+java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" goal step --project-root . --goal <goal-key> \
   --summary "Inspected existing controller/service/mapper/tests" \
   --field existing_controller=OrderController \
   --field existing_service=OrderService \
@@ -202,19 +274,19 @@ java -jar target/dhk-cli-0.4.4-beta.1-all.jar goal step --project-root . --goal 
   --field existing_tests=OrderServiceTest
 ```
 
-Before claiming completion, run goal verification and complete the goal only when
-it reports `ready_to_complete`:
+Before claiming completion, run goal verification and complete the goal only
+when it reports `ready_to_complete`:
 
 ```bash
-java -jar target/dhk-cli-0.4.4-beta.1-all.jar goal verify --project-root . --goal <goal-key>
-java -jar target/dhk-cli-0.4.4-beta.1-all.jar goal complete --project-root . --goal <goal-key>
+java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" goal verify --project-root . --goal <goal-key>
+java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" goal complete --project-root . --goal <goal-key>
 ```
 
 Graph-aware profiles are opt-in. Use a `*-with-graph` profile, or a custom
 profile with `graph_required=true`, when graph impact evidence is required:
 
 ```bash
-java -jar target/dhk-cli-0.4.4-beta.1-all.jar goal start \
+java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" goal start \
   --project-root . \
   --profile java-api-change-with-graph \
   --task "Implement order query endpoint" \
@@ -234,7 +306,7 @@ human evidence explicitly authorizes it.
 `.agents/memory/exports/ARTIFACT_PASSPORT.json`, and creates a checkpoint. The passport is an audit artifact
 for release and CI review; it does not replace human review, tests, or manual risk assessment.
 
-Goal orchestration is still experimental alpha. Built-in Java profiles are intentionally strict: skipped compile/test checks are not accepted, required specs must contain at least one closed task and one closed acceptance item, and pending hard workflow gates block completion unless mapped goal actions or accepted checks close them. `goal complete` closes the checkpoint gate while creating the completion checkpoint.
+Goal core is on the stable-candidate beta track, not stable. Built-in Java profiles are intentionally strict: skipped compile/test checks are not accepted, required specs must contain at least one closed task and one closed acceptance item, and pending hard workflow gates block completion unless mapped goal actions or accepted checks close them. `goal complete` closes the checkpoint gate while creating the completion checkpoint. Graph-aware goal, BDD-required profiles, and lower-level `goal check` / `goal evaluate` diagnostics remain experimental surfaces.
 
 Goal Sync Strictness makes `goal` the main controller for agent work while workflow and spec remain auditable state layers. Profile mappings can auto-pass deterministic workflow phases, gates, spec tasks, and business acceptance items from accepted evidence or fresh checks. Manual acceptance, gate waivers, spec archive, memory confirmation, and DB SQL remain explicit human or user-approved actions.
 
@@ -255,12 +327,12 @@ Goal-first is the recommended entry for agent work. Lower-level commands remain
 available for setup, debugging, and expert workflows:
 
 ```bash
-java -jar target/dhk-cli-0.4.4-beta.1-all.jar memory init --project-root .
-java -jar target/dhk-cli-0.4.4-beta.1-all.jar memory add --project-root . --type convention --module global --title "<title>" --content "<content>"
-java -jar target/dhk-cli-0.4.4-beta.1-all.jar memory confirm --project-root . --id <id>
-java -jar target/dhk-cli-0.4.4-beta.1-all.jar memory export --project-root . --task "<task>" --module <module>
-java -jar target/dhk-cli-0.4.4-beta.1-all.jar workflow template seed --project-root .
-java -jar target/dhk-cli-0.4.4-beta.1-all.jar spec create --project-root . --change <change-key> --title "<title>" --summary "<summary>"
+java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" memory init --project-root .
+java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" memory add --project-root . --type convention --module global --title "<title>" --content "<content>"
+java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" memory confirm --project-root . --id <id>
+java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" memory export --project-root . --task "<task>" --module <module>
+java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" workflow template seed --project-root .
+java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" spec create --project-root . --change <change-key> --title "<title>" --summary "<summary>"
 ```
 
 Use `--json` for machine-readable output on supported commands such as
@@ -293,30 +365,22 @@ Read [SECURITY.md](SECURITY.md) before using DB readonly features.
 
 ## Documentation
 
+Start with [docs/INDEX.md](docs/INDEX.md). It separates onboarding, daily usage,
+experimental surfaces, release operations, and historical design notes so new
+users do not have to scan every Markdown file.
+
+Most users need these first:
+
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): current architecture and module boundaries.
-- [docs/CLI_INPUTS.md](docs/CLI_INPUTS.md): file/stdin input, search explain, and backup command usage.
-- [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md): stable-ish alpha, beta, and alpha CLI/schema/output contract.
-- [docs/DB_COMPATIBILITY.md](docs/DB_COMPATIBILITY.md): MySQL 5.1 production and MySQL 8 local compatibility guidance.
-- [docs/decisions/0001-module-split-and-installer-strategy.md](docs/decisions/0001-module-split-and-installer-strategy.md): alpha distribution and module split decision.
-- [docs/decisions/0002-coverage-threshold-and-sql-safety-fuzz.md](docs/decisions/0002-coverage-threshold-and-sql-safety-fuzz.md): coverage gate decision and SQL safety fuzz backlog.
-- [docs/DEVHARNESS_GOAL_CLI_ORCHESTRATION_PLAN.md](docs/DEVHARNESS_GOAL_CLI_ORCHESTRATION_PLAN.md): V0.4 goal orchestration plan.
-- [docs/DEVHARNESS_SKILLS_REDESIGN_PLAN.md](docs/DEVHARNESS_SKILLS_REDESIGN_PLAN.md): goal-first skill redesign plan.
+- [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md): beta and alpha CLI/schema/output contract.
 - [docs/GOAL_CONFIGURATION.md](docs/GOAL_CONFIGURATION.md): project-level goal profile and check policy configuration.
-- [docs/GOAL_SYNC_STRICTNESS.md](docs/GOAL_SYNC_STRICTNESS.md): goal-controlled workflow/spec synchronization model and alpha boundaries.
-- [docs/GRAPH_CONTEXT_LAYER.md](docs/GRAPH_CONTEXT_LAYER.md): Graph Lite context layer, export boundary, and agent usage.
-- [docs/GRAPH_LIMITS.md](docs/GRAPH_LIMITS.md): Graph Lite safety limits, skipped metadata, and truncation reports.
-- [docs/GRAPH_SCHEMA.md](docs/GRAPH_SCHEMA.md): Graph Lite alpha schema, config, and SQLite table contract.
-- [docs/JSON_OUTPUT.md](docs/JSON_OUTPUT.md): alpha JSON output commands and required fields.
 - [docs/MIGRATIONS.md](docs/MIGRATIONS.md): SQLite schema compatibility and recovery policy.
-- [docs/POLICY.md](docs/POLICY.md): project policy hooks for protected paths, command guards, DB SQL, export, and goal lifecycle checks.
-- [docs/ROADMAP.md](docs/ROADMAP.md): release maturity plan.
-- [docs/SENSITIVE_POLICY.md](docs/SENSITIVE_POLICY.md): project-level sensitive-data reject/redact/allow policy.
 - [SECURITY.md](SECURITY.md): threat model, limitations, and reporting.
-- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md): dependency license notices for source and shaded binaries.
-- [CONTRIBUTING.md](CONTRIBUTING.md): development and PR workflow.
 - [RELEASE.md](RELEASE.md): release packaging checklist.
 
-`docs/PRD.md` and `docs/IMPLEMENTATION_PLAN.md` are historical design notes. They are useful background, but README and the docs above describe the current open-source surface.
+`docs/PRD.md` and `docs/IMPLEMENTATION_PLAN.md` are historical design notes.
+They are useful background, but README and [docs/INDEX.md](docs/INDEX.md)
+describe the current open-source surface.
 
 ## License
 

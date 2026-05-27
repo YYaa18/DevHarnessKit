@@ -45,7 +45,7 @@ Options:
   --no-remove-legacy             Keep legacy files
   --compile-mode <mode>          auto | manual | disabled
   --test-mode <mode>             auto | manual | disabled
-  --graph <mode>                 required | optional | off
+  --graph <mode>                 required | advisory | optional | off
   --allow-stale-policy <policy>  approval | off
   --status-format <format>       text | json | markdown
   -h, --help                     Show this help
@@ -53,7 +53,7 @@ Options:
 Examples:
   ./scripts/devharness-control-panel.sh configure --preset springboot-manual-ide-test --target all --force
   ./scripts/devharness-control-panel.sh plan --target claude --dry-run
-  ./scripts/devharness-control-panel.sh install --target all --jar target/dhk-cli-0.4.4-beta.1-all.jar
+  ./scripts/devharness-control-panel.sh install --target all --jar target/dhk-cli-<version>-all.jar
   ./scripts/devharness-control-panel.sh status --status-format markdown
 USAGE
 }
@@ -77,6 +77,60 @@ run() {
 
 quote_json() {
   printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+sha256_file() {
+  path="$1"
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$path" | awk '{print $1}'
+  elif command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$path" | awk '{print $1}'
+  else
+    cksum "$path" | awk '{print $1}'
+  fi
+}
+
+managed_file_paths() {
+  for path in \
+    ".agents/devharness/config.json" \
+    ".agents/devharness/policy.json" \
+    ".agents/devharness/agent-manifest.json" \
+    ".agents/graph/config.json"
+  do
+    [ -f "$PROJECT_ROOT/$path" ] && printf '%s\n' "$path"
+  done
+  case "$TARGET" in
+    claude|all)
+      for path in \
+        ".claude/skills/devharness-goal-development/SKILL.md" \
+        ".claude/skills/devharness-graph-aware-development/SKILL.md" \
+        "CLAUDE.md"
+      do
+        [ -f "$PROJECT_ROOT/$path" ] && printf '%s\n' "$path"
+      done
+      ;;
+  esac
+  case "$TARGET" in
+    opencode|all)
+      [ -f "$PROJECT_ROOT/AGENTS.md" ] && printf '%s\n' "AGENTS.md"
+      ;;
+  esac
+  case "$TARGET" in
+    comate|all)
+      for path in \
+        ".comate/rules/devharness-goal-protocol.mdr" \
+        ".comate/rules/devharness-graph-aware-protocol.mdr"
+      do
+        [ -f "$PROJECT_ROOT/$path" ] && printf '%s\n' "$path"
+      done
+      ;;
+  esac
+  [ -f "$PROJECT_ROOT/.agents/tools/devharness-kit/dhk.jar" ] \
+    && printf '%s\n' ".agents/tools/devharness-kit/dhk.jar"
+}
+
+extract_json_string() {
+  printf '%s' "$1" | sed 's/.*"[^"]*": "\([^"]*\)".*/\1/'
 }
 
 write_text_file() {
@@ -158,7 +212,7 @@ validate_modes() {
   case "$MODE" in copy|link) ;; *) fail "--mode must be copy or link";; esac
   case "$COMPILE_MODE" in auto|manual|disabled) ;; *) fail "--compile-mode must be auto, manual, or disabled";; esac
   case "$TEST_MODE" in auto|manual|disabled) ;; *) fail "--test-mode must be auto, manual, or disabled";; esac
-  case "$GRAPH_MODE" in required|optional|off) ;; *) fail "--graph must be required, optional, or off";; esac
+  case "$GRAPH_MODE" in required|advisory|optional|off) ;; *) fail "--graph must be required, advisory, optional, or off";; esac
   case "$ALLOW_STALE_POLICY" in approval|off) ;; *) fail "--allow-stale-policy must be approval or off";; esac
   case "$STATUS_FORMAT" in text|json|markdown) ;; *) fail "--status-format must be text, json, or markdown";; esac
 }
@@ -186,6 +240,8 @@ write_config() {
   graph_required="false"
   graph_fresh="false"
   impact_required="false"
+  graph_config_mode="$GRAPH_MODE"
+  [ "$graph_config_mode" = "optional" ] && graph_config_mode="advisory"
   if [ "$GRAPH_MODE" = "required" ]; then
     graph_required="true"
     graph_fresh="true"
@@ -226,6 +282,7 @@ write_config() {
   "verification.test.manual_trigger": "'"$(quote_json "$test_trigger")"'",
   "verification.test.expected_duration": "'"$(quote_json "$test_duration")"'",
   "verification.test.required_evidence": "manual_evidence_status=passed,test_scope,manual_evidence_path",
+  "verification.graph.mode": "'"$graph_config_mode"'",
   "verification.graph.required": "'"$graph_required"'",
   "verification.graph.fresh_snapshot_required": "'"$graph_fresh"'",
   "verification.graph.impact_map_required": "'"$impact_required"'",
@@ -452,7 +509,21 @@ write_install_state() {
   "graph": "$GRAPH_MODE",
   "allow_stale_policy": "$ALLOW_STALE_POLICY",
   "remove_legacy": "$REMOVE_LEGACY",
-  "managed_files": "CLAUDE.md,AGENTS.md,.claude/skills/devharness-goal-development,.claude/skills/devharness-graph-aware-development,.comate/rules/devharness-goal-protocol.mdr,.comate/rules/devharness-graph-aware-protocol.mdr"
+  "managed_files": [
+STATE
+  first="true"
+  managed_file_paths | while IFS= read -r rel; do
+    [ -f "$PROJECT_ROOT/$rel" ] || continue
+    hash=$(sha256_file "$PROJECT_ROOT/$rel")
+    if [ "$first" = "true" ]; then
+      first="false"
+    else
+      printf ',\n' >> "$state"
+    fi
+    printf '    {\n      "path": "%s",\n      "sha256": "%s"\n    }' "$(quote_json "$rel")" "$hash" >> "$state"
+  done
+  cat >> "$state" <<STATE
+  ]
 }
 STATE
 }
@@ -469,6 +540,38 @@ legacy_status() {
   else
     printf 'removed'
   fi
+}
+
+check_install_state_drift() {
+  state="$PROJECT_ROOT/.agents/devharness/install-state.json"
+  [ -f "$state" ] || return 0
+  drift="false"
+  current_path=""
+  while IFS= read -r line; do
+    case "$line" in
+      *'"path": '*)
+        current_path=$(extract_json_string "$line")
+        ;;
+      *'"sha256": '*)
+        expected_hash=$(extract_json_string "$line")
+        if [ -n "$current_path" ]; then
+          file="$PROJECT_ROOT/$current_path"
+          if [ ! -f "$file" ]; then
+            printf 'doctor warning: managed file missing %s\n' "$current_path" >&2
+            drift="true"
+          else
+            actual_hash=$(sha256_file "$file")
+            if [ "$actual_hash" != "$expected_hash" ]; then
+              printf 'doctor warning: managed file drift %s\n' "$current_path" >&2
+              drift="true"
+            fi
+          fi
+          current_path=""
+        fi
+        ;;
+    esac
+  done < "$state"
+  [ "$drift" = "false" ]
 }
 
 status() {
@@ -585,6 +688,7 @@ doctor() {
       [ -e "$PROJECT_ROOT/.comate/rules/devharness-graph-aware-protocol.mdr" ] || { printf 'doctor warning: missing Comate graph rule\n' >&2; failed="true"; }
       ;;
   esac
+  check_install_state_drift || failed="true"
   if [ "$failed" = "true" ]; then
     printf 'doctor suggestion: run scripts/devharness-control-panel.sh repair --project-root "%s" --target %s --force\n' "$PROJECT_ROOT" "$TARGET" >&2
     exit 3
@@ -610,7 +714,11 @@ plan() {
   log "- .agents/devharness/agent-manifest.json"
   log "- .agents/devharness/install-state.json"
   log "- .agents/graph/config.json"
-  log "will_copy_or_link:"
+  if [ "$MODE" = "link" ]; then
+    log "will_link:"
+  else
+    log "will_copy:"
+  fi
   case "$TARGET" in claude|all) log "- .claude/skills/devharness-goal-development"; log "- .claude/skills/devharness-graph-aware-development"; log "- CLAUDE.md" ;; esac
   case "$TARGET" in opencode|all) log "- AGENTS.md" ;; esac
   case "$TARGET" in comate|all) log "- .comate/rules/devharness-goal-protocol.mdr"; log "- .comate/rules/devharness-graph-aware-protocol.mdr" ;; esac

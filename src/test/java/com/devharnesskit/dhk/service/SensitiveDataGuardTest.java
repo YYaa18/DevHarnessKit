@@ -66,6 +66,23 @@ final class SensitiveDataGuardTest {
     }
 
     @Test
+    void projectPolicyAliasesMatchCredentialPatternNames() throws Exception {
+        Files.createDirectories(PathUtil.devharnessDirectory(tempDir));
+        Files.write(PathUtil.sensitivePolicy(tempDir), ("{\n"
+                + "  \"api_key\": \"allow\",\n"
+                + "  \"private_key\": \"allow\"\n"
+                + "}\n").getBytes("UTF-8"));
+        SensitiveDataGuard.useProjectPolicy(tempDir);
+        try {
+            assertFalse(guard.containsSensitiveData("api_key=abc123"));
+            assertFalse(guard.containsSensitiveData("private_key=abc123"));
+            assertTrue(guard.containsSensitiveData("password=abc123"));
+        } finally {
+            SensitiveDataGuard.clearProjectPolicy();
+        }
+    }
+
+    @Test
     void strictFixtureRejectsFinancialPii() throws Exception {
         useFixture("strict-reject.json");
         try {
@@ -93,9 +110,12 @@ final class SensitiveDataGuardTest {
             List<String> secretMatches = guard.findMatches(secretSample());
             assertTrue(secretMatches.contains("jwt"));
             assertTrue(secretMatches.contains("api_key="));
+            assertTrue(secretMatches.contains("private_key="));
             assertTrue(secretMatches.contains("jdbc:mysql://"));
             assertTrue(secretMatches.contains("private key block"));
             assertTrue(secretMatches.contains("authorization:"));
+            assertTrue(secretMatches.contains("github token"));
+            assertTrue(secretMatches.contains("url credential"));
         } finally {
             SensitiveDataGuard.clearProjectPolicy();
         }
@@ -113,9 +133,12 @@ final class SensitiveDataGuardTest {
             List<String> secretMatches = guard.findMatches(secretSample());
             assertTrue(secretMatches.contains("jwt"));
             assertTrue(secretMatches.contains("api_key="));
+            assertTrue(secretMatches.contains("private_key="));
             assertTrue(secretMatches.contains("jdbc:mysql://"));
             assertTrue(secretMatches.contains("private key block"));
             assertTrue(secretMatches.contains("authorization:"));
+            assertTrue(secretMatches.contains("github token"));
+            assertTrue(secretMatches.contains("url credential"));
         } finally {
             SensitiveDataGuard.clearProjectPolicy();
         }
@@ -137,8 +160,11 @@ final class SensitiveDataGuardTest {
     private String secretSample() {
         return "jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkw.signaturepart\n"
                 + "api_key=abc123\n"
+                + "private_key=abc123\n"
                 + "jdbc:mysql://127.0.0.1/demo\n"
                 + "Authorization: Bearer abcdefghijk\n"
+                + "github token ghp_abcdefghijklmnopqrstuvwxyz\n"
+                + "https://user:secret@example.com/path\n"
                 + "-----BEGIN OPENSSH PRIVATE KEY-----";
     }
 }

@@ -44,12 +44,15 @@ final class GoalSkillPackagingTest {
         assertScriptPair(skillRoot, "goal-export");
 
         String skill = read(skillRoot.resolve("SKILL.md"));
+        assertTrue(skill.contains("## Core Path"));
+        assertTrue(skill.contains("## Full Protocol"));
         assertTrue(skill.contains("goal-verify.sh"));
         assertTrue(skill.contains("goal-check.sh --all"));
         assertTrue(skill.contains("goal-evaluate.sh"));
         assertTrue(skill.contains("goal-complete.sh"));
         assertTrue(skill.contains("required evidence keys from GOAL_CONTEXT"));
         assertTrue(skill.contains("Perform only the `current_action`"));
+        assertFalse(skill.contains("Do not bypass failed discipline checks"));
 
         assertProjectRootInjection(skillRoot);
         assertGoalWrapper(skillRoot, "goal-start", "start");
@@ -79,6 +82,25 @@ final class GoalSkillPackagingTest {
     @Test
     void legacyMemoryFirstSkillPackageIsRemoved() {
         assertFalse(Files.exists(Paths.get(".agents/skills/devharness-java-development")));
+    }
+
+    @Test
+    void comateReleaseRulesUseGoalFirstProtocol() throws Exception {
+        Path rulesRoot = Paths.get(".comate/rules");
+
+        assertTrue(Files.isRegularFile(rulesRoot.resolve("devharness-goal-protocol.mdr")));
+        assertTrue(Files.isRegularFile(rulesRoot.resolve("devharness-graph-aware-protocol.mdr")));
+        assertFalse(Files.exists(rulesRoot.resolve("project-memory-bootstrap.mdr")));
+        assertFalse(Files.exists(rulesRoot.resolve("java-development-guard.mdr")));
+
+        String goalRule = read(rulesRoot.resolve("devharness-goal-protocol.mdr"));
+        String graphRule = read(rulesRoot.resolve("devharness-graph-aware-protocol.mdr"));
+        assertTrue(goalRule.contains("goal-start.sh"));
+        assertTrue(goalRule.contains("goal-next.sh"));
+        assertTrue(goalRule.contains("goal-verify.sh"));
+        assertTrue(goalRule.contains("Do not bypass goal"));
+        assertTrue(graphRule.contains("graph_required=true"));
+        assertTrue(graphRule.contains("Do not use --allow-stale"));
     }
 
     @Test
@@ -203,6 +225,7 @@ final class GoalSkillPackagingTest {
         assertTrue(config.contains("\"schema_version\": \"devharness-config/v1-alpha\""));
         assertTrue(config.contains("\"verification.compile.mode\": \"manual\""));
         assertTrue(config.contains("\"verification.test.mode\": \"manual\""));
+        assertTrue(config.contains("\"verification.graph.mode\": \"required\""));
         assertTrue(config.contains("\"verification.graph.required\": \"true\""));
         assertFalse(config.contains("\"verification\": {"));
 
@@ -218,6 +241,10 @@ final class GoalSkillPackagingTest {
         assertTrue(state.contains("\"compile_mode\": \"manual\""));
         assertTrue(state.contains("\"test_mode\": \"manual\""));
         assertTrue(state.contains("\"graph\": \"required\""));
+        assertTrue(state.contains("\"managed_files\": ["));
+        assertTrue(state.contains("\"path\": \"CLAUDE.md\""));
+        assertTrue(state.contains("\"path\": \"AGENTS.md\""));
+        assertTrue(state.contains("\"sha256\": \""));
 
         CommandResult statusJson = runControlPanel("status",
                 "--project-root", project.toString(),
@@ -253,6 +280,9 @@ final class GoalSkillPackagingTest {
 
         assertEquals(0, plan.exitCode, plan.stderr);
         assertTrue(plan.stdout.contains("DevHarness plan"));
+        assertTrue(plan.stdout.contains("will_write:"));
+        assertTrue(plan.stdout.contains("will_copy:"));
+        assertTrue(plan.stdout.contains("will_remove:"));
         assertTrue(plan.stdout.contains("plan is read-only"));
         assertFalse(Files.exists(project.resolve(".agents/devharness/config.json")));
         assertFalse(Files.exists(project.resolve(".claude")));
@@ -303,6 +333,46 @@ final class GoalSkillPackagingTest {
         assertTrue(doctor.stdout.contains("opencode_adapter: missing"));
         assertTrue(doctor.stderr.contains("doctor warning: missing AGENTS.md"));
         assertTrue(doctor.stderr.contains("doctor suggestion: run scripts/devharness-control-panel.sh repair"));
+
+        CommandResult repair = runControlPanel("repair",
+                "--project-root", project.toString(),
+                "--target", "all",
+                "--force");
+        assertEquals(0, repair.exitCode, repair.stderr);
+        assertTrue(Files.isRegularFile(project.resolve("AGENTS.md")));
+    }
+
+    @Test
+    void controlPanelDoctorDetectsManagedFileDriftAndRepairRefreshesState() throws Exception {
+        Path project = tempDir.resolve("control-panel-drift-project");
+        prepareAdapterProject(project);
+
+        CommandResult configure = runControlPanel("configure",
+                "--project-root", project.toString(),
+                "--target", "all",
+                "--force");
+        assertEquals(0, configure.exitCode, configure.stderr);
+
+        Files.write(project.resolve("AGENTS.md"), bytes("locally edited adapter"));
+
+        CommandResult doctor = runControlPanel("doctor",
+                "--project-root", project.toString(),
+                "--target", "all");
+        assertEquals(3, doctor.exitCode);
+        assertTrue(doctor.stderr.contains("doctor warning: managed file drift AGENTS.md"), doctor.stderr);
+        assertTrue(doctor.stderr.contains("doctor suggestion: run scripts/devharness-control-panel.sh repair"));
+
+        CommandResult repair = runControlPanel("repair",
+                "--project-root", project.toString(),
+                "--target", "all",
+                "--force");
+        assertEquals(0, repair.exitCode, repair.stderr);
+
+        CommandResult doctorAfterRepair = runControlPanel("doctor",
+                "--project-root", project.toString(),
+                "--target", "all");
+        assertEquals(0, doctorAfterRepair.exitCode, doctorAfterRepair.stderr);
+        assertTrue(doctorAfterRepair.stdout.contains("doctor: ok"));
     }
 
     @Test
@@ -339,10 +409,16 @@ final class GoalSkillPackagingTest {
     void formalAgentAdapterInstallerScriptExistsAndIsExecutable() {
         Path installer = Paths.get("scripts/install-agent-adapters.sh");
         Path controlPanel = Paths.get("scripts/devharness-control-panel.sh");
+        Path versionMetadata = Paths.get("scripts/check-version-metadata.sh");
+        Path coverageThreshold = Paths.get("scripts/check-coverage-threshold.sh");
         assertTrue(Files.isRegularFile(installer));
         assertTrue(Files.isExecutable(installer));
         assertTrue(Files.isRegularFile(controlPanel));
         assertTrue(Files.isExecutable(controlPanel));
+        assertTrue(Files.isRegularFile(versionMetadata));
+        assertTrue(Files.isExecutable(versionMetadata));
+        assertTrue(Files.isRegularFile(coverageThreshold));
+        assertTrue(Files.isExecutable(coverageThreshold));
     }
 
     private void assertScriptPair(Path skillRoot, String name) {
@@ -355,8 +431,12 @@ final class GoalSkillPackagingTest {
         String dhkBat = read(skillRoot.resolve("scripts/dhk.bat"));
         assertTrue(dhkSh.contains("PROJECT_ROOT=$(CDPATH= cd -- \"$SCRIPT_DIR/../../../..\" && pwd)"));
         assertTrue(dhkSh.contains("--project-root \"$PROJECT_ROOT\""));
+        assertTrue(dhkSh.contains("dhk-cli-*-all.jar"));
+        assertFalse(dhkSh.matches("(?s).*target/dhk-cli-[0-9].*-all\\.jar.*"));
         assertTrue(dhkBat.contains("PROJECT_ROOT=%%~fI"));
         assertTrue(dhkBat.contains("--project-root \"%PROJECT_ROOT%\""));
+        assertTrue(dhkBat.contains("dhk-cli-*-all.jar"));
+        assertFalse(dhkBat.matches("(?s).*target\\\\dhk-cli-[0-9].*-all\\.jar.*"));
     }
 
     private void assertGoalWrapper(Path skillRoot, String scriptName, String goalCommand) throws Exception {

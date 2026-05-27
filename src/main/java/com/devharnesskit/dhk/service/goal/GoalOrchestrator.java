@@ -4,23 +4,16 @@ import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.db.TransactionTemplate;
-import com.devharnesskit.dhk.export.ArtifactPassportRenderer;
-import com.devharnesskit.dhk.export.GoalSummaryRenderer;
-import com.devharnesskit.dhk.model.Checkpoint;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.goal.GoalArtifact;
 import com.devharnesskit.dhk.model.goal.GoalCheck;
 import com.devharnesskit.dhk.model.goal.GoalEvaluation;
 import com.devharnesskit.dhk.model.goal.GoalEvent;
-import com.devharnesskit.dhk.model.goal.GoalGraphArtifacts;
 import com.devharnesskit.dhk.model.goal.GoalPlan;
 import com.devharnesskit.dhk.model.goal.GoalProfile;
 import com.devharnesskit.dhk.model.goal.GoalRun;
 import com.devharnesskit.dhk.model.goal.GoalStep;
-import com.devharnesskit.dhk.model.graph.GraphSnapshot;
 import com.devharnesskit.dhk.model.spec.SpecChange;
-import com.devharnesskit.dhk.model.workflow.WorkflowArtifact;
-import com.devharnesskit.dhk.model.workflow.WorkflowCheckpointBinding;
 import com.devharnesskit.dhk.model.workflow.WorkflowRun;
 import com.devharnesskit.dhk.model.workflow.WorkflowTemplate;
 import com.devharnesskit.dhk.repository.ProjectRepository;
@@ -57,7 +50,6 @@ import com.devharnesskit.dhk.util.PathUtil;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.MessageDigest;
 import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.List;
@@ -94,15 +86,21 @@ public final class GoalOrchestrator {
     private final GoalPlanner planner = new GoalPlanner();
     private final GoalKeyGenerator keyGenerator = new GoalKeyGenerator();
     private final GoalContextService contextService = new GoalContextService();
+    private final GoalContextExportCoordinator contextExportCoordinator =
+            new GoalContextExportCoordinator(goalRunRepository, goalEventRepository, planner, contextService);
+    private final GoalStepEvidenceValidator stepEvidenceValidator = new GoalStepEvidenceValidator();
     private final GoalCheckService checkService = new GoalCheckService();
     private final GoalCheckPolicyService checkPolicyService = new GoalCheckPolicyService();
     private final GoalCompletionEvaluator completionEvaluator = new GoalCompletionEvaluator();
     private final GoalIntegrityGateService integrityGateService = new GoalIntegrityGateService();
     private final GoalActionSyncService actionSyncService = new GoalActionSyncService();
     private final WorkspaceFingerprintService fingerprintService = new WorkspaceFingerprintService();
-    private final GoalSummaryRenderer summaryRenderer = new GoalSummaryRenderer();
-    private final ArtifactPassportRenderer artifactPassportRenderer = new ArtifactPassportRenderer();
     private final SensitiveDataGuard sensitiveDataGuard = new SensitiveDataGuard();
+    private final GoalCompletionArtifactService completionArtifactService =
+            new GoalCompletionArtifactService(goalArtifactRepository, graphRepository,
+                    goalGraphBindingRepository, checkpointRepository, workflowArtifactRepository,
+                    workflowCheckpointBindingRepository, new com.devharnesskit.dhk.export.GoalSummaryRenderer(),
+                    new com.devharnesskit.dhk.export.ArtifactPassportRenderer(), sensitiveDataGuard);
     private final PolicyHookService policyHookService = new PolicyHookService();
     private final DevHarnessPolicyService devHarnessPolicyService = new DevHarnessPolicyService();
     private final HumanCheckpointService humanCheckpointService = new HumanCheckpointService();
@@ -151,7 +149,7 @@ public final class GoalOrchestrator {
                             return new GoalStartTransaction(goal, workflowRun, specChange);
                         }
                     });
-            Path contextPath = exportGoalContext(connection, projectRoot, project, result.goal(),
+            Path contextPath = contextExportCoordinator.export(connection, projectRoot, project, result.goal(),
                     result.workflowRun(), result.specChange(), "context_ready", now);
             GoalRun exportedGoal = goalRunRepository.findByKey(connection, result.goal().goalKey());
             actionSyncService.syncAfterContextExport(connection, projectRoot, project, exportedGoal, profile, now);
@@ -200,13 +198,13 @@ public final class GoalOrchestrator {
             if (goal == null) {
                 throw new IllegalStateException("Goal not found: " + goalKey);
             }
-            if (isContextExportIncomplete(goal.status())) {
+            if (contextExportCoordinator.isIncomplete(goal.status())) {
                 throw new IllegalStateException("Goal context export is incomplete; run dhk goal resume --goal "
                         + goal.goalKey());
             }
             GoalProfile profile = requireProfile(projectRoot, goal.profileKey());
             GoalPlan plan = planner.plan(goal, profile);
-            validateStepEvidence(plan, summary, changedFiles, evidence);
+            stepEvidenceValidator.validate(plan, summary, changedFiles, evidence);
             String now = context.clock().now().toString();
             int nextIndex = goal.stepCount() + 1;
             String action = goal.currentAction();
@@ -227,7 +225,7 @@ public final class GoalOrchestrator {
             WorkflowRun workflowRun = workflowRunRepository.findByKey(connection, updated.workflowRunKey());
             SpecChange specChange = updated.specChangeKey().length() == 0
                     ? null : specChangeRepository.findByKey(connection, updated.specChangeKey());
-            Path contextPath = exportGoalContext(connection, projectRoot, project, updated,
+            Path contextPath = contextExportCoordinator.export(connection, projectRoot, project, updated,
                     workflowRun, specChange, status, now);
             GoalRun readyGoal = goalRunRepository.findByKey(connection, goal.goalKey());
             return new GoalStepResult(stepId, readyGoal, contextPath);
@@ -244,13 +242,13 @@ public final class GoalOrchestrator {
             if (goal == null) {
                 throw new IllegalStateException("Goal not found: " + goalKey);
             }
-            if (isContextExportIncomplete(goal.status())) {
+            if (contextExportCoordinator.isIncomplete(goal.status())) {
                 throw new IllegalStateException("Goal context export is incomplete; run dhk goal resume --goal "
                         + goal.goalKey());
             }
             GoalProfile profile = requireProfile(projectRoot, goal.profileKey());
             GoalPlan plan = planner.plan(goal, profile);
-            validateStepEvidence(plan, summary, changedFiles, evidence);
+            stepEvidenceValidator.validate(plan, summary, changedFiles, evidence);
             return new GoalStepValidationResult(goal, plan);
         }
     }
@@ -267,8 +265,8 @@ public final class GoalOrchestrator {
             SpecChange specChange = goal.specChangeKey().length() == 0
                     ? null : specChangeRepository.findByKey(connection, goal.specChangeKey());
             String now = context.clock().now().toString();
-            return exportGoalContext(connection, projectRoot, project, goal, workflowRun, specChange,
-                    targetStatusAfterExport(goal), now);
+            return contextExportCoordinator.export(connection, projectRoot, project, goal, workflowRun, specChange,
+                    contextExportCoordinator.targetStatusAfterExport(goal), now);
         }
     }
 
@@ -386,53 +384,25 @@ public final class GoalOrchestrator {
             GoalCompleteResult result = transactionTemplate.execute(connection,
                     new TransactionTemplate.Work<GoalCompleteResult>() {
                         public GoalCompleteResult execute() throws Exception {
-                            GoalGraphArtifacts graphArtifacts = bindGraphArtifacts(connection, projectRoot,
-                                    project, goal, profile, now);
-                            long checkpointId = checkpointRepository.insert(connection, new Checkpoint(0L,
-                                    project.projectKey(), goal.taskName(), goal.moduleName(),
-                                    "Goal completed: " + goal.taskName(), changedFiles(steps),
-                                    "none", checkpointSummary(profile, graphArtifacts), PathUtil.GOAL_SUMMARY, now));
-                            String summary = summaryRenderer.render(goal, steps, checks, checkpointId, now,
-                                    graphArtifacts);
-                            summary = sensitiveDataGuard.redact(summary);
-                            if (sensitiveDataGuard.containsSensitiveData(summary)) {
-                                throw new IllegalStateException("Sensitive data rejected during goal summary export: "
-                                        + sensitiveDataGuard.findMatches(summary));
-                            }
-                            Path summaryPath = PathUtil.goalSummary(projectRoot);
-                            Files.createDirectories(summaryPath.getParent());
-                            Files.write(summaryPath, summary.getBytes("UTF-8"));
-                            goalArtifactRepository.insert(connection, new GoalArtifact(0L, goal.goalKey(),
-                                    "goal_summary", "GOAL_SUMMARY.md", summaryPath.toString(), "",
-                                    "Goal summary exported", now));
+                            GoalCompletionArtifacts artifacts = completionArtifactService.create(connection,
+                                    projectRoot, project, goal, profile, steps, checks,
+                                    stepEvidenceValidator.changedFiles(steps), now);
                             Path passportPath = PathUtil.artifactPassport(projectRoot);
-                            String passport = artifactPassportRenderer.render(projectRoot, goal, profile, steps,
-                                    checks, checkpointId, now, graphArtifacts, summaryPath, passportPath);
-                            passport = sensitiveDataGuard.redact(passport);
-                            if (sensitiveDataGuard.containsSensitiveData(passport)) {
-                                throw new IllegalStateException("Sensitive data rejected during artifact passport export: "
-                                        + sensitiveDataGuard.findMatches(passport));
-                            }
-                            Files.write(passportPath, passport.getBytes("UTF-8"));
-                            goalArtifactRepository.insert(connection, new GoalArtifact(0L, goal.goalKey(),
-                                    "artifact_passport", "ARTIFACT_PASSPORT.json", passportPath.toString(),
-                                    fileHash(passportPath), "Artifact passport exported", now));
-                            goalArtifactRepository.insert(connection, new GoalArtifact(0L, goal.goalKey(),
-                                    "checkpoint", "Completion checkpoint", "", "",
-                                    "checkpoint_id=" + checkpointId, now));
-                            GoalEvaluation finalIntegrity = integrityGateService.finalComplete(goal, summaryPath,
-                                    passportPath, goalArtifactRepository.listByGoal(connection, goal.goalKey()));
+                            GoalEvaluation finalIntegrity = integrityGateService.finalComplete(goal,
+                                    artifacts.summaryPath(), passportPath,
+                                    goalArtifactRepository.listByGoal(connection, goal.goalKey()));
                             if (!finalIntegrity.readyToComplete()) {
                                 throw new GoalNotReadyException(finalIntegrity);
                             }
                             actionSyncService.syncOnComplete(connection, project, goal, profile, policy,
-                                    checks, checkpointId, now);
-                            bindWorkflowCompletion(connection, project, goal, checkpointId, summaryPath, now);
+                                    checks, artifacts.checkpointId(), now);
+                            completionArtifactService.bindWorkflowCompletion(connection, project, goal,
+                                    artifacts.checkpointId(), artifacts.summaryPath(), now);
                             goalRunRepository.complete(connection, goal.goalKey(), now, now);
                             goalEventRepository.insert(connection, new GoalEvent(0L, goal.goalKey(), "goal_completed",
-                                    "info", "Goal completed", "checkpoint_id=" + checkpointId, now));
+                                    "info", "Goal completed", "checkpoint_id=" + artifacts.checkpointId(), now));
                             GoalRun completed = goalRunRepository.findByKey(connection, goal.goalKey());
-                            return new GoalCompleteResult(completed, checkpointId, summaryPath);
+                            return new GoalCompleteResult(completed, artifacts.checkpointId(), artifacts.summaryPath());
                         }
                     });
             WorkflowRun workflowRun = workflowRunRepository.findByKey(connection, result.goal().workflowRunKey());
@@ -441,158 +411,6 @@ public final class GoalOrchestrator {
             contextService.export(connection, projectRoot, project, result.goal(), workflowRun, specChange, now);
             return result;
         }
-    }
-
-    private void bindWorkflowCompletion(Connection connection, Project project, GoalRun goal,
-                                        long checkpointId, Path summaryPath, String now) throws Exception {
-        if (goal.workflowRunKey().length() == 0) {
-            return;
-        }
-        workflowCheckpointBindingRepository.insert(connection, new WorkflowCheckpointBinding(0L,
-                goal.workflowRunKey(), checkpointId, "created", now));
-        workflowArtifactRepository.insert(connection, new WorkflowArtifact(0L, project.projectKey(),
-                goal.workflowRunKey(), "custom", "GOAL_SUMMARY.md", summaryPath.toString(), "",
-                "confirmed", "goal_complete", "Goal summary exported for goal " + goal.goalKey(),
-                "goal,completion", now, now));
-    }
-
-    private GoalGraphArtifacts bindGraphArtifacts(Connection connection, Path projectRoot, Project project,
-                                                  GoalRun goal, GoalProfile profile, String now) throws Exception {
-        if (profile == null || !profile.graphRequired()) {
-            return GoalGraphArtifacts.none();
-        }
-        GraphSnapshot snapshot = graphRepository.latestCompletedSnapshot(connection, project.projectKey());
-        if (snapshot == null) {
-            throw new IllegalStateException("Graph-required goal completed without a completed graph snapshot");
-        }
-
-        Path snapshotPath = PathUtil.graphSnapshotJson(projectRoot);
-        Path contextPath = PathUtil.graphContext(projectRoot);
-        Path impactPath = PathUtil.graphImpactMap(projectRoot);
-        Path scenarioImpactPath = PathUtil.scenarioImpactMap(projectRoot);
-        String snapshotHash = fileHash(snapshotPath);
-        String contextHash = fileHash(contextPath);
-        String impactHash = fileHash(impactPath);
-        String scenarioImpactHash = fileHash(scenarioImpactPath);
-
-        if (Files.isRegularFile(snapshotPath)) {
-            bindGraphArtifact(connection, project, goal, snapshot, "used", "graph_snapshot",
-                    "GRAPH_SNAPSHOT.json", snapshotPath, snapshotHash,
-                    "Graph snapshot used for goal completion", now);
-        }
-        if (Files.isRegularFile(contextPath)) {
-            bindGraphArtifact(connection, project, goal, snapshot, "summary", "graph_context",
-                    "GRAPH_CONTEXT.md", contextPath, contextHash,
-                    "Graph context export used for goal completion", now);
-        }
-        if (Files.isRegularFile(impactPath)) {
-            bindGraphArtifact(connection, project, goal, snapshot, "impact_map", "graph_impact_map",
-                    "IMPACT_MAP.md", impactPath, impactHash,
-                    "Impact map used for goal completion", now);
-        }
-        if (Files.isRegularFile(scenarioImpactPath)) {
-            bindScenarioImpactArtifact(connection, project, goal, scenarioImpactPath,
-                    scenarioImpactHash, now);
-        }
-
-        return new GoalGraphArtifacts(true, snapshot.id(), snapshot.snapshotKey(), snapshot.provider(),
-                snapshot.fileCount(), snapshot.nodeCount(), snapshot.edgeCount(),
-                Files.isRegularFile(snapshotPath) ? snapshotPath.toString() : "",
-                Files.isRegularFile(contextPath) ? contextPath.toString() : "",
-                Files.isRegularFile(impactPath) ? impactPath.toString() : "",
-                Files.isRegularFile(scenarioImpactPath) ? scenarioImpactPath.toString() : "",
-                snapshotHash, contextHash, impactHash, scenarioImpactHash);
-    }
-
-    private void bindGraphArtifact(Connection connection, Project project, GoalRun goal, GraphSnapshot snapshot,
-                                   String bindingType, String artifactType, String title, Path path,
-                                   String contentHash, String summary, String now) throws Exception {
-        goalGraphBindingRepository.upsert(connection, goal.goalKey(), snapshot.id(), bindingType,
-                path.toString(), contentHash, now);
-        goalArtifactRepository.insert(connection, new GoalArtifact(0L, goal.goalKey(), artifactType,
-                title, path.toString(), contentHash,
-                summary + "; snapshot_key=" + snapshot.snapshotKey(), now));
-        if (goal.workflowRunKey().length() > 0) {
-            workflowArtifactRepository.insert(connection, new WorkflowArtifact(0L, project.projectKey(),
-                    goal.workflowRunKey(), "custom", title, path.toString(), contentHash,
-                    "confirmed", "goal_complete", summary + " for goal " + goal.goalKey(),
-                    "goal,completion,graph", now, now));
-        }
-    }
-
-    private void bindScenarioImpactArtifact(Connection connection, Project project, GoalRun goal,
-                                            Path path, String contentHash, String now) throws Exception {
-        goalArtifactRepository.insert(connection, new GoalArtifact(0L, goal.goalKey(), "scenario_impact_map",
-                "SCENARIO_IMPACT_MAP.md", path.toString(), contentHash,
-                "Scenario impact map used for goal completion", now));
-        if (goal.workflowRunKey().length() > 0) {
-            workflowArtifactRepository.insert(connection, new WorkflowArtifact(0L, project.projectKey(),
-                    goal.workflowRunKey(), "custom", "SCENARIO_IMPACT_MAP.md", path.toString(), contentHash,
-                    "confirmed", "goal_complete",
-                    "Scenario impact map exported for goal " + goal.goalKey(),
-                    "goal,completion,graph,bdd", now, now));
-        }
-    }
-
-    private String checkpointSummary(GoalProfile profile, GoalGraphArtifacts graphArtifacts) {
-        if (profile != null && profile.graphRequired() && graphArtifacts != null && graphArtifacts.enabled()) {
-            return "goal checks accepted; graph evidence bound snapshot_key=" + graphArtifacts.snapshotKey();
-        }
-        return "goal checks accepted";
-    }
-
-    private String fileHash(Path path) throws Exception {
-        if (path == null || !Files.isRegularFile(path)) {
-            return "";
-        }
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        byte[] hash = digest.digest(Files.readAllBytes(path));
-        StringBuilder builder = new StringBuilder("sha256:");
-        for (byte b : hash) {
-            builder.append(String.format("%02x", b & 0xff));
-        }
-        return builder.toString();
-    }
-
-    private Path exportGoalContext(Connection connection, Path projectRoot, Project project, GoalRun goal,
-                                   WorkflowRun workflowRun, SpecChange specChange, String targetStatus,
-                                   String now) throws Exception {
-        goalRunRepository.updateStatus(connection, goal.goalKey(), "context_exporting", now);
-        GoalRun exportGoal = withStatus(goalRunRepository.findByKey(connection, goal.goalKey()), targetStatus, now);
-        try {
-            Path contextPath = contextService.export(connection, projectRoot, project, exportGoal,
-                    workflowRun, specChange, now);
-            goalRunRepository.updateStatus(connection, goal.goalKey(), targetStatus, now);
-            goalEventRepository.insert(connection, new GoalEvent(0L, goal.goalKey(), "goal_context_exported",
-                    "info", "Goal context exported", targetStatus, now));
-            return contextPath;
-        } catch (Exception ex) {
-            goalRunRepository.updateStatus(connection, goal.goalKey(), "context_export_failed", now);
-            goalEventRepository.insert(connection, new GoalEvent(0L, goal.goalKey(), "goal_context_export_failed",
-                    "error", "Goal context export failed", ex.getMessage(), now));
-            throw ex;
-        }
-    }
-
-    private String targetStatusAfterExport(GoalRun goal) {
-        if (isContextExportIncomplete(goal.status())) {
-            if (goal.stepCount() <= 0) {
-                return "context_ready";
-            }
-            return planner.statusForAction(goal.currentAction());
-        }
-        return goal.status();
-    }
-
-    private boolean isContextExportIncomplete(String status) {
-        return "context_export_failed".equals(status) || "context_exporting".equals(status);
-    }
-
-    private GoalRun withStatus(GoalRun goal, String status, String now) {
-        return new GoalRun(goal.goalKey(), goal.projectKey(), goal.workflowRunKey(), goal.specChangeKey(),
-                goal.profileKey(), goal.taskName(), goal.moduleName(), goal.mode(), goal.conditionText(),
-                status, goal.currentAction(), goal.maxSteps(), goal.stepCount(), goal.createdAt(), now,
-                goal.completedAt());
     }
 
     private GoalEvaluation evaluate(Connection connection, Path projectRoot, GoalRun goal,
@@ -629,83 +447,6 @@ public final class GoalOrchestrator {
         List<GoalCheck> checks = new ArrayList<GoalCheck>();
         checks.add(check);
         return checks;
-    }
-
-    private String changedFiles(List<GoalStep> steps) {
-        StringBuilder builder = new StringBuilder();
-        for (GoalStep step : steps) {
-            if (step.changedFiles().length() == 0) {
-                continue;
-            }
-            if (builder.length() > 0) {
-                builder.append('\n');
-            }
-            builder.append(step.changedFiles());
-        }
-        return builder.length() == 0 ? "none" : builder.toString();
-    }
-
-    private void validateStepEvidence(GoalPlan plan, String summary, String changedFiles, String evidence) {
-        List<String> missing = new ArrayList<String>();
-        String evidenceText = evidence == null ? "" : evidence.trim();
-        String lowerEvidence = evidenceText.toLowerCase(java.util.Locale.ROOT);
-        String lowerChangedFiles = changedFiles == null ? "" : changedFiles.trim().toLowerCase(java.util.Locale.ROOT);
-        for (String required : plan.requiredEvidence()) {
-            String key = required == null ? "" : required.trim();
-            if (key.length() == 0) {
-                continue;
-            }
-            if ("summary".equals(key)) {
-                if (summary == null || summary.trim().length() == 0) {
-                    missing.add(key);
-                }
-                continue;
-            }
-            if ("evidence".equals(key)) {
-                if (evidenceText.length() == 0) {
-                    missing.add(key);
-                }
-                continue;
-            }
-            if ("changed_files".equals(key)) {
-                if (lowerChangedFiles.length() == 0 && !containsEvidenceKey(lowerEvidence, key)) {
-                    missing.add(key);
-                }
-                continue;
-            }
-            if ("implementation_summary".equals(key)) {
-                if ((summary == null || summary.trim().length() == 0) && !containsEvidenceKey(lowerEvidence, key)) {
-                    missing.add(key);
-                }
-                continue;
-            }
-            if (!containsEvidenceKey(lowerEvidence, key)) {
-                missing.add(key);
-            }
-        }
-        if (!missing.isEmpty()) {
-            throw new IllegalArgumentException("Goal step evidence missing required items: " + missing);
-        }
-    }
-
-    private boolean containsEvidenceKey(String lowerEvidence, String key) {
-        String normalized = key.toLowerCase(java.util.Locale.ROOT).replace('-', '_').replace(' ', '_');
-        if (lowerEvidence.contains(normalized)) {
-            return true;
-        }
-        if (normalized.startsWith("existing_")) {
-            return lowerEvidence.contains("read_files=");
-        }
-        if ("impacted_files".equals(normalized)) {
-            return lowerEvidence.contains("changed_files=") || lowerEvidence.contains("read_files=");
-        }
-        if ("risk_points".equals(normalized)) {
-            return lowerEvidence.contains("risks=");
-        }
-        if ("test_result".equals(normalized)) {
-            return lowerEvidence.contains("tests_run=");
-        }
-        return false;
     }
 
     private GoalProfile requireProfile(String profileKey) {

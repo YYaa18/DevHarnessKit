@@ -55,11 +55,27 @@ jobs:
 
       - name: Coverage threshold gate
         shell: bash
-        run: scripts/check-coverage-threshold.sh 60
+        run: |
+          source scripts/release-thresholds.env
+          scripts/check-coverage-threshold.sh "$DHK_MIN_LINE_COVERAGE"
+
+      - name: Module boundary gate
+        shell: bash
+        run: scripts/check-module-boundaries.sh
 
       - name: Version smoke
         shell: bash
         run: java -jar "$DHK_JAR" version
+
+      - name: Install perf smoke dependency
+        if: matrix.smoke
+        shell: bash
+        run: sudo apt-get update && sudo apt-get install -y sqlite3
+
+      - name: Performance smoke
+        if: matrix.smoke
+        shell: bash
+        run: scripts/perf-smoke.sh "$DHK_JAR"
 
       - name: Workflow smoke
         if: matrix.smoke

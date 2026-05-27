@@ -6,7 +6,7 @@ DevHarness Kit is a local-first CLI. It does not run a daemon, open an HTTP port
 
 | Version | Status |
 | --- | --- |
-| `v0.4.4-beta.1` | Beta developer preview. Security fixes are best-effort while the public API and schema are still stabilizing. |
+| `0.4.6-beta.1` | Beta developer preview. Security fixes are best-effort while the public API and schema are still stabilizing. |
 
 ## Threat Model
 
@@ -17,7 +17,8 @@ Expected safe use:
 - Run the CLI in a trusted local project checkout.
 - Review generated context before sharing it outside the local environment.
 - Store only project facts that are safe for agents to read.
-- Use read-only database credentials for `dhk db` commands.
+- Use database credentials that match your trusted development environment;
+  lower privilege accounts are recommended when practical.
 - Keep `.agents/memory/memory.db` and `.agents/memory/exports/*.md` out of public commits unless intentionally publishing examples.
 
 Out of scope:
@@ -39,7 +40,7 @@ The guard is heuristic. Users are responsible for reviewing exported context. Do
 
 See [docs/SENSITIVE_POLICY.md](docs/SENSITIVE_POLICY.md) for the policy format.
 
-## Readonly Database Safety
+## Database Inspection Safety
 
 `dhk db sql` applies fail-closed SQL text checks and asks JDBC to use a read-only connection where supported.
 
@@ -51,9 +52,16 @@ These checks are guardrails only:
 - JDBC `setReadOnly(true)` is not a permission boundary.
 - Views, functions, stored procedures, triggers, permissions, and audit configuration can affect real risk.
 
-Always use database credentials that have read-only privileges at the database server. Do not connect DevHarness Kit to production databases with write-capable credentials.
+DevHarness Kit is a developer toolkit, and its DB commands are intended for
+trusted personal development environments. The CLI does not force read-only
+credentials. Use credentials appropriate to the environment and prefer lower
+privilege accounts when practical.
 
-`dhk db sql --explain` is treated as a readonly inspection operation after SQL validation, but it may run without the JDBC read-only hint because MySQL 8 with Connector/J 5.1 can reject `EXPLAIN` when that hint is enabled. This makes database-level read-only credentials especially important for execution-plan checks.
+`dhk db sql --explain` is treated as an inspection operation after SQL
+validation, but it may run without the JDBC read-only hint because MySQL 8 with
+Connector/J 5.1 can reject `EXPLAIN` when that hint is enabled. This makes
+credential choice and local development environment discipline especially
+important for execution-plan checks.
 
 ## Workflow and Spec Safety
 

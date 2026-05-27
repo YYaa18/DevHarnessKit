@@ -236,10 +236,49 @@ final class MemoryExportRecoverIntegrationTest {
         assertTrue(recover.stderr().contains("No checkpoint found for module: order"));
     }
 
+    @Test
+    void backupWritesExplicitArchiveAndFailsWhenMemoryIsMissing() throws Exception {
+        Harness missing = new Harness(tempDir);
+        int missingExit = new CommandRouter().run(new String[]{
+                "memory", "backup", "--project-root", "missing-demo"
+        }, missing.context());
+        assertEquals(ExitCodes.NOT_FOUND, missingExit);
+        assertTrue(missing.stderr().contains("Memory is not initialized"));
+
+        initProject();
+        Path backup = tempDir.resolve("manual-backup.zip");
+        Harness explicit = new Harness(tempDir);
+        int explicitExit = new CommandRouter().run(new String[]{
+                "memory", "backup", "--project-root", "demo", "--out", backup.toString()
+        }, explicit.context());
+        assertEquals(ExitCodes.SUCCESS, explicitExit);
+        assertTrue(Files.isRegularFile(backup));
+        assertTrue(explicit.stdout().contains("backup_path: " + backup));
+
+        Harness defaultOut = new Harness(tempDir);
+        int defaultExit = new CommandRouter().run(new String[]{
+                "memory", "backup", "--project-root", "demo"
+        }, defaultOut.context());
+        assertEquals(ExitCodes.SUCCESS, defaultExit);
+        String backupPath = firstValue(defaultOut.stdout(), "backup_path: ");
+        assertTrue(backupPath.contains("memory-backup"));
+        assertTrue(Files.isRegularFile(java.nio.file.Paths.get(backupPath)));
+    }
+
     private void initProject() {
         Harness init = new Harness(tempDir);
         int exitCode = new CommandRouter().run(new String[]{"memory", "init", "--project-root", "demo"}, init.context());
         assertEquals(ExitCodes.SUCCESS, exitCode);
+    }
+
+    private String firstValue(String text, String prefix) {
+        String[] lines = text.split("\\r?\\n");
+        for (String line : lines) {
+            if (line.startsWith(prefix)) {
+                return line.substring(prefix.length()).trim();
+            }
+        }
+        return "";
     }
 
     private void addMemory(String title, String content, String tags) {

@@ -320,6 +320,17 @@ final class GoalIntegrationTest {
         assertTrue(recheck.stdout().contains("step_count_before: 4"));
         assertTrue(recheck.stdout().contains("step_count_after: 4"));
         assertTrue(recheck.stdout().contains("decision: ready_to_complete"));
+
+        Harness recheckJson = new Harness(tempDir);
+        int recheckJsonExit = new CommandRouter().run(new String[]{
+                "goal", "recheck", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, recheckJson.context());
+        assertEquals(ExitCodes.SUCCESS, recheckJsonExit);
+        assertTrue(recheckJson.stdout().contains("\"command\": \"goal recheck\""));
+        assertTrue(recheckJson.stdout().contains("\"goal_key\": \"" + goalKey + "\""));
+        assertTrue(recheckJson.stdout().contains("\"status_before\": \"completed\""));
+        assertTrue(recheckJson.stdout().contains("\"ready_to_complete\": true"));
+        assertTrue(recheckJson.stdout().contains("\"checks\": ["));
     }
 
     @Test
@@ -803,6 +814,10 @@ final class GoalIntegrationTest {
         assertTrue(verify.stdout().contains("\"missing_count\": 3"));
         assertTrue(verify.stdout().contains("\"completion_blocker_count\": 3"));
         assertTrue(verify.stdout().contains("\"completion_blockers\": ["));
+        assertTrue(verify.stdout().contains("\"blocker_summary\": \"skipped_required_check: check compile is skipped; accepted_statuses=passed\""));
+        assertTrue(verify.stdout().contains("\"blocker_categories\": ["));
+        assertTrue(verify.stdout().contains("\"category\": \"skipped_required_check\""));
+        assertTrue(verify.stdout().contains("\"category\": \"failed_check\""));
         assertTrue(verify.stdout().contains("check compile is skipped; accepted_statuses=passed"));
         assertTrue(verify.stdout().contains("check test is skipped; accepted_statuses=passed"));
         assertTrue(verify.stdout().contains("check spec is failed; accepted_statuses=passed"));
@@ -2097,6 +2112,11 @@ final class GoalIntegrationTest {
         assertTrue(verify.stdout().contains("impact: failed - impact freshness failed"));
         assertTrue(verify.stdout().contains("IMPACT_MAP.md missing"));
         assertTrue(verify.stdout().contains("failed_checks:"));
+        assertTrue(verify.stdout().contains("blocker_summary: failed_check: check impact is failed; accepted_statuses=passed"));
+        assertTrue(verify.stdout().contains("blocker_categories:"));
+        assertTrue(verify.stdout().contains("  - failed_check"));
+        assertTrue(verify.stdout().contains("blocker_details:"));
+        assertTrue(verify.stdout().contains("    check_key: impact"));
         assertTrue(verify.stdout().contains("next_command: dhk goal check --goal " + goalKey
                 + " --check impact"));
 

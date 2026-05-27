@@ -2,7 +2,7 @@
 
 DevHarness Kit source code is licensed under the MIT License.
 
-The shaded binary jar, `dhk-cli-0.1.0-alpha-all.jar`, bundles third-party runtime dependencies. Those dependencies remain under their own licenses.
+The shaded binary jar, `dhk-cli-<version>-all.jar`, bundles third-party runtime dependencies. Those dependencies remain under their own licenses.
 
 This file is a dependency notice for users of the source repository and generated release artifacts. It is not legal advice.
 

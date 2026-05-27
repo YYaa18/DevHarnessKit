@@ -15,6 +15,7 @@ public final class HelpCommand implements Command {
         context.out().println("  dhk doctor --project-root <path>");
         context.out().println("  dhk status --project-root <path> [--json|--markdown] [--write <path>] [--exit-code]");
         context.out().println("  dhk readiness --project-root <path> [--json|--markdown] [--write <path>] [--exit-code]");
+        context.out().println("    status is the human read-only snapshot; readiness is the CI/release gate alias.");
         context.out().println("  dhk quickstart --project-root <path> --task <task> [--preset <preset>] [--dry-run]");
         context.out().println("  dhk completion bash|zsh|fish");
         context.out().println("  dhk memory init --project-root <path>");
@@ -102,7 +103,7 @@ public final class HelpCommand implements Command {
         context.out().println("Stability:");
         context.out().println("  Current build: beta developer preview; not stable or 1.0-ready.");
         context.out().println("  Stable-candidate track: help/version/doctor, memory core, goal core, release packaging.");
-        context.out().println("  Beta surface: DB readonly. SQL guard is not a database permission boundary.");
+        context.out().println("  Beta surface: DB inspection. SQL guard is not a database permission boundary.");
         context.out().println("  Experimental surface: graph, BDD, skill contract/trust, policy governance, ECC control panel, routine.");
         context.out().println("  See docs/STABLE_CANDIDATE.md and docs/COMPATIBILITY.md.");
         context.out().println();

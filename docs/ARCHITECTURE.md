@@ -183,6 +183,9 @@ src/main/java/com/devharnesskit/dhk/util
 
 Commands should stay thin: parse inputs, call services, and print stable output. Repositories own SQL persistence. Services own validation and workflow rules. Renderers own Markdown output.
 
+Logical package ownership, dependency direction, and multi-module preview rules
+are maintained in [MODULE_BOUNDARIES.md](MODULE_BOUNDARIES.md).
+
 ## Package Ownership
 
 | Logical module | Current packages and files | Ownership notes |
@@ -200,8 +203,9 @@ Commands should stay thin: parse inputs, call services, and print stable output.
   fails when non-command packages import CLI command packages, and it reports
   the known goal-to-graph/BDD/governance crossings so they stay visible during
   stable-candidate work. It is intentionally not a Maven module replacement.
-- `GoalCheckService` still coordinates checks from graph, BDD, governance, workflow, spec, and command execution. AI-151 introduced `GoalCheckRunner` and a static registry, but the physical check implementations still live in `service.goal`. Before Maven modules, graph/BDD/governance checks should move behind module-owned runners.
-- `MigrationRunner` now has a `MigrationStep` contract and versioned methods, but all schema SQL still lives in one class. Before a module split, schema ownership should be documented per step and future steps should be introduced as small migration classes.
+- `GoalCheckService` is now a facade and default runner wiring lives in `DefaultGoalCheckRunnerFactory`. The physical check implementations still live in `service.goal`. Before Maven modules, graph/BDD/governance checks should move behind module-owned factories while keeping check keys stable.
+- `MigrationRunner` now delegates ordered steps to `DefaultMigrationStepCatalog`, pre-upgrade backups to `MigrationBackupCoordinator`, and schema inspection to `MigrationSchema`. Future migration debt should focus on fixtures and ownership per step rather than adding responsibilities back to the runner.
+- `CliCommandCatalog` is descriptor-driven and shell completion consumes the same command metadata. Future commands should update the descriptor table once instead of maintaining a separate completion list.
 - Root `service` still contains cross-module helpers such as sensitive guard, SQL guard, and backup service. A future split should decide whether these stay in `dhk-core` or move to smaller shared internal packages.
 - `command` is a single tree containing all command families. This is acceptable while the jar is single-artifact, but Maven preview should keep command packages in `dhk-cli` and move only implementation services/repositories into module artifacts.
 - `model.Project` and several generic repositories are shared by all domains. This should remain core until there is a stable public persistence contract.

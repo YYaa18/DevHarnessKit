@@ -2,11 +2,10 @@ package com.devharnesskit.dhk.command;
 
 import com.devharnesskit.dhk.cli.Args;
 import com.devharnesskit.dhk.cli.CliCommandCatalog;
+import com.devharnesskit.dhk.cli.CliCommandDescriptor;
 import com.devharnesskit.dhk.cli.Command;
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
-
-import java.util.Map;
 
 public final class CompletionCommand implements Command {
     public int run(CommandContext context, Args args) {
@@ -41,10 +40,10 @@ public final class CompletionCommand implements Command {
         builder.append("    return 0\n");
         builder.append("  fi\n");
         builder.append("  case \"$command\" in\n");
-        for (Map.Entry<String, String[]> entry : CliCommandCatalog.subcommands().entrySet()) {
-            builder.append("    ").append(entry.getKey()).append(") words=\"")
-                    .append(CliCommandCatalog.join(entry.getValue())).append(' ')
-                    .append(CliCommandCatalog.join(CliCommandCatalog.commonCommandOptions(entry.getKey())))
+        for (CliCommandDescriptor descriptor : CliCommandCatalog.descriptors()) {
+            builder.append("    ").append(descriptor.name()).append(") words=\"")
+                    .append(CliCommandCatalog.join(descriptor.subcommands())).append(' ')
+                    .append(CliCommandCatalog.join(descriptor.options()))
                     .append("\" ;;\n");
         }
         builder.append("    *) words=\"")
@@ -68,12 +67,12 @@ public final class CompletionCommand implements Command {
         builder.append("    return\n");
         builder.append("  fi\n");
         builder.append("  case $words[2] in\n");
-        for (Map.Entry<String, String[]> entry : CliCommandCatalog.subcommands().entrySet()) {
-            builder.append("    ").append(entry.getKey()).append(")\n");
+        for (CliCommandDescriptor descriptor : CliCommandCatalog.descriptors()) {
+            builder.append("    ").append(descriptor.name()).append(")\n");
             builder.append("      local -a subcommands options\n");
-            builder.append("      subcommands=(").append(zshWords(entry.getValue())).append(")\n");
-            builder.append("      options=(").append(zshWords(CliCommandCatalog.commonCommandOptions(entry.getKey()))).append(")\n");
-            builder.append("      _describe 'subcommand' subcommands && return\n");
+            builder.append("      subcommands=(").append(zshWords(descriptor.subcommands())).append(")\n");
+            builder.append("      options=(").append(zshWords(descriptor.options())).append(")\n");
+            builder.append("      if (( ${#subcommands[@]} > 0 )); then _describe 'subcommand' subcommands && return; fi\n");
             builder.append("      _describe 'option' options\n");
             builder.append("      ;;\n");
         }
@@ -89,10 +88,16 @@ public final class CompletionCommand implements Command {
         builder.append("complete -c dhk -f\n");
         builder.append("complete -c dhk -n '__fish_use_subcommand' -a '")
                 .append(CliCommandCatalog.join(CliCommandCatalog.topLevelCommands())).append("'\n");
-        for (Map.Entry<String, String[]> entry : CliCommandCatalog.subcommands().entrySet()) {
-            builder.append("complete -c dhk -n '__fish_seen_subcommand_from ")
-                    .append(entry.getKey()).append("' -a '")
-                    .append(CliCommandCatalog.join(entry.getValue())).append("'\n");
+        for (CliCommandDescriptor descriptor : CliCommandCatalog.descriptors()) {
+            if (descriptor.subcommands().length > 0) {
+                builder.append("complete -c dhk -n '__fish_seen_subcommand_from ")
+                        .append(descriptor.name()).append("' -a '")
+                        .append(CliCommandCatalog.join(descriptor.subcommands())).append("'\n");
+            }
+            for (String option : descriptor.options()) {
+                builder.append("complete -c dhk -n '__fish_seen_subcommand_from ")
+                        .append(descriptor.name()).append("' -l ").append(option.substring(2)).append('\n');
+            }
         }
         for (String option : CliCommandCatalog.commonOptions()) {
             builder.append("complete -c dhk -l ").append(option.substring(2)).append('\n');

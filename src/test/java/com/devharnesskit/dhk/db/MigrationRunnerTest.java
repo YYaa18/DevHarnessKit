@@ -1,5 +1,6 @@
 package com.devharnesskit.dhk.db;
 
+import com.devharnesskit.dhk.db.migration.DefaultMigrationStepCatalog;
 import com.devharnesskit.dhk.db.migration.MigrationStep;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.repository.ProjectRepository;
@@ -28,6 +29,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 final class MigrationRunnerTest {
     @TempDir
     Path tempDir;
+
+    @Test
+    void defaultMigrationCatalogIsVersionOrderedThroughCurrentSchema() {
+        int expected = 1;
+        for (MigrationStep step : DefaultMigrationStepCatalog.steps()) {
+            assertEquals(expected, step.version());
+            assertFalse(step.description().isEmpty());
+            expected++;
+        }
+        assertEquals(MigrationRunner.V13 + 1, expected);
+    }
 
     @Test
     void migrationIsIdempotentThroughSkillTrustV13() throws Exception {

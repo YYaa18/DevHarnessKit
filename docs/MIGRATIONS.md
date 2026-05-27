@@ -80,25 +80,27 @@ automatic pre-migration backup churn.
 
 ## MigrationStep Mapping
 
-`MigrationRunner` now executes an ordered `MigrationStep` contract. The runner
-keeps transaction control, pre-upgrade backup, rollback, and optional FTS setup;
-each version remains isolated behind a versioned step entry.
+`MigrationRunner` now executes an ordered `MigrationStep` contract supplied by
+`DefaultMigrationStepCatalog`. The runner keeps transaction control, rollback,
+and optional FTS setup; `MigrationBackupCoordinator` handles pre-upgrade backup;
+`MigrationSchema` owns schema inspection helpers. Each version remains isolated
+behind a versioned step class.
 
-| Version | MigrationStep description | Implementation method |
+| Version | MigrationStep description | Implementation class |
 | --- | --- | --- |
-| v1 | `MVP memory schema` | `MigrationRunner.migrateV1` |
-| v2 | `V0.2 workflow persistence schema` | `MigrationRunner.migrateV2` |
-| v3 | `V0.2-B workflow artifact binding schema` | `MigrationRunner.migrateV3` |
-| v4 | `V0.3 spec persistence schema` | `MigrationRunner.migrateV4` |
-| v5 | `V0.4 goal orchestration schema` | `MigrationRunner.migrateV5` |
-| v6 | `V0.4 goal check freshness schema` | `MigrationRunner.migrateV6` |
-| v7 | `V0.4 goal context export failure schema` | `MigrationRunner.migrateV7` |
-| v8 | `V0.4 goal workflow/spec sync schema` | `MigrationRunner.migrateV8` |
-| v9 | `V0.4 graph lite schema` | `MigrationRunner.migrateV9` |
-| v10 | `V0.4 BDD acceptance schema` | `MigrationRunner.migrateV10` |
-| v11 | `V0.4 skill contract schema` | `MigrationRunner.migrateV11` |
-| v12 | `V0.4 human checkpoint schema` | `MigrationRunner.migrateV12` |
-| v13 | `V0.4 skill trust hardening schema` | `MigrationRunner.migrateV13` |
+| v1 | `MVP memory schema` | `V1InitialMemoryMigration` |
+| v2 | `V0.2 workflow persistence schema` | `V2WorkflowPersistenceMigration` |
+| v3 | `V0.2-B workflow artifact binding schema` | `V3WorkflowArtifactBindingMigration` |
+| v4 | `V0.3 spec persistence schema` | `V4SpecPersistenceMigration` |
+| v5 | `V0.4 goal orchestration schema` | `V5GoalOrchestrationMigration` |
+| v6 | `V0.4 goal check freshness schema` | `V6GoalCheckFreshnessMigration` |
+| v7 | `V0.4 goal context export failure schema` | `V7GoalContextExportFailureMigration` |
+| v8 | `V0.4 goal workflow/spec sync schema` | `V8GoalWorkflowSpecSyncMigration` |
+| v9 | `V0.4 graph lite schema` | `V9GraphLiteMigration` |
+| v10 | `V0.4 BDD acceptance schema` | `V10BddAcceptanceMigration` |
+| v11 | `V0.4 skill contract schema` | `V11SkillContractMigration` |
+| v12 | `V0.4 human checkpoint schema` | `V12HumanCheckpointMigration` |
+| v13 | `V0.4 skill trust hardening schema` | `V13SkillTrustHardeningMigration` |
 
 Adding a future migration should add one `MigrationStep` entry, one fixture or
 upgrade test, and one row in this table.

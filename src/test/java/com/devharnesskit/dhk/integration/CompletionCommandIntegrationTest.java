@@ -3,6 +3,8 @@ package com.devharnesskit.dhk.integration;
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.CommandRouter;
 import com.devharnesskit.dhk.cli.ExitCodes;
+import com.devharnesskit.dhk.cli.CliCommandCatalog;
+import com.devharnesskit.dhk.cli.CliCommandDescriptor;
 import com.devharnesskit.dhk.util.Clock;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -29,6 +31,8 @@ final class CompletionCommandIntegrationTest {
         assertTrue(bash.stdout().contains("quickstart"));
         assertTrue(bash.stdout().contains("--project-root"));
         assertTrue(bash.stdout().contains("--goal"));
+        assertTrue(bash.stdout().contains("--task"));
+        assertTrue(bash.stdout().contains("--preset"));
 
         Harness zsh = new Harness(tempDir);
         int zshExit = new CommandRouter().run(new String[]{"completion", "zsh"}, zsh.context());
@@ -43,6 +47,20 @@ final class CompletionCommandIntegrationTest {
         assertTrue(fish.stdout().contains("complete -c dhk -f"));
         assertTrue(fish.stdout().contains("__fish_use_subcommand"));
         assertTrue(fish.stdout().contains("__fish_seen_subcommand_from goal"));
+        assertTrue(fish.stdout().contains("__fish_seen_subcommand_from advise' -l task"));
+    }
+
+    @Test
+    void commandCatalogIsDescriptorDrivenForCompletion() {
+        CliCommandDescriptor advise = CliCommandCatalog.find("advise");
+        CliCommandDescriptor goal = CliCommandCatalog.find("goal");
+
+        assertTrue(CliCommandCatalog.topLevelCommands().length >= 18);
+        assertEquals("advise", advise.name());
+        assertEquals(0, advise.subcommands().length);
+        assertTrue(CliCommandCatalog.join(advise.options()).contains("--task"));
+        assertTrue(CliCommandCatalog.join(goal.subcommands()).contains("verify"));
+        assertTrue(CliCommandCatalog.join(goal.options()).contains("--force-new"));
     }
 
     @Test

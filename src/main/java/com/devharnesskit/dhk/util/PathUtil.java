@@ -9,8 +9,12 @@ import java.nio.file.Path;
 public final class PathUtil {
     public static final String AGENTS_DIRECTORY = ".agents";
     public static final String DEVHARNESS_DIRECTORY = "devharness";
+    public static final String SKILLS_DIRECTORY = "skills";
     public static final String MEMORY_DIRECTORY = "memory";
     public static final String GRAPH_DIRECTORY = "graph";
+    public static final String BDD_DIRECTORY = "bdd";
+    public static final String FEATURES_DIRECTORY = "features";
+    public static final String EVIDENCE_DIRECTORY = "evidence";
     public static final String EXPORTS_DIRECTORY = "exports";
     public static final String ARTIFACTS_DIRECTORY = "artifacts";
     public static final String BACKUPS_DIRECTORY = "backups";
@@ -25,16 +29,23 @@ public final class PathUtil {
     public static final String IMPACT_MAP = "IMPACT_MAP.md";
     public static final String GRAPH_CONTEXT = "GRAPH_CONTEXT.md";
     public static final String GRAPH_SNAPSHOT_JSON = "GRAPH_SNAPSHOT.json";
+    public static final String BDD_CONTEXT = "BDD_CONTEXT.md";
+    public static final String BDD_EVIDENCE = "BDD_EVIDENCE.md";
+    public static final String BDD_COVERAGE = "BDD_COVERAGE.md";
+    public static final String SCENARIO_IMPACT_MAP = "SCENARIO_IMPACT_MAP.md";
     public static final String CURRENT_CONTEXT = "CURRENT_CONTEXT.md";
     public static final String RECOVERY_CONTEXT = "RECOVERY_CONTEXT.md";
     public static final String WORKFLOW_CONTEXT = "WORKFLOW_CONTEXT.md";
     public static final String SPEC_CONTEXT = "SPEC_CONTEXT.md";
     public static final String GOAL_CONTEXT = "GOAL_CONTEXT.md";
     public static final String GOAL_SUMMARY = "GOAL_SUMMARY.md";
+    public static final String ARTIFACT_PASSPORT_JSON = "ARTIFACT_PASSPORT.json";
     public static final String POLICY_JSON = "policy.json";
+    public static final String DEVHARNESS_CONFIG_JSON = "config.json";
     public static final String SENSITIVE_POLICY_JSON = "sensitive-policy.json";
     public static final String GOAL_PROFILES_DIRECTORY = "goal-profiles";
     public static final String GOAL_CHECK_POLICY_JSON = "goal-check-policy.json";
+    public static final String CONTRACT_JSON = "contract.json";
 
     private PathUtil() {
     }
@@ -65,6 +76,22 @@ public final class PathUtil {
 
     public static Path graphDirectory(Path projectRoot) {
         return projectRoot.resolve(AGENTS_DIRECTORY).resolve(GRAPH_DIRECTORY);
+    }
+
+    public static Path bddDirectory(Path projectRoot) {
+        return projectRoot.resolve(AGENTS_DIRECTORY).resolve(BDD_DIRECTORY);
+    }
+
+    public static Path skillsDirectory(Path projectRoot) {
+        return projectRoot.resolve(AGENTS_DIRECTORY).resolve(SKILLS_DIRECTORY);
+    }
+
+    public static Path skillDirectory(Path projectRoot, String skillKey) {
+        return skillsDirectory(projectRoot).resolve(skillKey);
+    }
+
+    public static Path skillContract(Path projectRoot, String skillKey) {
+        return skillDirectory(projectRoot, skillKey).resolve(CONTRACT_JSON);
     }
 
     public static Path graphConfig(Path projectRoot) {
@@ -103,12 +130,44 @@ public final class PathUtil {
         return graphExportsDirectory(projectRoot).resolve(GRAPH_SNAPSHOT_JSON);
     }
 
+    public static Path bddFeaturesDirectory(Path projectRoot) {
+        return bddDirectory(projectRoot).resolve(FEATURES_DIRECTORY);
+    }
+
+    public static Path bddEvidenceDirectory(Path projectRoot) {
+        return bddDirectory(projectRoot).resolve(EVIDENCE_DIRECTORY);
+    }
+
+    public static Path bddExportsDirectory(Path projectRoot) {
+        return bddDirectory(projectRoot).resolve(EXPORTS_DIRECTORY);
+    }
+
+    public static Path bddContext(Path projectRoot) {
+        return bddExportsDirectory(projectRoot).resolve(BDD_CONTEXT);
+    }
+
+    public static Path bddEvidence(Path projectRoot) {
+        return bddExportsDirectory(projectRoot).resolve(BDD_EVIDENCE);
+    }
+
+    public static Path bddCoverage(Path projectRoot) {
+        return bddExportsDirectory(projectRoot).resolve(BDD_COVERAGE);
+    }
+
+    public static Path scenarioImpactMap(Path projectRoot) {
+        return bddExportsDirectory(projectRoot).resolve(SCENARIO_IMPACT_MAP);
+    }
+
     public static Path sensitivePolicy(Path projectRoot) {
         return devharnessDirectory(projectRoot).resolve(SENSITIVE_POLICY_JSON);
     }
 
     public static Path devharnessPolicy(Path projectRoot) {
         return devharnessDirectory(projectRoot).resolve(POLICY_JSON);
+    }
+
+    public static Path devharnessConfig(Path projectRoot) {
+        return devharnessDirectory(projectRoot).resolve(DEVHARNESS_CONFIG_JSON);
     }
 
     public static Path goalProfilesDirectory(Path projectRoot) {
@@ -179,6 +238,10 @@ public final class PathUtil {
         return exportsDirectory(projectRoot).resolve(GOAL_SUMMARY);
     }
 
+    public static Path artifactPassport(Path projectRoot) {
+        return exportsDirectory(projectRoot).resolve(ARTIFACT_PASSPORT_JSON);
+    }
+
     public static void createMemoryDirectories(Path projectRoot) {
         try {
             Files.createDirectories(devharnessDirectory(projectRoot));
@@ -197,6 +260,25 @@ public final class PathUtil {
             Files.createDirectories(graphCacheDirectory(projectRoot));
         } catch (IOException ex) {
             throw new IllegalStateException("Failed to create graph directories: " + ex.getMessage(), ex);
+        }
+    }
+
+    public static void createBddDirectories(Path projectRoot) {
+        try {
+            Files.createDirectories(bddDirectory(projectRoot));
+            Files.createDirectories(bddFeaturesDirectory(projectRoot));
+            Files.createDirectories(bddEvidenceDirectory(projectRoot));
+            Files.createDirectories(bddExportsDirectory(projectRoot));
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to create BDD directories: " + ex.getMessage(), ex);
+        }
+    }
+
+    public static void createSkillDirectories(Path projectRoot) {
+        try {
+            Files.createDirectories(skillsDirectory(projectRoot));
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to create skill directories: " + ex.getMessage(), ex);
         }
     }
 }

@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devharnesskit.local/schema/artifact_passport.schema.json",
+  "title": "DevHarnessKit Artifact Passport",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "generated_at",
+    "goal",
+    "completion",
+    "checks",
+    "steps",
+    "evidence",
+    "graph",
+    "bdd",
+    "rollback",
+    "artifacts"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "artifact-passport/v1-alpha"
+    },
+    "generated_at": {
+      "type": "string"
+    },
+    "goal": {
+      "type": "object"
+    },
+    "completion": {
+      "type": "object"
+    },
+    "checks": {
+      "type": "array"
+    },
+    "steps": {
+      "type": "array"
+    },
+    "evidence": {
+      "type": "object"
+    },
+    "graph": {
+      "type": "object"
+    },
+    "bdd": {
+      "type": "object"
+    },
+    "rollback": {
+      "type": "object"
+    },
+    "artifacts": {
+      "type": "array"
+    }
+  },
+  "additionalProperties": false
+}

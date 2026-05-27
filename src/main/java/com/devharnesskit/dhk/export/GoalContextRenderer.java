@@ -1,8 +1,10 @@
 package com.devharnesskit.dhk.export;
 
 import com.devharnesskit.dhk.model.goal.GoalPlan;
+import com.devharnesskit.dhk.model.goal.GoalBddState;
 import com.devharnesskit.dhk.model.goal.GoalGraphState;
 import com.devharnesskit.dhk.model.goal.GoalRun;
+import com.devharnesskit.dhk.model.config.DevHarnessConfig;
 
 public final class GoalContextRenderer {
     private static final int MAX_CHARS = 16 * 1024;
@@ -35,7 +37,43 @@ public final class GoalContextRenderer {
     public String render(GoalRun goal, GoalPlan plan, String[] requiredChecks,
                          String[] completionBlockers, String[] staleChecks,
                          String freshnessStatus, String generatedAt, GoalGraphState graphState) {
+        return render(goal, plan, requiredChecks, completionBlockers, staleChecks, freshnessStatus,
+                generatedAt, graphState, GoalBddState.disabled());
+    }
+
+    public String render(GoalRun goal, GoalPlan plan, String[] requiredChecks,
+                         String[] completionBlockers, String[] staleChecks,
+                         String freshnessStatus, String generatedAt, GoalGraphState graphState,
+                         GoalBddState bddState) {
+        return render(goal, plan, requiredChecks, completionBlockers, staleChecks, freshnessStatus,
+                generatedAt, graphState, bddState, new String[0]);
+    }
+
+    public String render(GoalRun goal, GoalPlan plan, String[] requiredChecks,
+                         String[] completionBlockers, String[] staleChecks,
+                         String freshnessStatus, String generatedAt, GoalGraphState graphState,
+                         GoalBddState bddState, String[] disciplineGateStatus) {
+        return render(goal, plan, requiredChecks, completionBlockers, staleChecks, freshnessStatus,
+                generatedAt, graphState, bddState, disciplineGateStatus, new String[0]);
+    }
+
+    public String render(GoalRun goal, GoalPlan plan, String[] requiredChecks,
+                         String[] completionBlockers, String[] staleChecks,
+                         String freshnessStatus, String generatedAt, GoalGraphState graphState,
+                         GoalBddState bddState, String[] disciplineGateStatus,
+                         String[] requiredCheckpointStatus) {
+        return render(goal, plan, requiredChecks, completionBlockers, staleChecks, freshnessStatus,
+                generatedAt, graphState, bddState, disciplineGateStatus, requiredCheckpointStatus, null);
+    }
+
+    public String render(GoalRun goal, GoalPlan plan, String[] requiredChecks,
+                         String[] completionBlockers, String[] staleChecks,
+                         String freshnessStatus, String generatedAt, GoalGraphState graphState,
+                         GoalBddState bddState, String[] disciplineGateStatus,
+                         String[] requiredCheckpointStatus, DevHarnessConfig verificationConfig) {
         GoalGraphState graph = graphState == null ? GoalGraphState.disabled() : graphState;
+        GoalBddState bdd = bddState == null ? GoalBddState.disabled() : bddState;
+        DevHarnessConfig config = verificationConfig == null ? new DevHarnessConfig(null) : verificationConfig;
         StringBuilder builder = new StringBuilder();
         builder.append("# GOAL_CONTEXT\n\n");
         builder.append("<generated-at>").append(generatedAt).append("</generated-at>\n\n");
@@ -73,6 +111,14 @@ public final class GoalContextRenderer {
             builder.append("- dhk graph export --project-root <project-root>\n");
             builder.append("- dhk graph impact --project-root <project-root> --file|--symbol|--sql-table <query>\n");
         }
+        if (bdd.enabled()) {
+            builder.append("- dhk bdd bind-goal --scenario <scenario-key> --goal ")
+                    .append(goal.goalKey()).append('\n');
+            builder.append("- dhk bdd evidence add --scenario <scenario-key> --goal ")
+                    .append(goal.goalKey()).append(" --status passed --summary \"<evidence>\"\n");
+            builder.append("- dhk bdd verify --goal ").append(goal.goalKey()).append('\n');
+            builder.append("- dhk graph impact --project-root <project-root> --scenario <scenario-key>\n");
+        }
         builder.append("- dhk goal verify --goal ").append(goal.goalKey()).append('\n');
         builder.append("- dhk goal complete --goal ").append(goal.goalKey())
                 .append(" only when ready_to_complete\n");
@@ -108,13 +154,22 @@ public final class GoalContextRenderer {
         appendList(builder, requiredChecks, "none");
         builder.append("</required-checks>\n\n");
 
+        appendVerificationPolicySection(builder, config);
+        appendDisciplineGateSection(builder, disciplineGateStatus);
+        appendRequiredCheckpointSection(builder, requiredCheckpointStatus);
         appendGraphSections(builder, graph);
+        appendBddSections(builder, bdd);
 
         builder.append("<context-files>\n");
         builder.append("- .agents/memory/exports/CURRENT_CONTEXT.md\n");
         builder.append("- .agents/memory/exports/WORKFLOW_CONTEXT.md\n");
         if (goal.specChangeKey().length() > 0) {
             builder.append("- .agents/memory/exports/SPEC_CONTEXT.md\n");
+        }
+        if (bdd.enabled()) {
+            builder.append("- .agents/bdd/exports/BDD_EVIDENCE.md\n");
+            builder.append("- .agents/bdd/exports/BDD_COVERAGE.md\n");
+            builder.append("- .agents/bdd/exports/SCENARIO_IMPACT_MAP.md\n");
         }
         builder.append("</context-files>\n\n");
 
@@ -136,8 +191,94 @@ public final class GoalContextRenderer {
         builder.append("- checkpoint must be created before stable completion\n");
         builder.append("</completion-condition>\n\n");
 
-        builder.append("<next-command>\n").append(nextCommand(plan, graph)).append("\n</next-command>\n");
+        builder.append("<next-command>\n").append(nextCommand(plan, graph, bdd)).append("\n</next-command>\n");
         return limit(builder.toString());
+    }
+
+    private void appendDisciplineGateSection(StringBuilder builder, String[] disciplineGateStatus) {
+        if (disciplineGateStatus == null || disciplineGateStatus.length == 0) {
+            return;
+        }
+        builder.append("<discipline-gates>\n");
+        appendList(builder, disciplineGateStatus, "none");
+        builder.append("- rule: strict skills must not bypass discipline gates before goal complete\n");
+        builder.append("</discipline-gates>\n\n");
+    }
+
+    private void appendRequiredCheckpointSection(StringBuilder builder, String[] checkpointStatus) {
+        if (checkpointStatus == null || checkpointStatus.length == 0) {
+            return;
+        }
+        builder.append("<required-checkpoints>\n");
+        appendList(builder, checkpointStatus, "none");
+        builder.append("- rule: strict skills must not complete high-risk goals without approved human checkpoints\n");
+        builder.append("</required-checkpoints>\n\n");
+    }
+
+    private void appendVerificationPolicySection(StringBuilder builder, DevHarnessConfig config) {
+        builder.append("<verification-policy>\n");
+        builder.append("- config_schema: ")
+                .append(config.schemaVersion().length() == 0 ? "default" : config.schemaVersion()).append('\n');
+        builder.append("- preset: ").append(config.preset()).append('\n');
+        builder.append("- compile_mode: ").append(config.compileMode()).append('\n');
+        builder.append("- compile_command: ").append(valueOrNone(config.compileCommand())).append('\n');
+        builder.append("- compile_trigger: ").append(valueOrNone(config.compileTrigger())).append('\n');
+        builder.append("- test_mode: ").append(config.testMode()).append('\n');
+        builder.append("- test_command: ").append(valueOrNone(config.testCommand())).append('\n');
+        builder.append("- test_trigger: ").append(valueOrNone(config.testTrigger())).append('\n');
+        builder.append("- test_cost: ").append(valueOrNone(config.testCost())).append('\n');
+        boolean manual = "manual".equals(config.compileMode()) || "manual".equals(config.testMode());
+        boolean autoMavenTest = "auto".equals(config.testMode());
+        builder.append("- auto_maven_test: ").append(autoMavenTest ? "enabled" : "disabled").append('\n');
+        builder.append("- manual_evidence_required: ").append(manual).append('\n');
+        builder.append("- rollback_required_if_test_not_run: ")
+                .append(config.value("verification.rollback.required_when_auto_tests_unavailable", "true"))
+                .append('\n');
+        if (!autoMavenTest) {
+            builder.append("- instruction: do not run mvn test automatically; record manual or risk evidence\n");
+        }
+        builder.append("</verification-policy>\n\n");
+
+        if (!manual) {
+            return;
+        }
+        builder.append("<manual-verification-contract>\n");
+        builder.append("- manual_evidence_status=passed\n");
+        if ("manual".equals(config.compileMode())) {
+            builder.append("- compile_scope=<module or changed classes>\n");
+        }
+        if ("manual".equals(config.testMode())) {
+            builder.append("- test_scope=<class or method>\n");
+        }
+        builder.append("- manual_evidence_path=<path>\n");
+        builder.append("- tester=<human or role>\n");
+        builder.append("- risk_if_not_run=<risk summary>\n");
+        builder.append("</manual-verification-contract>\n\n");
+    }
+
+    private void appendBddSections(StringBuilder builder, GoalBddState bdd) {
+        if (!bdd.enabled()) {
+            return;
+        }
+        builder.append("<bdd-status>\n");
+        builder.append("- bdd_required: ").append(bdd.required()).append('\n');
+        builder.append("- bound_scenario_count: ").append(bdd.scenarioCount()).append('\n');
+        builder.append("- covered_count: ").append(bdd.coveredCount()).append('\n');
+        builder.append("- missing_count: ").append(bdd.missingCount()).append('\n');
+        builder.append("- pending_count: ").append(bdd.pendingCount()).append('\n');
+        builder.append("- failed_count: ").append(bdd.failedCount()).append('\n');
+        builder.append("- evidence_path: ").append(valueOrNone(bdd.evidencePath())).append('\n');
+        builder.append("- coverage_path: ").append(valueOrNone(bdd.coveragePath())).append('\n');
+        builder.append("- scenario_impact_map_path: ").append(valueOrNone(bdd.scenarioImpactMapPath())).append('\n');
+        builder.append("- scenario_impact_map_exists: ").append(bdd.scenarioImpactMapExists()).append('\n');
+        if (bdd.nextCommand().length() > 0) {
+            builder.append("- next_command: ").append(bdd.nextCommand()).append('\n');
+        }
+        if (!bdd.scenarioImpactMapExists()) {
+            builder.append("- scenario_impact_next_command: dhk graph impact --project-root <project-root> --scenario <scenario-key>\n");
+        }
+        builder.append("- rule: bdd_required profiles need goal-bound scenarios with latest passed evidence\n");
+        builder.append("</bdd-status>\n\n");
     }
 
     private void appendGraphSections(StringBuilder builder, GoalGraphState graph) {
@@ -210,9 +351,12 @@ public final class GoalContextRenderer {
         return value == null || value.length() == 0 ? "none" : value;
     }
 
-    private String nextCommand(GoalPlan plan, GoalGraphState graph) {
+    private String nextCommand(GoalPlan plan, GoalGraphState graph, GoalBddState bdd) {
         if (graph.enabled() && graph.graphNextCommand().length() > 0) {
             return graph.graphNextCommand();
+        }
+        if (graph.enabled() && bdd.enabled() && !bdd.scenarioImpactMapExists()) {
+            return "dhk graph impact --project-root <project-root> --scenario <scenario-key>";
         }
         return plan.nextCommand();
     }

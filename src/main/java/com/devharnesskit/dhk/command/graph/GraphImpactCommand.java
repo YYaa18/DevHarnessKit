@@ -7,7 +7,9 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.model.graph.GraphImpactRequest;
 import com.devharnesskit.dhk.model.graph.GraphImpactResult;
 import com.devharnesskit.dhk.model.graph.GraphNode;
+import com.devharnesskit.dhk.model.graph.ScenarioGraphImpactResult;
 import com.devharnesskit.dhk.service.graph.GraphImpactService;
+import com.devharnesskit.dhk.service.graph.ScenarioGraphImpactService;
 import com.devharnesskit.dhk.service.policy.PolicyHookService;
 import com.devharnesskit.dhk.service.policy.PolicyViolationException;
 import com.devharnesskit.dhk.util.JsonOutput;
@@ -18,30 +20,47 @@ import java.nio.file.Path;
 
 public final class GraphImpactCommand implements Command {
     private final GraphImpactService impactService;
+    private final ScenarioGraphImpactService scenarioImpactService;
     private final PolicyHookService policyHookService;
 
     public GraphImpactCommand() {
-        this(new GraphImpactService(), new PolicyHookService());
+        this(new GraphImpactService(), new ScenarioGraphImpactService(), new PolicyHookService());
     }
 
     GraphImpactCommand(GraphImpactService impactService) {
-        this(impactService, new PolicyHookService());
+        this(impactService, new ScenarioGraphImpactService(), new PolicyHookService());
     }
 
-    GraphImpactCommand(GraphImpactService impactService, PolicyHookService policyHookService) {
+    GraphImpactCommand(GraphImpactService impactService, ScenarioGraphImpactService scenarioImpactService,
+                       PolicyHookService policyHookService) {
         this.impactService = impactService;
+        this.scenarioImpactService = scenarioImpactService;
         this.policyHookService = policyHookService;
     }
 
     public int run(CommandContext context, Args args) {
-        GraphImpactRequest request = request(args);
-        if (request == null) {
-            context.err().println("Missing required parameter: one of --file, --symbol, or --sql-table");
+        ImpactTarget target = target(args);
+        if (target == null) {
+            context.err().println("Missing required parameter: exactly one of --file, --symbol, --sql-table, or --scenario");
             return ExitCodes.USAGE_ERROR;
         }
         Path projectRoot = PathUtil.resolveProjectRoot(args, context.workingDirectory());
         try {
             policyHookService.requireGraphImpactAllowed(projectRoot, args);
+            if (target.scenarioKey.length() > 0) {
+                ScenarioGraphImpactResult result = scenarioImpactService.impact(projectRoot, target.scenarioKey,
+                        depth(args), args.hasFlag("allow-stale"), args.option("allow-stale-evidence", ""),
+                        context.clock());
+                if (JsonOutput.enabled(args)) {
+                    printScenarioJson(context, result);
+                } else if ("md".equalsIgnoreCase(args.option("format", ""))) {
+                    context.out().print(new String(Files.readAllBytes(result.scenarioImpactMapPath()), "UTF-8"));
+                } else {
+                    printScenarioText(context, result);
+                }
+                return result.found() ? ExitCodes.SUCCESS : ExitCodes.NOT_FOUND;
+            }
+            GraphImpactRequest request = target.request;
             GraphImpactResult result = impactService.impact(projectRoot, request, context.clock());
             if (JsonOutput.enabled(args)) {
                 printJson(context, result);
@@ -60,22 +79,30 @@ public final class GraphImpactCommand implements Command {
         }
     }
 
-    private GraphImpactRequest request(Args args) {
-        String query = args.option("file", "").trim();
-        String type = "file";
-        if (query.length() == 0) {
-            query = args.option("symbol", "").trim();
-            type = "symbol";
-        }
-        if (query.length() == 0) {
-            query = args.option("sql-table", "").trim();
-            type = "sql-table";
-        }
-        if (query.length() == 0) {
+    private ImpactTarget target(Args args) {
+        String file = args.option("file", "").trim();
+        String symbol = args.option("symbol", "").trim();
+        String sqlTable = args.option("sql-table", "").trim();
+        String scenario = args.option("scenario", "").trim();
+        int count = (file.length() > 0 ? 1 : 0) + (symbol.length() > 0 ? 1 : 0)
+                + (sqlTable.length() > 0 ? 1 : 0);
+        count += scenario.length() > 0 ? 1 : 0;
+        if (count != 1) {
             return null;
         }
-        return new GraphImpactRequest(type, query, depth(args), args.hasFlag("allow-stale"),
-                args.option("allow-stale-evidence", ""));
+        if (scenario.length() > 0) {
+            return new ImpactTarget(scenario);
+        }
+        if (file.length() > 0) {
+            return new ImpactTarget(new GraphImpactRequest("file", file, depth(args), args.hasFlag("allow-stale"),
+                    args.option("allow-stale-evidence", "")));
+        }
+        if (symbol.length() > 0) {
+            return new ImpactTarget(new GraphImpactRequest("symbol", symbol, depth(args), args.hasFlag("allow-stale"),
+                    args.option("allow-stale-evidence", "")));
+        }
+        return new ImpactTarget(new GraphImpactRequest("sql-table", sqlTable, depth(args), args.hasFlag("allow-stale"),
+                args.option("allow-stale-evidence", "")));
     }
 
     private int depth(Args args) {
@@ -129,6 +156,31 @@ public final class GraphImpactCommand implements Command {
         }
     }
 
+    private void printScenarioText(CommandContext context, ScenarioGraphImpactResult result) {
+        if (!result.found()) {
+            context.err().println("Graph scenario impact found no matching graph nodes: scenario="
+                    + result.scenarioKey());
+            context.err().println("scenario_impact_map: " + result.scenarioImpactMapPath());
+            return;
+        }
+        context.out().println("graph scenario impact");
+        context.out().println("scenario_key: " + result.scenarioKey());
+        context.out().println("input_bindings: " + result.inputBindings().size());
+        context.out().println("impact_results: " + result.impactResults().size());
+        context.out().println("found_results: " + result.foundCount());
+        context.out().println("snapshot_stale: " + result.snapshotStale());
+        context.out().println("allow_stale: " + result.staleAllowed());
+        context.out().println("related_files: " + result.relatedFiles().size());
+        context.out().println("related_tests: " + result.relatedTests().size());
+        context.out().println("related_sql: " + result.relatedSql().size());
+        context.out().println("risk_nodes: " + result.riskNodes().size());
+        context.out().println("scenario_impact_map: " + result.scenarioImpactMapPath());
+        context.out().println("recommended_read_files:");
+        for (String file : result.recommendedReadFiles()) {
+            context.out().println("- " + file);
+        }
+    }
+
     private void printJson(CommandContext context, GraphImpactResult result) {
         context.out().print(JsonOutput.object(
                 JsonOutput.stringField("command", "graph impact"),
@@ -157,7 +209,43 @@ public final class GraphImpactCommand implements Command {
         ));
     }
 
+    private void printScenarioJson(CommandContext context, ScenarioGraphImpactResult result) {
+        context.out().print(JsonOutput.object(
+                JsonOutput.stringField("command", "graph impact"),
+                JsonOutput.stringField("scenario_key", result.scenarioKey()),
+                JsonOutput.booleanField("found", result.found()),
+                JsonOutput.numberField("input_bindings", result.inputBindings().size()),
+                JsonOutput.numberField("impact_results", result.impactResults().size()),
+                JsonOutput.numberField("found_results", result.foundCount()),
+                JsonOutput.booleanField("snapshot_stale", result.snapshotStale()),
+                JsonOutput.booleanField("allow_stale", result.staleAllowed()),
+                JsonOutput.numberField("related_files", result.relatedFiles().size()),
+                JsonOutput.numberField("related_tests", result.relatedTests().size()),
+                JsonOutput.numberField("related_sql", result.relatedSql().size()),
+                JsonOutput.numberField("risk_nodes", result.riskNodes().size()),
+                JsonOutput.rawField("recommended_read_files",
+                        JsonOutput.stringArray(result.recommendedReadFiles().toArray(
+                                new String[result.recommendedReadFiles().size()]))),
+                JsonOutput.stringField("scenario_impact_map", result.scenarioImpactMapPath().toString())
+        ));
+    }
+
     private String displayName(GraphNode node) {
         return node.qualifiedName().length() > 0 ? node.qualifiedName() : node.name();
+    }
+
+    private static final class ImpactTarget {
+        private final GraphImpactRequest request;
+        private final String scenarioKey;
+
+        private ImpactTarget(GraphImpactRequest request) {
+            this.request = request;
+            this.scenarioKey = "";
+        }
+
+        private ImpactTarget(String scenarioKey) {
+            this.request = null;
+            this.scenarioKey = scenarioKey;
+        }
     }
 }

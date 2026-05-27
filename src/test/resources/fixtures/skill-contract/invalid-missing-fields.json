@@ -1,0 +1,10 @@
+{
+  "schema_version": "skill-contract/v1-alpha",
+  "skill_key": "missing-fields",
+  "version": "0.7.1",
+  "risk_level": "medium",
+  "mode": "strict",
+  "allowed_commands": [
+    "dhk goal next"
+  ]
+}

@@ -73,6 +73,8 @@ Required section order:
 <evidence-contract>
 <structured-evidence-fields>
 <required-checks>
+<graph-profile>          optional for graph-aware profiles
+<bdd-status>             optional for BDD-required profiles
 <context-files>
 <completion-blockers>
 <freshness-status>
@@ -92,6 +94,8 @@ Required content:
   `goal step` must report.
 - `completion-blockers` and `freshness-status` explain why completion is not
   yet ready.
+- `bdd-status`, when present, lists goal-bound scenario count, covered/missing/
+  pending/failed evidence counts, BDD report paths, and the next BDD command.
 - `next-command` gives the next goal command to run.
 
 Goal context is the agent protocol export. It guides the next action; it is not
@@ -105,14 +109,122 @@ Required section order:
 # GOAL_SUMMARY
 <generated-at>
 <goal>
+<completion-bindings>
+<graph-artifacts> optional
 <steps>
 <checks>
-<completion>
-<artifacts>
+<agent-instructions>
 ```
 
 Goal summary is a completion artifact. Sensitive values are redacted before the
 summary is written, and the redacted result is checked again before export.
+The `<completion-bindings>` section includes `ARTIFACT_PASSPORT.json` and the
+`dhk artifact passport verify` command so release and CI reviewers can audit
+the completion evidence. The passport is evidence metadata, not a substitute
+for human review or correctness proof.
+
+## BDD_CONTEXT.md
+
+Required section order:
+
+```text
+# BDD_CONTEXT
+<generated-at>
+<boundary>
+<features>
+<scenarios>
+<agent-instructions>
+```
+
+Required content:
+
+- `boundary` explains that BDD rows are specification-level acceptance context,
+  generated exports are not source of truth, and evidence/coverage are separate
+  checks.
+- `features` lists feature key, status, title, and module.
+- `scenarios` lists scenario key, status, title, feature, type, priority, tags,
+  exported Given/When/Then/And steps, and any spec/goal traceability bindings.
+- `agent-instructions` must remind agents not to treat scenarios as proof of
+  implementation correctness.
+
+BDD context is generated from SQLite v10 BDD rows. `.feature` files under
+`.agents/bdd/features/` are also generated exports.
+
+Scenario binding lines use this shape:
+
+```text
+- spec_acceptance <change-key>:<acceptance-key> (verifies)
+- goal <goal-key> (supports)
+- sql_table <table> (impacts)
+- file <path> (impacts)
+- symbol <symbol> (impacts)
+```
+
+## SCENARIO_IMPACT_MAP.md
+
+Required section order:
+
+```text
+# SCENARIO_IMPACT_MAP
+<generated-at>
+<summary>
+<scenario-impact-boundary>
+<impact-inputs>
+<impact-results>
+<related-files>
+<related-tests>
+<related-sql>
+<risk-nodes>
+<recommended-read-files>
+```
+
+Required content:
+
+- `summary` lists the scenario key, input binding count, impact result count,
+  found result count, related file/test counts, and snapshot stale state.
+- `scenario-impact-boundary` states that Graph Lite scenario impact is
+  advisory and must not be treated as correctness proof.
+- `impact-inputs` lists scenario-bound `file`, `symbol`, and `sql_table`
+  inputs.
+- `impact-results` summarizes each underlying `graph impact` query.
+- `related-sql` and `risk-nodes` list node evidence with file, line,
+  confidence, source, and evidence fields.
+- The report inherits Graph Lite snapshot freshness enforcement.
+
+## BDD_EVIDENCE.md
+
+Required section order:
+
+```text
+# BDD_EVIDENCE
+<generated-at>
+<summary>
+<scenario-evidence>
+```
+
+Required content:
+
+- `summary` lists scenario, covered, missing, pending, and failed counts.
+- `scenario-evidence` lists each selected scenario, optional adapter
+  normalization details, and its evidence rows.
+- Sensitive values must be rejected before the report is written.
+
+## BDD_COVERAGE.md
+
+Required section order:
+
+```text
+# BDD_COVERAGE
+<generated-at>
+<coverage-summary>
+<scenario-coverage>
+```
+
+Required content:
+
+- `coverage-summary` lists selected scenario coverage counts and status.
+- `scenario-coverage` lists scenario key, evidence status, evidence count, and
+  optional adapter normalization details.
 
 ## Regeneration
 
@@ -122,4 +234,5 @@ Do not hand-edit exported Markdown to change source state. Regenerate exports fr
 dhk goal export --goal <goal-key>
 dhk workflow export --run <run-key>
 dhk spec export --change <change-key>
+dhk bdd export
 ```

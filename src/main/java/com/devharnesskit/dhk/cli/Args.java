@@ -11,17 +11,21 @@ import java.util.Set;
 public final class Args {
     private final List<String> positionals;
     private final Map<String, String> options;
+    private final Map<String, List<String>> optionValues;
     private final Set<String> flags;
 
-    private Args(List<String> positionals, Map<String, String> options, Set<String> flags) {
+    private Args(List<String> positionals, Map<String, String> options,
+                 Map<String, List<String>> optionValues, Set<String> flags) {
         this.positionals = Collections.unmodifiableList(positionals);
         this.options = Collections.unmodifiableMap(options);
+        this.optionValues = immutableOptionValues(optionValues);
         this.flags = Collections.unmodifiableSet(flags);
     }
 
     public static Args parse(String[] rawArgs) {
         List<String> positionals = new ArrayList<String>();
         Map<String, String> options = new LinkedHashMap<String, String>();
+        Map<String, List<String>> optionValues = new LinkedHashMap<String, List<String>>();
         Set<String> flags = new LinkedHashSet<String>();
 
         for (int i = 0; i < rawArgs.length; i++) {
@@ -36,23 +40,27 @@ public final class Args {
                         positionals.add(token);
                     } else {
                         options.put(key, value);
+                        appendOptionValue(optionValues, key, value);
                         flags.remove(key);
                     }
                 } else if (i + 1 < rawArgs.length && !rawArgs[i + 1].startsWith("--")) {
                     String key = option;
-                    options.put(key, rawArgs[++i]);
+                    String value = rawArgs[++i];
+                    options.put(key, value);
+                    appendOptionValue(optionValues, key, value);
                     flags.remove(key);
                 } else {
                     String key = option;
                     flags.add(key);
                     options.remove(key);
+                    optionValues.remove(key);
                 }
             } else {
                 positionals.add(token);
             }
         }
 
-        return new Args(positionals, options, flags);
+        return new Args(positionals, options, optionValues, flags);
     }
 
     public List<String> positionals() {
@@ -95,6 +103,11 @@ public final class Args {
         return options;
     }
 
+    public List<String> optionValues(String key) {
+        List<String> values = optionValues.get(key);
+        return values == null ? Collections.<String>emptyList() : values;
+    }
+
     public Set<String> flags() {
         return flags;
     }
@@ -105,6 +118,7 @@ public final class Args {
             redactedPositionals.add(guard.redact(positional));
         }
         Map<String, String> redactedOptions = new LinkedHashMap<String, String>();
+        Map<String, List<String>> redactedOptionValues = new LinkedHashMap<String, List<String>>();
         for (Map.Entry<String, String> entry : options.entrySet()) {
             if (excludedOptions.contains(entry.getKey())) {
                 redactedOptions.put(entry.getKey(), entry.getValue());
@@ -112,6 +126,31 @@ public final class Args {
                 redactedOptions.put(entry.getKey(), guard.redact(entry.getValue()));
             }
         }
-        return new Args(redactedPositionals, redactedOptions, new LinkedHashSet<String>(flags));
+        for (Map.Entry<String, List<String>> entry : optionValues.entrySet()) {
+            List<String> values = new ArrayList<String>();
+            for (String value : entry.getValue()) {
+                values.add(excludedOptions.contains(entry.getKey()) ? value : guard.redact(value));
+            }
+            redactedOptionValues.put(entry.getKey(), values);
+        }
+        return new Args(redactedPositionals, redactedOptions, redactedOptionValues,
+                new LinkedHashSet<String>(flags));
+    }
+
+    private static void appendOptionValue(Map<String, List<String>> optionValues, String key, String value) {
+        List<String> values = optionValues.get(key);
+        if (values == null) {
+            values = new ArrayList<String>();
+            optionValues.put(key, values);
+        }
+        values.add(value);
+    }
+
+    private static Map<String, List<String>> immutableOptionValues(Map<String, List<String>> optionValues) {
+        Map<String, List<String>> result = new LinkedHashMap<String, List<String>>();
+        for (Map.Entry<String, List<String>> entry : optionValues.entrySet()) {
+            result.put(entry.getKey(), Collections.unmodifiableList(new ArrayList<String>(entry.getValue())));
+        }
+        return Collections.unmodifiableMap(result);
     }
 }

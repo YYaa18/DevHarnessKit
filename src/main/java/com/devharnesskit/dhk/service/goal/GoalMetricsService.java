@@ -15,6 +15,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class GoalMetricsService {
     public GoalMetricsSnapshot snapshot(GoalRun goal, List<GoalStep> steps, List<GoalCheck> checks,
@@ -32,6 +34,7 @@ public final class GoalMetricsService {
         int skippedChecks = 0;
         int waivedChecks = 0;
         int staleChecks = 0;
+        GoalCheck latestBddCheck = null;
         for (GoalCheck check : safeChecks(checks)) {
             if (check.required()) {
                 requiredChecks++;
@@ -48,7 +51,13 @@ public final class GoalMetricsService {
             if (check.stepCountAtCheck() < goal.stepCount()) {
                 staleChecks++;
             }
+            if (isBddCheck(check)) {
+                if (latestBddCheck == null || check.checkedAt().compareTo(latestBddCheck.checkedAt()) >= 0) {
+                    latestBddCheck = check;
+                }
+            }
         }
+        BddMetrics bddMetrics = bddMetrics(goal, latestBddCheck);
 
         return new GoalMetricsSnapshot(
                 goal.goalKey(),
@@ -69,7 +78,12 @@ public final class GoalMetricsService {
                 safeArtifacts(artifacts).size(),
                 goal.createdAt(),
                 goal.completedAt(),
-                durationMs(goal.createdAt(), goal.completedAt()));
+                durationMs(goal.createdAt(), goal.completedAt()),
+                bddMetrics.status,
+                bddMetrics.coveragePercent,
+                bddMetrics.freshness,
+                bddMetrics.qualityScore,
+                bddMetrics.failureReasons);
     }
 
     public List<GoalReplayEntry> replay(GoalRun goal, List<GoalStep> steps, List<GoalCheck> checks,
@@ -131,6 +145,59 @@ public final class GoalMetricsService {
         }
     }
 
+    private BddMetrics bddMetrics(GoalRun goal, GoalCheck check) {
+        if (check == null) {
+            return new BddMetrics("", -1, "missing", -1, "");
+        }
+        String freshness = "fresh";
+        if ("skipped".equals(check.status()) && check.resultSummary().contains("not required")) {
+            freshness = "not_required";
+        } else if (check.stepCountAtCheck() < goal.stepCount()) {
+            freshness = "stale";
+        }
+        int coveragePercent = parsePercent(check.resultSummary(), "coverage=(\\d+)%", "bdd coverage (\\d+)%");
+        int qualityScore = parsePercent(check.resultSummary(), "quality_score=(\\d+)", "bdd quality score (\\d+)");
+        String failureReasons = "";
+        if ("failed".equals(check.status())) {
+            failureReasons = stripPrefix(check.resultSummary(), "bdd incomplete:");
+        } else if ("stale".equals(freshness)) {
+            failureReasons = "bdd check is stale";
+        }
+        return new BddMetrics(check.status(), coveragePercent, freshness, qualityScore, failureReasons);
+    }
+
+    private boolean isBddCheck(GoalCheck check) {
+        return check != null && ("bdd".equals(check.checkKey()) || "bdd".equals(check.checkType()));
+    }
+
+    private int parsePercent(String text, String firstPattern, String secondPattern) {
+        int value = parseFirstInt(text, firstPattern);
+        if (value >= 0) {
+            return value;
+        }
+        return parseFirstInt(text, secondPattern);
+    }
+
+    private int parseFirstInt(String text, String pattern) {
+        Matcher matcher = Pattern.compile(pattern).matcher(text == null ? "" : text);
+        if (!matcher.find()) {
+            return -1;
+        }
+        try {
+            return Integer.parseInt(matcher.group(1));
+        } catch (NumberFormatException ignored) {
+            return -1;
+        }
+    }
+
+    private String stripPrefix(String text, String prefix) {
+        String value = text == null ? "" : text.trim();
+        if (value.startsWith(prefix)) {
+            return value.substring(prefix.length()).trim();
+        }
+        return value;
+    }
+
     private int sourceRank(String source) {
         if ("goal_run".equals(source)) {
             return 0;
@@ -164,5 +231,22 @@ public final class GoalMetricsService {
 
     private List<GoalArtifact> safeArtifacts(List<GoalArtifact> artifacts) {
         return artifacts == null ? Collections.<GoalArtifact>emptyList() : artifacts;
+    }
+
+    private static final class BddMetrics {
+        private final String status;
+        private final int coveragePercent;
+        private final String freshness;
+        private final int qualityScore;
+        private final String failureReasons;
+
+        private BddMetrics(String status, int coveragePercent, String freshness, int qualityScore,
+                           String failureReasons) {
+            this.status = status;
+            this.coveragePercent = coveragePercent;
+            this.freshness = freshness;
+            this.qualityScore = qualityScore;
+            this.failureReasons = failureReasons;
+        }
     }
 }

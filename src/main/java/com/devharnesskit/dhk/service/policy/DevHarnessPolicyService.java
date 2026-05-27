@@ -23,7 +23,9 @@ public final class DevHarnessPolicyService {
             "db_sql_requires_explicit_request", "db_require_readonly_credentials",
             "db_allowed_environments", "context_export_require_sensitive_scan",
             "context_export_block_on_sensitive", "context_export_allowed_files",
-            "context_export_forbidden_files", "graph_allow_stale_requires_approval");
+            "context_export_forbidden_files", "graph_allow_stale_requires_approval",
+            "skill_contract_required", "skill_key", "skill_trust_required_for_high_risk",
+            "skill_trust_override_checkpoint_type", "human_checkpoint_required", "human_checkpoint_type");
     private static final Set<String> MODES = set("strict", "guided", "expert");
 
     public DevHarnessPolicy load(Path projectRoot) {
@@ -48,7 +50,13 @@ public final class DevHarnessPolicyService {
                     parseBoolean(raw.get("context_export_block_on_sensitive"), true),
                     splitList(raw.get("context_export_allowed_files")),
                     splitList(raw.get("context_export_forbidden_files")),
-                    parseBoolean(raw.get("graph_allow_stale_requires_approval"), true));
+                    parseBoolean(raw.get("graph_allow_stale_requires_approval"), true),
+                    parseBoolean(raw.get("skill_contract_required"), false),
+                    value(raw, "skill_key", ""),
+                    parseBoolean(raw.get("skill_trust_required_for_high_risk"), false),
+                    value(raw, "skill_trust_override_checkpoint_type", "skill_trust_override"),
+                    parseBoolean(raw.get("human_checkpoint_required"), false),
+                    value(raw, "human_checkpoint_type", "before_complete"));
         } catch (Exception ex) {
             return DevHarnessPolicy.defaults();
         }
@@ -88,8 +96,46 @@ public final class DevHarnessPolicyService {
         diagnoseBoolean(policyPath, raw, "context_export_require_sensitive_scan", diagnostics);
         diagnoseBoolean(policyPath, raw, "context_export_block_on_sensitive", diagnostics);
         diagnoseBoolean(policyPath, raw, "graph_allow_stale_requires_approval", diagnostics);
+        diagnoseBoolean(policyPath, raw, "skill_contract_required", diagnostics);
+        diagnoseBoolean(policyPath, raw, "skill_trust_required_for_high_risk", diagnostics);
+        diagnoseBoolean(policyPath, raw, "human_checkpoint_required", diagnostics);
+        diagnoseSkillContract(projectRoot, policyPath, raw, diagnostics);
+        diagnoseSkillTrust(policyPath, raw, diagnostics);
+        diagnoseCheckpointType(policyPath, raw, diagnostics);
+        diagnoseSkillTrustCheckpointType(policyPath, raw, diagnostics);
         diagnoseEnvironmentList(policyPath, raw.get("db_allowed_environments"), diagnostics);
         return diagnostics;
+    }
+
+    private void diagnoseSkillTrust(Path file, Map<String, String> raw, List<Diagnostic> diagnostics) {
+        boolean trustRequired = parseBoolean(raw.get("skill_trust_required_for_high_risk"), false);
+        if (trustRequired && value(raw, "skill_key", "").length() == 0) {
+            diagnostics.add(warning(file.toString(),
+                    "skill_trust_required_for_high_risk is true but skill_key is missing"));
+        }
+    }
+
+    private void diagnoseSkillTrustCheckpointType(Path file, Map<String, String> raw,
+                                                  List<Diagnostic> diagnostics) {
+        String type = value(raw, "skill_trust_override_checkpoint_type", "");
+        if (type.length() == 0) {
+            return;
+        }
+        if (!ENV_PATTERN.matcher(type).matches()) {
+            diagnostics.add(warning(file.toString(),
+                    "skill_trust_override_checkpoint_type should be a lowercase key such as skill_trust_override"));
+        }
+    }
+
+    private void diagnoseCheckpointType(Path file, Map<String, String> raw, List<Diagnostic> diagnostics) {
+        String type = value(raw, "human_checkpoint_type", "");
+        if (type.length() == 0) {
+            return;
+        }
+        if (!ENV_PATTERN.matcher(type).matches()) {
+            diagnostics.add(warning(file.toString(),
+                    "human_checkpoint_type should be a lowercase key such as before_complete"));
+        }
     }
 
     private void diagnoseMode(Path file, Map<String, String> raw, List<Diagnostic> diagnostics) {
@@ -132,6 +178,24 @@ public final class DevHarnessPolicyService {
                                  List<Diagnostic> diagnostics) {
         if (raw.containsKey(field) && !validBoolean(raw.get(field))) {
             diagnostics.add(warning(file.toString(), field + " should be true/false, yes/no, or 1/0"));
+        }
+    }
+
+    private void diagnoseSkillContract(Path projectRoot, Path file, Map<String, String> raw,
+                                       List<Diagnostic> diagnostics) {
+        boolean required = parseBoolean(raw.get("skill_contract_required"), false);
+        String skillKey = value(raw, "skill_key", "");
+        if (required && skillKey.length() == 0) {
+            diagnostics.add(warning(file.toString(),
+                    "skill_contract_required is true but skill_key is missing"));
+            return;
+        }
+        if (skillKey.length() == 0) {
+            return;
+        }
+        if (!Files.isRegularFile(PathUtil.skillContract(projectRoot, skillKey))) {
+            diagnostics.add(warning(file.toString(),
+                    "skill contract not found for skill_key: " + skillKey));
         }
     }
 

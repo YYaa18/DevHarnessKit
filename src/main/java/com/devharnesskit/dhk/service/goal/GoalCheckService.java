@@ -4,6 +4,10 @@ import com.devharnesskit.dhk.model.goal.GoalCheck;
 import com.devharnesskit.dhk.model.goal.GoalProfile;
 import com.devharnesskit.dhk.model.goal.GoalRun;
 import com.devharnesskit.dhk.model.goal.GoalStep;
+import com.devharnesskit.dhk.model.bdd.BddBinding;
+import com.devharnesskit.dhk.model.bdd.BddEvidence;
+import com.devharnesskit.dhk.model.bdd.BddQualityIssue;
+import com.devharnesskit.dhk.model.bdd.BddScenarioView;
 import com.devharnesskit.dhk.repository.goal.GoalStepRepository;
 import com.devharnesskit.dhk.model.spec.SpecAcceptance;
 import com.devharnesskit.dhk.model.spec.SpecTask;
@@ -14,11 +18,22 @@ import com.devharnesskit.dhk.repository.spec.SpecAcceptanceRepository;
 import com.devharnesskit.dhk.repository.spec.SpecTaskRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowGateRunRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowRunRepository;
+import com.devharnesskit.dhk.repository.bdd.BddBindingRepository;
+import com.devharnesskit.dhk.repository.bdd.BddFeatureRepository;
+import com.devharnesskit.dhk.repository.bdd.BddQualityIssueRepository;
+import com.devharnesskit.dhk.repository.bdd.BddScenarioRepository;
+import com.devharnesskit.dhk.repository.bdd.BddStepRepository;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
+import com.devharnesskit.dhk.service.bdd.BddLintService;
+import com.devharnesskit.dhk.service.bdd.BddService;
+import com.devharnesskit.dhk.service.bdd.BddVerificationService;
+import com.devharnesskit.dhk.service.bdd.BddVerificationService.BddScenarioEvidenceResult;
 import com.devharnesskit.dhk.model.policy.DevHarnessPolicy;
 import com.devharnesskit.dhk.model.graph.GraphArchitectureCheckResult;
+import com.devharnesskit.dhk.model.skill.SkillDisciplineGateResult;
 import com.devharnesskit.dhk.service.policy.DevHarnessPolicyService;
 import com.devharnesskit.dhk.service.graph.GraphArchitectureCheckService;
+import com.devharnesskit.dhk.service.skill.SkillDisciplineGateService;
 import com.devharnesskit.dhk.util.PathUtil;
 
 import java.io.InputStream;
@@ -53,6 +68,10 @@ public final class GoalCheckService {
     private final GoalStepRepository stepRepository;
     private final DevHarnessPolicyService devHarnessPolicyService;
     private final GraphArchitectureCheckService architectureCheckService;
+    private final SkillDisciplineGateService disciplineGateService;
+    private final BddBindingRepository bddBindingRepository;
+    private final BddService bddService;
+    private final BddVerificationService bddVerificationService;
 
     public GoalCheckService() {
         this(new GoalCheckRepository(), new SpecTaskRepository(), new SpecAcceptanceRepository(),
@@ -72,6 +91,27 @@ public final class GoalCheckService {
                      GoalStepRepository stepRepository,
                      DevHarnessPolicyService devHarnessPolicyService,
                      GraphArchitectureCheckService architectureCheckService) {
+        this(checkRepository, taskRepository, acceptanceRepository, workflowRunRepository,
+                gateRunRepository, sensitiveDataGuard, policyService, profileService, fingerprintService,
+                stepRepository, devHarnessPolicyService, architectureCheckService,
+                new BddBindingRepository(), new BddService(new BddFeatureRepository(),
+                new BddScenarioRepository(), new BddStepRepository()), new BddVerificationService());
+    }
+
+    GoalCheckService(GoalCheckRepository checkRepository, SpecTaskRepository taskRepository,
+                     SpecAcceptanceRepository acceptanceRepository,
+                     WorkflowRunRepository workflowRunRepository,
+                     WorkflowGateRunRepository gateRunRepository,
+                     SensitiveDataGuard sensitiveDataGuard,
+                     GoalCheckPolicyService policyService,
+                     GoalProfileService profileService,
+                     WorkspaceFingerprintService fingerprintService,
+                     GoalStepRepository stepRepository,
+                     DevHarnessPolicyService devHarnessPolicyService,
+                     GraphArchitectureCheckService architectureCheckService,
+                     BddBindingRepository bddBindingRepository,
+                     BddService bddService,
+                     BddVerificationService bddVerificationService) {
         this.checkRepository = checkRepository;
         this.taskRepository = taskRepository;
         this.acceptanceRepository = acceptanceRepository;
@@ -84,6 +124,10 @@ public final class GoalCheckService {
         this.stepRepository = stepRepository;
         this.devHarnessPolicyService = devHarnessPolicyService;
         this.architectureCheckService = architectureCheckService;
+        this.disciplineGateService = new SkillDisciplineGateService();
+        this.bddBindingRepository = bddBindingRepository;
+        this.bddService = bddService;
+        this.bddVerificationService = bddVerificationService;
     }
 
     public GoalCheck run(Connection connection, Path projectRoot, GoalRun goal,
@@ -99,6 +143,17 @@ public final class GoalCheckService {
         }
         if ("test".equals(checkKey)) {
             return runMavenCheck(connection, projectRoot, goal, checkKey, policy.testCommand(), now);
+        }
+        if ("manual-compile".equals(checkKey)) {
+            return runManualVerificationCheck(connection, projectRoot, goal, checkKey,
+                    "compile_scope", now);
+        }
+        if ("manual-test".equals(checkKey)) {
+            return runManualVerificationCheck(connection, projectRoot, goal, checkKey,
+                    "test_scope", now);
+        }
+        if ("verification-risk".equals(checkKey)) {
+            return runVerificationRiskCheck(connection, projectRoot, goal, now);
         }
         if ("sensitive".equals(checkKey)) {
             return runSensitiveCheck(connection, projectRoot, goal, now);
@@ -120,6 +175,21 @@ public final class GoalCheckService {
         }
         if ("architecture".equals(checkKey)) {
             return runArchitectureCheck(connection, projectRoot, goal, now);
+        }
+        if ("bdd".equals(checkKey)) {
+            return runBddCheck(connection, projectRoot, goal, profile, policy, now);
+        }
+        if ("think-before-coding".equals(checkKey)) {
+            return runDisciplineGateCheck(connection, projectRoot, goal, profile, checkKey, now);
+        }
+        if ("goal-driven".equals(checkKey)) {
+            return runDisciplineGateCheck(connection, projectRoot, goal, profile, checkKey, now);
+        }
+        if ("simplicity".equals(checkKey)) {
+            return runDisciplineGateCheck(connection, projectRoot, goal, profile, checkKey, now);
+        }
+        if ("surgical-change".equals(checkKey)) {
+            return runDisciplineGateCheck(connection, projectRoot, goal, profile, checkKey, now);
         }
         throw new IllegalArgumentException("Unknown goal check: " + checkKey);
     }
@@ -150,6 +220,85 @@ public final class GoalCheckService {
                 + " duration_ms=" + result.durationMs()
                 + " output_truncated=" + result.truncated();
         return save(connection, projectRoot, goal, checkKey, "command", commandText, status, summary, log, now);
+    }
+
+    private GoalCheck runManualVerificationCheck(Connection connection, Path projectRoot, GoalRun goal,
+                                                 String checkKey, String scopeKey, String now) throws Exception {
+        Path log = logPath(projectRoot, goal, checkKey);
+        List<GoalStep> steps = stepRepository.listByGoal(connection, goal.goalKey());
+        List<String> failures = new ArrayList<String>();
+        String manualEvidenceStatus = latestEvidenceValue(steps, "manual_evidence_status");
+        String scope = latestEvidenceValue(steps, scopeKey);
+        String manualEvidencePath = latestEvidenceValue(steps, "manual_evidence_path");
+        String tester = latestEvidenceValue(steps, "tester");
+        String riskIfNotRun = latestEvidenceValue(steps, "risk_if_not_run");
+
+        StringBuilder output = new StringBuilder();
+        output.append("check_key: ").append(checkKey).append('\n');
+        output.append("manual_evidence_status: ").append(empty(manualEvidenceStatus, "none")).append('\n');
+        output.append(scopeKey).append(": ").append(empty(scope, "none")).append('\n');
+        output.append("manual_evidence_path: ").append(empty(manualEvidencePath, "none")).append('\n');
+        output.append("tester: ").append(empty(tester, "none")).append('\n');
+        output.append("risk_if_not_run: ").append(empty(riskIfNotRun, "none")).append('\n');
+
+        if (!"passed".equalsIgnoreCase(manualEvidenceStatus)) {
+            failures.add("manual evidence is not passed: manual_evidence_status="
+                    + empty(manualEvidenceStatus, "none"));
+        }
+        if (scope.length() == 0) {
+            failures.add(scopeKey + " is required");
+        }
+        if (!artifactExists(projectRoot, manualEvidencePath)) {
+            failures.add("manual evidence artifact missing: manual_evidence_path="
+                    + empty(manualEvidencePath, "none"));
+        }
+
+        writeLog(log, output.toString());
+        String status = failures.isEmpty() ? "passed" : "failed";
+        String summary = failures.isEmpty()
+                ? checkKey + " evidence passed; " + scopeKey + "=" + scope
+                + " manual_evidence_path=" + manualEvidencePath
+                : checkKey + " manual evidence required: " + failures;
+        return save(connection, projectRoot, goal, checkKey, "manual", "", status, summary, log, now);
+    }
+
+    private GoalCheck runVerificationRiskCheck(Connection connection, Path projectRoot, GoalRun goal,
+                                              String now) throws Exception {
+        Path log = logPath(projectRoot, goal, "verification-risk");
+        List<GoalStep> steps = stepRepository.listByGoal(connection, goal.goalKey());
+        List<String> failures = new ArrayList<String>();
+        String waiveReason = latestEvidenceValue(steps, "waive_reason");
+        String approver = latestEvidenceValue(steps, "approver");
+        String rollbackPlan = latestEvidenceValue(steps, "rollback_plan");
+        String riskScope = firstNonEmpty(latestEvidenceValue(steps, "risk_scope"),
+                latestEvidenceValue(steps, "risk_if_not_run"));
+
+        StringBuilder output = new StringBuilder();
+        output.append("check_key: verification-risk\n");
+        output.append("waive_reason: ").append(empty(waiveReason, "none")).append('\n');
+        output.append("approver: ").append(empty(approver, "none")).append('\n');
+        output.append("rollback_plan: ").append(empty(rollbackPlan, "none")).append('\n');
+        output.append("risk_scope: ").append(empty(riskScope, "none")).append('\n');
+
+        if (waiveReason.length() == 0) {
+            failures.add("waive_reason is required when verification is disabled");
+        }
+        if (approver.length() == 0) {
+            failures.add("approver is required when verification is disabled");
+        }
+        if (riskScope.length() == 0) {
+            failures.add("risk_scope or risk_if_not_run is required when verification is disabled");
+        }
+        if (!artifactExists(projectRoot, rollbackPlan)) {
+            failures.add("rollback plan artifact missing: rollback_plan=" + empty(rollbackPlan, "none"));
+        }
+
+        writeLog(log, output.toString());
+        String status = failures.isEmpty() ? "passed" : "failed";
+        String summary = failures.isEmpty()
+                ? "verification risk accepted; approver=" + approver + " rollback_plan=" + rollbackPlan
+                : "verification risk evidence required: " + failures;
+        return save(connection, projectRoot, goal, "verification-risk", "risk", "", status, summary, log, now);
     }
 
     private GoalCheck runSensitiveCheck(Connection connection, Path projectRoot, GoalRun goal,
@@ -378,6 +527,8 @@ public final class GoalCheckService {
             output.append("missing_related_tests_count: ").append(missingTests.size()).append('\n');
             validateSafeRefactorReimpact(projectRoot, profile, steps, output, failures);
         }
+        validateScenarioImpactMap(connection, projectRoot, goal, profile, snapshot, snapshotKey,
+                now, output, failures);
 
         writeLog(log, output.toString());
         String status = failures.isEmpty() ? "passed" : "failed";
@@ -388,6 +539,69 @@ public final class GoalCheckService {
                 : "")
                 : "impact freshness failed: " + failures;
         return save(connection, projectRoot, goal, "impact", "impact", command, status, summary, log, now);
+    }
+
+    private void validateScenarioImpactMap(Connection connection, Path projectRoot, GoalRun goal,
+                                           GoalProfile profile, Path snapshot, String snapshotKey,
+                                           String now, StringBuilder output, List<String> failures)
+            throws Exception {
+        if (profile == null || !profile.graphRequired() || !profile.bddRequired()) {
+            return;
+        }
+        Path scenarioImpact = PathUtil.scenarioImpactMap(projectRoot);
+        List<BddBinding> bindings = bddBindingRepository.listByBinding(connection, "goal", goal.goalKey());
+        String command = scenarioImpactCommand(projectRoot, bindings);
+        output.append("scenario_impact_required: true\n");
+        output.append("scenario_impact_map: ").append(scenarioImpact).append('\n');
+        output.append("scenario_impact_next_command: ").append(command).append('\n');
+        output.append("scenario_bound_count: ").append(bindings.size()).append('\n');
+        if (bindings.isEmpty()) {
+            failures.add("scenario impact required but no BDD scenarios are bound to goal; next_command="
+                    + command);
+            return;
+        }
+        if (!Files.isRegularFile(scenarioImpact)) {
+            failures.add("SCENARIO_IMPACT_MAP.md missing; next_command=" + command);
+            return;
+        }
+
+        String text = new String(Files.readAllBytes(scenarioImpact), "UTF-8");
+        String generatedAt = tagValue(text, "generated-at");
+        output.append("scenario_impact_generated_at: ").append(generatedAt).append('\n');
+        output.append("scenario_impact_snapshot_stale: ").append(lineValue(text, "- snapshot_stale: ")).append('\n');
+        String matchedScenario = matchedScenarioKey(bindings, text);
+        output.append("scenario_impact_matched_scenario: ").append(empty(matchedScenario, "none")).append('\n');
+        if (matchedScenario.length() == 0) {
+            failures.add("SCENARIO_IMPACT_MAP.md does not reference a goal-bound scenario; next_command="
+                    + command);
+        }
+        if ("true".equalsIgnoreCase(lineValue(text, "- snapshot_stale: "))) {
+            failures.add("SCENARIO_IMPACT_MAP.md is marked stale; next_command=" + command);
+        }
+        if (snapshot != null && Files.isRegularFile(snapshot)
+                && Files.getLastModifiedTime(scenarioImpact).compareTo(Files.getLastModifiedTime(snapshot)) < 0) {
+            failures.add("SCENARIO_IMPACT_MAP.md stale: generated before latest graph snapshot; next_command="
+                    + command);
+        }
+        addAgeFailure("scenario impact map", generatedAt, profile.graphMaxStalenessMinutes(),
+                now, command, failures);
+        if (snapshotKey != null && snapshotKey.length() > 0 && text.indexOf(snapshotKey) < 0) {
+            output.append("scenario_impact_snapshot_key_warning: not_embedded\n");
+        }
+    }
+
+    private String matchedScenarioKey(List<BddBinding> bindings, String scenarioImpactText) {
+        if (scenarioImpactText == null) {
+            return "";
+        }
+        for (BddBinding binding : bindings) {
+            String scenarioKey = binding.scenarioKey();
+            if (scenarioKey != null && scenarioKey.length() > 0
+                    && scenarioImpactText.indexOf("scenario_key: " + scenarioKey) >= 0) {
+                return scenarioKey;
+            }
+        }
+        return "";
     }
 
     private void validateSafeRefactorReimpact(Path projectRoot, GoalProfile profile, List<GoalStep> steps,
@@ -532,6 +746,122 @@ public final class GoalCheckService {
                 result.summary(), log, now);
     }
 
+    private GoalCheck runBddCheck(Connection connection, Path projectRoot, GoalRun goal, GoalProfile profile,
+                                  GoalCheckPolicy policy, String now) throws Exception {
+        Path log = logPath(projectRoot, goal, "bdd");
+        if (profile == null || !profile.bddRequired()) {
+            String summary = "bdd not required by goal profile";
+            writeLog(log, summary + "\n");
+            return save(connection, projectRoot, goal, "bdd", "bdd", "", "skipped", summary, log, now);
+        }
+        List<BddBinding> bindings = bddBindingRepository.listByBinding(connection, "goal", goal.goalKey());
+        List<String> failures = new ArrayList<String>();
+        StringBuilder output = new StringBuilder();
+        output.append("bdd_required: true\n");
+        output.append("goal_key: ").append(goal.goalKey()).append('\n');
+        output.append("bound_scenario_count: ").append(bindings.size()).append('\n');
+        output.append("evidence_path: ").append(PathUtil.bddEvidence(projectRoot)).append('\n');
+        output.append("coverage_path: ").append(PathUtil.bddCoverage(projectRoot)).append('\n');
+        if (bindings.isEmpty()) {
+            failures.add("bdd required but no scenarios are bound to goal; next_command=dhk bdd bind-goal --scenario <scenario-key> --goal "
+                    + goal.goalKey());
+        }
+        Set<String> boundScenarioKeys = new LinkedHashSet<String>();
+        int coveredCount = 0;
+        for (BddBinding binding : bindings) {
+            boundScenarioKeys.add(binding.scenarioKey());
+            BddScenarioView view = bddService.findScenario(connection,
+                    new com.devharnesskit.dhk.model.Project(goal.projectKey(), "", "", "", "",
+                            "", "", "", ""), binding.scenarioKey());
+            if (view == null) {
+                failures.add("bound BDD scenario not found: " + binding.scenarioKey());
+                continue;
+            }
+            List<BddEvidence> evidence = bddService.listEvidence(connection, view.scenario().scenarioKey(),
+                    goal.goalKey());
+            BddScenarioEvidenceResult scenario = bddVerificationService.evaluateScenario(view, evidence);
+            output.append("- ").append(view.scenario().scenarioKey()).append(" [")
+                    .append(scenario.status()).append("] evidence_count=")
+                    .append(evidence.size()).append('\n');
+            if (scenario.covered()) {
+                coveredCount++;
+            }
+            if (!scenario.covered()) {
+                failures.add("scenario " + view.scenario().scenarioKey()
+                        + " evidence is " + scenario.status()
+                        + "; next_command=dhk bdd evidence add --scenario "
+                        + view.scenario().scenarioKey()
+                        + " --goal " + goal.goalKey()
+                        + " --status passed --summary \"<evidence>\"");
+            }
+        }
+        int coveragePercent = bindings.isEmpty() ? 0 : coveredCount * 100 / bindings.size();
+        output.append("bdd_coverage_percent: ").append(coveragePercent).append('\n');
+        output.append("bdd_min_coverage_percent: ").append(policy.bddMinCoveragePercent()).append('\n');
+        if (!bindings.isEmpty() && coveragePercent < policy.bddMinCoveragePercent()) {
+            failures.add("bdd coverage " + coveragePercent + "% is below threshold "
+                    + policy.bddMinCoveragePercent() + "%");
+        }
+        List<BddQualityIssue> qualityIssues = new BddLintService(bddService,
+                new BddQualityIssueRepository()).lint(connection,
+                new com.devharnesskit.dhk.model.Project(goal.projectKey(), "", "", "", "",
+                        "", "", "", ""), "", now);
+        int qualityErrors = 0;
+        int qualityWarnings = 0;
+        for (BddQualityIssue issue : qualityIssues) {
+            if (!boundScenarioKeys.contains(issue.scenarioKey())) {
+                continue;
+            }
+            if ("error".equals(issue.severity())) {
+                qualityErrors++;
+            } else if ("warning".equals(issue.severity())) {
+                qualityWarnings++;
+            }
+        }
+        int qualityScore = Math.max(0, 100 - qualityErrors * 25 - qualityWarnings * 10);
+        output.append("bdd_quality_score: ").append(qualityScore).append('\n');
+        output.append("bdd_quality_errors: ").append(qualityErrors).append('\n');
+        output.append("bdd_quality_warnings: ").append(qualityWarnings).append('\n');
+        output.append("bdd_min_quality_score: ").append(policy.bddMinQualityScore()).append('\n');
+        if (qualityScore < policy.bddMinQualityScore()) {
+            failures.add("bdd quality score " + qualityScore + " is below threshold "
+                    + policy.bddMinQualityScore());
+        }
+        if (policy.bddFailOnQualityErrors() && qualityErrors > 0) {
+            failures.add("bdd quality errors present: " + qualityErrors);
+        }
+        if (policy.bddFailOnQualityWarnings() && qualityWarnings > 0) {
+            failures.add("bdd quality warnings present: " + qualityWarnings);
+        }
+        writeLog(log, output.toString());
+        String status = failures.isEmpty() ? "passed" : "failed";
+        String summary = failures.isEmpty()
+                ? "bdd scenarios covered; bound_scenarios=" + bindings.size()
+                + " coverage=" + coveragePercent + "% quality_score=" + qualityScore
+                : "bdd incomplete: " + failures;
+        return save(connection, projectRoot, goal, "bdd", "bdd", "", status, summary, log, now);
+    }
+
+    private GoalCheck runDisciplineGateCheck(Connection connection, Path projectRoot, GoalRun goal,
+                                             GoalProfile profile, String gateKey, String now) throws Exception {
+        Path log = logPath(projectRoot, goal, gateKey);
+        List<GoalStep> steps = stepRepository.listByGoal(connection, goal.goalKey());
+        SkillDisciplineGateResult result;
+        if ("think-before-coding".equals(gateKey)) {
+            result = disciplineGateService.thinkBeforeCoding(goal, profile, steps);
+        } else if ("goal-driven".equals(gateKey)) {
+            result = disciplineGateService.goalDriven(goal, profile, steps);
+        } else if ("simplicity".equals(gateKey)) {
+            result = disciplineGateService.simplicity(goal, profile, steps);
+        } else {
+            result = disciplineGateService.surgicalChange(goal, profile, steps,
+                    devHarnessPolicyService.load(projectRoot).protectedFiles());
+        }
+        writeLog(log, result.output());
+        return save(connection, projectRoot, goal, gateKey, "discipline", "", result.status(),
+                result.summary(), log, now);
+    }
+
     private boolean containsEvidenceFlag(List<GoalStep> steps, String key) {
         return "true".equalsIgnoreCase(evidenceValue(steps, key))
                 || "yes".equalsIgnoreCase(evidenceValue(steps, key));
@@ -554,6 +884,22 @@ public final class GoalCheckService {
             }
         }
         return "";
+    }
+
+    private String latestEvidenceValue(List<GoalStep> steps, String key) {
+        if (steps == null || key == null || key.length() == 0) {
+            return "";
+        }
+        Pattern pattern = Pattern.compile("(?i)(?:^|[;\\n\\r])\\s*" + Pattern.quote(key)
+                + "\\s*=\\s*([^;\\n\\r]+)");
+        String latest = "";
+        for (GoalStep step : steps) {
+            Matcher matcher = pattern.matcher(step.evidence() == null ? "" : step.evidence());
+            while (matcher.find()) {
+                latest = matcher.group(1).trim();
+            }
+        }
+        return latest;
     }
 
     private boolean artifactExists(Path projectRoot, String pathText) {
@@ -765,6 +1111,15 @@ public final class GoalCheckService {
         }
         return "dhk graph impact --project-root " + projectRoot.toAbsolutePath().normalize()
                 + " --file <changed-file>";
+    }
+
+    private String scenarioImpactCommand(Path projectRoot, List<BddBinding> bindings) {
+        String scenarioKey = "<scenario-key>";
+        if (bindings != null && !bindings.isEmpty()) {
+            scenarioKey = bindings.get(0).scenarioKey();
+        }
+        return "dhk graph impact --project-root " + projectRoot.toAbsolutePath().normalize()
+                + " --scenario " + scenarioKey;
     }
 
     private String commandForChangedFile(Path projectRoot, String file) {

@@ -56,12 +56,27 @@ Alpha:
 - `dhk graph index`
 - `dhk graph impact`
 - `dhk graph export`
+- `dhk bdd init`
+- `dhk bdd add`
+- `dhk bdd list`
+- `dhk bdd show`
+- `dhk bdd export`
+- `dhk bdd lint`
+- `dhk bdd evidence add`
+- `dhk bdd verify`
+- `dhk bdd coverage`
+- `dhk bdd bind-spec`
+- `dhk bdd bind-goal`
+- `dhk skill lint`
+- `dhk skill verify`
 - `dhk workflow ...`
 - `dhk spec ...`
 - agent skill/rule packaging under `.agents/` and `.comate/`
+- skill contract metadata under `.agents/skills/<skill>/contract.json`
 
 Internal/experimental:
 
+- Skill contract enforcement commands are experimental and introduced in stages.
 - Graph Lite SQLite tables, `.agents/graph/config.json`, snapshot rows, and
   generated graph exports beyond `GRAPH_INDEX_REPORT.md`, `IMPACT_MAP.md`,
   `GRAPH_CONTEXT.md`, and `GRAPH_SNAPSHOT.json`.
@@ -114,6 +129,9 @@ Alpha exports:
 - `WORKFLOW_CONTEXT.md`
 - `SPEC_CONTEXT.md`
 - `SQL_RESULT.md`
+- BDD exports under `.agents/bdd/exports/` including `BDD_CONTEXT.md`,
+  `BDD_EVIDENCE.md`, `BDD_COVERAGE.md`, and `SCENARIO_IMPACT_MAP.md` once the
+  BDD command surface is enabled.
 
 Export section names and order documented in [EXPORT_CONTRACTS.md](EXPORT_CONTRACTS.md)
 should change only with a changelog note. New fields or sections may be added
@@ -125,7 +143,7 @@ with the matching CLI version.
 
 ## SQLite Schema Contract
 
-Current schema version: `9`.
+Current schema version: `13`.
 
 Before 1.0, the schema is not a stable public API. Users may rely on these
 operational guarantees:
@@ -136,6 +154,12 @@ operational guarantees:
 - Commands should fail closed if a required backup cannot be created.
 - Markdown exports can be regenerated from SQLite with the matching CLI.
 - Graph Lite rows are snapshot-bound machine facts, not long-term memory facts.
+- BDD rows are alpha acceptance-specification facts. They are not executable
+  test results unless evidence rows explicitly bind them to adapter output.
+- Skill contract rows are alpha governance metadata. They do not execute skill
+  scripts. `dhk skill verify` stores source hashes; only `dhk skill trust`
+  pins a trusted source hash, and later source changes are marked
+  `review_required`.
 
 Unsupported:
 
@@ -144,6 +168,8 @@ Unsupported:
 - modifying generated exports and expecting SQLite state to change;
 - relying on table or column details as public API before 1.0.
 - treating graph snapshots as confirmed project memory.
+- treating BDD scenario rows as proof that behavior is implemented without
+  passing evidence, coverage, or goal checks.
 
 If downgrade support is added later, it must be explicit in release notes and
 migration docs. Until then, recover by restoring a pre-migration backup.

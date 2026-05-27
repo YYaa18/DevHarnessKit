@@ -23,12 +23,19 @@ public final class GoalCheckPolicy {
     private final String[] acceptedGraphStatuses;
     private final String[] acceptedImpactStatuses;
     private final String[] acceptedArchitectureStatuses;
+    private final String[] acceptedBddStatuses;
+    private final int bddMinCoveragePercent;
+    private final int bddMinQualityScore;
+    private final boolean bddFailOnQualityErrors;
+    private final boolean bddFailOnQualityWarnings;
+    private final String compileMode;
+    private final String testMode;
 
     public GoalCheckPolicy(String[] requiredChecks, String[] compileCommand,
                            String[] testCommand, boolean failPendingHardGates) {
         this(requiredChecks, false, compileCommand, testCommand, failPendingHardGates, true,
                 new String[0], new String[0], new String[0], new String[0], new String[0],
-                new String[0], new String[0], new String[0]);
+                new String[0], new String[0], new String[0], new String[0]);
     }
 
     public GoalCheckPolicy(String[] requiredChecks, String[] compileCommand,
@@ -39,7 +46,7 @@ public final class GoalCheckPolicy {
         this(requiredChecks, false, compileCommand, testCommand, failPendingHardGates, true,
                 acceptedCompileStatuses, acceptedTestStatuses, acceptedSensitiveStatuses,
                 acceptedSpecStatuses, acceptedWorkflowStatuses, new String[0], new String[0],
-                new String[0]);
+                new String[0], new String[0]);
     }
 
     public GoalCheckPolicy(String[] requiredChecks, boolean requiredChecksConfigured,
@@ -49,7 +56,8 @@ public final class GoalCheckPolicy {
                            String[] acceptedWorkflowStatuses) {
         this(requiredChecks, requiredChecksConfigured, compileCommand, testCommand, failPendingHardGates, true,
                 acceptedCompileStatuses, acceptedTestStatuses, acceptedSensitiveStatuses,
-                acceptedSpecStatuses, acceptedWorkflowStatuses, new String[0], new String[0], new String[0]);
+                acceptedSpecStatuses, acceptedWorkflowStatuses, new String[0], new String[0],
+                new String[0], new String[0]);
     }
 
     public GoalCheckPolicy(String[] requiredChecks, boolean requiredChecksConfigured,
@@ -58,7 +66,43 @@ public final class GoalCheckPolicy {
                            String[] acceptedCompileStatuses, String[] acceptedTestStatuses,
                            String[] acceptedSensitiveStatuses, String[] acceptedSpecStatuses,
                            String[] acceptedWorkflowStatuses, String[] acceptedGraphStatuses,
-                           String[] acceptedImpactStatuses, String[] acceptedArchitectureStatuses) {
+                           String[] acceptedImpactStatuses, String[] acceptedArchitectureStatuses,
+                           String[] acceptedBddStatuses) {
+        this(requiredChecks, requiredChecksConfigured, compileCommand, testCommand, failPendingHardGates,
+                failPendingHardGatesConfigured, acceptedCompileStatuses, acceptedTestStatuses,
+                acceptedSensitiveStatuses, acceptedSpecStatuses, acceptedWorkflowStatuses,
+                acceptedGraphStatuses, acceptedImpactStatuses, acceptedArchitectureStatuses, acceptedBddStatuses,
+                100, 0, false, false, "auto", "auto");
+    }
+
+    public GoalCheckPolicy(String[] requiredChecks, boolean requiredChecksConfigured,
+                           String[] compileCommand, String[] testCommand, boolean failPendingHardGates,
+                           boolean failPendingHardGatesConfigured,
+                           String[] acceptedCompileStatuses, String[] acceptedTestStatuses,
+                           String[] acceptedSensitiveStatuses, String[] acceptedSpecStatuses,
+                           String[] acceptedWorkflowStatuses, String[] acceptedGraphStatuses,
+                           String[] acceptedImpactStatuses, String[] acceptedArchitectureStatuses,
+                           String[] acceptedBddStatuses, int bddMinCoveragePercent,
+                           int bddMinQualityScore, boolean bddFailOnQualityErrors,
+                           boolean bddFailOnQualityWarnings) {
+        this(requiredChecks, requiredChecksConfigured, compileCommand, testCommand, failPendingHardGates,
+                failPendingHardGatesConfigured, acceptedCompileStatuses, acceptedTestStatuses,
+                acceptedSensitiveStatuses, acceptedSpecStatuses, acceptedWorkflowStatuses,
+                acceptedGraphStatuses, acceptedImpactStatuses, acceptedArchitectureStatuses, acceptedBddStatuses,
+                bddMinCoveragePercent, bddMinQualityScore, bddFailOnQualityErrors, bddFailOnQualityWarnings,
+                "auto", "auto");
+    }
+
+    public GoalCheckPolicy(String[] requiredChecks, boolean requiredChecksConfigured,
+                           String[] compileCommand, String[] testCommand, boolean failPendingHardGates,
+                           boolean failPendingHardGatesConfigured,
+                           String[] acceptedCompileStatuses, String[] acceptedTestStatuses,
+                           String[] acceptedSensitiveStatuses, String[] acceptedSpecStatuses,
+                           String[] acceptedWorkflowStatuses, String[] acceptedGraphStatuses,
+                           String[] acceptedImpactStatuses, String[] acceptedArchitectureStatuses,
+                           String[] acceptedBddStatuses, int bddMinCoveragePercent,
+                           int bddMinQualityScore, boolean bddFailOnQualityErrors,
+                           boolean bddFailOnQualityWarnings, String compileMode, String testMode) {
         this.requiredChecks = requiredChecks == null || requiredChecks.length == 0
                 ? DEFAULT_REQUIRED_CHECKS
                 : requiredChecks;
@@ -80,6 +124,13 @@ public final class GoalCheckPolicy {
         this.acceptedImpactStatuses = acceptedImpactStatuses == null ? new String[0] : acceptedImpactStatuses;
         this.acceptedArchitectureStatuses = acceptedArchitectureStatuses == null
                 ? new String[0] : acceptedArchitectureStatuses;
+        this.acceptedBddStatuses = acceptedBddStatuses == null ? new String[0] : acceptedBddStatuses;
+        this.bddMinCoveragePercent = clampPercent(bddMinCoveragePercent, 100);
+        this.bddMinQualityScore = clampPercent(bddMinQualityScore, 0);
+        this.bddFailOnQualityErrors = bddFailOnQualityErrors;
+        this.bddFailOnQualityWarnings = bddFailOnQualityWarnings;
+        this.compileMode = normalizeMode(compileMode);
+        this.testMode = normalizeMode(testMode);
     }
 
     public GoalCheckPolicy(String[] requiredChecks, boolean requiredChecksConfigured,
@@ -91,7 +142,7 @@ public final class GoalCheckPolicy {
         this(requiredChecks, requiredChecksConfigured, compileCommand, testCommand, failPendingHardGates,
                 failPendingHardGatesConfigured, acceptedCompileStatuses, acceptedTestStatuses,
                 acceptedSensitiveStatuses, acceptedSpecStatuses, acceptedWorkflowStatuses,
-                new String[0], new String[0], new String[0]);
+                new String[0], new String[0], new String[0], new String[0]);
     }
 
     public static GoalCheckPolicy defaults() {
@@ -99,7 +150,7 @@ public final class GoalCheckPolicy {
                 new String[]{"mvn", "-q", "-DskipTests", "compile"},
                 new String[]{"mvn", "-q", "test"}, false, false,
                 new String[0], new String[0], new String[0], new String[0], new String[0],
-                new String[0], new String[0], new String[0]);
+                new String[0], new String[0], new String[0], new String[0]);
     }
 
     public String[] requiredChecks() {
@@ -115,7 +166,7 @@ public final class GoalCheckPolicy {
         } else {
             selected = requiredChecks;
         }
-        return withGraphChecks(selected, profile);
+        return withVerificationModeChecks(withBddChecks(withGraphChecks(selected, profile), profile));
     }
 
     public String[] compileCommand() {
@@ -128,6 +179,30 @@ public final class GoalCheckPolicy {
 
     public boolean failPendingHardGates() {
         return failPendingHardGates;
+    }
+
+    public int bddMinCoveragePercent() {
+        return bddMinCoveragePercent;
+    }
+
+    public int bddMinQualityScore() {
+        return bddMinQualityScore;
+    }
+
+    public boolean bddFailOnQualityErrors() {
+        return bddFailOnQualityErrors;
+    }
+
+    public boolean bddFailOnQualityWarnings() {
+        return bddFailOnQualityWarnings;
+    }
+
+    public String compileMode() {
+        return compileMode;
+    }
+
+    public String testMode() {
+        return testMode;
     }
 
     public boolean failPendingHardGates(GoalProfile profile) {
@@ -168,6 +243,13 @@ public final class GoalCheckPolicy {
         if ("legacy".equals(checkKey)) {
             return PASSED_ONLY;
         }
+        if ("bdd".equals(checkKey)) {
+            return PASSED_ONLY;
+        }
+        if ("manual-compile".equals(checkKey) || "manual-test".equals(checkKey)
+                || "verification-risk".equals(checkKey)) {
+            return PASSED_ONLY;
+        }
         if (isBuiltInJavaProfile(profile)) {
             if ("compile".equals(checkKey) || "test".equals(checkKey) || "sensitive".equals(checkKey)) {
                 return PASSED_ONLY;
@@ -204,6 +286,9 @@ public final class GoalCheckPolicy {
         if ("architecture".equals(checkKey)) {
             return acceptedArchitectureStatuses;
         }
+        if ("bdd".equals(checkKey)) {
+            return acceptedBddStatuses;
+        }
         return new String[0];
     }
 
@@ -213,6 +298,7 @@ public final class GoalCheckPolicy {
         }
         return "java-api-change".equals(profile.profileKey())
                 || "java-mvc-change".equals(profile.profileKey())
+                || "java-api-change-with-bdd".equals(profile.profileKey())
                 || "java-api-change-with-graph".equals(profile.profileKey())
                 || "java-mvc-change-with-graph".equals(profile.profileKey())
                 || "safe-refactor-with-graph".equals(profile.profileKey())
@@ -238,6 +324,55 @@ public final class GoalCheckPolicy {
         return merged.toArray(new String[merged.size()]);
     }
 
+    private String[] withBddChecks(String[] checks, GoalProfile profile) {
+        if (profile == null || !profile.bddRequired()) {
+            return checks;
+        }
+        java.util.LinkedHashSet<String> merged = new java.util.LinkedHashSet<String>();
+        for (String check : checks) {
+            if (check != null && check.length() > 0) {
+                merged.add(check);
+            }
+        }
+        merged.add("bdd");
+        return merged.toArray(new String[merged.size()]);
+    }
+
+    private String[] withVerificationModeChecks(String[] checks) {
+        java.util.LinkedHashSet<String> merged = new java.util.LinkedHashSet<String>();
+        for (String check : checks) {
+            if (check == null || check.length() == 0) {
+                continue;
+            }
+            if ("compile".equals(check)) {
+                addVerificationCheck(merged, "compile", compileMode);
+            } else if ("test".equals(check)) {
+                addVerificationCheck(merged, "test", testMode);
+            } else {
+                merged.add(check);
+            }
+        }
+        return merged.toArray(new String[merged.size()]);
+    }
+
+    private void addVerificationCheck(java.util.LinkedHashSet<String> checks, String baseCheck, String mode) {
+        if ("manual".equals(mode)) {
+            checks.add("manual-" + baseCheck);
+        } else if ("disabled".equals(mode)) {
+            checks.add("verification-risk");
+        } else {
+            checks.add(baseCheck);
+        }
+    }
+
+    private String normalizeMode(String value) {
+        String normalized = value == null ? "" : value.trim().toLowerCase();
+        if ("manual".equals(normalized) || "disabled".equals(normalized)) {
+            return normalized;
+        }
+        return "auto";
+    }
+
     private String join(String[] values) {
         StringBuilder builder = new StringBuilder();
         for (String value : values) {
@@ -247,5 +382,12 @@ public final class GoalCheckPolicy {
             builder.append(value);
         }
         return builder.toString();
+    }
+
+    private int clampPercent(int value, int fallback) {
+        if (value < 0 || value > 100) {
+            return fallback;
+        }
+        return value;
     }
 }

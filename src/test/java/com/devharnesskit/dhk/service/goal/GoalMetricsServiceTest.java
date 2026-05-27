@@ -43,6 +43,41 @@ class GoalMetricsServiceTest {
         assertEquals(1, snapshot.totalEvents());
         assertEquals(1, snapshot.totalArtifacts());
         assertEquals(600000L, snapshot.durationMs());
+        assertEquals("missing", snapshot.bddEvidenceFreshness());
+    }
+
+    @Test
+    void snapshotDerivesBddQualityMetricsForEvalReports() {
+        GoalMetricsSnapshot snapshot = service.snapshot(goal(),
+                Arrays.asList(step(1, "inspect", "recorded")),
+                Arrays.asList(check("bdd", "passed", true, 4,
+                        "bdd scenarios covered; bound_scenarios=3 coverage=67% quality_score=80")),
+                Arrays.asList(event("goal_started", "2026-01-01T00:00:01Z")),
+                Arrays.asList(artifact("goal_summary", "2026-01-01T00:10:01Z")));
+
+        assertEquals("passed", snapshot.bddStatus());
+        assertEquals(67, snapshot.bddScenarioCoveragePercent());
+        assertEquals("fresh", snapshot.bddEvidenceFreshness());
+        assertEquals(80, snapshot.bddQualityScore());
+        assertEquals("", snapshot.bddFailureReasons());
+    }
+
+    @Test
+    void snapshotRecordsBddFailureReasonsAndFreshness() {
+        GoalMetricsSnapshot snapshot = service.snapshot(goal(),
+                Arrays.asList(step(1, "inspect", "recorded")),
+                Arrays.asList(check("bdd", "failed", true, 3,
+                        "bdd incomplete: [bdd coverage 50% is below threshold 100%, "
+                                + "bdd quality score 70 is below threshold 90]")),
+                Arrays.asList(event("goal_started", "2026-01-01T00:00:01Z")),
+                Arrays.asList(artifact("goal_summary", "2026-01-01T00:10:01Z")));
+
+        assertEquals("failed", snapshot.bddStatus());
+        assertEquals(50, snapshot.bddScenarioCoveragePercent());
+        assertEquals("stale", snapshot.bddEvidenceFreshness());
+        assertEquals(70, snapshot.bddQualityScore());
+        assertEquals("[bdd coverage 50% is below threshold 100%, bdd quality score 70 is below threshold 90]",
+                snapshot.bddFailureReasons());
     }
 
     @Test
@@ -81,8 +116,12 @@ class GoalMetricsServiceTest {
     }
 
     private static GoalCheck check(String key, String status, boolean required, int stepCount) {
+        return check(key, status, required, stepCount, key + " summary");
+    }
+
+    private static GoalCheck check(String key, String status, boolean required, int stepCount, String summary) {
         return new GoalCheck(1L, "goal-1", key, "command", required, stepCount,
-                key + " command", status, key + " summary", key + ".log",
+                key + " command", status, summary, key + ".log",
                 "2026-01-01T00:03:00Z", "2026-01-01T00:03:00Z", "2026-01-01T00:03:00Z");
     }
 

@@ -23,6 +23,10 @@ public final class MigrationRunner {
     public static final int V7 = 7;
     public static final int V8 = 8;
     public static final int V9 = 9;
+    public static final int V10 = 10;
+    public static final int V11 = 11;
+    public static final int V12 = 12;
+    public static final int V13 = 13;
 
     public MigrationResult migrate(Connection connection, Clock clock) throws SQLException {
         String backupPath = backupBeforeUpgrade(connection, clock);
@@ -110,6 +114,10 @@ public final class MigrationRunner {
         migrateV7(connection, clock);
         migrateV8(connection, clock);
         migrateV9(connection, clock);
+        migrateV10(connection, clock);
+        migrateV11(connection, clock);
+        migrateV12(connection, clock);
+        migrateV13(connection, clock);
 
         boolean ftsAvailable = true;
         String ftsError = "";
@@ -128,7 +136,7 @@ public final class MigrationRunner {
             return "";
         }
         int currentVersion = currentSchemaVersion(connection);
-        if (currentVersion >= V9) {
+        if (currentVersion >= V13) {
             return "";
         }
         try {
@@ -145,7 +153,7 @@ public final class MigrationRunner {
             }
             MemoryBackupService backupService = new MemoryBackupService();
             Path out = backupService.defaultBackupPath(projectRoot, clock.now().toString(),
-                    "pre-migration-v" + currentVersion + "-to-v" + V9);
+                    "pre-migration-v" + currentVersion + "-to-v" + V13);
             backupService.writeBackup(PathUtil.memoryDirectory(projectRoot), out);
             return out.toString();
         } catch (IOException ex) {
@@ -789,6 +797,202 @@ public final class MigrationRunner {
             if (!schemaVersionExists(connection, V9)) {
                 statement.executeUpdate("INSERT INTO schema_version(version, description, applied_at) VALUES ("
                         + V9 + ", 'V0.5.0 Graph Lite snapshot schema', '"
+                        + clock.now().toString() + "')");
+            }
+        }
+    }
+
+    private void migrateV10(Connection connection, Clock clock) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("CREATE TABLE IF NOT EXISTS bdd_feature ("
+                    + "feature_key TEXT PRIMARY KEY,"
+                    + "project_key TEXT NOT NULL,"
+                    + "module_name TEXT NOT NULL DEFAULT 'global',"
+                    + "title TEXT NOT NULL,"
+                    + "description TEXT NOT NULL DEFAULT '',"
+                    + "tags TEXT NOT NULL DEFAULT '',"
+                    + "status TEXT NOT NULL DEFAULT 'draft',"
+                    + "source_kind TEXT NOT NULL DEFAULT 'manual',"
+                    + "created_at TEXT NOT NULL,"
+                    + "updated_at TEXT NOT NULL,"
+                    + "CHECK (status IN ('draft', 'active', 'deprecated', 'archived')),"
+                    + "FOREIGN KEY (project_key) REFERENCES project(project_key)"
+                    + ")");
+            statement.execute("CREATE TABLE IF NOT EXISTS bdd_scenario ("
+                    + "scenario_key TEXT PRIMARY KEY,"
+                    + "feature_key TEXT NOT NULL,"
+                    + "project_key TEXT NOT NULL,"
+                    + "title TEXT NOT NULL,"
+                    + "description TEXT NOT NULL DEFAULT '',"
+                    + "scenario_type TEXT NOT NULL DEFAULT 'acceptance',"
+                    + "priority TEXT NOT NULL DEFAULT 'normal',"
+                    + "status TEXT NOT NULL DEFAULT 'draft',"
+                    + "tags TEXT NOT NULL DEFAULT '',"
+                    + "created_at TEXT NOT NULL,"
+                    + "updated_at TEXT NOT NULL,"
+                    + "CHECK (scenario_type IN ('acceptance', 'edge_case', 'regression', 'manual', 'exploratory')),"
+                    + "CHECK (priority IN ('low', 'normal', 'high', 'critical')),"
+                    + "CHECK (status IN ('draft', 'active', 'implemented', 'verified', 'blocked', 'deprecated', 'archived')),"
+                    + "FOREIGN KEY (feature_key) REFERENCES bdd_feature(feature_key),"
+                    + "FOREIGN KEY (project_key) REFERENCES project(project_key)"
+                    + ")");
+            statement.execute("CREATE TABLE IF NOT EXISTS bdd_step ("
+                    + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                    + "scenario_key TEXT NOT NULL,"
+                    + "step_order INTEGER NOT NULL,"
+                    + "step_type TEXT NOT NULL,"
+                    + "step_text TEXT NOT NULL,"
+                    + "normalized_text TEXT NOT NULL DEFAULT '',"
+                    + "created_at TEXT NOT NULL,"
+                    + "CHECK (step_order > 0),"
+                    + "CHECK (step_type IN ('given', 'when', 'then', 'and', 'but')),"
+                    + "UNIQUE(scenario_key, step_order),"
+                    + "FOREIGN KEY (scenario_key) REFERENCES bdd_scenario(scenario_key)"
+                    + ")");
+            statement.execute("CREATE TABLE IF NOT EXISTS bdd_binding ("
+                    + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                    + "scenario_key TEXT NOT NULL,"
+                    + "binding_type TEXT NOT NULL,"
+                    + "binding_key TEXT NOT NULL,"
+                    + "relation TEXT NOT NULL DEFAULT '',"
+                    + "metadata TEXT NOT NULL DEFAULT '',"
+                    + "created_at TEXT NOT NULL,"
+                    + "CHECK (binding_type IN ('spec_acceptance', 'spec_task', 'goal', 'workflow',"
+                    + "'graph', 'file', 'symbol', 'sql_table', 'test')),"
+                    + "UNIQUE(scenario_key, binding_type, binding_key, relation),"
+                    + "FOREIGN KEY (scenario_key) REFERENCES bdd_scenario(scenario_key)"
+                    + ")");
+            statement.execute("CREATE TABLE IF NOT EXISTS bdd_evidence ("
+                    + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                    + "scenario_key TEXT NOT NULL,"
+                    + "goal_key TEXT NOT NULL DEFAULT '',"
+                    + "evidence_type TEXT NOT NULL DEFAULT 'manual',"
+                    + "status TEXT NOT NULL DEFAULT 'pending',"
+                    + "evidence_path TEXT NOT NULL DEFAULT '',"
+                    + "summary TEXT NOT NULL DEFAULT '',"
+                    + "command TEXT NOT NULL DEFAULT '',"
+                    + "created_at TEXT NOT NULL,"
+                    + "updated_at TEXT NOT NULL,"
+                    + "CHECK (status IN ('pending', 'passed', 'failed', 'skipped', 'waived')),"
+                    + "FOREIGN KEY (scenario_key) REFERENCES bdd_scenario(scenario_key)"
+                    + ")");
+            statement.execute("CREATE TABLE IF NOT EXISTS bdd_quality_issue ("
+                    + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                    + "project_key TEXT NOT NULL,"
+                    + "feature_key TEXT NOT NULL DEFAULT '',"
+                    + "scenario_key TEXT NOT NULL DEFAULT '',"
+                    + "issue_type TEXT NOT NULL,"
+                    + "severity TEXT NOT NULL DEFAULT 'warning',"
+                    + "status TEXT NOT NULL DEFAULT 'open',"
+                    + "message TEXT NOT NULL,"
+                    + "created_at TEXT NOT NULL,"
+                    + "CHECK (severity IN ('info', 'warning', 'error')),"
+                    + "CHECK (status IN ('open', 'resolved', 'waived')),"
+                    + "FOREIGN KEY (project_key) REFERENCES project(project_key)"
+                    + ")");
+            statement.execute("CREATE INDEX IF NOT EXISTS idx_bdd_feature_project_status "
+                    + "ON bdd_feature(project_key, status)");
+            statement.execute("CREATE INDEX IF NOT EXISTS idx_bdd_feature_project_module "
+                    + "ON bdd_feature(project_key, module_name)");
+            statement.execute("CREATE INDEX IF NOT EXISTS idx_bdd_scenario_feature_status "
+                    + "ON bdd_scenario(feature_key, status)");
+            statement.execute("CREATE INDEX IF NOT EXISTS idx_bdd_scenario_project_status "
+                    + "ON bdd_scenario(project_key, status)");
+            statement.execute("CREATE INDEX IF NOT EXISTS idx_bdd_step_scenario_order "
+                    + "ON bdd_step(scenario_key, step_order)");
+            statement.execute("CREATE INDEX IF NOT EXISTS idx_bdd_binding_scenario_type "
+                    + "ON bdd_binding(scenario_key, binding_type)");
+            statement.execute("CREATE INDEX IF NOT EXISTS idx_bdd_binding_type_key "
+                    + "ON bdd_binding(binding_type, binding_key)");
+            statement.execute("CREATE INDEX IF NOT EXISTS idx_bdd_evidence_scenario_status "
+                    + "ON bdd_evidence(scenario_key, status)");
+            statement.execute("CREATE INDEX IF NOT EXISTS idx_bdd_evidence_goal_status "
+                    + "ON bdd_evidence(goal_key, status)");
+            statement.execute("CREATE INDEX IF NOT EXISTS idx_bdd_quality_issue_scenario_severity "
+                    + "ON bdd_quality_issue(scenario_key, severity)");
+            statement.execute("CREATE INDEX IF NOT EXISTS idx_bdd_quality_issue_project_status "
+                    + "ON bdd_quality_issue(project_key, status)");
+            if (!schemaVersionExists(connection, V10)) {
+                statement.executeUpdate("INSERT INTO schema_version(version, description, applied_at) VALUES ("
+                        + V10 + ", 'V0.6.1 BDD specification schema', '"
+                        + clock.now().toString() + "')");
+            }
+        }
+    }
+
+    private void migrateV11(Connection connection, Clock clock) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("CREATE TABLE IF NOT EXISTS skill_contract ("
+                    + "skill_key TEXT PRIMARY KEY,"
+                    + "version TEXT NOT NULL,"
+                    + "task_type TEXT NOT NULL,"
+                    + "risk_level TEXT NOT NULL DEFAULT 'medium',"
+                    + "mode TEXT NOT NULL DEFAULT 'strict',"
+                    + "data_access_level TEXT NOT NULL,"
+                    + "allowed_commands TEXT NOT NULL DEFAULT '',"
+                    + "forbidden_commands TEXT NOT NULL DEFAULT '',"
+                    + "contract_json TEXT NOT NULL,"
+                    + "source_path TEXT NOT NULL DEFAULT '',"
+                    + "trusted INTEGER NOT NULL DEFAULT 0,"
+                    + "created_at TEXT NOT NULL,"
+                    + "updated_at TEXT NOT NULL,"
+                    + "CHECK (length(skill_key) > 0),"
+                    + "CHECK (length(task_type) > 0),"
+                    + "CHECK (data_access_level IN ('none', 'metadata', 'context', 'raw')),"
+                    + "CHECK (trusted IN (0, 1))"
+                    + ")");
+            statement.execute("CREATE INDEX IF NOT EXISTS idx_skill_contract_task_type "
+                    + "ON skill_contract(task_type)");
+            statement.execute("CREATE INDEX IF NOT EXISTS idx_skill_contract_access "
+                    + "ON skill_contract(data_access_level)");
+            if (!schemaVersionExists(connection, V11)) {
+                statement.executeUpdate("INSERT INTO schema_version(version, description, applied_at) VALUES ("
+                        + V11 + ", 'V0.7.1 skill contract schema', '"
+                        + clock.now().toString() + "')");
+            }
+        }
+    }
+
+    private void migrateV12(Connection connection, Clock clock) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("CREATE TABLE IF NOT EXISTS human_checkpoint ("
+                    + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                    + "goal_key TEXT NOT NULL,"
+                    + "checkpoint_type TEXT NOT NULL DEFAULT 'before_complete',"
+                    + "reason TEXT NOT NULL DEFAULT '',"
+                    + "status TEXT NOT NULL DEFAULT 'pending',"
+                    + "requested_by TEXT NOT NULL DEFAULT 'manual',"
+                    + "requested_at TEXT NOT NULL,"
+                    + "approver TEXT NOT NULL DEFAULT '',"
+                    + "approved_at TEXT NOT NULL DEFAULT '',"
+                    + "decision_reason TEXT NOT NULL DEFAULT '',"
+                    + "created_at TEXT NOT NULL,"
+                    + "updated_at TEXT NOT NULL,"
+                    + "CHECK (status IN ('pending', 'approved', 'rejected', 'canceled')),"
+                    + "FOREIGN KEY (goal_key) REFERENCES goal_run(goal_key)"
+                    + ")");
+            statement.execute("CREATE INDEX IF NOT EXISTS idx_human_checkpoint_goal_status "
+                    + "ON human_checkpoint(goal_key, status)");
+            statement.execute("CREATE INDEX IF NOT EXISTS idx_human_checkpoint_goal_type_status "
+                    + "ON human_checkpoint(goal_key, checkpoint_type, status)");
+            if (!schemaVersionExists(connection, V12)) {
+                statement.executeUpdate("INSERT INTO schema_version(version, description, applied_at) VALUES ("
+                        + V12 + ", 'V0.7.4 human checkpoint schema', '"
+                        + clock.now().toString() + "')");
+            }
+        }
+    }
+
+    private void migrateV13(Connection connection, Clock clock) throws SQLException {
+        addColumnIfMissing(connection, "skill_contract", "source_hash", "TEXT NOT NULL DEFAULT ''");
+        addColumnIfMissing(connection, "skill_contract", "trusted_source_hash", "TEXT NOT NULL DEFAULT ''");
+        addColumnIfMissing(connection, "skill_contract", "trust_status", "TEXT NOT NULL DEFAULT 'unknown'");
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("CREATE INDEX IF NOT EXISTS idx_skill_contract_trust_status "
+                    + "ON skill_contract(trust_status)");
+            if (!schemaVersionExists(connection, V13)) {
+                statement.executeUpdate("INSERT INTO schema_version(version, description, applied_at) VALUES ("
+                        + V13 + ", 'V0.7.5 skill trust source hash schema', '"
                         + clock.now().toString() + "')");
             }
         }

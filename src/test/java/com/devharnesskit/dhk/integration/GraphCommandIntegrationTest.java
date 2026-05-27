@@ -406,6 +406,200 @@ final class GraphCommandIntegrationTest {
     }
 
     @Test
+    void graphImpactCanUseBddScenarioGraphBindings() throws Exception {
+        Path fixture = copyFixture("legacy-mybatis-order", tempDir.resolve("scenario-impact"));
+        write(fixture, ".agents/graph/config.json",
+                "{\n"
+                        + "  \"limits\": {\n"
+                        + "    \"max_impact_depth\": 6\n"
+                        + "  }\n"
+                        + "}\n");
+
+        Harness add = new Harness(tempDir);
+        int addExit = new CommandRouter().run(new String[]{
+                "bdd", "add", "--project-root", "scenario-impact",
+                "--feature", "order-query",
+                "--title", "订单查询",
+                "--scenario", "order-query.customer-name",
+                "--scenario-title", "按客户名称查询订单",
+                "--module", "order",
+                "--given", "已有订单数据",
+                "--when", "用户按客户名称查询",
+                "--then", "返回匹配订单"
+        }, add.context());
+        Harness bind = new Harness(tempDir);
+        int bindExit = new CommandRouter().run(new String[]{
+                "bdd", "bind-graph", "--project-root", "scenario-impact",
+                "--scenario", "order-query.customer-name",
+                "--sql-table", "legacy_order",
+                "--json"
+        }, bind.context());
+        Harness indexHarness = new Harness(tempDir);
+        int indexExit = new CommandRouter().run(new String[]{
+                "graph", "index", "--project-root", "scenario-impact"
+        }, indexHarness.context());
+        Harness impactHarness = new Harness(tempDir);
+        int impactExit = new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", "scenario-impact",
+                "--scenario", "order-query.customer-name",
+                "--depth", "6"
+        }, impactHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, addExit);
+        assertEquals(ExitCodes.SUCCESS, bindExit);
+        assertTrue(bind.stdout().contains("\"command\": \"bdd bind-graph\""));
+        assertTrue(bind.stdout().contains("\"binding_type\": \"sql_table\""));
+        assertEquals(ExitCodes.SUCCESS, indexExit);
+        assertEquals(ExitCodes.SUCCESS, impactExit);
+        assertTrue(impactHarness.stdout().contains("graph scenario impact"));
+        assertTrue(impactHarness.stdout().contains("scenario_key: order-query.customer-name"));
+        assertTrue(impactHarness.stdout().contains("input_bindings: 1"));
+        assertTrue(impactHarness.stdout().contains("found_results: 1"));
+        assertTrue(impactHarness.stdout().contains("related_sql: "));
+        assertTrue(impactHarness.stdout().contains("risk_nodes: "));
+        assertTrue(Files.isRegularFile(PathUtil.scenarioImpactMap(fixture)));
+
+        String scenarioImpactMap = new String(Files.readAllBytes(PathUtil.scenarioImpactMap(fixture)), "UTF-8");
+        assertTrue(scenarioImpactMap.contains("# SCENARIO_IMPACT_MAP"));
+        assertTrue(scenarioImpactMap.contains("- scenario_key: order-query.customer-name"));
+        assertTrue(scenarioImpactMap.contains("- sql_table legacy_order"));
+        assertTrue(scenarioImpactMap.contains("src/main/java/com/acme/legacy/order/web/OrderController.java"));
+        assertTrue(scenarioImpactMap.contains("src/main/java/com/acme/legacy/order/service/OrderService.java"));
+        assertTrue(scenarioImpactMap.contains("src/main/java/com/acme/legacy/order/mapper/OrderMapper.java"));
+        assertTrue(scenarioImpactMap.contains("src/test/java/com/acme/legacy/order/service/OrderServiceTest.java"));
+        assertTrue(scenarioImpactMap.contains("<related-sql>"));
+        assertTrue(scenarioImpactMap.contains("db_table legacy_order"));
+        assertTrue(scenarioImpactMap.contains("<risk-nodes>"));
+        assertTrue(scenarioImpactMap.contains("- do_not_treat_as_correctness_proof: true"));
+
+    }
+
+    @Test
+    void graphImpactByScenarioCoversModernFixture() throws Exception {
+        Path fixture = copyFixture("modern-java-api", tempDir.resolve("scenario-modern-impact"));
+
+        Harness add = new Harness(tempDir);
+        int addExit = new CommandRouter().run(new String[]{
+                "bdd", "add", "--project-root", "scenario-modern-impact",
+                "--feature", "account-freeze",
+                "--title", "账户冻结",
+                "--scenario", "account-freeze.endpoint",
+                "--scenario-title", "冻结账户接口影响面",
+                "--module", "account",
+                "--given", "已有账户",
+                "--when", "用户调用冻结接口",
+                "--then", "账户状态更新"
+        }, add.context());
+        Harness bind = new Harness(tempDir);
+        int bindExit = new CommandRouter().run(new String[]{
+                "bdd", "bind-graph", "--project-root", "scenario-modern-impact",
+                "--scenario", "account-freeze.endpoint",
+                "--file", "src/main/java/com/acme/modern/account/service/AccountService.java"
+        }, bind.context());
+        Harness indexHarness = new Harness(tempDir);
+        int indexExit = new CommandRouter().run(new String[]{
+                "graph", "index", "--project-root", "scenario-modern-impact"
+        }, indexHarness.context());
+        Harness impactHarness = new Harness(tempDir);
+        int impactExit = new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", "scenario-modern-impact",
+                "--scenario", "account-freeze.endpoint",
+                "--depth", "4"
+        }, impactHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, addExit);
+        assertEquals(ExitCodes.SUCCESS, bindExit);
+        assertEquals(ExitCodes.SUCCESS, indexExit);
+        assertEquals(ExitCodes.SUCCESS, impactExit);
+        String scenarioImpactMap = new String(Files.readAllBytes(PathUtil.scenarioImpactMap(fixture)), "UTF-8");
+        assertTrue(scenarioImpactMap.contains("# SCENARIO_IMPACT_MAP"));
+        assertTrue(scenarioImpactMap.contains("- scenario_key: account-freeze.endpoint"));
+        assertTrue(scenarioImpactMap.contains("src/main/java/com/acme/modern/account/service/AccountService.java"));
+        assertTrue(scenarioImpactMap.contains("src/test/java/com/acme/modern/account/service/AccountServiceTest.java"));
+        assertTrue(scenarioImpactMap.contains("<recommended-read-files>"));
+        assertTrue(scenarioImpactMap.contains("- precision: advisory"));
+    }
+
+    @Test
+    void graphImpactByScenarioFailsWithoutGraphBindings() throws Exception {
+        Path root = tempDir.resolve("scenario-missing-impact");
+        write(root, "src/main/java/com/example/App.java",
+                "package com.example;\npublic class App { public void run() {} }\n");
+
+        Harness add = new Harness(tempDir);
+        int addExit = new CommandRouter().run(new String[]{
+                "bdd", "add", "--project-root", "scenario-missing-impact",
+                "--feature", "demo",
+                "--title", "Demo",
+                "--scenario", "demo.no-binding",
+                "--scenario-title", "No graph binding",
+                "--given", "demo",
+                "--when", "run",
+                "--then", "ok"
+        }, add.context());
+        Harness indexHarness = new Harness(tempDir);
+        int indexExit = new CommandRouter().run(new String[]{
+                "graph", "index", "--project-root", "scenario-missing-impact"
+        }, indexHarness.context());
+        Harness impactHarness = new Harness(tempDir);
+        int impactExit = new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", "scenario-missing-impact",
+                "--scenario", "demo.no-binding"
+        }, impactHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, addExit);
+        assertEquals(ExitCodes.SUCCESS, indexExit);
+        assertEquals(ExitCodes.RUNTIME_ERROR, impactExit);
+        assertTrue(impactHarness.stderr().contains("No graph impact bindings found for scenario demo.no-binding"));
+        assertTrue(impactHarness.stderr().contains("bdd bind-graph"));
+    }
+
+    @Test
+    void graphImpactByScenarioRejectsStaleGraphSnapshot() throws Exception {
+        Path root = tempDir.resolve("scenario-stale-impact");
+        write(root, "src/main/java/com/example/App.java",
+                "package com.example;\npublic class App { public void run() {} }\n");
+
+        Harness add = new Harness(tempDir);
+        int addExit = new CommandRouter().run(new String[]{
+                "bdd", "add", "--project-root", "scenario-stale-impact",
+                "--feature", "demo",
+                "--title", "Demo",
+                "--scenario", "demo.stale",
+                "--scenario-title", "Stale graph scenario",
+                "--given", "demo",
+                "--when", "run",
+                "--then", "ok"
+        }, add.context());
+        Harness bind = new Harness(tempDir);
+        int bindExit = new CommandRouter().run(new String[]{
+                "bdd", "bind-graph", "--project-root", "scenario-stale-impact",
+                "--scenario", "demo.stale",
+                "--file", "src/main/java/com/example/App.java"
+        }, bind.context());
+        Harness indexHarness = new Harness(tempDir);
+        int indexExit = new CommandRouter().run(new String[]{
+                "graph", "index", "--project-root", "scenario-stale-impact"
+        }, indexHarness.context());
+
+        write(root, "src/main/java/com/example/App.java",
+                "package com.example;\npublic class App { public void run() { String changed = \"yes\"; } }\n");
+
+        Harness impactHarness = new Harness(tempDir);
+        int impactExit = new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", "scenario-stale-impact",
+                "--scenario", "demo.stale"
+        }, impactHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, addExit);
+        assertEquals(ExitCodes.SUCCESS, bindExit);
+        assertEquals(ExitCodes.SUCCESS, indexExit);
+        assertEquals(ExitCodes.RUNTIME_ERROR, impactExit);
+        assertTrue(impactHarness.stderr().contains("STALE_GRAPH_SNAPSHOT"));
+        assertTrue(impactHarness.stderr().contains("dhk graph index"));
+    }
+
+    @Test
     void graphExportWritesContextAndSnapshotContractsWithoutSensitiveValues() throws Exception {
         Path root = tempDir.resolve("demo-export");
         write(root, "src/main/java/com/example/App.java",

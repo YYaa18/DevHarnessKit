@@ -1,0 +1,9 @@
+{
+  "fixture_key": "skill-evaluation-f-group-baseline",
+  "group": "F",
+  "baseline_score": "70",
+  "expected_skill_quality_score": "100",
+  "expected_dqi_delta": "30",
+  "contract_expected": "true",
+  "trust_status_expected": "trusted"
+}

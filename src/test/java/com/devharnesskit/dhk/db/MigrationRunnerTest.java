@@ -28,7 +28,7 @@ final class MigrationRunnerTest {
     Path tempDir;
 
     @Test
-    void migrationIsIdempotentThroughGraphV9() throws Exception {
+    void migrationIsIdempotentThroughSkillTrustV13() throws Exception {
         PathUtil.createMemoryDirectories(tempDir);
         DbConnectionFactory factory = new DbConnectionFactory();
         MigrationRunner runner = new MigrationRunner();
@@ -37,8 +37,8 @@ final class MigrationRunnerTest {
             MigrationResult first = runner.migrate(connection, new FixedClock());
             MigrationResult second = runner.migrate(connection, new FixedClock());
 
-            assertEquals(MigrationRunner.V9, first.schemaVersion());
-            assertEquals(MigrationRunner.V9, second.schemaVersion());
+            assertEquals(MigrationRunner.V13, first.schemaVersion());
+            assertEquals(MigrationRunner.V13, second.schemaVersion());
             assertTrue(MigrationRunner.hasTable(connection, "schema_version"));
             assertTrue(MigrationRunner.hasTable(connection, "project"));
             assertTrue(MigrationRunner.hasTable(connection, "memory_item"));
@@ -70,6 +70,14 @@ final class MigrationRunnerTest {
             assertTrue(MigrationRunner.hasTable(connection, "code_graph_edge"));
             assertTrue(MigrationRunner.hasTable(connection, "code_graph_query_cache"));
             assertTrue(MigrationRunner.hasTable(connection, "goal_graph_binding"));
+            assertTrue(MigrationRunner.hasTable(connection, "bdd_feature"));
+            assertTrue(MigrationRunner.hasTable(connection, "bdd_scenario"));
+            assertTrue(MigrationRunner.hasTable(connection, "bdd_step"));
+            assertTrue(MigrationRunner.hasTable(connection, "bdd_binding"));
+            assertTrue(MigrationRunner.hasTable(connection, "bdd_evidence"));
+            assertTrue(MigrationRunner.hasTable(connection, "bdd_quality_issue"));
+            assertTrue(MigrationRunner.hasTable(connection, "skill_contract"));
+            assertTrue(MigrationRunner.hasTable(connection, "human_checkpoint"));
             assertTrue(columnExists(connection, "goal_check", "step_count_at_check"));
             assertTrue(columnExists(connection, "goal_check", "workspace_fingerprint"));
             assertTrue(columnExists(connection, "goal_check", "context_fingerprint"));
@@ -80,6 +88,24 @@ final class MigrationRunnerTest {
             assertTrue(columnExists(connection, "code_graph_edge", "confidence"));
             assertTrue(columnExists(connection, "code_graph_query_cache", "query_type"));
             assertTrue(columnExists(connection, "goal_graph_binding", "impact_hash"));
+            assertTrue(columnExists(connection, "bdd_feature", "feature_key"));
+            assertTrue(columnExists(connection, "bdd_feature", "module_name"));
+            assertTrue(columnExists(connection, "bdd_scenario", "scenario_type"));
+            assertTrue(columnExists(connection, "bdd_step", "step_type"));
+            assertTrue(columnExists(connection, "bdd_binding", "binding_type"));
+            assertTrue(columnExists(connection, "bdd_evidence", "evidence_type"));
+            assertTrue(columnExists(connection, "bdd_quality_issue", "severity"));
+            assertTrue(columnExists(connection, "skill_contract", "skill_key"));
+            assertTrue(columnExists(connection, "skill_contract", "task_type"));
+            assertTrue(columnExists(connection, "skill_contract", "data_access_level"));
+            assertTrue(columnExists(connection, "skill_contract", "allowed_commands"));
+            assertTrue(columnExists(connection, "skill_contract", "forbidden_commands"));
+            assertTrue(columnExists(connection, "skill_contract", "source_hash"));
+            assertTrue(columnExists(connection, "skill_contract", "trusted_source_hash"));
+            assertTrue(columnExists(connection, "skill_contract", "trust_status"));
+            assertTrue(columnExists(connection, "human_checkpoint", "checkpoint_type"));
+            assertTrue(columnExists(connection, "human_checkpoint", "approver"));
+            assertTrue(columnExists(connection, "human_checkpoint", "approved_at"));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V1));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V2));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V3));
@@ -89,6 +115,10 @@ final class MigrationRunnerTest {
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V7));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V8));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V9));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V10));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V11));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V12));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V13));
             assertTrue(goalRunTableSql(connection).contains("context_export_failed"));
             assertTrue(indexExists(connection, "idx_memory_item_project_status_confidence"));
             assertTrue(indexExists(connection, "idx_memory_item_project_module"));
@@ -116,7 +146,44 @@ final class MigrationRunnerTest {
             assertTrue(indexExists(connection, "idx_code_graph_query_cache_snapshot_type"));
             assertTrue(indexExists(connection, "idx_goal_graph_binding_goal"));
             assertTrue(indexExists(connection, "idx_goal_graph_binding_snapshot"));
+            assertTrue(indexExists(connection, "idx_bdd_feature_project_status"));
+            assertTrue(indexExists(connection, "idx_bdd_scenario_feature_status"));
+            assertTrue(indexExists(connection, "idx_bdd_step_scenario_order"));
+            assertTrue(indexExists(connection, "idx_bdd_binding_scenario_type"));
+            assertTrue(indexExists(connection, "idx_bdd_evidence_scenario_status"));
+            assertTrue(indexExists(connection, "idx_bdd_quality_issue_project_status"));
+            assertTrue(indexExists(connection, "idx_skill_contract_task_type"));
+            assertTrue(indexExists(connection, "idx_skill_contract_access"));
+            assertTrue(indexExists(connection, "idx_skill_contract_trust_status"));
+            assertTrue(indexExists(connection, "idx_human_checkpoint_goal_status"));
+            assertTrue(indexExists(connection, "idx_human_checkpoint_goal_type_status"));
         }
+    }
+
+    @Test
+    void bddPathContractCreatesExpectedDirectories() throws Exception {
+        PathUtil.createBddDirectories(tempDir);
+
+        assertTrue(Files.isDirectory(PathUtil.bddDirectory(tempDir)));
+        assertTrue(Files.isDirectory(PathUtil.bddFeaturesDirectory(tempDir)));
+        assertTrue(Files.isDirectory(PathUtil.bddEvidenceDirectory(tempDir)));
+        assertTrue(Files.isDirectory(PathUtil.bddExportsDirectory(tempDir)));
+        assertEquals(tempDir.resolve(".agents/bdd/exports/BDD_CONTEXT.md"), PathUtil.bddContext(tempDir));
+        assertEquals(tempDir.resolve(".agents/bdd/exports/BDD_EVIDENCE.md"), PathUtil.bddEvidence(tempDir));
+        assertEquals(tempDir.resolve(".agents/bdd/exports/BDD_COVERAGE.md"), PathUtil.bddCoverage(tempDir));
+        assertEquals(tempDir.resolve(".agents/bdd/exports/SCENARIO_IMPACT_MAP.md"),
+                PathUtil.scenarioImpactMap(tempDir));
+    }
+
+    @Test
+    void skillPathContractCreatesExpectedDirectoryAndContractPath() throws Exception {
+        PathUtil.createSkillDirectories(tempDir);
+
+        assertTrue(Files.isDirectory(PathUtil.skillsDirectory(tempDir)));
+        assertEquals(tempDir.resolve(".agents/skills/devharness-strict"),
+                PathUtil.skillDirectory(tempDir, "devharness-strict"));
+        assertEquals(tempDir.resolve(".agents/skills/devharness-strict/contract.json"),
+                PathUtil.skillContract(tempDir, "devharness-strict"));
     }
 
     @Test
@@ -128,12 +195,15 @@ final class MigrationRunnerTest {
             MigrationResult result = new MigrationRunner().migrate(connection, new FixedClock());
             Project project = new ProjectRepository().findByKey(connection, "demo");
 
-            assertEquals(MigrationRunner.V9, result.schemaVersion());
-            assertTrue(result.backupPath().contains("pre-migration-v1-to-v9"));
+            assertEquals(MigrationRunner.V13, result.schemaVersion());
+            assertTrue(result.backupPath().contains("pre-migration-v1-to-v13"));
             assertTrue(Files.isRegularFile(Paths.get(result.backupPath())));
             assertTrue(MigrationRunner.hasTable(connection, "goal_check"));
             assertTrue(columnExists(connection, "goal_check", "step_count_at_check"));
             assertTrue(columnExists(connection, "goal_check", "workspace_fingerprint"));
+            assertTrue(MigrationRunner.hasTable(connection, "bdd_feature"));
+            assertTrue(MigrationRunner.hasTable(connection, "skill_contract"));
+            assertTrue(MigrationRunner.hasTable(connection, "human_checkpoint"));
             assertEquals("Demo", project.projectName());
             assertEquals("java", project.language());
             assertEquals("unknown", project.framework());
@@ -150,8 +220,8 @@ final class MigrationRunnerTest {
         try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(tempDir))) {
             MigrationResult result = new MigrationRunner().migrate(connection, new FixedClock());
 
-            assertEquals(MigrationRunner.V9, result.schemaVersion());
-            assertTrue(result.backupPath().contains("pre-migration-v2-to-v9"));
+            assertEquals(MigrationRunner.V13, result.schemaVersion());
+            assertTrue(result.backupPath().contains("pre-migration-v2-to-v13"));
             assertTrue(Files.isRegularFile(Paths.get(result.backupPath())));
             assertTrue(MigrationRunner.hasTable(connection, "workflow_artifact"));
             assertTrue(MigrationRunner.hasTable(connection, "workflow_memory_binding"));
@@ -172,6 +242,10 @@ final class MigrationRunnerTest {
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V7));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V8));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V9));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V10));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V11));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V12));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V13));
         }
     }
 
@@ -183,8 +257,8 @@ final class MigrationRunnerTest {
         try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(tempDir))) {
             MigrationResult result = new MigrationRunner().migrate(connection, new FixedClock());
 
-            assertEquals(MigrationRunner.V9, result.schemaVersion());
-            assertTrue(result.backupPath().contains("pre-migration-v4-to-v9"));
+            assertEquals(MigrationRunner.V13, result.schemaVersion());
+            assertTrue(result.backupPath().contains("pre-migration-v4-to-v13"));
             assertTrue(Files.isRegularFile(Paths.get(result.backupPath())));
             assertTrue(MigrationRunner.hasTable(connection, "goal_run"));
             assertTrue(MigrationRunner.hasTable(connection, "goal_check"));
@@ -203,6 +277,10 @@ final class MigrationRunnerTest {
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V7));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V8));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V9));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V10));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V11));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V12));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V13));
             assertTrue(columnExists(connection, "goal_check", "step_count_at_check"));
             assertTrue(columnExists(connection, "goal_check", "workspace_fingerprint"));
         }
@@ -216,8 +294,8 @@ final class MigrationRunnerTest {
         try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(tempDir))) {
             MigrationResult result = new MigrationRunner().migrate(connection, new FixedClock());
 
-            assertEquals(MigrationRunner.V9, result.schemaVersion());
-            assertTrue(result.backupPath().contains("pre-migration-v5-to-v9"));
+            assertEquals(MigrationRunner.V13, result.schemaVersion());
+            assertTrue(result.backupPath().contains("pre-migration-v5-to-v13"));
             assertTrue(Files.isRegularFile(Paths.get(result.backupPath())));
             assertTrue(columnExists(connection, "goal_check", "step_count_at_check"));
             assertTrue(columnExists(connection, "goal_check", "workspace_fingerprint"));
@@ -230,10 +308,15 @@ final class MigrationRunnerTest {
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V7));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V8));
             assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V9));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V10));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V11));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V12));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V13));
             assertTrue(goalRunTableSql(connection).contains("context_export_failed"));
             assertEquals("goal_run", foreignKeyTable(connection, "goal_check"));
             assertTrue(MigrationRunner.hasTable(connection, "code_graph_snapshot"));
             assertTrue(MigrationRunner.hasTable(connection, "goal_graph_binding"));
+            assertTrue(MigrationRunner.hasTable(connection, "human_checkpoint"));
         }
     }
 

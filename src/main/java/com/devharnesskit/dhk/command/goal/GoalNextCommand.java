@@ -8,6 +8,7 @@ import com.devharnesskit.dhk.model.goal.GoalEvaluation;
 import com.devharnesskit.dhk.model.goal.GoalPlan;
 import com.devharnesskit.dhk.model.goal.GoalRun;
 import com.devharnesskit.dhk.service.goal.GoalOrchestrator;
+import com.devharnesskit.dhk.util.JsonOutput;
 
 import java.nio.file.Path;
 
@@ -24,7 +25,11 @@ public final class GoalNextCommand implements Command {
             }
             GoalPlan plan = orchestrator.plan(projectRoot, goal);
             GoalEvaluation evaluation = orchestrator.evaluate(context, projectRoot, goal.goalKey());
-            GoalCommandSupport.printPlan(context, projectRoot, goal, plan, evaluation.missing());
+            if (JsonOutput.enabled(args)) {
+                GoalCommandSupport.printPlanJson(context, projectRoot, goal, plan, evaluation.missing());
+            } else {
+                GoalCommandSupport.printPlan(context, projectRoot, goal, plan, evaluation.missing());
+            }
             return ExitCodes.SUCCESS;
         } catch (Exception ex) {
             context.err().println("ERROR goal next failed: " + ex.getMessage());

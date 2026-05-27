@@ -22,6 +22,8 @@ final class CommandRouterTest {
         assertTrue(harness.stdout().contains("DevHarness Kit CLI"));
         assertTrue(harness.stdout().contains("dhk memory init"));
         assertTrue(harness.stdout().contains("dhk goal verify"));
+        assertTrue(harness.stdout().contains("dhk bdd init"));
+        assertTrue(harness.stdout().contains("dhk configure init"));
     }
 
     @Test
@@ -43,7 +45,7 @@ final class CommandRouterTest {
         assertEquals(ExitCodes.SUCCESS, exitCode);
         assertTrue(harness.stdout().contains("DevHarness Kit 0.4.4-beta.1"));
         assertTrue(harness.stdout().contains("release_channel: beta / developer preview"));
-        assertTrue(harness.stdout().contains("schema_version: 9"));
+        assertTrue(harness.stdout().contains("schema_version: 13"));
     }
 
     @Test

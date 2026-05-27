@@ -1,0 +1,22 @@
+{
+  "schema_version": "skill-contract/v1-alpha",
+  "skill_key": "bad-command-boundary",
+  "version": "0.7.1",
+  "task_type": "coding",
+  "risk_level": "high",
+  "mode": "strict",
+  "data_access_level": "context",
+  "allowed_commands": [
+    "dhk goal next",
+    "dhk db sql"
+  ],
+  "forbidden_commands": [
+    "dhk db sql",
+    "dhk memory confirm"
+  ],
+  "declared_commands": [
+    "dhk db sql",
+    "dhk memory confirm",
+    "dhk workflow gate pass"
+  ]
+}

@@ -1,7 +1,7 @@
 package com.devharnesskit.dhk.model.goal;
 
 public final class GoalMetricsSnapshot {
-    public static final String SCHEMA_VERSION = "goal-metrics/v1-alpha";
+    public static final String SCHEMA_VERSION = "goal-metrics/v1.1-alpha";
 
     private final String goalKey;
     private final String profileKey;
@@ -22,6 +22,11 @@ public final class GoalMetricsSnapshot {
     private final String startedAt;
     private final String completedAt;
     private final long durationMs;
+    private final String bddStatus;
+    private final int bddScenarioCoveragePercent;
+    private final String bddEvidenceFreshness;
+    private final int bddQualityScore;
+    private final String bddFailureReasons;
 
     public GoalMetricsSnapshot(String goalKey, String profileKey, String status, String currentAction,
                                int expectedSteps, int recordedSteps, int acceptedSteps,
@@ -29,6 +34,21 @@ public final class GoalMetricsSnapshot {
                                int failedChecks, int skippedChecks, int waivedChecks,
                                int staleChecks, int totalEvents, int totalArtifacts,
                                String startedAt, String completedAt, long durationMs) {
+        this(goalKey, profileKey, status, currentAction, expectedSteps, recordedSteps, acceptedSteps,
+                totalChecks, requiredChecks, passedChecks, failedChecks, skippedChecks, waivedChecks,
+                staleChecks, totalEvents, totalArtifacts, startedAt, completedAt, durationMs,
+                "", -1, "missing", -1, "");
+    }
+
+    public GoalMetricsSnapshot(String goalKey, String profileKey, String status, String currentAction,
+                               int expectedSteps, int recordedSteps, int acceptedSteps,
+                               int totalChecks, int requiredChecks, int passedChecks,
+                               int failedChecks, int skippedChecks, int waivedChecks,
+                               int staleChecks, int totalEvents, int totalArtifacts,
+                               String startedAt, String completedAt, long durationMs,
+                               String bddStatus, int bddScenarioCoveragePercent,
+                               String bddEvidenceFreshness, int bddQualityScore,
+                               String bddFailureReasons) {
         this.goalKey = value(goalKey);
         this.profileKey = value(profileKey);
         this.status = value(status);
@@ -48,6 +68,11 @@ public final class GoalMetricsSnapshot {
         this.startedAt = value(startedAt);
         this.completedAt = value(completedAt);
         this.durationMs = durationMs;
+        this.bddStatus = value(bddStatus);
+        this.bddScenarioCoveragePercent = bddScenarioCoveragePercent;
+        this.bddEvidenceFreshness = value(bddEvidenceFreshness);
+        this.bddQualityScore = bddQualityScore;
+        this.bddFailureReasons = value(bddFailureReasons);
     }
 
     public String schemaVersion() { return SCHEMA_VERSION; }
@@ -70,6 +95,11 @@ public final class GoalMetricsSnapshot {
     public String startedAt() { return startedAt; }
     public String completedAt() { return completedAt; }
     public long durationMs() { return durationMs; }
+    public String bddStatus() { return bddStatus; }
+    public int bddScenarioCoveragePercent() { return bddScenarioCoveragePercent; }
+    public String bddEvidenceFreshness() { return bddEvidenceFreshness; }
+    public int bddQualityScore() { return bddQualityScore; }
+    public String bddFailureReasons() { return bddFailureReasons; }
 
     private String value(String raw) {
         return raw == null ? "" : raw;

@@ -9,6 +9,7 @@ import com.devharnesskit.dhk.service.policy.PolicyHookService;
 import com.devharnesskit.dhk.service.policy.PolicyViolationException;
 
 import java.nio.file.Path;
+import java.util.List;
 
 public final class GoalStepCommand implements Command {
     private final GoalOrchestrator orchestrator = new GoalOrchestrator();
@@ -16,18 +17,39 @@ public final class GoalStepCommand implements Command {
 
     public int run(CommandContext context, Args args) {
         String goalKey = args.option("goal").trim();
-        String summary = args.option("summary").trim();
-        if (goalKey.length() == 0 || summary.length() == 0) {
-            context.err().println("Missing required parameters: --goal, --summary");
+        Path projectRoot = GoalCommandSupport.projectRoot(args, context);
+        if (goalKey.length() == 0) {
+            context.err().println("Missing required parameter: --goal");
             return ExitCodes.USAGE_ERROR;
         }
-        String changedFiles = args.option("changed-files", "").trim();
+        if (args.hasFlag("template")) {
+            return printTemplate(context, args, projectRoot, goalKey);
+        }
+        String summary = args.option("summary").trim();
+        if (summary.length() == 0) {
+            context.err().println("Missing required parameter: --summary");
+            return ExitCodes.USAGE_ERROR;
+        }
+        String changedFiles = changedFiles(args);
         String evidence = args.option("evidence", "").trim();
         String structuredEvidence = structuredEvidence(args, changedFiles);
-        String combinedEvidence = combineEvidence(evidence, structuredEvidence);
-        Path projectRoot = GoalCommandSupport.projectRoot(args, context);
         try {
+            String fieldEvidence = fieldEvidence(args);
+            String combinedEvidence = combineEvidence(evidence, structuredEvidence, fieldEvidence);
             policyHookService.requireGoalStepAllowed(projectRoot, changedFiles);
+            if (args.hasFlag("dry-run")) {
+                GoalOrchestrator.GoalStepValidationResult result = orchestrator.validateStep(context,
+                        projectRoot, goalKey, summary, changedFiles, combinedEvidence);
+                context.out().println("goal step dry-run complete");
+                context.out().println("status: passed");
+                context.out().println("goal_key: " + result.goal().goalKey());
+                context.out().println("current_action: " + result.plan().currentAction());
+                context.out().println("would_record: true");
+                context.out().println("step_count: " + result.goal().stepCount());
+                context.out().println("next_command: dhk goal step --goal " + result.goal().goalKey()
+                        + " --summary \"<summary>\" --evidence \"<evidence>\"");
+                return ExitCodes.SUCCESS;
+            }
             GoalOrchestrator.GoalStepResult result = orchestrator.step(context, projectRoot, goalKey,
                     summary, changedFiles, combinedEvidence);
             context.out().println("step_id: " + result.stepId());
@@ -49,6 +71,52 @@ public final class GoalStepCommand implements Command {
         }
     }
 
+    private int printTemplate(CommandContext context, Args args, Path projectRoot, String goalKey) {
+        try {
+            com.devharnesskit.dhk.model.goal.GoalRun goal = orchestrator.find(context, projectRoot, goalKey);
+            com.devharnesskit.dhk.model.goal.GoalPlan plan = orchestrator.plan(projectRoot, goal);
+            context.out().println("goal step template");
+            context.out().println("goal_key: " + goal.goalKey());
+            context.out().println("current_action: " + plan.currentAction());
+            context.out().println("summary: <summary>");
+            context.out().println("required_evidence:");
+            for (String required : plan.requiredEvidence()) {
+                context.out().println("  --field " + required + "=<value>");
+            }
+            context.out().println("structured_fields:");
+            context.out().println("  --read-files <files>");
+            context.out().println("  --changed-files <files>");
+            context.out().println("  --tests-run <command/result>");
+            context.out().println("  --compile-result <result>");
+            context.out().println("  --risks <risks>");
+            context.out().println("  --pending <pending-or-none>");
+            context.out().println("dry_run_command: dhk goal step --goal " + goal.goalKey()
+                    + " --summary \"<summary>\" --field <key=value> --dry-run");
+            return ExitCodes.SUCCESS;
+        } catch (Exception ex) {
+            context.err().println("ERROR goal step template failed: " + ex.getMessage());
+            return ExitCodes.RUNTIME_ERROR;
+        }
+    }
+
+    private String changedFiles(Args args) {
+        String changedFiles = args.option("changed-files", "").trim();
+        if (changedFiles.length() > 0) {
+            return changedFiles;
+        }
+        for (String field : args.optionValues("field")) {
+            int equals = field.indexOf('=');
+            if (equals <= 0) {
+                continue;
+            }
+            String key = field.substring(0, equals).trim();
+            if ("changed_files".equals(key) || "changed-files".equals(key)) {
+                return field.substring(equals + 1).trim();
+            }
+        }
+        return "";
+    }
+
     private String structuredEvidence(Args args, String changedFiles) {
         StringBuilder builder = new StringBuilder();
         appendField(builder, "read_files", args.option("read-files", ""));
@@ -66,6 +134,28 @@ public final class GoalStepCommand implements Command {
         return builder.toString();
     }
 
+    private String fieldEvidence(Args args) {
+        StringBuilder builder = new StringBuilder();
+        List<String> fields = args.optionValues("field");
+        for (String field : fields) {
+            String value = field == null ? "" : field.trim();
+            if (value.length() == 0) {
+                continue;
+            }
+            int equals = value.indexOf('=');
+            if (equals <= 0) {
+                throw new IllegalArgumentException("--field must use key=value: " + value);
+            }
+            String key = value.substring(0, equals).trim();
+            String text = value.substring(equals + 1).trim();
+            if (key.length() == 0 || text.length() == 0) {
+                throw new IllegalArgumentException("--field must use non-empty key=value: " + value);
+            }
+            appendField(builder, key.replace('-', '_'), text);
+        }
+        return builder.toString();
+    }
+
     private void appendField(StringBuilder builder, String key, String value) {
         String text = value == null ? "" : value.trim();
         if (text.length() == 0) {
@@ -77,13 +167,18 @@ public final class GoalStepCommand implements Command {
         builder.append(key).append('=').append(text);
     }
 
-    private String combineEvidence(String evidence, String structuredEvidence) {
-        if (evidence.length() == 0) {
-            return structuredEvidence;
+    private String combineEvidence(String... parts) {
+        StringBuilder builder = new StringBuilder();
+        for (String part : parts) {
+            String text = part == null ? "" : part.trim();
+            if (text.length() == 0) {
+                continue;
+            }
+            if (builder.length() > 0) {
+                builder.append('\n');
+            }
+            builder.append(text);
         }
-        if (structuredEvidence.length() == 0) {
-            return evidence;
-        }
-        return evidence + "\n" + structuredEvidence;
+        return builder.toString();
     }
 }

@@ -21,7 +21,7 @@ The generated artifacts that may appear later, such as `GOAL_METRICS.md` or rout
 The code-level schema version is:
 
 ```text
-goal-metrics/v1-alpha
+goal-metrics/v1.1-alpha
 ```
 
 A metrics snapshot summarizes one goal run:
@@ -47,8 +47,18 @@ A metrics snapshot summarizes one goal run:
 | `started_at` | `goal_run.created_at`. |
 | `completed_at` | `goal_run.completed_at`, when present. |
 | `duration_ms` | Duration from start to completion, or `-1` when incomplete or unparsable. |
+| `bdd_status` | Latest BDD check status, when a `bdd` check exists. |
+| `bdd_scenario_coverage_percent` | Scenario evidence coverage parsed from the latest BDD check summary, or `-1` when unavailable. |
+| `bdd_evidence_freshness` | `fresh`, `stale`, `missing`, or `not_required` based on latest BDD check step count and status. |
+| `bdd_quality_score` | BDD quality score parsed from the latest BDD check summary, or `-1` when unavailable. |
+| `bdd_failure_reasons` | Failed BDD check reasons, suitable for trend reports. |
 
 Snapshots are intentionally descriptive. They do not decide whether a goal is complete; `goal evaluate` remains responsible for completion decisions because it has profile and check policy context.
+
+BDD fields are report metrics, not correctness proof. They let future eval and
+routine reports compare scenario coverage, evidence freshness, and quality
+failures across tasks or models while keeping `goal_check` and BDD SQLite rows as
+the source of truth.
 
 ## Replay Entries
 
@@ -102,6 +112,8 @@ Future routine reporting can consume this model to answer questions such as:
 - whether stale checks are common;
 - how many steps a profile usually requires;
 - what happened in a goal run without reading chat history.
+- how BDD scenario coverage, evidence freshness, and quality score trend across
+  comparable tasks or model runs.
 
 The first routine implementation should export derived reports under `.agents/memory/exports/` and include the schema version in every artifact.
 

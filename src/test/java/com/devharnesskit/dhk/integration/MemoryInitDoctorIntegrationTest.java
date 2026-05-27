@@ -77,7 +77,7 @@ final class MemoryInitDoctorIntegrationTest {
         int exitCode = new CommandRouter().run(new String[]{"doctor", "--project-root", root.toString()}, doctorHarness.context());
 
         assertEquals(ExitCodes.SUCCESS, exitCode);
-        assertTrue(doctorHarness.stdout().contains("schema_version: ok (9)"));
+        assertTrue(doctorHarness.stdout().contains("schema_version: ok (13)"));
         assertTrue(doctorHarness.stdout().contains("mysql_driver: ok"));
         assertTrue(doctorHarness.stdout().contains("sensitive_policy: default"));
         assertTrue(doctorHarness.stdout().contains("devharness_policy: default"));
@@ -90,7 +90,7 @@ final class MemoryInitDoctorIntegrationTest {
         }, jsonDoctorHarness.context());
         assertEquals(ExitCodes.SUCCESS, jsonExitCode);
         assertTrue(jsonDoctorHarness.stdout().contains("\"command\": \"doctor\""));
-        assertTrue(jsonDoctorHarness.stdout().contains("\"schema_version\": 9"));
+        assertTrue(jsonDoctorHarness.stdout().contains("\"schema_version\": 13"));
         assertTrue(jsonDoctorHarness.stdout().contains("\"mysql_driver_loaded\": true"));
         assertTrue(jsonDoctorHarness.stdout().contains("\"devharness_policy\": \"default\""));
     }
@@ -269,6 +269,7 @@ final class MemoryInitDoctorIntegrationTest {
                 + "  \"context_export_block_on_sensitive\": \"maybe\",\n"
                 + "  \"context_export_allowed_files\": \"CURRENT_CONTEXT.md\",\n"
                 + "  \"context_export_forbidden_files\": \"../raw.sql\",\n"
+                + "  \"skill_contract_required\": \"true\",\n"
                 + "  \"extra\": \"value\"\n"
                 + "}\n").getBytes("UTF-8"));
 
@@ -294,6 +295,7 @@ final class MemoryInitDoctorIntegrationTest {
         assertTrue(doctorHarness.stderr().contains("context_export_require_sensitive_scan should be true/false"));
         assertTrue(doctorHarness.stderr().contains("context_export_block_on_sensitive should be true/false"));
         assertTrue(doctorHarness.stderr().contains("context_export_forbidden_files should contain project-relative safe globs only: ../raw.sql"));
+        assertTrue(doctorHarness.stderr().contains("skill_contract_required is true but skill_key is missing"));
 
         Harness jsonDoctorHarness = new Harness(tempDir);
         int jsonExitCode = new CommandRouter().run(new String[]{
@@ -323,8 +325,19 @@ final class MemoryInitDoctorIntegrationTest {
                 + "  \"context_export_require_sensitive_scan\": \"true\",\n"
                 + "  \"context_export_block_on_sensitive\": \"true\",\n"
                 + "  \"context_export_allowed_files\": \".agents/memory/exports/*.md\",\n"
-                + "  \"context_export_forbidden_files\": \".env,application-prod.yml\"\n"
+                + "  \"context_export_forbidden_files\": \".env,application-prod.yml\",\n"
+                + "  \"skill_contract_required\": \"true\",\n"
+                + "  \"skill_key\": \"devharness-goal-development\"\n"
                 + "}\n").getBytes("UTF-8"));
+        write(root, ".agents/skills/devharness-goal-development/contract.json",
+                "{\n"
+                        + "  \"skill_key\": \"devharness-goal-development\",\n"
+                        + "  \"version\": \"0.7.1\",\n"
+                        + "  \"task_type\": \"coding\",\n"
+                        + "  \"data_access_level\": \"context\",\n"
+                        + "  \"allowed_commands\": \"dhk goal next,dhk goal step\",\n"
+                        + "  \"forbidden_commands\": \"dhk db sql\"\n"
+                        + "}\n");
 
         Harness doctorHarness = new Harness(tempDir);
         int exitCode = new CommandRouter().run(new String[]{
@@ -358,6 +371,12 @@ final class MemoryInitDoctorIntegrationTest {
             assertTrue(zip.getEntry(PathUtil.EXPORTS_DIRECTORY + "/" + PathUtil.PROJECT_INDEX) != null);
         }
         assertTrue(Files.isDirectory(root.resolve(".agents").resolve("memory")));
+    }
+
+    private void write(Path root, String relativePath, String content) throws Exception {
+        Path path = root.resolve(relativePath);
+        Files.createDirectories(path.getParent());
+        Files.write(path, content.getBytes("UTF-8"));
     }
 
     private static final class Harness {

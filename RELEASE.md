@@ -35,9 +35,14 @@ Current release channel: `beta / developer preview`.
    unzip -l target/devharnesskit-0.4.4-beta.1.zip | grep 'LICENSE'
    unzip -l target/devharnesskit-0.4.4-beta.1.zip | grep 'THIRD_PARTY_NOTICES.md'
    unzip -l target/devharnesskit-0.4.4-beta.1.zip | grep '.agents/skills/devharness-goal-development/SKILL.md'
+   unzip -l target/devharnesskit-0.4.4-beta.1.zip | grep '.agents/skills/devharness-graph-aware-development/SKILL.md'
    unzip -l target/devharnesskit-0.4.4-beta.1.zip | grep '.agents/skills/devharness-goal-development/scripts/goal-start.sh'
    unzip -l target/devharnesskit-0.4.4-beta.1.zip | grep '.agents/skills/devharness-goal-development/scripts/goal-start.bat'
-   unzip -l target/devharnesskit-0.4.4-beta.1.zip | grep '.comate/rules/java-development-guard.mdr'
+   unzip -l target/devharnesskit-0.4.4-beta.1.zip | grep '.comate/rules/devharness-goal-protocol.mdr'
+   unzip -l target/devharnesskit-0.4.4-beta.1.zip | grep '.comate/rules/devharness-graph-aware-protocol.mdr'
+   unzip -l target/devharnesskit-0.4.4-beta.1.zip | grep 'scripts/devharness-control-panel.sh'
+   unzip -l target/devharnesskit-0.4.4-beta.1.zip | grep 'scripts/install-agent-adapters.sh'
+   ! unzip -l target/devharnesskit-0.4.4-beta.1.zip | grep 'devharness-java-development'
    tar -tzf target/devharnesskit-0.4.4-beta.1.tar.gz | grep 'lib/dhk.jar'
    ```
 
@@ -48,6 +53,8 @@ Current release channel: `beta / developer preview`.
    unzip -q target/devharnesskit-0.4.4-beta.1.zip -d "$ARCHIVE_ROOT"
    java -jar "$ARCHIVE_ROOT/devharnesskit-0.4.4-beta.1/lib/dhk.jar" version
    "$ARCHIVE_ROOT/devharnesskit-0.4.4-beta.1/.agents/skills/devharness-goal-development/scripts/dhk.sh" version
+   "$ARCHIVE_ROOT/devharnesskit-0.4.4-beta.1/scripts/devharness-control-panel.sh" plan --project-root "$ARCHIVE_ROOT/devharnesskit-0.4.4-beta.1" --target all --dry-run
+   "$ARCHIVE_ROOT/devharnesskit-0.4.4-beta.1/scripts/install-agent-adapters.sh" --project-root "$ARCHIVE_ROOT/devharnesskit-0.4.4-beta.1" --target all --dry-run
    ```
 
    Windows `.bat` wrappers are verified by archive presence in this local checklist. Run them on Windows before a release promoted beyond alpha.
@@ -60,12 +67,43 @@ Current release channel: `beta / developer preview`.
    java -jar "$JAR" memory init --project-root "$SMOKE_ROOT"
    java -jar "$JAR" doctor --project-root "$SMOKE_ROOT" --json | grep '"command": "doctor"'
    java -jar "$JAR" memory export --project-root "$SMOKE_ROOT" --task "release smoke" --module global --json | grep '"command": "memory export"'
+   java -jar "$JAR" configure init --project-root "$SMOKE_ROOT" --preset springboot-manual-ide-test --force
+   java -jar "$JAR" configure show --project-root "$SMOKE_ROOT" --json | grep '"compile_mode": "manual"'
+   java -jar "$JAR" configure doctor --project-root "$SMOKE_ROOT" --json | grep '"command": "configure doctor"'
    GOAL_KEY="$(java -jar "$JAR" goal start --project-root "$SMOKE_ROOT" --profile bugfix --task "release smoke goal" --module global | sed -n 's/^goal_key: //p' | head -n 1)"
    test -n "$GOAL_KEY"
    java -jar "$JAR" goal status --project-root "$SMOKE_ROOT" --goal "$GOAL_KEY" --json | grep '"command": "goal status"'
    ```
 
-8. Confirm alpha wording:
+8. Confirm v0.4.5 agent adapter and verification-policy acceptance:
+
+   ```bash
+   test ! -d .agents/skills/devharness-java-development
+   test -x scripts/install-agent-adapters.sh
+   mvn -q -Dtest=GoalSkillPackagingTest test
+   mvn -q -Dtest=ConfigureCommandIntegrationTest test
+   grep -n "goal-first" README.md docs/features/DEVHARNESS_V0_4_5_ACCEPTANCE_CHECKLIST.md
+   grep -n "manual evidence" README.md docs/GOAL_CONFIGURATION.md
+   grep -n "devharness-config/v1-alpha" docs/GOAL_CONFIGURATION.md
+   ```
+
+9. Confirm v0.4.6 control panel acceptance:
+
+   ```bash
+   CP_ROOT="$(mktemp -d)"
+   mkdir -p "$CP_ROOT/.agents/skills"
+   cp -R .agents/skills/devharness-goal-development "$CP_ROOT/.agents/skills/"
+   cp -R .agents/skills/devharness-graph-aware-development "$CP_ROOT/.agents/skills/"
+   scripts/devharness-control-panel.sh plan --project-root "$CP_ROOT" --target all --dry-run
+   scripts/devharness-control-panel.sh configure --project-root "$CP_ROOT" --target all --preset springboot-manual-ide-test --compile-mode manual --test-mode manual --graph required --force
+   scripts/devharness-control-panel.sh status --project-root "$CP_ROOT" --status-format json | grep '"install_state": "ok"'
+   scripts/devharness-control-panel.sh status --project-root "$CP_ROOT" --status-format markdown | grep '| manifest | ok |'
+   scripts/devharness-control-panel.sh doctor --project-root "$CP_ROOT" --target all
+   scripts/devharness-control-panel.sh uninstall --project-root "$CP_ROOT" --target all --dry-run
+   mvn -q -Dtest=GoalSkillPackagingTest test
+   ```
+
+10. Confirm alpha wording:
 
    ```bash
    grep -n "0.4.4-beta.1" README.md
@@ -75,7 +113,20 @@ Current release channel: `beta / developer preview`.
    grep -n "downgrade" docs/COMPATIBILITY.md docs/MIGRATIONS.md
    ```
 
-9. Generate checksums:
+11. Confirm the release goal completion evidence:
+
+   ```bash
+   test -f .agents/memory/exports/GOAL_SUMMARY.md
+   test -f .agents/memory/exports/ARTIFACT_PASSPORT.json
+   grep -n "ARTIFACT_PASSPORT.json" .agents/memory/exports/GOAL_SUMMARY.md
+   java -jar target/dhk-cli-0.4.4-beta.1-all.jar artifact passport verify \
+     --path .agents/memory/exports/ARTIFACT_PASSPORT.json
+   ```
+
+   Artifact Passport is release audit metadata. It does not replace code review,
+   human risk review, compile/test results, or security review.
+
+12. Generate checksums:
 
    ```bash
    cd target

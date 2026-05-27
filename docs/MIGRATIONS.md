@@ -6,7 +6,7 @@ DevHarness Kit stores project state in:
 .agents/memory/memory.db
 ```
 
-Current schema version: `9`.
+Current schema version: `13`.
 
 ## Current Schema Versions
 
@@ -21,6 +21,8 @@ Current schema version: `9`.
 | v7 | Goal context export recovery statuses for resumable failed exports. |
 | v8 | Goal check workspace, context, and check fingerprints for freshness enforcement. |
 | v9 | Graph Lite snapshot, file, node, edge, query cache, and goal binding tables. |
+| v10 | BDD specification features, scenarios, steps, bindings, evidence, and quality issue tables. |
+| v11 | Skill contract metadata for local skill governance. |
 
 ## Alpha Compatibility Policy
 
@@ -33,7 +35,7 @@ When an existing non-empty database is below the current schema version, DevHarn
 .agents/memory/backups/
 ```
 
-The backup filename includes the old and new schema versions, for example `pre-migration-v1-to-v9`.
+The backup filename includes the old and new schema versions, for example `pre-migration-v1-to-v13`.
 
 Current fixture coverage includes:
 
@@ -46,13 +48,13 @@ v5-goal-before-step-count.sql
                          goal schema before check freshness metadata
 ```
 
-These fixtures verify that old databases are backed up before upgrade, important rows are preserved, and the current v9 schema is created.
+These fixtures verify that old databases are backed up before upgrade, important rows are preserved, and the current v11 schema is created.
 
-The workflow fixture verifies that v2 `workflow_template`, `workflow_run`, `workflow_phase_run`, `workflow_gate_run`, and `workflow_event` rows survive upgrade while v3 artifact binding tables, v4 spec tables, v5 goal tables, v6 check metadata, v7 export recovery state, v8 fingerprint columns, and v9 graph tables are added.
+The workflow fixture verifies that v2 `workflow_template`, `workflow_run`, `workflow_phase_run`, `workflow_gate_run`, and `workflow_event` rows survive upgrade while v3 artifact binding tables, v4 spec tables, v5 goal tables, v6 check metadata, v7 export recovery state, v8 fingerprint columns, v9 graph tables, v10 BDD tables, and v11 skill contract tables are added.
 
-The spec fixture verifies that v4 `spec_change`, `spec_document`, `spec_task`, `spec_acceptance`, `workflow_spec_binding`, and `spec_event` rows survive upgrade while v5 goal tables, v6 check metadata, v7 export recovery state, v8 fingerprint columns, and v9 graph tables are added.
+The spec fixture verifies that v4 `spec_change`, `spec_document`, `spec_task`, `spec_acceptance`, `workflow_spec_binding`, and `spec_event` rows survive upgrade while v5 goal tables, v6 check metadata, v7 export recovery state, v8 fingerprint columns, v9 graph tables, v10 BDD tables, and v11 skill contract tables are added.
 
-The goal fixture verifies that v5 `goal_check` rows survive upgrade, receive a default `step_count_at_check = 0` value, can be extended with v8 fingerprint metadata, and receives v9 graph tables without losing rows.
+The goal fixture verifies that v5 `goal_check` rows survive upgrade, receive a default `step_count_at_check = 0` value, can be extended with v8 fingerprint metadata, and receives v9 graph tables, v10 BDD tables, and v11 skill contract tables without losing rows.
 
 Graph Lite v9 tables are additive. They store snapshot-bound machine facts:
 
@@ -67,6 +69,43 @@ goal_graph_binding
 
 They are not confirmed memory, and they should not be treated as durable human
 facts. See [GRAPH_SCHEMA.md](GRAPH_SCHEMA.md).
+
+BDD v10 tables are additive alpha storage for specification-level acceptance
+scenarios:
+
+```text
+bdd_feature
+bdd_scenario
+bdd_step
+bdd_binding
+bdd_evidence
+bdd_quality_issue
+```
+
+They are local SQLite source-of-truth rows for `dhk bdd` commands and generated
+BDD exports under `.agents/bdd/`. They do not require or imply Cucumber,
+Playwright, Postman, or any other executable BDD framework.
+
+Skill Contract v11 tables are additive alpha storage for local skill governance:
+
+```text
+skill_contract
+```
+
+They store parsed `contract.json` metadata for future `dhk skill` lint, verify,
+trust, and audit commands. They do not execute scripts or mark any skill trusted
+by default. See [SKILL_CONTRACT.md](SKILL_CONTRACT.md).
+
+Schema v13 adds source-hash trust fields to `skill_contract`:
+
+```text
+source_hash
+trusted_source_hash
+trust_status
+```
+
+These fields support `dhk skill trust` and make changed trusted skills visible
+as `review_required` on the next `dhk skill verify`.
 
 For older v1 project tables, migration repairs missing project metadata columns such as `root_path`, `language`, `framework`, and `database_type` with conservative defaults.
 

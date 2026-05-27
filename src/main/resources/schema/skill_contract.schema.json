@@ -1,0 +1,7 @@
+{
+  "schema_version": "skill-contract-schema/v1-alpha",
+  "required": "skill_key,version,task_type,data_access_level",
+  "data_access_levels": "none,metadata,context,raw",
+  "list_fields": "allowed_commands,forbidden_commands,declared_commands,required_artifacts,hard_gates,human_checkpoints",
+  "notes": "DevHarnessKit parses string arrays or comma/newline strings for list fields in the alpha contract loader."
+}

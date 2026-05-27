@@ -37,6 +37,12 @@ public final class GoalCommand implements Command {
         commands.put("verify", new Supplier<Command>() {
             public Command get() { return new GoalVerifyCommand(); }
         });
+        commands.put("audit", new Supplier<Command>() {
+            public Command get() { return new GoalAuditCommand(); }
+        });
+        commands.put("recheck", new Supplier<Command>() {
+            public Command get() { return new GoalRecheckCommand(); }
+        });
         commands.put("complete", new Supplier<Command>() {
             public Command get() { return new GoalCompleteCommand(); }
         });

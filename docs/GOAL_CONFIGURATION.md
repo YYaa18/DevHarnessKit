@@ -67,6 +67,168 @@ Notes:
 - A goal is not ready to complete until every configured action has a recorded `goal step`.
 - `goal step` validates the current action's required evidence. Built-in and configured action evidence keys should appear in `--evidence`, while `changed_files` may be satisfied by `--changed-files`.
 
+## Goal UX Hardening
+
+V0.4.5 adds a stricter but easier goal interaction surface for agents and
+scripts. The intent is to keep completion gates strict while reducing fragile
+manual evidence formatting.
+
+Use machine-readable `goal next` when an agent needs to decide the next action:
+
+```bash
+dhk goal next --goal <goal-key> --json
+```
+
+The JSON output includes `evidence_contract`, `required_evidence`,
+`structured_evidence_fields`, `allowed_actions`, `forbidden_actions`,
+`required_checks`, `completion_blockers`, and `next_command`.
+
+Use `goal step --template` before recording evidence when the current action is
+unclear:
+
+```bash
+dhk goal step --goal <goal-key> --template
+```
+
+Prefer repeated `--field key=value` inputs over hand-written long evidence
+strings:
+
+```bash
+dhk goal step --goal <goal-key> \
+  --summary "Inspected existing order flow" \
+  --field existing_controller=OrderController \
+  --field existing_service=OrderService \
+  --field existing_mapper=OrderMapper \
+  --field existing_tests=OrderServiceTest
+```
+
+`--dry-run` validates the same evidence contract without inserting a
+`goal_step` row:
+
+```bash
+dhk goal step --goal <goal-key> \
+  --summary "Planned change" \
+  --field impacted_files=OrderController.java,OrderService.java \
+  --field risk_points=pagination-boundary \
+  --field verification_plan="mvn test" \
+  --dry-run
+```
+
+Completed goals can be checked without reopening them:
+
+```bash
+dhk goal audit --goal <goal-key>
+dhk goal recheck --goal <goal-key>
+```
+
+`goal audit` is read-only. `goal recheck` reruns checks and refreshes
+`goal_check` rows, but it does not add development steps and does not reopen a
+completed goal.
+
+`goal verify` supports three levels:
+
+```bash
+dhk goal verify --goal <goal-key> --level fast
+dhk goal verify --goal <goal-key> --level standard
+dhk goal verify --goal <goal-key> --level release
+```
+
+- `fast` is a lightweight preflight for sensitive/discipline/graph-bdd checks.
+  It is not a completion proof.
+- `standard` is the default and preserves the previous `goal verify` behavior:
+  run all required checks and evaluate completion readiness.
+- `release` runs standard checks and reports package, artifact passport, and
+  export-contract status for release review. The artifact passport is normally
+  created by `goal complete`, so pre-complete release verification may report
+  `missing_until_goal_complete`.
+
+## Project Configuration
+
+V0.4.5 adds a project-level configuration file at:
+
+```text
+.agents/devharness/config.json
+```
+
+The schema key is `devharness-config/v1-alpha`. Like profile and policy files,
+the current parser uses flat string fields. Use dotted keys instead of nested
+objects:
+
+```json
+{
+  "schema_version": "devharness-config/v1-alpha",
+  "project.type": "springboot-enterprise-large",
+  "project.module_style": "api",
+  "verification.compile.mode": "manual",
+  "verification.compile.manual_trigger": "IDE build action",
+  "verification.test.mode": "manual",
+  "verification.test.manual_trigger": "IDE test button",
+  "verification.test.cost": "slow",
+  "verification.rollback.required_if_test_not_run": "true"
+}
+```
+
+Create one with:
+
+```bash
+dhk configure init --preset springboot-manual-ide-test --force
+dhk configure show
+dhk configure doctor
+dhk configure explain verification.test.mode
+```
+
+Supported starter presets:
+
+| Preset | Intent |
+| --- | --- |
+| `springboot-manual-ide-test` | Spring Boot or company-runtime projects where compile/test evidence comes from IDE, CI, or another manual source. |
+| `springboot-auto-test` | Projects where CLI compile/test commands are expected to run locally. |
+| `legacy-java-small-fix` | High-risk legacy maintenance where auto compile/test may be unavailable and rollback evidence is required. |
+
+`verification.compile.mode` and `verification.test.mode` accept:
+
+| Mode | Runtime behavior |
+| --- | --- |
+| `auto` | `goal verify` runs configured compile/test commands. |
+| `manual` | `goal verify` does not run the command and instead requires manual evidence. |
+| `disabled` | The direct check is replaced with `verification-risk`, which requires waiver, approver, risk scope, and rollback evidence. |
+
+Manual verification is not skipped verification. Missing evidence blocks
+completion. A manual compile check requires the latest goal-step evidence to
+include:
+
+```text
+manual_evidence_status=passed
+compile_scope=<module, class, or changed file scope>
+manual_evidence_path=<project-relative artifact path>
+```
+
+A manual test check requires:
+
+```text
+manual_evidence_status=passed
+test_scope=<class, method, scenario, or regression scope>
+manual_evidence_path=<project-relative artifact path>
+```
+
+The evidence path must exist inside the project. Typical artifacts are IDE test
+screenshots, CI logs, copied console output, or a checked-in manual verification
+note under a project-approved audit directory.
+
+When compile or test is `disabled`, the replacement `verification-risk` check
+requires:
+
+```text
+waive_reason=<why this verification cannot be run>
+approver=<human or role approving the risk>
+risk_scope=<affected module or behavior>
+rollback_plan=<project-relative rollback artifact>
+```
+
+`GOAL_CONTEXT.md` renders the effective `<verification-policy>` and, for manual
+flows, a `<manual-verification-contract>`. Strict skills should follow that
+contract instead of inventing their own test commands.
+
 ## Profile Schema Alpha
 
 The alpha schema is deliberately flat so it can be parsed by the current minimal JSON parser. Nested objects and arrays are not supported yet.
@@ -92,12 +254,23 @@ Supported profile fields:
 | `graph_require_fresh_snapshot` | If true, graph-aware verification should require a fresh graph snapshot. Defaults to `graph_required`. |
 | `graph_require_impact_map` | If true, graph-aware verification should require `IMPACT_MAP.md`. Defaults to `graph_required`. |
 | `graph_max_staleness_minutes` | Positive integer staleness window for graph evidence. Defaults to `60`. |
+| `bdd_min_coverage_percent` | Goal check policy key. Minimum BDD bound-scenario coverage percentage. Defaults to `100`. |
+| `bdd_min_quality_score` | Goal check policy key. Minimum BDD quality score. Defaults to `0` so lint warnings stay advisory unless configured. |
+| `bdd_fail_on_quality_errors` | Goal check policy key. When `true`, any BDD lint error on a goal-bound scenario fails the BDD check. |
+| `bdd_fail_on_quality_warnings` | Goal check policy key. When `true`, any BDD lint warning on a goal-bound scenario fails the BDD check. |
 | `graph_actions` | Comma-separated action keys that are graph-specific and must also be present in `actions`. |
+| `bdd_required` | If true, `goal verify` requires the `bdd` check. The check passes only when the goal has bound BDD scenarios and the latest goal-specific evidence for each scenario is accepted. |
+
+BDD policy fields are governance gates for acceptance evidence quality. They do
+not replace compile/test checks, code review, or manual validation. A failed BDD
+gate should explain whether the blocker is missing scenario binding, insufficient
+scenario coverage, stale/missing evidence, or configured quality thresholds.
 
 Built-in graph-aware Java profiles are available as alpha profiles:
 
 ```text
 java-api-change-with-graph
+java-api-change-with-bdd-graph
 java-mvc-change-with-graph
 safe-refactor-with-graph
 ```
@@ -113,6 +286,23 @@ staleness window, and checks that recorded `changed_files` under `src/` are
 covered by the impact map. The impact map also reports related tests and
 `missing-related-tests` using Java file conventions. This is an alpha heuristic:
 it is meant to surface likely test gaps, not to prove test sufficiency.
+
+BDD-required profiles automatically require `bdd`, even when a local
+`goal-check-policy.json` narrows the base check list. The `bdd` check reads
+`bdd_binding` rows where `binding_type=goal` and `binding_key=<goal-key>`, then
+requires the latest evidence for each bound scenario and goal to be `passed`,
+`waived`, or `skipped`. Missing, pending, or failed scenario evidence blocks
+`goal verify` and `goal complete`.
+
+When a profile sets both `bdd_required=true` and `graph_required=true`, the
+`impact` check also requires `.agents/bdd/exports/SCENARIO_IMPACT_MAP.md`.
+The map must reference a goal-bound scenario, must not be marked stale, and must
+be newer than the latest `GRAPH_SNAPSHOT.json`. `goal next` and
+`GOAL_CONTEXT.md` surface the next scenario impact command:
+
+```bash
+dhk graph impact --project-root <project-root> --scenario <scenario-key>
+```
 
 `goal next` and `GOAL_CONTEXT.md` surface graph preflight fields when graph is
 required: `snapshot_workspace_fingerprint`, `current_workspace_fingerprint`,

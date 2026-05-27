@@ -1,0 +1,25 @@
+{
+  "schema_version": "skill-contract/v1-alpha",
+  "skill_key": "devharness-strict",
+  "version": "0.7.1",
+  "task_type": "coding",
+  "risk_level": "medium",
+  "mode": "strict",
+  "data_access_level": "context",
+  "allowed_commands": [
+    "dhk goal next",
+    "dhk goal step",
+    "dhk goal verify"
+  ],
+  "forbidden_commands": [
+    "dhk workflow gate waive",
+    "dhk spec archive",
+    "dhk memory confirm",
+    "dhk db sql"
+  ],
+  "declared_commands": [
+    "dhk goal next",
+    "dhk goal step",
+    "dhk goal verify"
+  ]
+}

@@ -11,14 +11,27 @@ public final class GoalGraphArtifacts {
     private final String graphSnapshotPath;
     private final String graphContextPath;
     private final String impactMapPath;
+    private final String scenarioImpactMapPath;
     private final String graphSnapshotHash;
     private final String graphContextHash;
     private final String impactMapHash;
+    private final String scenarioImpactMapHash;
 
     public GoalGraphArtifacts(boolean enabled, long snapshotId, String snapshotKey, String provider,
                               int fileCount, int nodeCount, int edgeCount,
                               String graphSnapshotPath, String graphContextPath, String impactMapPath,
                               String graphSnapshotHash, String graphContextHash, String impactMapHash) {
+        this(enabled, snapshotId, snapshotKey, provider, fileCount, nodeCount, edgeCount,
+                graphSnapshotPath, graphContextPath, impactMapPath, "",
+                graphSnapshotHash, graphContextHash, impactMapHash, "");
+    }
+
+    public GoalGraphArtifacts(boolean enabled, long snapshotId, String snapshotKey, String provider,
+                              int fileCount, int nodeCount, int edgeCount,
+                              String graphSnapshotPath, String graphContextPath, String impactMapPath,
+                              String scenarioImpactMapPath, String graphSnapshotHash,
+                              String graphContextHash, String impactMapHash,
+                              String scenarioImpactMapHash) {
         this.enabled = enabled;
         this.snapshotId = snapshotId;
         this.snapshotKey = value(snapshotKey);
@@ -29,9 +42,11 @@ public final class GoalGraphArtifacts {
         this.graphSnapshotPath = value(graphSnapshotPath);
         this.graphContextPath = value(graphContextPath);
         this.impactMapPath = value(impactMapPath);
+        this.scenarioImpactMapPath = value(scenarioImpactMapPath);
         this.graphSnapshotHash = value(graphSnapshotHash);
         this.graphContextHash = value(graphContextHash);
         this.impactMapHash = value(impactMapHash);
+        this.scenarioImpactMapHash = value(scenarioImpactMapHash);
     }
 
     public static GoalGraphArtifacts none() {
@@ -49,9 +64,11 @@ public final class GoalGraphArtifacts {
     public String graphSnapshotPath() { return graphSnapshotPath; }
     public String graphContextPath() { return graphContextPath; }
     public String impactMapPath() { return impactMapPath; }
+    public String scenarioImpactMapPath() { return scenarioImpactMapPath; }
     public String graphSnapshotHash() { return graphSnapshotHash; }
     public String graphContextHash() { return graphContextHash; }
     public String impactMapHash() { return impactMapHash; }
+    public String scenarioImpactMapHash() { return scenarioImpactMapHash; }
 
     private static String value(String raw) {
         return raw == null ? "" : raw;

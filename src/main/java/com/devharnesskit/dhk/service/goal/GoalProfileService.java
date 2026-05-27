@@ -23,6 +23,12 @@ public final class GoalProfileService {
         if ("java-api-change".equals(profileKey)) {
             return javaProfile(profileKey, "api-change", "api");
         }
+        if ("java-api-change-with-bdd".equals(profileKey)) {
+            return javaProfile(profileKey, "api-change", "api", false, true);
+        }
+        if ("java-api-change-with-bdd-graph".equals(profileKey)) {
+            return javaProfile(profileKey, "api-change", "api", true, true);
+        }
         if ("java-api-change-with-graph".equals(profileKey)) {
             return javaProfile(profileKey, "api-change", "api", true);
         }
@@ -105,7 +111,8 @@ public final class GoalProfileService {
                     parseBoolean(value(raw, "rollback_plan_required", "false")),
                     parseBoolean(value(raw, "manual_evidence_required", "false")),
                     parseBoolean(value(raw, "protected_impact_requires_manual_evidence", "false")),
-                    parsePositiveInt(value(raw, "legacy_max_changed_files", "8"), 8));
+                    parsePositiveInt(value(raw, "legacy_max_changed_files", "8"), 8),
+                    parseBoolean(value(raw, "bdd_required", "false")));
         } catch (Exception ex) {
             return null;
         }
@@ -116,6 +123,11 @@ public final class GoalProfileService {
     }
 
     private GoalProfile javaProfile(String profileKey, String workflowKey, String defaultMode, boolean graphAware) {
+        return javaProfile(profileKey, workflowKey, defaultMode, graphAware, false);
+    }
+
+    private GoalProfile javaProfile(String profileKey, String workflowKey, String defaultMode,
+                                    boolean graphAware, boolean bddAware) {
         String[] actions = graphAware
                 ? new String[]{"graph_index_or_refresh", "graph_impact_analysis", "inspect_existing_code",
                 "create_change_plan", "implement_minimal_change", "graph_reimpact", "verify"}
@@ -137,7 +149,9 @@ public final class GoalProfileService {
         evidence.put("implement_minimal_change",
                 new String[]{"changed_files", "implementation_summary"});
         evidence.put("verify",
-                new String[]{"compile_result", "test_result", "sensitive_result"});
+                bddAware
+                        ? new String[]{"compile_result", "test_result", "sensitive_result", "bdd_result"}
+                        : new String[]{"compile_result", "test_result", "sensitive_result"});
 
         Map<String, GoalActionMapping> mappings = new LinkedHashMap<String, GoalActionMapping>();
         String[] inspectGates = "mvc-change".equals(workflowKey)
@@ -160,34 +174,67 @@ public final class GoalProfileService {
                 "implement_minimal_change", new String[0], "implement_minimal_change", "",
                 GoalActionMapping.MODE_STEP, GoalActionMapping.MODE_NONE,
                 GoalActionMapping.ACCEPTANCE_NONE, new String[0]));
+        String[] verificationChecks = verificationChecks(graphAware, bddAware);
         mappings.put("verify", new GoalActionMapping("verify",
                 verifyPhase, verifyGates, "verify", "auto_pass",
                 GoalActionMapping.MODE_CHECK, GoalActionMapping.MODE_CHECK,
-                GoalActionMapping.ACCEPTANCE_CHECKS,
-                graphAware
-                        ? new String[]{"compile", "test", "sensitive", "graph", "impact", "architecture"}
-                        : new String[]{"compile", "test", "sensitive"}));
+                GoalActionMapping.ACCEPTANCE_CHECKS, verificationChecks));
 
         Map<String, GoalAcceptanceMapping> acceptances = new LinkedHashMap<String, GoalAcceptanceMapping>();
         acceptances.put("goal_checks_pass", new GoalAcceptanceMapping("goal_checks_pass",
                 "Required goal checks are accepted",
-                graphAware
-                        ? "compile/test/sensitive/graph/impact/architecture checks are accepted by policy"
-                        : "compile/test/sensitive checks are accepted by policy",
+                checkDescription(graphAware, bddAware),
                 GoalAcceptanceMapping.SOURCE_CHECKS,
-                graphAware
-                        ? new String[]{"compile", "test", "sensitive", "graph", "impact", "architecture"}
-                        : new String[]{"compile", "test", "sensitive"}, ""));
+                verificationChecks, ""));
 
         return new GoalProfile(profileKey, workflowKey, true, defaultMode, actions, evidence,
-                graphAware
-                        ? new String[]{"compile", "test", "sensitive", "graph", "impact",
-                        "architecture", "workflow", "spec"}
-                        : new String[]{"compile", "test", "sensitive", "workflow", "spec"},
+                requiredChecks(graphAware, bddAware),
                 true, false, true, true, true, true, mappings, acceptances,
                 graphAware, "lite", true, true, 60,
                 graphAware ? new String[]{"graph_index_or_refresh", "graph_impact_analysis", "graph_reimpact"}
-                        : new String[0]);
+                        : new String[0],
+                false, false, false, false, 8, bddAware);
+    }
+
+    private String[] verificationChecks(boolean graphAware, boolean bddAware) {
+        if (graphAware && bddAware) {
+            return new String[]{"compile", "test", "sensitive", "graph", "impact", "architecture", "bdd"};
+        }
+        if (graphAware) {
+            return new String[]{"compile", "test", "sensitive", "graph", "impact", "architecture"};
+        }
+        if (bddAware) {
+            return new String[]{"compile", "test", "sensitive", "bdd"};
+        }
+        return new String[]{"compile", "test", "sensitive"};
+    }
+
+    private String[] requiredChecks(boolean graphAware, boolean bddAware) {
+        if (graphAware && bddAware) {
+            return new String[]{"compile", "test", "sensitive", "graph", "impact",
+                    "architecture", "bdd", "workflow", "spec"};
+        }
+        if (graphAware) {
+            return new String[]{"compile", "test", "sensitive", "graph", "impact",
+                    "architecture", "workflow", "spec"};
+        }
+        if (bddAware) {
+            return new String[]{"compile", "test", "sensitive", "bdd", "workflow", "spec"};
+        }
+        return new String[]{"compile", "test", "sensitive", "workflow", "spec"};
+    }
+
+    private String checkDescription(boolean graphAware, boolean bddAware) {
+        if (graphAware && bddAware) {
+            return "compile/test/sensitive/graph/impact/architecture/bdd checks are accepted by policy";
+        }
+        if (graphAware) {
+            return "compile/test/sensitive/graph/impact/architecture checks are accepted by policy";
+        }
+        if (bddAware) {
+            return "compile/test/sensitive/bdd checks are accepted by policy";
+        }
+        return "compile/test/sensitive checks are accepted by policy";
     }
 
     private GoalProfile legacyGraphProfile(String profileKey, String workflowKey, String defaultMode) {

@@ -166,6 +166,10 @@ public final class WorkspaceFingerprintService {
                 String third = relative.getName(2).toString();
                 return "exports".equals(third) || "snapshots".equals(third) || "cache".equals(third);
             }
+            if ("bdd".equals(second) && relative.getNameCount() > 2) {
+                String third = relative.getName(2).toString();
+                return "exports".equals(third);
+            }
         }
         return false;
     }

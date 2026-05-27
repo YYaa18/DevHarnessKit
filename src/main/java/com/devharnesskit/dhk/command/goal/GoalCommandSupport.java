@@ -11,7 +11,11 @@ import com.devharnesskit.dhk.service.goal.GoalOrchestrator;
 import com.devharnesskit.dhk.service.goal.GoalProfileService;
 import com.devharnesskit.dhk.model.goal.GoalGraphState;
 import com.devharnesskit.dhk.util.PathUtil;
+import com.devharnesskit.dhk.util.JsonOutput;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 final class GoalCommandSupport {
@@ -81,6 +85,7 @@ final class GoalCommandSupport {
         }
         GoalGraphState graph = GRAPH_STATE_SERVICE.inspect(projectRoot, profile, plan);
         printGraphState(context, graph);
+        printScenarioImpactState(context, projectRoot, profile);
         context.out().println("context_files:");
         context.out().println("  - .agents/memory/exports/CURRENT_CONTEXT.md");
         context.out().println("  - .agents/memory/exports/WORKFLOW_CONTEXT.md");
@@ -95,8 +100,92 @@ final class GoalCommandSupport {
                 context.out().println("  - " + blocker);
             }
         }
-        context.out().println("next_command: " + nextCommand(plan, graph));
+        context.out().println("next_command: " + nextCommand(plan, graph, profile, projectRoot));
         context.out().println("context_path: " + PathUtil.goalContext(projectRoot));
+    }
+
+    static void printPlanJson(CommandContext context, Path projectRoot, GoalRun goal, GoalPlan plan,
+                              String[] completionBlockers) {
+        GoalProfile profile = PROFILE_SERVICE.find(projectRoot, goal.profileKey());
+        String[] requiredChecks = CHECK_POLICY_SERVICE.load(projectRoot).requiredChecks(profile);
+        GoalGraphState graph = GRAPH_STATE_SERVICE.inspect(projectRoot, profile, plan);
+        String[] contextFiles = contextFiles(goal);
+        String nextCommand = nextCommand(plan, graph, profile, projectRoot);
+        context.out().print(JsonOutput.object(
+                JsonOutput.stringField("command", "goal next"),
+                JsonOutput.stringField("goal_key", goal.goalKey()),
+                JsonOutput.stringField("status", goal.status()),
+                JsonOutput.stringField("current_action", plan.currentAction()),
+                JsonOutput.stringField("instruction", plan.instruction()),
+                JsonOutput.rawField("allowed_actions", JsonOutput.stringArray(ALLOWED_ACTIONS)),
+                JsonOutput.rawField("required_evidence", JsonOutput.stringArray(plan.requiredEvidence())),
+                JsonOutput.rawField("structured_evidence_fields", JsonOutput.stringArray(STRUCTURED_EVIDENCE_FIELDS)),
+                JsonOutput.rawField("forbidden_actions", JsonOutput.stringArray(plan.forbiddenActions())),
+                JsonOutput.rawField("required_checks", JsonOutput.stringArray(requiredChecks)),
+                JsonOutput.rawField("context_files", JsonOutput.stringArray(contextFiles)),
+                JsonOutput.rawField("completion_blockers", JsonOutput.stringArray(
+                        completionBlockers == null ? new String[0] : completionBlockers)),
+                JsonOutput.rawField("evidence_contract", evidenceContractJson(plan)),
+                JsonOutput.rawField("graph", graphJson(graph)),
+                JsonOutput.rawField("scenario_impact", scenarioImpactJson(projectRoot, profile)),
+                JsonOutput.stringField("next_command", nextCommand),
+                JsonOutput.stringField("context_path", PathUtil.goalContext(projectRoot).toString())
+        ));
+    }
+
+    private static String[] contextFiles(GoalRun goal) {
+        List<String> files = new ArrayList<String>();
+        files.add(".agents/memory/exports/CURRENT_CONTEXT.md");
+        files.add(".agents/memory/exports/WORKFLOW_CONTEXT.md");
+        if (goal.specChangeKey().length() > 0) {
+            files.add(".agents/memory/exports/SPEC_CONTEXT.md");
+        }
+        return files.toArray(new String[files.size()]);
+    }
+
+    private static String evidenceContractJson(GoalPlan plan) {
+        return JsonOutput.object(
+                JsonOutput.stringField("current_action", plan.currentAction()),
+                JsonOutput.rawField("required_evidence", JsonOutput.stringArray(plan.requiredEvidence())),
+                JsonOutput.rawField("structured_evidence_fields", JsonOutput.stringArray(STRUCTURED_EVIDENCE_FIELDS)),
+                JsonOutput.stringField("rule", "include every required_evidence key in goal step evidence")
+        );
+    }
+
+    private static String graphJson(GoalGraphState graph) {
+        if (graph == null || !graph.enabled()) {
+            return JsonOutput.object(JsonOutput.booleanField("enabled", false));
+        }
+        return JsonOutput.object(
+                JsonOutput.booleanField("enabled", graph.enabled()),
+                JsonOutput.stringField("snapshot_path", graph.snapshotPath()),
+                JsonOutput.booleanField("snapshot_exists", graph.snapshotExists()),
+                JsonOutput.stringField("snapshot_key", graph.snapshotKey()),
+                JsonOutput.stringField("snapshot_workspace_fingerprint", graph.snapshotWorkspaceFingerprint()),
+                JsonOutput.stringField("current_workspace_fingerprint", graph.currentWorkspaceFingerprint()),
+                JsonOutput.booleanField("graph_stale", graph.snapshotStale()),
+                JsonOutput.stringField("freshness_status", graph.freshnessStatus()),
+                JsonOutput.stringField("graph_context_path", graph.graphContextPath()),
+                JsonOutput.booleanField("graph_context_exists", graph.graphContextExists()),
+                JsonOutput.stringField("impact_map_path", graph.impactMapPath()),
+                JsonOutput.booleanField("impact_map_exists", graph.impactMapExists()),
+                JsonOutput.stringField("required_graph_action", graph.requiredGraphAction()),
+                JsonOutput.stringField("graph_next_command", graph.graphNextCommand())
+        );
+    }
+
+    private static String scenarioImpactJson(Path projectRoot, GoalProfile profile) {
+        boolean required = profile != null && profile.graphRequired() && profile.bddRequired();
+        if (!required) {
+            return JsonOutput.object(JsonOutput.booleanField("required", false));
+        }
+        Path scenarioImpact = PathUtil.scenarioImpactMap(projectRoot);
+        return JsonOutput.object(
+                JsonOutput.booleanField("required", true),
+                JsonOutput.stringField("path", scenarioImpact.toString()),
+                JsonOutput.booleanField("exists", Files.isRegularFile(scenarioImpact)),
+                JsonOutput.stringField("next_command", scenarioImpactCommand(projectRoot))
+        );
     }
 
     private static void printGraphState(CommandContext context, GoalGraphState graph) {
@@ -125,10 +214,31 @@ final class GoalCommandSupport {
         }
     }
 
-    private static String nextCommand(GoalPlan plan, GoalGraphState graph) {
+    private static void printScenarioImpactState(CommandContext context, Path projectRoot, GoalProfile profile) {
+        if (profile == null || !profile.graphRequired() || !profile.bddRequired()) {
+            return;
+        }
+        Path scenarioImpact = PathUtil.scenarioImpactMap(projectRoot);
+        context.out().println("scenario_impact:");
+        context.out().println("  required: true");
+        context.out().println("  path: " + scenarioImpact);
+        context.out().println("  exists: " + Files.isRegularFile(scenarioImpact));
+        context.out().println("  next_command: " + scenarioImpactCommand(projectRoot));
+    }
+
+    private static String nextCommand(GoalPlan plan, GoalGraphState graph, GoalProfile profile, Path projectRoot) {
         if (graph != null && graph.enabled() && graph.graphNextCommand().length() > 0) {
             return graph.graphNextCommand();
         }
+        if (profile != null && profile.graphRequired() && profile.bddRequired()
+                && !Files.isRegularFile(PathUtil.scenarioImpactMap(projectRoot))) {
+            return scenarioImpactCommand(projectRoot);
+        }
         return plan.nextCommand();
+    }
+
+    private static String scenarioImpactCommand(Path projectRoot) {
+        return "dhk graph impact --project-root " + projectRoot.toAbsolutePath().normalize()
+                + " --scenario <scenario-key>";
     }
 }

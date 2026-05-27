@@ -31,6 +31,7 @@ public final class GoalProfile {
     private final boolean manualEvidenceRequired;
     private final boolean protectedImpactRequiresManualEvidence;
     private final int legacyMaxChangedFiles;
+    private final boolean bddRequired;
 
     public GoalProfile(String profileKey, String workflowKey, boolean specRequired,
                        String defaultMode, String[] actions) {
@@ -158,6 +159,39 @@ public final class GoalProfile {
                        boolean manualEvidenceRequired,
                        boolean protectedImpactRequiresManualEvidence,
                        int legacyMaxChangedFiles) {
+        this(profileKey, workflowKey, specRequired, defaultMode, actions, requiredEvidenceByAction,
+                requiredChecks, completionRequireFreshChecks, completionAllowSkippedChecks,
+                completionRequireCheckpoint, strictWorkflowPhaseOrder, specRequireNonEmptyTasks,
+                specRequireNonEmptyAcceptance, actionMappings, acceptanceMappings, graphRequired,
+                graphProvider, graphRequireFreshSnapshot, graphRequireImpactMap, graphMaxStalenessMinutes,
+                graphActions, legacyGraphProfile, rollbackPlanRequired, manualEvidenceRequired,
+                protectedImpactRequiresManualEvidence, legacyMaxChangedFiles, false);
+    }
+
+    public GoalProfile(String profileKey, String workflowKey, boolean specRequired,
+                       String defaultMode, String[] actions,
+                       Map<String, String[]> requiredEvidenceByAction,
+                       String[] requiredChecks,
+                       boolean completionRequireFreshChecks,
+                       boolean completionAllowSkippedChecks,
+                       boolean completionRequireCheckpoint,
+                       boolean strictWorkflowPhaseOrder,
+                       boolean specRequireNonEmptyTasks,
+                       boolean specRequireNonEmptyAcceptance,
+                       Map<String, GoalActionMapping> actionMappings,
+                       Map<String, GoalAcceptanceMapping> acceptanceMappings,
+                       boolean graphRequired,
+                       String graphProvider,
+                       boolean graphRequireFreshSnapshot,
+                       boolean graphRequireImpactMap,
+                       int graphMaxStalenessMinutes,
+                       String[] graphActions,
+                       boolean legacyGraphProfile,
+                       boolean rollbackPlanRequired,
+                       boolean manualEvidenceRequired,
+                       boolean protectedImpactRequiresManualEvidence,
+                       int legacyMaxChangedFiles,
+                       boolean bddRequired) {
         this.profileKey = profileKey;
         this.workflowKey = workflowKey;
         this.specRequired = specRequired;
@@ -184,6 +218,7 @@ public final class GoalProfile {
         this.manualEvidenceRequired = manualEvidenceRequired;
         this.protectedImpactRequiresManualEvidence = protectedImpactRequiresManualEvidence;
         this.legacyMaxChangedFiles = legacyMaxChangedFiles <= 0 ? 8 : legacyMaxChangedFiles;
+        this.bddRequired = bddRequired;
     }
 
     public String profileKey() { return profileKey; }
@@ -209,6 +244,7 @@ public final class GoalProfile {
     public boolean manualEvidenceRequired() { return manualEvidenceRequired; }
     public boolean protectedImpactRequiresManualEvidence() { return protectedImpactRequiresManualEvidence; }
     public int legacyMaxChangedFiles() { return legacyMaxChangedFiles; }
+    public boolean bddRequired() { return bddRequired; }
 
     public String[] requiredEvidence(String actionKey) {
         String[] evidence = requiredEvidenceByAction.get(actionKey);

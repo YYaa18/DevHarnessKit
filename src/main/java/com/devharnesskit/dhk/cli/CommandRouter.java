@@ -3,10 +3,15 @@ package com.devharnesskit.dhk.cli;
 import com.devharnesskit.dhk.command.HelpCommand;
 import com.devharnesskit.dhk.command.DoctorCommand;
 import com.devharnesskit.dhk.command.VersionCommand;
+import com.devharnesskit.dhk.command.artifact.ArtifactCommand;
+import com.devharnesskit.dhk.command.bdd.BddCommand;
+import com.devharnesskit.dhk.command.checkpoint.CheckpointCommand;
+import com.devharnesskit.dhk.command.configure.ConfigureCommand;
 import com.devharnesskit.dhk.command.projectdb.DbCommand;
 import com.devharnesskit.dhk.command.graph.GraphCommand;
 import com.devharnesskit.dhk.command.memory.MemoryCommand;
 import com.devharnesskit.dhk.command.goal.GoalCommand;
+import com.devharnesskit.dhk.command.skill.SkillCommand;
 import com.devharnesskit.dhk.command.spec.SpecCommand;
 import com.devharnesskit.dhk.command.workflow.WorkflowCommand;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
@@ -57,6 +62,31 @@ public final class CommandRouter {
         this.commands.put("graph", new Supplier<Command>() {
             public Command get() {
                 return new GraphCommand();
+            }
+        });
+        this.commands.put("bdd", new Supplier<Command>() {
+            public Command get() {
+                return new BddCommand();
+            }
+        });
+        this.commands.put("skill", new Supplier<Command>() {
+            public Command get() {
+                return new SkillCommand();
+            }
+        });
+        this.commands.put("artifact", new Supplier<Command>() {
+            public Command get() {
+                return new ArtifactCommand();
+            }
+        });
+        this.commands.put("checkpoint", new Supplier<Command>() {
+            public Command get() {
+                return new CheckpointCommand();
+            }
+        });
+        this.commands.put("configure", new Supplier<Command>() {
+            public Command get() {
+                return new ConfigureCommand();
             }
         });
         this.commands.put("workflow", new Supplier<Command>() {
@@ -118,6 +148,7 @@ public final class CommandRouter {
         excluded.add("database");
         excluded.add("user");
         excluded.add("port");
+        excluded.add("path");
         return excluded;
     }
 

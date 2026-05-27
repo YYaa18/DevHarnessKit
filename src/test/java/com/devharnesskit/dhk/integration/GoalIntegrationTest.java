@@ -109,6 +109,28 @@ final class GoalIntegrationTest {
         assertTrue(next.stdout().contains("completion_blockers:"));
         assertTrue(next.stdout().contains("check compile is pending"));
 
+        Harness nextJson = new Harness(tempDir);
+        int nextJsonExit = new CommandRouter().run(new String[]{
+                "goal", "next", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, nextJson.context());
+        assertEquals(ExitCodes.SUCCESS, nextJsonExit);
+        assertTrue(nextJson.stdout().contains("\"command\": \"goal next\""));
+        assertTrue(nextJson.stdout().contains("\"goal_key\": \"" + goalKey + "\""));
+        assertTrue(nextJson.stdout().contains("\"current_action\": \"inspect_existing_code\""));
+        assertTrue(nextJson.stdout().contains("\"evidence_contract\": {"));
+        assertTrue(nextJson.stdout().contains("\"required_evidence\": [\"existing_controller\", \"existing_service\", \"existing_mapper\", \"existing_tests\"]"));
+        assertTrue(nextJson.stdout().contains("\"structured_evidence_fields\": [\"--read-files\", \"--changed-files\", \"--tests-run\", \"--compile-result\", \"--risks\", \"--pending\"]"));
+        assertTrue(nextJson.stdout().contains("\"allowed_actions\": [\"perform_current_action_only\", \"record_goal_step_after_work\", \"run_goal_next_before_continuing\"]"));
+        assertTrue(nextJson.stdout().contains("\"forbidden_actions\": [\"do_not_archive_spec\""));
+        assertTrue(nextJson.stdout().contains("\"required_checks\": ["));
+        assertTrue(nextJson.stdout().contains("\"compile\""));
+        assertTrue(nextJson.stdout().contains("\"test\""));
+        assertTrue(nextJson.stdout().contains("\"sensitive\""));
+        assertTrue(nextJson.stdout().contains("\"workflow\""));
+        assertTrue(nextJson.stdout().contains("\"spec\""));
+        assertTrue(nextJson.stdout().contains("\"completion_blockers\": [\"goal steps incomplete: expected 4 actions, recorded 0\""));
+        assertTrue(nextJson.stdout().contains("\"next_command\": \"dhk goal step --goal " + goalKey));
+
         Harness step = new Harness(tempDir);
         int stepExit = new CommandRouter().run(new String[]{
                 "goal", "step",
@@ -206,6 +228,8 @@ final class GoalIntegrationTest {
         }, verifyReady.context());
         assertEquals(ExitCodes.SUCCESS, verifyReadyExit);
         assertTrue(verifyReady.stdout().contains("goal_key: " + goalKey));
+        assertTrue(verifyReady.stdout().contains("level: standard"));
+        assertTrue(verifyReady.stdout().contains("check_scope: all_required"));
         assertTrue(verifyReady.stdout().contains("decision: ready_to_complete"));
         assertTrue(verifyReady.stdout().contains("ready_to_complete: true"));
         assertTrue(verifyReady.stdout().contains("checks:"));
@@ -215,6 +239,27 @@ final class GoalIntegrationTest {
         assertTrue(verifyReady.stdout().contains("completion_blockers:"));
         assertTrue(verifyReady.stdout().contains("next_command: dhk goal complete --goal " + goalKey));
         assertTrue(verifyReady.stdout().contains("context_path: " + goalContext));
+
+        Harness verifyFast = new Harness(tempDir);
+        int verifyFastExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "demo", "--goal", goalKey, "--level", "fast"
+        }, verifyFast.context());
+        assertEquals(ExitCodes.SUCCESS, verifyFastExit);
+        assertTrue(verifyFast.stdout().contains("level: fast"));
+        assertTrue(verifyFast.stdout().contains("check_scope: fast"));
+        assertTrue(verifyFast.stdout().contains("selected_checks:"));
+        assertTrue(verifyFast.stdout().contains("sensitive: passed"));
+
+        Harness verifyRelease = new Harness(tempDir);
+        int verifyReleaseExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "demo", "--goal", goalKey, "--level", "release"
+        }, verifyRelease.context());
+        assertEquals(ExitCodes.SUCCESS, verifyReleaseExit);
+        assertTrue(verifyRelease.stdout().contains("level: release"));
+        assertTrue(verifyRelease.stdout().contains("check_scope: release"));
+        assertTrue(verifyRelease.stdout().contains("release_checks:"));
+        assertTrue(verifyRelease.stdout().contains("package: passed"));
+        assertTrue(verifyRelease.stdout().contains("artifact_passport: missing_until_goal_complete"));
 
         Harness complete = new Harness(tempDir);
         int completeExit = new CommandRouter().run(new String[]{
@@ -241,6 +286,40 @@ final class GoalIntegrationTest {
         assertTrue(summary.contains("Do not treat generated summary text as confirmed long-term memory"));
         assertFalse(summary.contains("password="));
         assertCompletedRows(root, goalKey);
+
+        Harness audit = new Harness(tempDir);
+        int auditExit = new CommandRouter().run(new String[]{
+                "goal", "audit", "--project-root", "demo", "--goal", goalKey
+        }, audit.context());
+        assertEquals(ExitCodes.SUCCESS, auditExit);
+        assertTrue(audit.stdout().contains("goal audit complete"));
+        assertTrue(audit.stdout().contains("status: completed"));
+        assertTrue(audit.stdout().contains("step_count: 4"));
+        assertTrue(audit.stdout().contains("artifact_passport: present"));
+        assertTrue(audit.stdout().contains("decision: ready_to_complete"));
+        assertTrue(audit.stdout().contains("missing:\n  - none"));
+        assertTrue(audit.stdout().contains("invalid:\n  - none"));
+
+        Harness auditJson = new Harness(tempDir);
+        int auditJsonExit = new CommandRouter().run(new String[]{
+                "goal", "audit", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, auditJson.context());
+        assertEquals(ExitCodes.SUCCESS, auditJsonExit);
+        assertTrue(auditJson.stdout().contains("\"command\": \"goal audit\""));
+        assertTrue(auditJson.stdout().contains("\"status\": \"completed\""));
+        assertTrue(auditJson.stdout().contains("\"artifact_passport\": \"present\""));
+
+        Harness recheck = new Harness(tempDir);
+        int recheckExit = new CommandRouter().run(new String[]{
+                "goal", "recheck", "--project-root", "demo", "--goal", goalKey
+        }, recheck.context());
+        assertEquals(ExitCodes.SUCCESS, recheckExit);
+        assertTrue(recheck.stdout().contains("goal recheck complete"));
+        assertTrue(recheck.stdout().contains("status_before: completed"));
+        assertTrue(recheck.stdout().contains("status_after: completed"));
+        assertTrue(recheck.stdout().contains("step_count_before: 4"));
+        assertTrue(recheck.stdout().contains("step_count_after: 4"));
+        assertTrue(recheck.stdout().contains("decision: ready_to_complete"));
     }
 
     @Test
@@ -347,6 +426,75 @@ final class GoalIntegrationTest {
         assertTrue(verifyEvidence.contains("tests_run=GoalIntegrationTest"));
         assertTrue(verifyEvidence.contains("test_result=GoalIntegrationTest"));
         assertTrue(verifyEvidence.contains("pending=none"));
+    }
+
+    @Test
+    void goalStepTemplateFieldAndDryRunAvoidFragileEvidenceFormatting() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "java-api-change",
+                "--task", "Field evidence",
+                "--module", "goal"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        Harness template = new Harness(tempDir);
+        int templateExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--template"
+        }, template.context());
+        assertEquals(ExitCodes.SUCCESS, templateExit);
+        assertTrue(template.stdout().contains("goal step template"));
+        assertTrue(template.stdout().contains("current_action: inspect_existing_code"));
+        assertTrue(template.stdout().contains("--field existing_controller=<value>"));
+        assertTrue(template.stdout().contains("--field existing_service=<value>"));
+        assertTrue(template.stdout().contains("dry_run_command: dhk goal step --goal " + goalKey));
+
+        Harness dryRun = new Harness(tempDir);
+        int dryRunExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Inspected with field evidence",
+                "--field", "existing_controller=GoalStepCommand",
+                "--field", "existing_service=GoalOrchestrator",
+                "--field", "existing_mapper=GoalStepRepository",
+                "--field", "existing_tests=GoalIntegrationTest",
+                "--dry-run"
+        }, dryRun.context());
+        assertEquals(ExitCodes.SUCCESS, dryRunExit,
+                "stdout=" + dryRun.stdout() + "\nstderr=" + dryRun.stderr());
+        assertTrue(dryRun.stdout().contains("goal step dry-run complete"));
+        assertTrue(dryRun.stdout().contains("status: passed"));
+        assertTrue(dryRun.stdout().contains("would_record: true"));
+        assertTrue(dryRun.stdout().contains("step_count: 0"));
+        assertEquals(0, countRows(root, "goal_step"));
+
+        Harness step = new Harness(tempDir);
+        int stepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Inspected with field evidence",
+                "--field", "existing_controller=GoalStepCommand",
+                "--field", "existing_service=GoalOrchestrator",
+                "--field", "existing_mapper=GoalStepRepository",
+                "--field", "existing_tests=GoalIntegrationTest"
+        }, step.context());
+        assertEquals(ExitCodes.SUCCESS, stepExit,
+                "stdout=" + step.stdout() + "\nstderr=" + step.stderr());
+        assertTrue(step.stdout().contains("current_action: create_change_plan"));
+        String evidence = singleString(root, "SELECT evidence FROM goal_step WHERE goal_key = '" + goalKey + "'");
+        assertTrue(evidence.contains("existing_controller=GoalStepCommand"));
+        assertTrue(evidence.contains("existing_service=GoalOrchestrator"));
+        assertTrue(evidence.contains("existing_mapper=GoalStepRepository"));
+        assertTrue(evidence.contains("existing_tests=GoalIntegrationTest"));
     }
 
     @Test
@@ -2261,6 +2409,10 @@ final class GoalIntegrationTest {
                 "graph", "impact", "--project-root", "demo-graph-complete",
                 "--file", "src/main/java/com/example/App.java"
         }, new Harness(tempDir).context()));
+        Files.createDirectories(PathUtil.bddExportsDirectory(root));
+        Files.write(PathUtil.scenarioImpactMap(root),
+                "# SCENARIO_IMPACT_MAP\n\n<summary>\n- scenario_key: graph-complete\n</summary>\n"
+                        .getBytes("UTF-8"));
         recordCustomGraphGoalSteps("demo-graph-complete", goalKey,
                 "src/main/java/com/example/App.java", true);
 
@@ -2285,6 +2437,8 @@ final class GoalIntegrationTest {
         assertTrue(summary.contains("GRAPH_SNAPSHOT.json"));
         assertTrue(summary.contains("GRAPH_CONTEXT.md"));
         assertTrue(summary.contains("IMPACT_MAP.md"));
+        assertTrue(summary.contains("SCENARIO_IMPACT_MAP.md"));
+        assertTrue(summary.contains("- goal_artifact: scenario_impact_map"));
         assertTrue(summary.contains("- goal_graph_binding: used,summary,impact_map"));
         assertTrue(summary.contains("impact map is query-scoped"));
         assertFalse(summary.contains("password="));
@@ -2999,7 +3153,9 @@ final class GoalIntegrationTest {
                     + "WHERE goal_key = '" + goalKey + "' AND artifact_type = 'graph_context'"));
             assertEquals(1, count(statement, "SELECT COUNT(*) FROM goal_artifact "
                     + "WHERE goal_key = '" + goalKey + "' AND artifact_type = 'graph_impact_map'"));
-            assertEquals(3, count(statement, "SELECT COUNT(*) FROM workflow_artifact "
+            assertEquals(1, count(statement, "SELECT COUNT(*) FROM goal_artifact "
+                    + "WHERE goal_key = '" + goalKey + "' AND artifact_type = 'scenario_impact_map'"));
+            assertEquals(4, count(statement, "SELECT COUNT(*) FROM workflow_artifact "
                     + "WHERE produced_by_phase = 'goal_complete' AND tags LIKE '%graph%'"));
             assertEquals(1, count(statement, "SELECT COUNT(*) FROM checkpoint "
                     + "WHERE verify_status LIKE 'goal checks accepted; graph evidence bound%'"));

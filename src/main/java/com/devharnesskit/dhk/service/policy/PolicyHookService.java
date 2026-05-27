@@ -110,6 +110,16 @@ public final class PolicyHookService {
         }
     }
 
+    public static String humanCheckpointBlocker(DevHarnessPolicy policy, boolean approved,
+                                                String checkpointType) {
+        if (policy == null || !policy.humanCheckpointRequired() || approved) {
+            return "";
+        }
+        String type = checkpointType == null || checkpointType.trim().length() == 0
+                ? policy.humanCheckpointType() : checkpointType.trim();
+        return "human_checkpoint_required: type=" + type + " status=missing_approved";
+    }
+
     private PolicyDecision commandDecision(DevHarnessPolicy policy, String command) {
         if (matchesCommand(command, policy.forbiddenDhkCommands())) {
             return PolicyDecision.block("command is forbidden by policy: " + command);

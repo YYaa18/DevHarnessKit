@@ -1,0 +1,109 @@
+package com.devharnesskit.dhk.model.config;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+public final class DevHarnessConfig {
+    public static final String SCHEMA_VERSION = "devharness-config/v1-alpha";
+
+    private final Map<String, String> values;
+
+    public DevHarnessConfig(Map<String, String> values) {
+        this.values = new LinkedHashMap<String, String>();
+        if (values != null) {
+            this.values.putAll(values);
+        }
+    }
+
+    public Map<String, String> values() {
+        return new LinkedHashMap<String, String>(values);
+    }
+
+    public String schemaVersion() {
+        return value("schema_version", "");
+    }
+
+    public String preset() {
+        return value("preset", "custom");
+    }
+
+    public String projectType() {
+        return value("project.type", "unknown");
+    }
+
+    public String moduleStyle() {
+        return value("project.module_style", "unknown");
+    }
+
+    public String runtime() {
+        return value("project.runtime", "local");
+    }
+
+    public String compileMode() {
+        return mode("verification.compile.mode");
+    }
+
+    public String compileCommand() {
+        return value("verification.compile.command", "");
+    }
+
+    public String compileTrigger() {
+        return value("verification.compile.manual_trigger", "");
+    }
+
+    public String testMode() {
+        return mode("verification.test.mode");
+    }
+
+    public String testCommand() {
+        return value("verification.test.command", "");
+    }
+
+    public String testTrigger() {
+        return value("verification.test.manual_trigger", "");
+    }
+
+    public String testCost() {
+        return value("verification.test.expected_duration", "");
+    }
+
+    public boolean graphRequired() {
+        return booleanValue("verification.graph.required", false);
+    }
+
+    public boolean graphFreshSnapshotRequired() {
+        return booleanValue("verification.graph.fresh_snapshot_required", graphRequired());
+    }
+
+    public boolean impactMapRequired() {
+        return booleanValue("verification.graph.impact_map_required", graphRequired());
+    }
+
+    public boolean allowStaleRequiresApproval() {
+        return booleanValue("verification.graph.allow_stale_requires_approval", true);
+    }
+
+    public String value(String key, String defaultValue) {
+        String value = values.get(key);
+        return value == null || value.trim().length() == 0 ? defaultValue : value.trim();
+    }
+
+    private String mode(String key) {
+        return value(key, "auto").toLowerCase();
+    }
+
+    private boolean booleanValue(String key, boolean defaultValue) {
+        String value = values.get(key);
+        if (value == null) {
+            return defaultValue;
+        }
+        String normalized = value.trim().toLowerCase();
+        if ("true".equals(normalized) || "yes".equals(normalized) || "1".equals(normalized)) {
+            return true;
+        }
+        if ("false".equals(normalized) || "no".equals(normalized) || "0".equals(normalized)) {
+            return false;
+        }
+        return defaultValue;
+    }
+}

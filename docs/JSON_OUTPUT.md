@@ -16,11 +16,36 @@ dhk memory export --task "Order API" --module order --json
 dhk db test --jdbc-url <url> --user <user> --password-env <env> --json
 dhk db sql --dry-run --sql "SELECT 1" --json
 dhk db sql --sql "SELECT 1" --format json --jdbc-url <url> --user <user> --password-env <env>
+dhk configure show --json
+dhk configure doctor --json
+dhk configure explain [key] --json
 dhk goal status --goal <goal-key> --json
+dhk goal next --goal <goal-key> --json
 dhk goal check --goal <goal-key> --all --json
 dhk goal evaluate --goal <goal-key> --json
-dhk goal verify --goal <goal-key> --json
+dhk goal verify --goal <goal-key> [--level fast|standard|release] --json
+dhk goal audit --goal <goal-key> --json
+dhk goal recheck --goal <goal-key> --json
 dhk goal complete --goal <goal-key> --json
+dhk bdd init --json
+dhk bdd add --feature <key> --title <title> --scenario <key> --scenario-title <title> --json
+dhk bdd list --json
+dhk bdd show --scenario <key> --json
+dhk bdd export --json
+dhk bdd lint --json
+dhk bdd evidence add --scenario <key> --summary <text> --json
+dhk bdd verify --json
+dhk bdd coverage --json
+dhk bdd bind-spec --scenario <key> --change <key> --acceptance <key> --json
+dhk bdd bind-goal --scenario <key> --goal <goal-key> --json
+dhk bdd bind-graph --scenario <key> --file <path>|--symbol <symbol>|--sql-table <table> --json
+dhk graph impact --scenario <key> --json
+dhk skill lint --skill <key>|--path <skill-dir> --json
+dhk skill verify --skill <key>|--path <skill-dir> --json
+dhk skill trust --skill <key>|--path <skill-dir> --json
+dhk skill audit --skill <key>|--path <skill-dir> --json
+dhk skill score --goal <goal-key> --json
+dhk skill report --goal <goal-key> --baseline-score <score> --json
 ```
 
 ## Contract Notes
@@ -140,6 +165,42 @@ data
 risk_warning
 ```
 
+`configure show`:
+
+```text
+command
+project_root
+config_path
+exists
+schema_version
+project_type
+compile_mode
+test_mode
+graph_required
+rollback_required_if_test_not_run
+```
+
+`configure doctor`:
+
+```text
+command
+project_root
+config_path
+status
+warnings
+effective_compile_mode
+effective_test_mode
+manual_evidence_required
+```
+
+`configure explain`:
+
+```text
+command
+key
+explanation
+```
+
 `goal status`:
 
 ```text
@@ -176,6 +237,31 @@ result_summary
 evidence_path
 ```
 
+`goal next`:
+
+```text
+command
+goal_key
+status
+current_action
+instruction
+allowed_actions
+required_evidence
+structured_evidence_fields
+forbidden_actions
+required_checks
+context_files
+completion_blockers
+evidence_contract
+graph
+scenario_impact
+next_command
+context_path
+```
+
+`evidence_contract` repeats the current action, required evidence keys,
+structured evidence fields, and the rule for recording the next `goal step`.
+
 `goal evaluate`:
 
 ```text
@@ -195,6 +281,9 @@ next_command
 ```text
 command
 goal_key
+level
+check_scope
+selected_checks
 decision
 ready_to_complete
 check_count
@@ -214,6 +303,238 @@ context_path
 ```
 
 `goal verify` runs required checks before evaluating readiness. `failed_checks` lists checks with `failed` status; skipped-disallowed checks are reported through `missing`. `freshness_status` is `fresh` only when required checks are current for the latest goal steps and workspace fingerprint. `completion_blockers` combines failed, missing, stale, and policy blockers for agent-facing next-action decisions.
+
+`level=fast` is a preflight and only runs selected lightweight checks.
+`level=standard` is the default and runs all required checks. `level=release`
+runs standard checks and adds `release_checks`:
+
+```text
+package
+artifact_passport
+export_contract
+```
+
+`goal audit`:
+
+```text
+command
+goal_key
+status
+current_action
+step_count
+check_count
+artifact_count
+artifact_passport
+decision
+ready_to_complete
+missing
+stale
+invalid
+next_command
+context_path
+```
+
+`goal audit` is read-only; it does not rerun checks or reopen completed goals.
+
+`goal recheck`:
+
+```text
+command
+goal_key
+status_before
+status_after
+step_count_before
+step_count_after
+check_count
+checks
+decision
+ready_to_complete
+stale_checks
+missing
+next_command
+```
+
+`goal recheck` reruns checks and refreshes check rows without adding goal steps
+or changing a completed goal back to an open state.
+
+Profiles with `bdd_required=true` include a `bdd` check in `checks`; failed BDD
+checks appear in `failed_checks` and `completion_blockers` like other required
+checks.
+
+`bdd init`:
+
+```text
+command
+bdd_dir
+features_dir
+evidence_dir
+exports_dir
+```
+
+`bdd add`:
+
+```text
+command
+feature_key
+scenario_key
+status
+step_count
+steps
+```
+
+`bdd list`:
+
+```text
+command
+feature_count
+scenario_count
+features
+scenarios
+```
+
+`bdd show`:
+
+```text
+command
+feature_key
+scenario_key
+title
+status
+steps
+bindings
+```
+
+For feature-level show, `bdd show --feature <key> --json` returns
+`scenario_count` and `scenarios` instead of `steps`.
+
+`bdd export`:
+
+```text
+command
+context_path
+features
+scenarios
+feature_files
+```
+
+`bdd lint`:
+
+```text
+command
+issue_count
+issues
+```
+
+`bdd evidence add`:
+
+```text
+command
+evidence_id
+scenario_key
+goal_key
+evidence_type
+status
+evidence_path
+summary
+```
+
+`bdd evidence junit`:
+
+```text
+command
+scenario_count
+binding_count
+report_result_count
+evidence_count
+passed_count
+failed_count
+skipped_count
+pending_count
+```
+
+`bdd evidence report`:
+
+```text
+command
+adapter_key
+scenario_count
+evidence_count
+status
+report_path
+```
+
+`bdd verify` and `bdd coverage`:
+
+```text
+command
+passed
+scenario_count
+covered_count
+missing_evidence
+pending_evidence
+failed_evidence
+scenarios
+```
+
+Each `scenarios` item includes adapter fields when an executable BDD adapter
+normalized the latest evidence:
+
+```text
+adapter_key
+adapter_normalized_status
+```
+
+`bdd bind-spec`:
+
+```text
+command
+scenario_key
+binding_type
+binding_key
+relation
+change_key
+acceptance_key
+```
+
+`bdd bind-goal`:
+
+```text
+command
+scenario_key
+binding_type
+binding_key
+relation
+goal_key
+```
+
+`bdd bind-graph`:
+
+```text
+command
+scenario_key
+binding_type
+binding_key
+relation
+```
+
+`graph impact --scenario`:
+
+```text
+command
+scenario_key
+found
+input_bindings
+impact_results
+found_results
+snapshot_stale
+allow_stale
+related_files
+related_tests
+related_sql
+risk_nodes
+recommended_read_files
+scenario_impact_map
+```
 
 `goal complete` success:
 

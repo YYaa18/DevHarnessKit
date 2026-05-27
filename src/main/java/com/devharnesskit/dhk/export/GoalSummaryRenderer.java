@@ -37,6 +37,8 @@ public final class GoalSummaryRenderer {
         builder.append("- checkpoint_id: ").append(checkpointId).append('\n');
         builder.append("- workflow_checkpoint_binding: created\n");
         builder.append("- workflow_artifact: GOAL_SUMMARY.md\n");
+        builder.append("- artifact_passport: ARTIFACT_PASSPORT.json\n");
+        builder.append("- artifact_passport_verify: dhk artifact passport verify --path .agents/memory/exports/ARTIFACT_PASSPORT.json\n");
         builder.append("</completion-bindings>\n\n");
 
         appendGraphArtifacts(builder, graphArtifacts);
@@ -92,15 +94,20 @@ public final class GoalSummaryRenderer {
         builder.append("- graph_snapshot: ").append(emptyValue(artifacts.graphSnapshotPath())).append('\n');
         builder.append("- graph_context: ").append(emptyValue(artifacts.graphContextPath())).append('\n');
         builder.append("- impact_map: ").append(emptyValue(artifacts.impactMapPath())).append('\n');
+        builder.append("- scenario_impact_map: ").append(emptyValue(artifacts.scenarioImpactMapPath())).append('\n');
         builder.append("- graph_snapshot_hash: ").append(emptyValue(artifacts.graphSnapshotHash())).append('\n');
         builder.append("- graph_context_hash: ").append(emptyValue(artifacts.graphContextHash())).append('\n');
         builder.append("- impact_map_hash: ").append(emptyValue(artifacts.impactMapHash())).append('\n');
+        builder.append("- scenario_impact_map_hash: ").append(emptyValue(artifacts.scenarioImpactMapHash())).append('\n');
         appendImpactHighlights(builder, artifacts.impactMapPath());
         builder.append("- goal_graph_binding: used,summary");
         if (artifacts.impactMapPath().length() > 0) {
             builder.append(",impact_map");
         }
         builder.append('\n');
+        if (artifacts.scenarioImpactMapPath().length() > 0) {
+            builder.append("- goal_artifact: scenario_impact_map\n");
+        }
         builder.append("- limitation: graph facts are generated snapshot facts, not confirmed memory\n");
         builder.append("- limitation: impact map is query-scoped and must be regenerated after code changes\n");
         builder.append("</graph-artifacts>\n\n");

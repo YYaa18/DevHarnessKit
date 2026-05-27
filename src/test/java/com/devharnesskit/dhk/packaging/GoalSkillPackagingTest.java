@@ -1,14 +1,26 @@
 package com.devharnesskit.dhk.packaging;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class GoalSkillPackagingTest {
+    @TempDir
+    Path tempDir;
+
     @Test
     void goalFirstSkillPackageContainsRequiredProtocolAndScripts() throws Exception {
         Path skillRoot = Paths.get(".agents/skills/devharness-goal-development");
@@ -65,6 +77,11 @@ final class GoalSkillPackagingTest {
     }
 
     @Test
+    void legacyMemoryFirstSkillPackageIsRemoved() {
+        assertFalse(Files.exists(Paths.get(".agents/skills/devharness-java-development")));
+    }
+
+    @Test
     void graphAwareSkillPackageContainsRequiredProtocolAndScripts() throws Exception {
         Path skillRoot = Paths.get(".agents/skills/devharness-graph-aware-development");
 
@@ -113,6 +130,221 @@ final class GoalSkillPackagingTest {
         assertTrue(indexExportBatch.contains("graph export"));
     }
 
+    @Test
+    void agentAdapterInstallerInstallsGoalFirstAdaptersAndRemovesLegacyEntries() throws Exception {
+        Path project = tempDir.resolve("adapter-project");
+        prepareAdapterProject(project);
+        Files.createDirectories(project.resolve(".agents/skills/devharness-java-development"));
+        Files.createDirectories(project.resolve(".comate/rules"));
+        Files.write(project.resolve(".comate/rules/project-memory-bootstrap.mdr"), bytes("old memory rule"));
+        Files.write(project.resolve(".comate/rules/java-development-guard.mdr"), bytes("old java rule"));
+        Path jar = tempDir.resolve("dhk.jar");
+        Files.write(jar, bytes("fake jar"));
+
+        CommandResult result = runInstaller("--project-root", project.toString(),
+                "--target", "all", "--force", "--jar", jar.toString());
+
+        assertEquals(0, result.exitCode, result.stderr);
+        assertTrue(Files.isRegularFile(project.resolve(".claude/skills/devharness-goal-development/SKILL.md")));
+        assertTrue(Files.isRegularFile(project.resolve(".claude/skills/devharness-graph-aware-development/SKILL.md")));
+        assertTrue(Files.isRegularFile(project.resolve("CLAUDE.md")));
+        assertTrue(read(project.resolve("CLAUDE.md")).contains("Do not bypass goal"));
+        assertTrue(read(project.resolve("CLAUDE.md")).contains("Do not use graph impact --allow-stale"));
+        assertTrue(Files.isRegularFile(project.resolve("AGENTS.md")));
+        assertTrue(read(project.resolve("AGENTS.md")).contains("Do not call lower-level memory/workflow/spec/db commands"));
+        assertTrue(Files.isRegularFile(project.resolve(".comate/rules/devharness-goal-protocol.mdr")));
+        assertTrue(Files.isRegularFile(project.resolve(".comate/rules/devharness-graph-aware-protocol.mdr")));
+        assertTrue(read(project.resolve(".comate/rules/devharness-graph-aware-protocol.mdr"))
+                .contains("Do not use --allow-stale"));
+        assertFalse(Files.exists(project.resolve(".claude/skills/devharness-java-development")));
+        assertFalse(Files.exists(project.resolve(".agents/skills/devharness-java-development")));
+        assertFalse(Files.exists(project.resolve(".comate/rules/project-memory-bootstrap.mdr")));
+        assertFalse(Files.exists(project.resolve(".comate/rules/java-development-guard.mdr")));
+        assertTrue(Files.isRegularFile(project.resolve(".agents/tools/devharness-kit/dhk.jar")));
+        assertTrue(Files.isExecutable(project.resolve(".claude/skills/devharness-goal-development/scripts/goal-start.sh")));
+        assertTrue(Files.isExecutable(project.resolve(".agents/skills/devharness-goal-development/scripts/goal-start.sh")));
+    }
+
+    @Test
+    void controlPanelConfigureWritesManifestInstallStateAndAdapters() throws Exception {
+        Path project = tempDir.resolve("control-panel-project");
+        prepareAdapterProject(project);
+        Files.createDirectories(project.resolve(".agents/skills/devharness-java-development"));
+        Files.createDirectories(project.resolve(".comate/rules"));
+        Files.write(project.resolve(".comate/rules/project-memory-bootstrap.mdr"), bytes("old memory rule"));
+        Files.write(project.resolve(".comate/rules/java-development-guard.mdr"), bytes("old java rule"));
+
+        CommandResult result = runControlPanel("configure",
+                "--project-root", project.toString(),
+                "--target", "all",
+                "--preset", "springboot-manual-ide-test",
+                "--compile-mode", "manual",
+                "--test-mode", "manual",
+                "--graph", "required",
+                "--force");
+
+        assertEquals(0, result.exitCode, result.stderr);
+        assertTrue(Files.isRegularFile(project.resolve(".agents/devharness/config.json")));
+        assertTrue(Files.isRegularFile(project.resolve(".agents/devharness/policy.json")));
+        assertTrue(Files.isRegularFile(project.resolve(".agents/devharness/agent-manifest.json")));
+        assertTrue(Files.isRegularFile(project.resolve(".agents/devharness/install-state.json")));
+        assertTrue(Files.isRegularFile(project.resolve(".agents/graph/config.json")));
+        assertTrue(Files.isRegularFile(project.resolve(".claude/skills/devharness-goal-development/SKILL.md")));
+        assertTrue(Files.isRegularFile(project.resolve(".claude/skills/devharness-graph-aware-development/SKILL.md")));
+        assertTrue(Files.isRegularFile(project.resolve("AGENTS.md")));
+        assertTrue(Files.isRegularFile(project.resolve("CLAUDE.md")));
+        assertTrue(Files.isRegularFile(project.resolve(".comate/rules/devharness-goal-protocol.mdr")));
+        assertTrue(Files.isRegularFile(project.resolve(".comate/rules/devharness-graph-aware-protocol.mdr")));
+        assertFalse(Files.exists(project.resolve(".agents/skills/devharness-java-development")));
+        assertFalse(Files.exists(project.resolve(".comate/rules/project-memory-bootstrap.mdr")));
+        assertFalse(Files.exists(project.resolve(".comate/rules/java-development-guard.mdr")));
+
+        String config = read(project.resolve(".agents/devharness/config.json"));
+        assertTrue(config.contains("\"schema_version\": \"devharness-config/v1-alpha\""));
+        assertTrue(config.contains("\"verification.compile.mode\": \"manual\""));
+        assertTrue(config.contains("\"verification.test.mode\": \"manual\""));
+        assertTrue(config.contains("\"verification.graph.required\": \"true\""));
+        assertFalse(config.contains("\"verification\": {"));
+
+        String manifest = read(project.resolve(".agents/devharness/agent-manifest.json"));
+        assertTrue(manifest.contains("\"default_skill\": \"devharness-goal-development\""));
+        assertTrue(manifest.contains("\"name\": \"devharness-graph-aware-development\""));
+        assertTrue(manifest.contains("\"remove_memory_first_skill\": true"));
+
+        String state = read(project.resolve(".agents/devharness/install-state.json"));
+        assertTrue(state.contains("\"target\": \"all\""));
+        assertTrue(state.contains("\"mode\": \"copy\""));
+        assertTrue(state.contains("\"preset\": \"springboot-manual-ide-test\""));
+        assertTrue(state.contains("\"compile_mode\": \"manual\""));
+        assertTrue(state.contains("\"test_mode\": \"manual\""));
+        assertTrue(state.contains("\"graph\": \"required\""));
+
+        CommandResult statusJson = runControlPanel("status",
+                "--project-root", project.toString(),
+                "--status-format", "json");
+        assertEquals(0, statusJson.exitCode, statusJson.stderr);
+        assertTrue(statusJson.stdout.contains("\"manifest\": \"ok\""));
+        assertTrue(statusJson.stdout.contains("\"install_state\": \"ok\""));
+        assertTrue(statusJson.stdout.contains("\"legacy_memory_first\": \"removed\""));
+
+        CommandResult statusMarkdown = runControlPanel("status",
+                "--project-root", project.toString(),
+                "--status-format", "markdown");
+        assertEquals(0, statusMarkdown.exitCode, statusMarkdown.stderr);
+        assertTrue(statusMarkdown.stdout.contains("| manifest | ok |"));
+        assertTrue(statusMarkdown.stdout.contains("| comate_graph_adapter | ok |"));
+
+        CommandResult doctor = runControlPanel("doctor",
+                "--project-root", project.toString(),
+                "--target", "all");
+        assertEquals(0, doctor.exitCode, doctor.stderr);
+        assertTrue(doctor.stdout.contains("doctor: ok"));
+    }
+
+    @Test
+    void controlPanelPlanAndUninstallDryRunDoNotModifyTargetProject() throws Exception {
+        Path project = tempDir.resolve("control-panel-dry-run-project");
+        prepareAdapterProject(project);
+
+        CommandResult plan = runControlPanel("plan",
+                "--project-root", project.toString(),
+                "--target", "all",
+                "--dry-run");
+
+        assertEquals(0, plan.exitCode, plan.stderr);
+        assertTrue(plan.stdout.contains("DevHarness plan"));
+        assertTrue(plan.stdout.contains("plan is read-only"));
+        assertFalse(Files.exists(project.resolve(".agents/devharness/config.json")));
+        assertFalse(Files.exists(project.resolve(".claude")));
+        assertFalse(Files.exists(project.resolve("AGENTS.md")));
+
+        CommandResult configure = runControlPanel("configure",
+                "--project-root", project.toString(),
+                "--target", "all",
+                "--force");
+        assertEquals(0, configure.exitCode, configure.stderr);
+        assertTrue(Files.isRegularFile(project.resolve("AGENTS.md")));
+
+        CommandResult dryRunUninstall = runControlPanel("uninstall",
+                "--project-root", project.toString(),
+                "--target", "all",
+                "--dry-run");
+        assertEquals(0, dryRunUninstall.exitCode, dryRunUninstall.stderr);
+        assertTrue(dryRunUninstall.stdout.contains("[dry-run]"));
+        assertTrue(Files.isRegularFile(project.resolve("AGENTS.md")));
+        assertTrue(Files.isRegularFile(project.resolve("CLAUDE.md")));
+
+        CommandResult uninstall = runControlPanel("uninstall",
+                "--project-root", project.toString(),
+                "--target", "all");
+        assertEquals(0, uninstall.exitCode, uninstall.stderr);
+        assertFalse(Files.exists(project.resolve("AGENTS.md")));
+        assertFalse(Files.exists(project.resolve("CLAUDE.md")));
+        assertFalse(Files.exists(project.resolve(".comate/rules/devharness-goal-protocol.mdr")));
+    }
+
+    @Test
+    void controlPanelDoctorFailsWithRepairSuggestionWhenAdaptersAreMissing() throws Exception {
+        Path project = tempDir.resolve("control-panel-doctor-project");
+        prepareAdapterProject(project);
+
+        CommandResult configure = runControlPanel("configure",
+                "--project-root", project.toString(),
+                "--target", "all",
+                "--force");
+        assertEquals(0, configure.exitCode, configure.stderr);
+        Files.delete(project.resolve("AGENTS.md"));
+
+        CommandResult doctor = runControlPanel("doctor",
+                "--project-root", project.toString(),
+                "--target", "all");
+
+        assertEquals(3, doctor.exitCode);
+        assertTrue(doctor.stdout.contains("opencode_adapter: missing"));
+        assertTrue(doctor.stderr.contains("doctor warning: missing AGENTS.md"));
+        assertTrue(doctor.stderr.contains("doctor suggestion: run scripts/devharness-control-panel.sh repair"));
+    }
+
+    @Test
+    void agentAdapterInstallerDryRunDoesNotModifyTargetProject() throws Exception {
+        Path project = tempDir.resolve("dry-run-project");
+        prepareAdapterProject(project);
+
+        CommandResult result = runInstaller("--project-root", project.toString(),
+                "--target", "all", "--dry-run");
+
+        assertEquals(0, result.exitCode, result.stderr);
+        assertTrue(result.stdout.contains("[dry-run]"));
+        assertFalse(Files.exists(project.resolve(".claude")));
+        assertFalse(Files.exists(project.resolve("CLAUDE.md")));
+        assertFalse(Files.exists(project.resolve("AGENTS.md")));
+        assertFalse(Files.exists(project.resolve(".comate")));
+    }
+
+    @Test
+    void agentAdapterInstallerFailsWhenRequiredSkillIsMissing() throws Exception {
+        Path project = tempDir.resolve("missing-skill-project");
+        Files.createDirectories(project.resolve(".agents/skills"));
+        copyTree(Paths.get(".agents/skills/devharness-goal-development"),
+                project.resolve(".agents/skills/devharness-goal-development"));
+
+        CommandResult result = runInstaller("--project-root", project.toString(),
+                "--target", "all", "--force");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.stderr.contains("missing .agents/skills/devharness-graph-aware-development"));
+    }
+
+    @Test
+    void formalAgentAdapterInstallerScriptExistsAndIsExecutable() {
+        Path installer = Paths.get("scripts/install-agent-adapters.sh");
+        Path controlPanel = Paths.get("scripts/devharness-control-panel.sh");
+        assertTrue(Files.isRegularFile(installer));
+        assertTrue(Files.isExecutable(installer));
+        assertTrue(Files.isRegularFile(controlPanel));
+        assertTrue(Files.isExecutable(controlPanel));
+    }
+
     private void assertScriptPair(Path skillRoot, String name) {
         assertTrue(Files.isRegularFile(skillRoot.resolve("scripts/" + name + ".sh")));
         assertTrue(Files.isRegularFile(skillRoot.resolve("scripts/" + name + ".bat")));
@@ -145,5 +377,90 @@ final class GoalSkillPackagingTest {
 
     private String read(Path path) throws Exception {
         return new String(Files.readAllBytes(path), "UTF-8");
+    }
+
+    private void prepareAdapterProject(Path project) throws Exception {
+        copyTree(Paths.get(".agents/skills/devharness-goal-development"),
+                project.resolve(".agents/skills/devharness-goal-development"));
+        copyTree(Paths.get(".agents/skills/devharness-graph-aware-development"),
+                project.resolve(".agents/skills/devharness-graph-aware-development"));
+    }
+
+    private void copyTree(Path source, Path target) throws Exception {
+        try (Stream<Path> paths = Files.walk(source)) {
+            List<Path> all = new ArrayList<Path>();
+            paths.forEach(all::add);
+            for (Path path : all) {
+                Path relative = source.relativize(path);
+                Path destination = target.resolve(relative);
+                if (Files.isDirectory(path)) {
+                    Files.createDirectories(destination);
+                } else {
+                    Files.createDirectories(destination.getParent());
+                    Files.copy(path, destination, StandardCopyOption.REPLACE_EXISTING,
+                            StandardCopyOption.COPY_ATTRIBUTES);
+                }
+            }
+        }
+    }
+
+    private CommandResult runInstaller(String... args) throws Exception {
+        List<String> command = new ArrayList<String>();
+        command.add("sh");
+        command.add(Paths.get("scripts/install-agent-adapters.sh").toAbsolutePath().toString());
+        for (String arg : args) {
+            command.add(arg);
+        }
+        Process process = new ProcessBuilder(command)
+                .directory(Paths.get(".").toAbsolutePath().toFile())
+                .start();
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        drain(process.getInputStream(), stdout);
+        drain(process.getErrorStream(), stderr);
+        int exitCode = process.waitFor();
+        return new CommandResult(exitCode, stdout.toString("UTF-8"), stderr.toString("UTF-8"));
+    }
+
+    private CommandResult runControlPanel(String... args) throws Exception {
+        List<String> command = new ArrayList<String>();
+        command.add("sh");
+        command.add(Paths.get("scripts/devharness-control-panel.sh").toAbsolutePath().toString());
+        for (String arg : args) {
+            command.add(arg);
+        }
+        Process process = new ProcessBuilder(command)
+                .directory(Paths.get(".").toAbsolutePath().toFile())
+                .start();
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        drain(process.getInputStream(), stdout);
+        drain(process.getErrorStream(), stderr);
+        int exitCode = process.waitFor();
+        return new CommandResult(exitCode, stdout.toString("UTF-8"), stderr.toString("UTF-8"));
+    }
+
+    private void drain(InputStream input, ByteArrayOutputStream output) throws Exception {
+        byte[] buffer = new byte[4096];
+        int read;
+        while ((read = input.read(buffer)) >= 0) {
+            output.write(buffer, 0, read);
+        }
+    }
+
+    private byte[] bytes(String value) throws Exception {
+        return value.getBytes("UTF-8");
+    }
+
+    private static final class CommandResult {
+        private final int exitCode;
+        private final String stdout;
+        private final String stderr;
+
+        private CommandResult(int exitCode, String stdout, String stderr) {
+            this.exitCode = exitCode;
+            this.stdout = stdout;
+            this.stderr = stderr;
+        }
     }
 }

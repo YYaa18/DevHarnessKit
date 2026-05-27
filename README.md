@@ -17,10 +17,11 @@ This repository is `v0.4.4-beta.1` and should be treated as a beta developer pre
 | Goal orchestration | Beta | High-level `dhk goal` protocol for start/resume/next/step/check/evaluate/verify/complete and short context export. It is the preferred harness entry for agent work, but not stable. |
 | Graph Lite | Alpha+ | `dhk graph init/status/index/impact/export/prune` can scan files, parse Lite nodes/edges, persist snapshot-bound graph rows, export local graph context, and audit/prune old snapshots. |
 | Graph-aware goal | Beta preview | Graph freshness, impact-map checks, stale override approval, and prune audit are wired into the goal workflow. Graph output remains heuristic advisory context. |
+| BDD acceptance harness | Internal alpha | `dhk bdd init/add/list/show/export/lint/evidence/verify/coverage/bind-spec/bind-goal/bind-graph` can record, export, lint, verify, cover, and trace specification-level BDD features, scenarios, Given/When/Then steps, evidence, spec acceptance rows, goal runs, and Graph Lite impact inputs. BDD-required goal profiles can block completion on missing scenario evidence. Executable adapters are not enabled yet. |
 | Workflow | Alpha | Records process state for audit and context export. It is not a workflow engine. |
 | Spec | Alpha | Records change documents, tasks, acceptance, and status. Markdown is export only. |
 | Agent packaging | Alpha | Ships `.agents/skills` and `.comate/rules` helpers for agent workflows. |
-| SQLite schema | Alpha | Current schema version is v9. Compatibility policy is documented, but not yet guaranteed as stable. |
+| SQLite schema | Alpha | Current schema version is v13. Compatibility policy is documented, but not yet guaranteed as stable. |
 
 Do not publish or describe the current build as stable or 1.0-ready.
 
@@ -45,6 +46,7 @@ DevHarnessKit
 |-- db readonly      optional business database inspection
 |-- goal             high-level task orchestration over memory/workflow/spec
 |-- graph lite       snapshot-bound file graph context for impact analysis
+|-- bdd              specification-level acceptance scenarios and evidence
 |-- workflow         process state recording, not a workflow engine
 |-- spec             requirements/design/tasks/acceptance state recording
 `-- agent packaging  skills, rules, and wrapper scripts
@@ -64,6 +66,7 @@ SQLite memory.db + controlled readonly DB query
         v
 CURRENT_CONTEXT.md / GOAL_CONTEXT.md / GOAL_SUMMARY.md
 RECOVERY_CONTEXT.md / SQL_RESULT.md / SPEC_CONTEXT.md / WORKFLOW_CONTEXT.md
+BDD_CONTEXT.md / BDD_EVIDENCE.md / BDD_COVERAGE.md
         |
         v
 Agent reads short Markdown context
@@ -71,7 +74,9 @@ Agent reads short Markdown context
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for module boundaries and
 [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) for the current CLI, schema,
-JSON, and export compatibility contract.
+JSON, and export compatibility contract. See [docs/BDD.md](docs/BDD.md) for the
+current internal-alpha BDD specification layer and [docs/SKILL_CONTRACT.md](docs/SKILL_CONTRACT.md)
+for the alpha skill contract model.
 
 ## Requirements
 
@@ -122,82 +127,58 @@ Check the version:
 java -jar target/dhk-cli-0.4.4-beta.1-all.jar version
 ```
 
-Initialize project memory:
+Create a project-level DevHarness configuration and install generated agent
+adapters through the local control panel. For Spring Boot projects where
+compile/test must be run from the IDE or company runtime, use the manual preset:
 
 ```bash
-java -jar target/dhk-cli-0.4.4-beta.1-all.jar memory init --project-root .
-```
-
-Add a draft memory:
-
-```bash
-java -jar target/dhk-cli-0.4.4-beta.1-all.jar memory add \
+scripts/devharness-control-panel.sh configure \
   --project-root . \
-  --type gateway_convention \
-  --module global \
-  --title "User identity comes from gateway" \
-  --content "User ID is read from X-User-Id. Business services do not parse tokens." \
-  --tags "api,gateway,user-id,header"
+  --preset springboot-manual-ide-test \
+  --target all \
+  --compile-mode manual \
+  --test-mode manual \
+  --graph required \
+  --force
 ```
 
-For longer content, use `--content-file` or `--content-stdin`.
-
-Confirm it:
+For projects where CLI Maven checks are reliable, use the automatic preset:
 
 ```bash
-java -jar target/dhk-cli-0.4.4-beta.1-all.jar memory confirm --project-root . --id 1
-```
-
-Export current context:
-
-```bash
-java -jar target/dhk-cli-0.4.4-beta.1-all.jar memory export \
+scripts/devharness-control-panel.sh configure \
   --project-root . \
-  --task "Implement order query endpoint" \
-  --module order \
-  --mode api \
-  --keywords "gateway,mybatis,mysql"
+  --preset springboot-auto-test \
+  --target all \
+  --compile-mode auto \
+  --test-mode auto \
+  --force
 ```
 
-Use `--json` for machine-readable output on supported commands such as `doctor`, `memory search`, `memory export`, `db test`, `db sql --dry-run`, `goal status`, `goal check`, `goal evaluate`, `goal verify`, and `goal complete`. Use `dhk db sql --format json` for JSON query results.
-
-Seed workflow templates and start a run:
+Inspect local readiness:
 
 ```bash
-java -jar target/dhk-cli-0.4.4-beta.1-all.jar workflow template seed --project-root .
-
-java -jar target/dhk-cli-0.4.4-beta.1-all.jar workflow start \
-  --project-root . \
-  --workflow api-change \
-  --task "Implement order query endpoint" \
-  --module order \
-  --mode api
+scripts/devharness-control-panel.sh status --project-root .
+scripts/devharness-control-panel.sh doctor --project-root .
 ```
 
-Create a spec change:
+The control panel writes `.agents/devharness/config.json`,
+`.agents/devharness/policy.json`, `.agents/devharness/agent-manifest.json`,
+`.agents/devharness/install-state.json`, `.agents/graph/config.json`, and
+generated Claude Code, OpenCode, and Comate adapters.
+
+To preview the plan without writing files:
 
 ```bash
-java -jar target/dhk-cli-0.4.4-beta.1-all.jar spec create \
-  --project-root . \
-  --change order-query-api \
-  --title "Implement order query endpoint" \
-  --summary "Provide paginated order search for the frontend" \
-  --module order \
-  --mode api
+scripts/devharness-control-panel.sh plan --project-root . --target all --dry-run
 ```
 
-Include workflow and spec summaries in `CURRENT_CONTEXT.md`:
+`scripts/install-agent-adapters.sh` remains as a compatibility wrapper for
+`scripts/devharness-control-panel.sh install`. New projects should use the
+control panel because it records install state and can report readiness drift.
+The generated adapters point to the goal protocol and remove the old
+`devharness-java-development` memory-first skill by default.
 
-```bash
-java -jar target/dhk-cli-0.4.4-beta.1-all.jar memory export \
-  --project-root . \
-  --task "Implement order query endpoint" \
-  --module order \
-  --include-workflow <run-key> \
-  --include-spec order-query-api
-```
-
-Start a goal-oriented run:
+Start every code task through `goal`:
 
 ```bash
 java -jar target/dhk-cli-0.4.4-beta.1-all.jar goal start \
@@ -212,22 +193,46 @@ Then continue through the goal protocol:
 
 ```bash
 java -jar target/dhk-cli-0.4.4-beta.1-all.jar goal next --project-root . --goal <goal-key>
+cat .agents/memory/exports/GOAL_CONTEXT.md
 java -jar target/dhk-cli-0.4.4-beta.1-all.jar goal step --project-root . --goal <goal-key> \
   --summary "Inspected existing controller/service/mapper/tests" \
-  --evidence "existing_controller,existing_service,existing_mapper,existing_tests"
-java -jar target/dhk-cli-0.4.4-beta.1-all.jar goal status --project-root . --goal <goal-key>
+  --field existing_controller=OrderController \
+  --field existing_service=OrderService \
+  --field existing_mapper=OrderMapper \
+  --field existing_tests=OrderServiceTest
 ```
 
-Before claiming completion, run goal verification and complete the goal:
+Before claiming completion, run goal verification and complete the goal only when
+it reports `ready_to_complete`:
 
 ```bash
 java -jar target/dhk-cli-0.4.4-beta.1-all.jar goal verify --project-root . --goal <goal-key>
 java -jar target/dhk-cli-0.4.4-beta.1-all.jar goal complete --project-root . --goal <goal-key>
 ```
 
-`goal verify` runs the required checks and evaluates readiness in one command. `goal check` and `goal evaluate` remain available for lower-level debugging.
+Graph-aware profiles are opt-in. Use a `*-with-graph` profile, or a custom
+profile with `graph_required=true`, when graph impact evidence is required:
 
-`goal complete` writes `.agents/memory/exports/GOAL_SUMMARY.md`, records completion artifacts, and creates a checkpoint.
+```bash
+java -jar target/dhk-cli-0.4.4-beta.1-all.jar goal start \
+  --project-root . \
+  --profile java-api-change-with-graph \
+  --task "Implement order query endpoint" \
+  --module order
+```
+
+When graph is required, `goal next` and `GOAL_CONTEXT.md` will tell the agent
+when to run graph index/export or graph impact. Graph Lite output is heuristic:
+use it for impact discovery and recommended read files, not as a correctness
+proof. Strict skills must not use `graph impact --allow-stale` unless policy or
+human evidence explicitly authorizes it.
+
+`goal verify` runs the required checks and evaluates readiness in one command.
+`goal check` and `goal evaluate` remain available for lower-level debugging.
+
+`goal complete` writes `.agents/memory/exports/GOAL_SUMMARY.md`, records completion artifacts, exports
+`.agents/memory/exports/ARTIFACT_PASSPORT.json`, and creates a checkpoint. The passport is an audit artifact
+for release and CI review; it does not replace human review, tests, or manual risk assessment.
 
 Goal orchestration is still experimental alpha. Built-in Java profiles are intentionally strict: skipped compile/test checks are not accepted, required specs must contain at least one closed task and one closed acceptance item, and pending hard workflow gates block completion unless mapped goal actions or accepted checks close them. `goal complete` closes the checkpoint gate while creating the completion checkpoint.
 
@@ -236,6 +241,33 @@ Goal Sync Strictness makes `goal` the main controller for agent work while workf
 For agent-facing usage, `.agents/skills/devharness-goal-development/` provides goal-first wrapper scripts such as `goal-start.sh`, `goal-next.sh`, `goal-step.sh`, `goal-check.sh`, `goal-evaluate.sh`, and `goal-complete.sh`.
 
 Projects can customize goal profiles, required checks, and accepted check statuses with `.agents/devharness/goal-profiles/*.json` and `.agents/devharness/goal-check-policy.json`.
+
+Manual compile/test verification is not treated as skipped. If
+`.agents/devharness/config.json` sets `verification.compile.mode=manual` or
+`verification.test.mode=manual`, `goal verify` requires explicit evidence such
+as `manual_evidence_status=passed`, `compile_scope` or `test_scope`, and a
+project-local `manual_evidence_path`. Missing manual evidence blocks
+`goal complete`.
+
+## Lower-Level Commands
+
+Goal-first is the recommended entry for agent work. Lower-level commands remain
+available for setup, debugging, and expert workflows:
+
+```bash
+java -jar target/dhk-cli-0.4.4-beta.1-all.jar memory init --project-root .
+java -jar target/dhk-cli-0.4.4-beta.1-all.jar memory add --project-root . --type convention --module global --title "<title>" --content "<content>"
+java -jar target/dhk-cli-0.4.4-beta.1-all.jar memory confirm --project-root . --id <id>
+java -jar target/dhk-cli-0.4.4-beta.1-all.jar memory export --project-root . --task "<task>" --module <module>
+java -jar target/dhk-cli-0.4.4-beta.1-all.jar workflow template seed --project-root .
+java -jar target/dhk-cli-0.4.4-beta.1-all.jar spec create --project-root . --change <change-key> --title "<title>" --summary "<summary>"
+```
+
+Use `--json` for machine-readable output on supported commands such as
+`doctor`, `memory search`, `memory export`, `db test`, `db sql --dry-run`,
+`configure show`, `configure doctor`, `goal status`, `goal next`, `goal check`,
+`goal evaluate`, `goal verify`, and `goal complete`. Use
+`dhk db sql --format json` for JSON query results.
 
 ## Safety Model
 

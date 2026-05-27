@@ -4,6 +4,7 @@ import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.export.ArtifactPassportRenderer;
 import com.devharnesskit.dhk.export.GoalSummaryRenderer;
 import com.devharnesskit.dhk.model.Checkpoint;
 import com.devharnesskit.dhk.model.Project;
@@ -46,6 +47,8 @@ import com.devharnesskit.dhk.repository.workflow.WorkflowRunRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowTemplateRepository;
 import com.devharnesskit.dhk.service.ProjectService;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
+import com.devharnesskit.dhk.service.checkpoint.HumanCheckpointService;
+import com.devharnesskit.dhk.service.policy.DevHarnessPolicyService;
 import com.devharnesskit.dhk.service.policy.PolicyHookService;
 import com.devharnesskit.dhk.service.spec.SpecService;
 import com.devharnesskit.dhk.service.workflow.WorkflowSeedService;
@@ -94,11 +97,15 @@ public final class GoalOrchestrator {
     private final GoalCheckService checkService = new GoalCheckService();
     private final GoalCheckPolicyService checkPolicyService = new GoalCheckPolicyService();
     private final GoalCompletionEvaluator completionEvaluator = new GoalCompletionEvaluator();
+    private final GoalIntegrityGateService integrityGateService = new GoalIntegrityGateService();
     private final GoalActionSyncService actionSyncService = new GoalActionSyncService();
     private final WorkspaceFingerprintService fingerprintService = new WorkspaceFingerprintService();
     private final GoalSummaryRenderer summaryRenderer = new GoalSummaryRenderer();
+    private final ArtifactPassportRenderer artifactPassportRenderer = new ArtifactPassportRenderer();
     private final SensitiveDataGuard sensitiveDataGuard = new SensitiveDataGuard();
     private final PolicyHookService policyHookService = new PolicyHookService();
+    private final DevHarnessPolicyService devHarnessPolicyService = new DevHarnessPolicyService();
+    private final HumanCheckpointService humanCheckpointService = new HumanCheckpointService();
     private final TransactionTemplate transactionTemplate = new TransactionTemplate();
 
     public GoalStartResult start(CommandContext context, Path projectRoot, String profileKey,
@@ -227,6 +234,27 @@ public final class GoalOrchestrator {
         }
     }
 
+    public GoalStepValidationResult validateStep(CommandContext context, Path projectRoot, String goalKey,
+                                                 String summary, String changedFiles, String evidence)
+            throws Exception {
+        rejectSensitive("goal step", summary, changedFiles, evidence);
+        try (Connection connection = connectionFactory.open(projectRoot)) {
+            migrationRunner.migrate(connection, context.clock());
+            GoalRun goal = goalRunRepository.findByKey(connection, goalKey);
+            if (goal == null) {
+                throw new IllegalStateException("Goal not found: " + goalKey);
+            }
+            if (isContextExportIncomplete(goal.status())) {
+                throw new IllegalStateException("Goal context export is incomplete; run dhk goal resume --goal "
+                        + goal.goalKey());
+            }
+            GoalProfile profile = requireProfile(projectRoot, goal.profileKey());
+            GoalPlan plan = planner.plan(goal, profile);
+            validateStepEvidence(plan, summary, changedFiles, evidence);
+            return new GoalStepValidationResult(goal, plan);
+        }
+    }
+
     public Path export(CommandContext context, Path projectRoot, String goalKey) throws Exception {
         try (Connection connection = connectionFactory.open(projectRoot)) {
             migrationRunner.migrate(connection, context.clock());
@@ -285,6 +313,18 @@ public final class GoalOrchestrator {
         }
     }
 
+    public String[] requiredChecks(CommandContext context, Path projectRoot, String goalKey) throws Exception {
+        try (Connection connection = connectionFactory.open(projectRoot)) {
+            migrationRunner.migrate(connection, context.clock());
+            GoalRun goal = goalRunRepository.findByKey(connection, goalKey);
+            if (goal == null) {
+                throw new IllegalStateException("Goal not found: " + goalKey);
+            }
+            GoalProfile profile = requireProfile(projectRoot, goal.profileKey());
+            return checkPolicyService.load(projectRoot).requiredChecks(profile);
+        }
+    }
+
     public GoalEvaluation evaluate(CommandContext context, Path projectRoot, String goalKey) throws Exception {
         try (Connection connection = connectionFactory.open(projectRoot)) {
             migrationRunner.migrate(connection, context.clock());
@@ -293,6 +333,30 @@ public final class GoalOrchestrator {
                 throw new IllegalStateException("Goal not found: " + goalKey);
             }
             return evaluate(connection, projectRoot, goal, context.clock().now().toString());
+        }
+    }
+
+    public GoalAuditResult audit(CommandContext context, Path projectRoot, String goalKey) throws Exception {
+        try (Connection connection = connectionFactory.open(projectRoot)) {
+            migrationRunner.migrate(connection, context.clock());
+            GoalRun goal = goalRunRepository.findByKey(connection, goalKey);
+            if (goal == null) {
+                throw new IllegalStateException("Goal not found: " + goalKey);
+            }
+            List<GoalStep> steps = goalStepRepository.listByGoal(connection, goal.goalKey());
+            List<GoalCheck> checks = goalCheckRepository.listByGoal(connection, goal.goalKey());
+            List<GoalArtifact> artifacts = goalArtifactRepository.listByGoal(connection, goal.goalKey());
+            GoalProfile profile = requireProfile(projectRoot, goal.profileKey());
+            GoalCheckPolicy policy = checkPolicyService.load(projectRoot);
+            GoalEvaluation evaluation = completionEvaluator.evaluate(goal, checks, policy, profile, steps,
+                    fingerprintService.workspaceFingerprint(projectRoot),
+                    fingerprintService.contextFingerprint(projectRoot));
+            GoalEvaluation integrityEvaluation = integrityGateService.applyPreComplete(goal, evaluation,
+                    policy, profile, steps, checks);
+            GoalEvaluation finalEvaluation = humanCheckpointService.applyCompletionGate(connection, goal,
+                    integrityEvaluation, devHarnessPolicyService.load(projectRoot));
+            return new GoalAuditResult(goal, steps, checks, artifacts, finalEvaluation,
+                    Files.isRegularFile(PathUtil.artifactPassport(projectRoot)));
         }
     }
 
@@ -313,6 +377,11 @@ public final class GoalOrchestrator {
             final Project project = projectService.readProject(PathUtil.projectJson(projectRoot));
             final GoalProfile profile = requireProfile(projectRoot, goal.profileKey());
             final GoalCheckPolicy policy = checkPolicyService.load(projectRoot);
+            GoalEvaluation preIntegrity = integrityGateService.applyPreComplete(goal, evaluation,
+                    policy, profile, steps, checks);
+            if (!preIntegrity.readyToComplete()) {
+                throw new GoalNotReadyException(preIntegrity);
+            }
             policyHookService.requireGoalCompleteAllowed(projectRoot, steps);
             GoalCompleteResult result = transactionTemplate.execute(connection,
                     new TransactionTemplate.Work<GoalCompleteResult>() {
@@ -336,9 +405,26 @@ public final class GoalOrchestrator {
                             goalArtifactRepository.insert(connection, new GoalArtifact(0L, goal.goalKey(),
                                     "goal_summary", "GOAL_SUMMARY.md", summaryPath.toString(), "",
                                     "Goal summary exported", now));
+                            Path passportPath = PathUtil.artifactPassport(projectRoot);
+                            String passport = artifactPassportRenderer.render(projectRoot, goal, profile, steps,
+                                    checks, checkpointId, now, graphArtifacts, summaryPath, passportPath);
+                            passport = sensitiveDataGuard.redact(passport);
+                            if (sensitiveDataGuard.containsSensitiveData(passport)) {
+                                throw new IllegalStateException("Sensitive data rejected during artifact passport export: "
+                                        + sensitiveDataGuard.findMatches(passport));
+                            }
+                            Files.write(passportPath, passport.getBytes("UTF-8"));
+                            goalArtifactRepository.insert(connection, new GoalArtifact(0L, goal.goalKey(),
+                                    "artifact_passport", "ARTIFACT_PASSPORT.json", passportPath.toString(),
+                                    fileHash(passportPath), "Artifact passport exported", now));
                             goalArtifactRepository.insert(connection, new GoalArtifact(0L, goal.goalKey(),
                                     "checkpoint", "Completion checkpoint", "", "",
                                     "checkpoint_id=" + checkpointId, now));
+                            GoalEvaluation finalIntegrity = integrityGateService.finalComplete(goal, summaryPath,
+                                    passportPath, goalArtifactRepository.listByGoal(connection, goal.goalKey()));
+                            if (!finalIntegrity.readyToComplete()) {
+                                throw new GoalNotReadyException(finalIntegrity);
+                            }
                             actionSyncService.syncOnComplete(connection, project, goal, profile, policy,
                                     checks, checkpointId, now);
                             bindWorkflowCompletion(connection, project, goal, checkpointId, summaryPath, now);
@@ -383,9 +469,11 @@ public final class GoalOrchestrator {
         Path snapshotPath = PathUtil.graphSnapshotJson(projectRoot);
         Path contextPath = PathUtil.graphContext(projectRoot);
         Path impactPath = PathUtil.graphImpactMap(projectRoot);
+        Path scenarioImpactPath = PathUtil.scenarioImpactMap(projectRoot);
         String snapshotHash = fileHash(snapshotPath);
         String contextHash = fileHash(contextPath);
         String impactHash = fileHash(impactPath);
+        String scenarioImpactHash = fileHash(scenarioImpactPath);
 
         if (Files.isRegularFile(snapshotPath)) {
             bindGraphArtifact(connection, project, goal, snapshot, "used", "graph_snapshot",
@@ -402,13 +490,18 @@ public final class GoalOrchestrator {
                     "IMPACT_MAP.md", impactPath, impactHash,
                     "Impact map used for goal completion", now);
         }
+        if (Files.isRegularFile(scenarioImpactPath)) {
+            bindScenarioImpactArtifact(connection, project, goal, scenarioImpactPath,
+                    scenarioImpactHash, now);
+        }
 
         return new GoalGraphArtifacts(true, snapshot.id(), snapshot.snapshotKey(), snapshot.provider(),
                 snapshot.fileCount(), snapshot.nodeCount(), snapshot.edgeCount(),
                 Files.isRegularFile(snapshotPath) ? snapshotPath.toString() : "",
                 Files.isRegularFile(contextPath) ? contextPath.toString() : "",
                 Files.isRegularFile(impactPath) ? impactPath.toString() : "",
-                snapshotHash, contextHash, impactHash);
+                Files.isRegularFile(scenarioImpactPath) ? scenarioImpactPath.toString() : "",
+                snapshotHash, contextHash, impactHash, scenarioImpactHash);
     }
 
     private void bindGraphArtifact(Connection connection, Project project, GoalRun goal, GraphSnapshot snapshot,
@@ -424,6 +517,20 @@ public final class GoalOrchestrator {
                     goal.workflowRunKey(), "custom", title, path.toString(), contentHash,
                     "confirmed", "goal_complete", summary + " for goal " + goal.goalKey(),
                     "goal,completion,graph", now, now));
+        }
+    }
+
+    private void bindScenarioImpactArtifact(Connection connection, Project project, GoalRun goal,
+                                            Path path, String contentHash, String now) throws Exception {
+        goalArtifactRepository.insert(connection, new GoalArtifact(0L, goal.goalKey(), "scenario_impact_map",
+                "SCENARIO_IMPACT_MAP.md", path.toString(), contentHash,
+                "Scenario impact map used for goal completion", now));
+        if (goal.workflowRunKey().length() > 0) {
+            workflowArtifactRepository.insert(connection, new WorkflowArtifact(0L, project.projectKey(),
+                    goal.workflowRunKey(), "custom", "SCENARIO_IMPACT_MAP.md", path.toString(), contentHash,
+                    "confirmed", "goal_complete",
+                    "Scenario impact map exported for goal " + goal.goalKey(),
+                    "goal,completion,graph,bdd", now, now));
         }
     }
 
@@ -494,11 +601,16 @@ public final class GoalOrchestrator {
         GoalProfile profile = requireProfile(projectRoot, goal.profileKey());
         GoalCheckPolicy policy = checkPolicyService.load(projectRoot);
         actionSyncService.syncBeforeEvaluate(connection, projectRoot, project, goal, profile, policy, now);
-        return completionEvaluator.evaluate(goal, goalCheckRepository.listByGoal(connection, goal.goalKey()),
-                policy, profile,
-                goalStepRepository.listByGoal(connection, goal.goalKey()),
+        List<GoalCheck> checks = goalCheckRepository.listByGoal(connection, goal.goalKey());
+        List<GoalStep> steps = goalStepRepository.listByGoal(connection, goal.goalKey());
+        GoalEvaluation evaluation = completionEvaluator.evaluate(goal, checks,
+                policy, profile, steps,
                 fingerprintService.workspaceFingerprint(projectRoot),
                 fingerprintService.contextFingerprint(projectRoot));
+        GoalEvaluation integrityEvaluation = integrityGateService.applyPreComplete(goal, evaluation,
+                policy, profile, steps, checks);
+        return humanCheckpointService.applyCompletionGate(connection, goal, integrityEvaluation,
+                devHarnessPolicyService.load(projectRoot));
     }
 
     private List<GoalCheck> runAllChecks(Connection connection, Path projectRoot, Project project,
@@ -679,6 +791,19 @@ public final class GoalOrchestrator {
         public Path contextPath() { return contextPath; }
     }
 
+    public static final class GoalStepValidationResult {
+        private final GoalRun goal;
+        private final GoalPlan plan;
+
+        private GoalStepValidationResult(GoalRun goal, GoalPlan plan) {
+            this.goal = goal;
+            this.plan = plan;
+        }
+
+        public GoalRun goal() { return goal; }
+        public GoalPlan plan() { return plan; }
+    }
+
     public static final class GoalCompleteResult {
         private final GoalRun goal;
         private final long checkpointId;
@@ -693,6 +818,33 @@ public final class GoalOrchestrator {
         public GoalRun goal() { return goal; }
         public long checkpointId() { return checkpointId; }
         public Path summaryPath() { return summaryPath; }
+    }
+
+    public static final class GoalAuditResult {
+        private final GoalRun goal;
+        private final List<GoalStep> steps;
+        private final List<GoalCheck> checks;
+        private final List<GoalArtifact> artifacts;
+        private final GoalEvaluation evaluation;
+        private final boolean artifactPassportPresent;
+
+        private GoalAuditResult(GoalRun goal, List<GoalStep> steps, List<GoalCheck> checks,
+                                List<GoalArtifact> artifacts, GoalEvaluation evaluation,
+                                boolean artifactPassportPresent) {
+            this.goal = goal;
+            this.steps = steps;
+            this.checks = checks;
+            this.artifacts = artifacts;
+            this.evaluation = evaluation;
+            this.artifactPassportPresent = artifactPassportPresent;
+        }
+
+        public GoalRun goal() { return goal; }
+        public List<GoalStep> steps() { return steps; }
+        public List<GoalCheck> checks() { return checks; }
+        public List<GoalArtifact> artifacts() { return artifacts; }
+        public GoalEvaluation evaluation() { return evaluation; }
+        public boolean artifactPassportPresent() { return artifactPassportPresent; }
     }
 
     public static final class GoalNotReadyException extends Exception {

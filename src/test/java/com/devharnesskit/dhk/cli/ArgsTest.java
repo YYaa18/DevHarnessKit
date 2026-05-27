@@ -37,6 +37,20 @@ final class ArgsTest {
     }
 
     @Test
+    void repeatedOptionsPreserveAllValues() {
+        Args args = Args.parse(new String[]{
+                "goal", "step",
+                "--field", "existing_controller=GoalStepCommand",
+                "--field=existing_service=GoalOrchestrator"
+        });
+
+        assertEquals(2, args.optionValues("field").size());
+        assertEquals("existing_controller=GoalStepCommand", args.optionValues("field").get(0));
+        assertEquals("existing_service=GoalOrchestrator", args.optionValues("field").get(1));
+        assertEquals("existing_service=GoalOrchestrator", args.option("field"));
+    }
+
+    @Test
     void parsesEqualsOptions() {
         Args args = Args.parse(new String[]{"memory", "export", "--project-root=/tmp/demo", "--task=Order query"});
 

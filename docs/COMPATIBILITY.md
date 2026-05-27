@@ -43,6 +43,7 @@ Stable-candidate beta:
 - `dhk configure explain`
 - `dhk status`
 - `dhk readiness`
+- `dhk advise`
 - `dhk quickstart`
 - `dhk goal start`
 - `dhk goal resume`

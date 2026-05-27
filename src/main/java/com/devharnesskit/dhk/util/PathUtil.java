@@ -20,6 +20,7 @@ public final class PathUtil {
     public static final String BACKUPS_DIRECTORY = "backups";
     public static final String SNAPSHOTS_DIRECTORY = "snapshots";
     public static final String CACHE_DIRECTORY = "cache";
+    public static final String BRIEFS_DIRECTORY = "briefs";
     public static final String PROJECT_JSON = "project.json";
     public static final String MEMORY_DB = "memory.db";
     public static final String PROJECT_INDEX = "PROJECT_INDEX.md";
@@ -46,6 +47,8 @@ public final class PathUtil {
     public static final String GOAL_PROFILES_DIRECTORY = "goal-profiles";
     public static final String GOAL_CHECK_POLICY_JSON = "goal-check-policy.json";
     public static final String CONTRACT_JSON = "contract.json";
+    public static final String WORK_BRIEF = "WORK_BRIEF.md";
+    public static final String AGENT_BRIEF_JSON = "AGENT_BRIEF.json";
 
     private PathUtil() {
     }
@@ -168,6 +171,18 @@ public final class PathUtil {
 
     public static Path devharnessConfig(Path projectRoot) {
         return devharnessDirectory(projectRoot).resolve(DEVHARNESS_CONFIG_JSON);
+    }
+
+    public static Path devharnessBriefsDirectory(Path projectRoot) {
+        return devharnessDirectory(projectRoot).resolve(BRIEFS_DIRECTORY);
+    }
+
+    public static Path workBrief(Path projectRoot) {
+        return devharnessBriefsDirectory(projectRoot).resolve(WORK_BRIEF);
+    }
+
+    public static Path agentBrief(Path projectRoot) {
+        return devharnessBriefsDirectory(projectRoot).resolve(AGENT_BRIEF_JSON);
     }
 
     public static Path goalProfilesDirectory(Path projectRoot) {

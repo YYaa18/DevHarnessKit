@@ -1,5 +1,6 @@
 package com.devharnesskit.dhk.cli;
 
+import com.devharnesskit.dhk.command.AdviseCommand;
 import com.devharnesskit.dhk.command.HelpCommand;
 import com.devharnesskit.dhk.command.CompletionCommand;
 import com.devharnesskit.dhk.command.DoctorCommand;
@@ -61,6 +62,11 @@ public final class CommandRouter {
         this.commands.put("quickstart", new Supplier<Command>() {
             public Command get() {
                 return new QuickstartCommand();
+            }
+        });
+        this.commands.put("advise", new Supplier<Command>() {
+            public Command get() {
+                return new AdviseCommand();
             }
         });
         this.commands.put("completion", new Supplier<Command>() {

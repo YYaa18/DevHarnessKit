@@ -14,6 +14,7 @@ The stable-beta surface is intentionally narrow:
 - `dhk configure init/show/doctor/explain`
 - `dhk status`
 - `dhk readiness`
+- `dhk advise`
 - `dhk quickstart`
 - memory core: `init`, `add`, `confirm`, `search`, `export`, `checkpoint`,
   `recover`, and `backup`
@@ -49,7 +50,7 @@ The following fields are the minimum stable JSON fields:
 - verification arrays: `checks`, `failed_checks`, `missing`,
   `completion_blockers`, `stale_checks`
 - verification guidance: `blocker_summary`, `blocker_categories`,
-  `blocker_details`, `next_action`, `next_command`
+  `blocker_details`, `user_guidance`, `next_action`, `next_command`
 - context pointer: `context_path`
 
 `goal verify` blocker categories are stable-beta values:
@@ -104,6 +105,18 @@ succeeds, and may scan the listed anchors.
 - `artifacts`
 - `checks`
 - `manual_evidence_status`
+
+`WORK_BRIEF.md`:
+
+- task summary
+- recommendation
+- risk flags
+- expected work
+- user choices
+- confirmation requirement
+
+`AGENT_BRIEF.json` is alpha machine-readable adapter protocol, not stable-beta
+public API. Its schema is versioned with `devharness-agent-brief/v1-alpha`.
 
 ## Beta But Included
 

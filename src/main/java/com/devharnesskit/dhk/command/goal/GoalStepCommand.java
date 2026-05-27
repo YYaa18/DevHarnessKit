@@ -4,6 +4,7 @@ import com.devharnesskit.dhk.cli.Args;
 import com.devharnesskit.dhk.cli.Command;
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
+import com.devharnesskit.dhk.service.goal.GoalStepAutoEvidenceCollector;
 import com.devharnesskit.dhk.service.goal.GoalOrchestrator;
 import com.devharnesskit.dhk.service.policy.PolicyHookService;
 import com.devharnesskit.dhk.service.policy.PolicyViolationException;
@@ -14,6 +15,7 @@ import java.util.List;
 public final class GoalStepCommand implements Command {
     private final GoalOrchestrator orchestrator = new GoalOrchestrator();
     private final PolicyHookService policyHookService = new PolicyHookService();
+    private final GoalStepAutoEvidenceCollector autoEvidenceCollector = new GoalStepAutoEvidenceCollector();
 
     public int run(CommandContext context, Args args) {
         String goalKey = args.option("goal").trim();
@@ -31,11 +33,15 @@ public final class GoalStepCommand implements Command {
             return ExitCodes.USAGE_ERROR;
         }
         String changedFiles = changedFiles(args);
+        if (args.hasFlag("auto") && changedFiles.length() == 0) {
+            changedFiles = autoEvidenceCollector.changedFiles(projectRoot);
+        }
         String evidence = args.option("evidence", "").trim();
         String structuredEvidence = structuredEvidence(args, changedFiles);
         try {
             String fieldEvidence = fieldEvidence(args);
-            String combinedEvidence = combineEvidence(evidence, structuredEvidence, fieldEvidence);
+            String autoEvidence = args.hasFlag("auto") ? autoEvidenceCollector.evidence(projectRoot, changedFiles) : "";
+            String combinedEvidence = combineEvidence(evidence, structuredEvidence, fieldEvidence, autoEvidence);
             policyHookService.requireGoalStepAllowed(projectRoot, changedFiles);
             if (args.hasFlag("dry-run")) {
                 GoalOrchestrator.GoalStepValidationResult result = orchestrator.validateStep(context,
@@ -90,6 +96,8 @@ public final class GoalStepCommand implements Command {
             context.out().println("  --compile-result <result>");
             context.out().println("  --risks <risks>");
             context.out().println("  --pending <pending-or-none>");
+            context.out().println("auto_fields:");
+            context.out().println("  --auto collects changed_files, diff_stat, touched_modules, protected_file_hits, risk_flags");
             context.out().println("dry_run_command: dhk goal step --goal " + goal.goalKey()
                     + " --summary \"<summary>\" --field <key=value> --dry-run");
             return ExitCodes.SUCCESS;
@@ -181,4 +189,5 @@ public final class GoalStepCommand implements Command {
         }
         return builder.toString();
     }
+
 }

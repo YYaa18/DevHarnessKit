@@ -19,6 +19,8 @@ dhk db sql --sql "SELECT 1" --format json --jdbc-url <url> --user <user> --passw
 dhk configure show --json
 dhk configure doctor --json
 dhk configure explain [key] --json
+dhk advise --task "Order API" --json
+dhk quickstart --task "Order API" --dry-run --json
 dhk goal status --goal <goal-key> --json
 dhk goal next --goal <goal-key> --json
 dhk goal check --goal <goal-key> --all --json
@@ -199,6 +201,32 @@ manual_evidence_required
 command
 key
 explanation
+```
+
+`advise`:
+
+```text
+brief
+recommendation
+confidence
+safe_to_start
+confirmation_required
+confirmation_reason
+requires_user_confirmation_reason
+work_brief_path
+agent_brief_path
+```
+
+`quickstart` includes the existing setup/goal fields plus:
+
+```text
+recommendation
+safe_to_start
+confirmation_required
+confirmation_reason
+requires_user_confirmation_reason
+work_brief_path
+agent_brief_path
 ```
 
 `goal status`:

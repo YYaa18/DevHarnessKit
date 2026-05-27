@@ -23,6 +23,10 @@ Release-readiness, control-panel, and onboarding hardening beta.
   references, experimental surfaces, release notes, and historical design notes.
 - Added `docs/STABLE_CONTRACT.md` to define the stable-beta CLI, JSON,
   Markdown export, and `goal verify` blocker-category contract.
+- Added the agent-mounted Work Brief / Agent Brief entry layer: `dhk advise`
+  generates user-facing work intent and machine-facing execution policy,
+  `quickstart` reuses the same brief contract, and `goal step --auto` can
+  collect objective diff evidence for light patch flows.
 - `scripts/devharness-control-panel.sh` is the recommended setup/readiness
   entrypoint; `scripts/install-agent-adapters.sh` remains a deprecated
   compatibility wrapper for one beta minor line.

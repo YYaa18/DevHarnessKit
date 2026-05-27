@@ -5,7 +5,7 @@ import java.util.Map;
 
 public final class CliCommandCatalog {
     private static final String[] TOP_LEVEL = new String[]{
-            "help", "version", "doctor", "status", "readiness", "quickstart", "completion",
+            "help", "version", "doctor", "status", "readiness", "advise", "quickstart", "completion",
             "memory", "db", "goal", "graph", "bdd", "skill", "artifact", "checkpoint",
             "configure", "workflow", "spec"
     };
@@ -48,7 +48,8 @@ public final class CliCommandCatalog {
     public static String[] commonCommandOptions(String command) {
         if ("goal".equals(command)) {
             return new String[]{"--project-root", "--goal", "--profile", "--task", "--module", "--mode",
-                    "--summary", "--changed-files", "--evidence", "--check", "--all", "--level", "--json"};
+                    "--summary", "--changed-files", "--evidence", "--check", "--all", "--level", "--auto",
+                    "--markdown", "--json"};
         }
         if ("graph".equals(command)) {
             return new String[]{"--project-root", "--file", "--symbol", "--sql-table", "--scenario", "--depth",
@@ -61,6 +62,10 @@ public final class CliCommandCatalog {
         if ("quickstart".equals(command)) {
             return new String[]{"--project-root", "--preset", "--task", "--module", "--target", "--graph",
                     "--profile", "--mode", "--force", "--dry-run", "--json"};
+        }
+        if ("advise".equals(command)) {
+            return new String[]{"--project-root", "--task", "--module", "--target", "--preset", "--profile",
+                    "--mode", "--graph", "--json"};
         }
         return commonOptions();
     }

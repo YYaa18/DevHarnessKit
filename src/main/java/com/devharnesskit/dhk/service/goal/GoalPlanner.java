@@ -74,6 +74,12 @@ public final class GoalPlanner {
         if ("verify".equals(action)) {
             return "Run compile/test/sensitive checks or record why a check is not available.";
         }
+        if ("understand_patch".equals(action)) {
+            return "Understand the small change boundary and read only the minimum relevant files before editing.";
+        }
+        if ("apply_patch".equals(action)) {
+            return "Apply the small scoped change and record objective diff evidence.";
+        }
         if ("graph_index_or_refresh".equals(action)) {
             return "Generate a fresh graph snapshot and graph context before inspecting code.";
         }
@@ -152,6 +158,12 @@ public final class GoalPlanner {
         }
         if ("verify".equals(action)) {
             return new String[]{"compile_result", "test_result", "sensitive_result"};
+        }
+        if ("understand_patch".equals(action)) {
+            return new String[]{"goal_understanding", "assumptions", "read_files"};
+        }
+        if ("apply_patch".equals(action)) {
+            return new String[]{"changed_files", "diff_stat", "implementation_summary", "risk_flags"};
         }
         if ("collect_error".equals(action)) {
             return new String[]{"failing_symptom", "reproduction_or_log"};

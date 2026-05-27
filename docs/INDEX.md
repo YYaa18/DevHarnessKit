@@ -15,6 +15,8 @@ contracts, experimental surfaces, release material, and historical design notes.
   stable-candidate work.
 - [STABLE_CONTRACT](STABLE_CONTRACT.md): stable-beta CLI, JSON, export, and
   blocker-category contract for testing.
+- [BRIEF_PROTOCOL](BRIEF_PROTOCOL.md): Work Brief, Agent Execution Brief, and
+  GOAL_CONTEXT layering for agent-mounted usage.
 - [SECURITY](../SECURITY.md): security model, limitations, and reporting.
 
 ## Daily Usage

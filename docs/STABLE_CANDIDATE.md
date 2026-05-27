@@ -11,15 +11,15 @@ The first stable-candidate track should be limited to:
 - `dhk help` and `dhk version`;
 - `dhk doctor`;
 - configure/status onboarding commands: `configure init`, `configure show`,
-  `configure doctor`, `configure explain`, `status`, `readiness`, and
+  `configure doctor`, `configure explain`, `status`, `readiness`, `advise`, and
   `quickstart`;
 - memory core commands: `init`, `add`, `confirm`, `search`, `export`,
   `checkpoint`, `recover`, and `backup`;
 - goal core commands: `start`, `resume`, `next`, `step`, `status`, `export`,
   `verify`, `complete`, `audit`, and `recheck`;
-- generated `CURRENT_CONTEXT.md`, `RECOVERY_CONTEXT.md`, `GOAL_CONTEXT.md`,
-  `GOAL_SUMMARY.md`, and `ARTIFACT_PASSPORT.json` section names covered by
-  contract tests;
+- generated `WORK_BRIEF.md`, `CURRENT_CONTEXT.md`, `RECOVERY_CONTEXT.md`,
+  `GOAL_CONTEXT.md`, `GOAL_SUMMARY.md`, and `ARTIFACT_PASSPORT.json` section
+  names covered by contract tests. `AGENT_BRIEF.json` remains alpha schema;
 - release archives, checksums, third-party notices, and recovery-oriented
   migration behavior.
 

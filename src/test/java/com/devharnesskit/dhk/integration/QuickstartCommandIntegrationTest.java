@@ -82,7 +82,8 @@ final class QuickstartCommandIntegrationTest {
                 "--mode", "api"
         }, duplicateStart.context());
         assertEquals(ExitCodes.SUCCESS, duplicateStartExit);
-        assertTrue(duplicateStart.stdout().contains("status: existing_goal"));
+        assertTrue(duplicateStart.stdout().contains("status: context_ready"));
+        assertTrue(duplicateStart.stdout().contains("start_result: existing_goal"));
         assertEquals(goalKey, firstValue(duplicateStart.stdout(), "goal_key: "));
         assertTrue(duplicateStart.stdout().contains("--force-new"));
 

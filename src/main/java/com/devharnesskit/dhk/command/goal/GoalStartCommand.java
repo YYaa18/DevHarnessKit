@@ -36,7 +36,8 @@ public final class GoalStartCommand implements Command {
                     context.out().println("profile: " + existing.profileKey());
                     context.out().println("workflow_run: " + existing.workflowRunKey());
                     context.out().println("spec_change: " + existing.specChangeKey());
-                    context.out().println("status: existing_goal");
+                    context.out().println("status: " + existing.status());
+                    context.out().println("start_result: existing_goal");
                     context.out().println("current_action: " + existing.currentAction());
                     context.out().println("next_command: dhk goal next --goal " + existing.goalKey());
                     context.out().println("context_path: " + PathUtil.goalContext(projectRoot));

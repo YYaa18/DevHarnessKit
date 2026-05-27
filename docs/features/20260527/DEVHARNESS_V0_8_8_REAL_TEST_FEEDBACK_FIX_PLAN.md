@@ -54,7 +54,7 @@ Linear 当前因 workspace issue 额度限制无法创建新卡片，本文件�
 验收：
 
 - quickstart 创建 goal 后，再执行相同参数的 `goal start` 返回
-  `status: existing_goal` 和原 goal key。
+  真实 `status`、`start_result: existing_goal` 和原 goal key。
 
 ### B4: 普通离线构建被 release archive 插件阻断
 

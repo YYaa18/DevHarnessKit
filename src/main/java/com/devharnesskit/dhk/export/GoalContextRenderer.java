@@ -143,11 +143,11 @@ public final class GoalContextRenderer {
         builder.append("- current_action: ").append(plan.currentAction()).append('\n');
         builder.append("- include every required-evidence key in goal step evidence\n");
         builder.append("- put modified paths in --changed-files when files changed\n");
-        builder.append("- use structured fields for read_files, tests_run, compile_result, risks, and pending\n");
+        builder.append("- use --field key=value for required evidence that has no dedicated option\n");
         builder.append("</evidence-contract>\n\n");
 
         builder.append("<structured-evidence-fields>\n");
-        appendList(builder, STRUCTURED_EVIDENCE_FIELDS, "none");
+        appendList(builder, structuredEvidenceFields(plan), "none");
         builder.append("</structured-evidence-fields>\n\n");
 
         builder.append("<required-checks>\n");
@@ -369,6 +369,22 @@ public final class GoalContextRenderer {
         for (String value : values) {
             builder.append("- ").append(value).append('\n');
         }
+    }
+
+    private String[] structuredEvidenceFields(GoalPlan plan) {
+        java.util.List<String> fields = new java.util.ArrayList<String>();
+        for (String field : STRUCTURED_EVIDENCE_FIELDS) {
+            fields.add(field);
+        }
+        if (plan != null) {
+            for (String evidence : plan.requiredEvidence()) {
+                String key = evidence == null ? "" : evidence.trim();
+                if (key.length() > 0) {
+                    fields.add("--field " + key + "=<value>");
+                }
+            }
+        }
+        return fields.toArray(new String[fields.size()]);
     }
 
     private String limit(String text) {

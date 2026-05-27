@@ -71,7 +71,7 @@ final class GoalCommandSupport {
             context.out().println("  - " + evidence);
         }
         context.out().println("structured_evidence_fields:");
-        for (String field : STRUCTURED_EVIDENCE_FIELDS) {
+        for (String field : structuredEvidenceFields(plan)) {
             context.out().println("  - " + field);
         }
         context.out().println("forbidden_actions:");
@@ -119,7 +119,7 @@ final class GoalCommandSupport {
                 JsonOutput.stringField("instruction", plan.instruction()),
                 JsonOutput.rawField("allowed_actions", JsonOutput.stringArray(ALLOWED_ACTIONS)),
                 JsonOutput.rawField("required_evidence", JsonOutput.stringArray(plan.requiredEvidence())),
-                JsonOutput.rawField("structured_evidence_fields", JsonOutput.stringArray(STRUCTURED_EVIDENCE_FIELDS)),
+                JsonOutput.rawField("structured_evidence_fields", JsonOutput.stringArray(structuredEvidenceFields(plan))),
                 JsonOutput.rawField("forbidden_actions", JsonOutput.stringArray(plan.forbiddenActions())),
                 JsonOutput.rawField("required_checks", JsonOutput.stringArray(requiredChecks)),
                 JsonOutput.rawField("context_files", JsonOutput.stringArray(contextFiles)),
@@ -147,9 +147,25 @@ final class GoalCommandSupport {
         return JsonOutput.object(
                 JsonOutput.stringField("current_action", plan.currentAction()),
                 JsonOutput.rawField("required_evidence", JsonOutput.stringArray(plan.requiredEvidence())),
-                JsonOutput.rawField("structured_evidence_fields", JsonOutput.stringArray(STRUCTURED_EVIDENCE_FIELDS)),
+                JsonOutput.rawField("structured_evidence_fields", JsonOutput.stringArray(structuredEvidenceFields(plan))),
                 JsonOutput.stringField("rule", "include every required_evidence key in goal step evidence")
         );
+    }
+
+    private static String[] structuredEvidenceFields(GoalPlan plan) {
+        List<String> fields = new ArrayList<String>();
+        for (String field : STRUCTURED_EVIDENCE_FIELDS) {
+            fields.add(field);
+        }
+        if (plan != null) {
+            for (String evidence : plan.requiredEvidence()) {
+                String key = evidence == null ? "" : evidence.trim();
+                if (key.length() > 0) {
+                    fields.add("--field " + key + "=<value>");
+                }
+            }
+        }
+        return fields.toArray(new String[fields.size()]);
     }
 
     private static String graphJson(GoalGraphState graph) {

@@ -4,6 +4,7 @@ import com.devharnesskit.dhk.cli.Args;
 import com.devharnesskit.dhk.cli.Command;
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
+import com.devharnesskit.dhk.model.goal.GoalRun;
 import com.devharnesskit.dhk.model.spec.SpecChange;
 import com.devharnesskit.dhk.service.goal.GoalOrchestrator;
 import com.devharnesskit.dhk.util.PathUtil;
@@ -28,6 +29,21 @@ public final class GoalStartCommand implements Command {
         String condition = args.option("condition", "").trim();
         Path projectRoot = PathUtil.resolveProjectRoot(args, context.workingDirectory());
         try {
+            if (!args.hasFlag("force-new")) {
+                GoalRun existing = orchestrator.findOpenByIdentity(context, projectRoot, profile, task, module);
+                if (existing != null) {
+                    context.out().println("goal_key: " + existing.goalKey());
+                    context.out().println("profile: " + existing.profileKey());
+                    context.out().println("workflow_run: " + existing.workflowRunKey());
+                    context.out().println("spec_change: " + existing.specChangeKey());
+                    context.out().println("status: existing_goal");
+                    context.out().println("current_action: " + existing.currentAction());
+                    context.out().println("next_command: dhk goal next --goal " + existing.goalKey());
+                    context.out().println("context_path: " + PathUtil.goalContext(projectRoot));
+                    context.out().println("note: matching open goal reused; pass --force-new to create another goal");
+                    return ExitCodes.SUCCESS;
+                }
+            }
             GoalOrchestrator.GoalStartResult result = orchestrator.start(context, projectRoot,
                     profile, task, module, mode, condition);
             SpecChange spec = result.specChange();

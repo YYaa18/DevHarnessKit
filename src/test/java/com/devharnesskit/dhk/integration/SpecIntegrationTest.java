@@ -245,6 +245,60 @@ final class SpecIntegrationTest {
     }
 
     @Test
+    void acceptanceStatusesAreDiscoverableAndAliasesNormalize() throws Exception {
+        createSpec();
+        Harness add = new Harness(tempDir);
+        new CommandRouter().run(new String[]{
+                "spec", "acceptance", "add", "--project-root", "demo",
+                "--change", "order-query-api",
+                "--acceptance", "A001",
+                "--description", "分页查询返回统一结果"
+        }, add.context());
+
+        Harness statuses = new Harness(tempDir);
+        int statusesExit = new CommandRouter().run(new String[]{
+                "spec", "acceptance", "statuses", "--project-root", "demo"
+        }, statuses.context());
+        assertEquals(ExitCodes.SUCCESS, statusesExit);
+        assertTrue(statuses.stdout().contains("allowed_acceptance_statuses: pending, passed, failed, waived"));
+        assertTrue(statuses.stdout().contains("accepted/resolved/approved -> passed"));
+
+        Harness alias = new Harness(tempDir);
+        int aliasExit = new CommandRouter().run(new String[]{
+                "spec", "acceptance", "update", "--project-root", "demo",
+                "--change", "order-query-api",
+                "--acceptance", "A001",
+                "--status", "accepted",
+                "--evidence", "接口测试通过"
+        }, alias.context());
+        assertEquals(ExitCodes.SUCCESS, aliasExit);
+        assertTrue(alias.stdout().contains("status: passed"));
+        assertTrue(alias.stdout().contains("normalized_from: accepted"));
+        assertEquals(1, countRows("spec_acceptance",
+                "change_key = 'order-query-api' AND acceptance_key = 'A001' AND status = 'passed'"));
+
+        Harness invalid = new Harness(tempDir);
+        int invalidExit = new CommandRouter().run(new String[]{
+                "spec", "acceptance", "update", "--project-root", "demo",
+                "--change", "order-query-api",
+                "--acceptance", "A001",
+                "--status", "complete"
+        }, invalid.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, invalidExit);
+        assertTrue(invalid.stderr().contains("Allowed statuses: pending, passed, failed, waived"));
+
+        Harness waiveAlias = new Harness(tempDir);
+        int waiveAliasExit = new CommandRouter().run(new String[]{
+                "spec", "acceptance", "update", "--project-root", "demo",
+                "--change", "order-query-api",
+                "--acceptance", "A001",
+                "--status", "waive"
+        }, waiveAlias.context());
+        assertEquals(ExitCodes.USAGE_ERROR, waiveAliasExit);
+        assertTrue(waiveAlias.stderr().contains("requires --evidence or --reason"));
+    }
+
+    @Test
     void archiveRejectsBlockedOrFailedStateAndAllowsSkippedOrWaivedState() {
         createSpec();
         Harness taskAdd = new Harness(tempDir);

@@ -119,7 +119,13 @@ The shaded CLI jar is generated as:
 target/dhk-cli-<version>-all.jar
 ```
 
-Release archives are generated during `mvn package`:
+Ordinary `mvn package` builds only the shaded CLI jar, which keeps local and
+offline developer builds from resolving release-archive-only Maven plugins.
+Release archives are generated explicitly with:
+
+```bash
+mvn -DskipTests package -P release-archive
+```
 
 ```text
 target/devharnesskit-<version>.zip
@@ -243,6 +249,11 @@ java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" quickstart \
 If adapters are not installed yet, quickstart still creates the goal but reports
 `readiness: ready_with_warnings` and prints an `adapter_next_command` so setup
 can be audited through the control panel.
+
+If you accidentally run `goal start` again with the same project, profile,
+module, and task while that quickstart goal is still open, DevHarnessKit reuses
+the existing goal. Pass `--force-new` only when you intentionally want another
+parallel goal for the same work.
 
 The control panel writes `.agents/devharness/config.json`,
 `.agents/devharness/policy.json`, `.agents/devharness/agent-manifest.json`,

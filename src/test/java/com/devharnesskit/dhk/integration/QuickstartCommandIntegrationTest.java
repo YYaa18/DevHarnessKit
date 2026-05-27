@@ -72,6 +72,20 @@ final class QuickstartCommandIntegrationTest {
         String goalKey = firstValue(quickstart.stdout(), "goal_key: ");
         assertTrue(goalKey.length() > 0);
 
+        Harness duplicateStart = new Harness(tempDir);
+        int duplicateStartExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", root.toString(),
+                "--profile", "java-api-change",
+                "--task", "Implement order query endpoint",
+                "--module", "order",
+                "--mode", "api"
+        }, duplicateStart.context());
+        assertEquals(ExitCodes.SUCCESS, duplicateStartExit);
+        assertTrue(duplicateStart.stdout().contains("status: existing_goal"));
+        assertEquals(goalKey, firstValue(duplicateStart.stdout(), "goal_key: "));
+        assertTrue(duplicateStart.stdout().contains("--force-new"));
+
         Harness status = new Harness(tempDir);
         int statusExit = new CommandRouter().run(new String[]{
                 "goal", "status",

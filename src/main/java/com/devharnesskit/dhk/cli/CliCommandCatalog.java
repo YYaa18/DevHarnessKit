@@ -49,7 +49,7 @@ public final class CliCommandCatalog {
         if ("goal".equals(command)) {
             return new String[]{"--project-root", "--goal", "--profile", "--task", "--module", "--mode",
                     "--summary", "--changed-files", "--evidence", "--check", "--all", "--level", "--auto",
-                    "--markdown", "--json"};
+                    "--markdown", "--force-new", "--json"};
         }
         if ("graph".equals(command)) {
             return new String[]{"--project-root", "--file", "--symbol", "--sql-table", "--scenario", "--depth",

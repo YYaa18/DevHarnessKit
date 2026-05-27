@@ -10,6 +10,10 @@ import java.sql.Connection;
 import java.sql.SQLException;
 
 public final class SpecAcceptanceService {
+    public static final String ALLOWED_STATUS_TEXT = "pending, passed, failed, waived";
+    public static final String STATUS_ALIAS_TEXT = "done/closed/accepted/resolved/approved -> passed; "
+            + "open/in_progress -> pending; rejected -> failed; waive -> waived";
+
     private final SpecAcceptanceRepository acceptanceRepository;
     private final SpecEventRepository eventRepository;
 
@@ -40,16 +44,40 @@ public final class SpecAcceptanceService {
 
     public void updateAcceptance(Connection connection, SpecChange change, SpecAcceptance acceptance,
                                  String status, String evidence, String now) throws SQLException {
-        String verifiedAt = "passed".equals(status) || "waived".equals(status) ? now : "";
+        String normalizedStatus = normalizeAcceptanceStatus(status);
+        String verifiedAt = "passed".equals(normalizedStatus) || "waived".equals(normalizedStatus) ? now : "";
         acceptanceRepository.updateStatus(connection, change.changeKey(), acceptance.acceptanceKey(),
-                status, evidence, verifiedAt, now);
+                normalizedStatus, evidence, verifiedAt, now);
         eventRepository.insert(connection, new SpecEvent(0L, change.projectKey(), change.changeKey(),
                 "acceptance_updated", "info",
-                "Spec acceptance updated: " + acceptance.acceptanceKey(), status, now));
+                "Spec acceptance updated: " + acceptance.acceptanceKey(), normalizedStatus, now));
     }
 
     public static boolean isAcceptanceStatusAllowed(String status) {
-        return "pending".equals(status) || "passed".equals(status)
-                || "failed".equals(status) || "waived".equals(status);
+        return normalizeAcceptanceStatus(status).length() > 0;
+    }
+
+    public static String normalizeAcceptanceStatus(String status) {
+        String normalized = status == null ? "" : status.trim().toLowerCase(java.util.Locale.ROOT);
+        if ("pending".equals(normalized) || "passed".equals(normalized)
+                || "failed".equals(normalized) || "waived".equals(normalized)) {
+            return normalized;
+        }
+        if ("done".equals(normalized) || "closed".equals(normalized)
+                || "accepted".equals(normalized) || "resolved".equals(normalized)
+                || "approved".equals(normalized)) {
+            return "passed";
+        }
+        if ("open".equals(normalized) || "in_progress".equals(normalized)
+                || "in-progress".equals(normalized)) {
+            return "pending";
+        }
+        if ("rejected".equals(normalized)) {
+            return "failed";
+        }
+        if ("waive".equals(normalized)) {
+            return "waived";
+        }
+        return "";
     }
 }

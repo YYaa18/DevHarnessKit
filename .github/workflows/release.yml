@@ -24,7 +24,7 @@ jobs:
           cache: maven
 
       - name: Test and package
-        run: mvn -B clean package
+        run: mvn -B clean package -P release-archive
 
       - name: Resolve artifact version
         run: |

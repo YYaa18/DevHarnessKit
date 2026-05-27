@@ -181,6 +181,18 @@ public final class GoalOrchestrator {
         }
     }
 
+    public GoalRun findOpenByIdentity(CommandContext context, Path projectRoot, String profileKey,
+                                      String task, String module) throws Exception {
+        if (!Files.isRegularFile(PathUtil.memoryDb(projectRoot)) || !Files.isRegularFile(PathUtil.projectJson(projectRoot))) {
+            return null;
+        }
+        try (Connection connection = connectionFactory.open(projectRoot)) {
+            Project project = projectService.readProject(PathUtil.projectJson(projectRoot));
+            migrationRunner.migrate(connection, context.clock());
+            return goalRunRepository.findOpenByIdentity(connection, project.projectKey(), profileKey, module, task);
+        }
+    }
+
     public GoalPlan plan(GoalRun goal) {
         return planner.plan(goal, requireProfile(goal.profileKey()));
     }

@@ -111,28 +111,38 @@
                     </execution>
                 </executions>
             </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <version>3.7.1</version>
-                <executions>
-                    <execution>
-                        <id>release-archive</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>single</goal>
-                        </goals>
-                        <configuration>
-                            <descriptors>
-                                <descriptor>src/assembly/release.xml</descriptor>
-                            </descriptors>
-                            <finalName>devharnesskit-${project.version}</finalName>
-                            <appendAssemblyId>false</appendAssemblyId>
-                            <tarLongFileMode>gnu</tarLongFileMode>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>release-archive</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-assembly-plugin</artifactId>
+                        <version>3.7.1</version>
+                        <executions>
+                            <execution>
+                                <id>release-archive</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>single</goal>
+                                </goals>
+                                <configuration>
+                                    <descriptors>
+                                        <descriptor>src/assembly/release.xml</descriptor>
+                                    </descriptors>
+                                    <finalName>devharnesskit-${project.version}</finalName>
+                                    <appendAssemblyId>false</appendAssemblyId>
+                                    <tarLongFileMode>gnu</tarLongFileMode>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

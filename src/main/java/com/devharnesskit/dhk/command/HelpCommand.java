@@ -31,7 +31,7 @@ public final class HelpCommand implements Command {
         context.out().println("  dhk db test --jdbc-url <url> --user <user> --password-env <env>");
         context.out().println("  dhk db test --host <host> --database <db> [--server-timezone <zone>]");
         context.out().println("  dhk db sql --sql <sql>|--sql-file <path>|--sql-stdin --password-env <env>");
-        context.out().println("  dhk goal start --profile <profile> --task <task> [--module <module>] [--mode <mode>]");
+        context.out().println("  dhk goal start --profile <profile> --task <task> [--module <module>] [--mode <mode>] [--force-new]");
         context.out().println("  dhk goal resume [--goal <goal-key>]");
         context.out().println("  dhk goal next [--goal <goal-key>]");
         context.out().println("  dhk goal step --goal <goal-key> --summary <summary> [--auto] [--changed-files <files>] [--evidence <evidence>]");
@@ -96,7 +96,7 @@ public final class HelpCommand implements Command {
         context.out().println("  dhk spec create --change <key> --title <title>");
         context.out().println("  dhk spec document set --change <key> --type <type> --content <text>|--content-file <path>|--content-stdin");
         context.out().println("  dhk spec task add|update --change <key> --task <task>");
-        context.out().println("  dhk spec acceptance add|update --change <key> --acceptance <acceptance>");
+        context.out().println("  dhk spec acceptance add|update|statuses --change <key> --acceptance <acceptance>");
         context.out().println("  dhk spec status --change <key>");
         context.out().println("  dhk spec export --change <key>");
         context.out().println("  dhk spec bind-workflow --change <key> --run <run-key>");

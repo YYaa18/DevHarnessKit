@@ -41,6 +41,23 @@ public final class GoalRunRepository {
         }
     }
 
+    public GoalRun findOpenByIdentity(Connection connection, String projectKey, String profileKey,
+                                      String moduleName, String taskName) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT * FROM goal_run WHERE project_key = ? AND profile_key = ? "
+                        + "AND module_name = ? AND task_name = ? "
+                        + "AND status NOT IN ('completed', 'abandoned', 'failed') "
+                        + "ORDER BY updated_at DESC, created_at DESC LIMIT 1")) {
+            statement.setString(1, projectKey);
+            statement.setString(2, profileKey);
+            statement.setString(3, moduleName);
+            statement.setString(4, taskName);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next() ? map(resultSet) : null;
+            }
+        }
+    }
+
     public void updateProgress(Connection connection, String goalKey, String status,
                                String currentAction, int stepCount, String now) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(

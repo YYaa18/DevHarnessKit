@@ -41,7 +41,11 @@ public final class SpecAcceptanceCommand implements Command {
         if ("update".equals(action)) {
             return update(context, args);
         }
+        if ("statuses".equals(action) || "status-values".equals(action)) {
+            return statuses(context);
+        }
         context.err().println("Unknown spec acceptance action: " + action);
+        context.err().println("Available actions: add, update, statuses");
         return ExitCodes.USAGE_ERROR;
     }
 
@@ -100,12 +104,15 @@ public final class SpecAcceptanceCommand implements Command {
             context.err().println("Missing required parameters: --change, --acceptance, --status");
             return ExitCodes.USAGE_ERROR;
         }
-        if (!SpecAcceptanceService.isAcceptanceStatusAllowed(status)) {
-            context.err().println("Invalid acceptance status: " + status);
+        String normalizedStatus = SpecAcceptanceService.normalizeAcceptanceStatus(status);
+        if (normalizedStatus.length() == 0) {
+            context.err().println("Invalid acceptance status: " + status
+                    + ". Allowed statuses: " + SpecAcceptanceService.ALLOWED_STATUS_TEXT
+                    + ". Aliases: " + SpecAcceptanceService.STATUS_ALIAS_TEXT);
             return ExitCodes.VALIDATION_ERROR;
         }
         String evidence = args.option("evidence", args.option("reason", "")).trim();
-        if ("waived".equals(status) && evidence.length() == 0) {
+        if ("waived".equals(normalizedStatus) && evidence.length() == 0) {
             context.err().println("Waived acceptance requires --evidence or --reason");
             return ExitCodes.USAGE_ERROR;
         }
@@ -129,7 +136,7 @@ public final class SpecAcceptanceCommand implements Command {
             }
             final SpecChange selectedChange = change;
             final SpecAcceptance selectedAcceptance = acceptance;
-            final String selectedStatus = status;
+            final String selectedStatus = normalizedStatus;
             final String selectedEvidence = evidence.length() == 0 ? acceptance.evidence() : evidence;
             transactionTemplate.execute(connection, new TransactionTemplate.Work<Void>() {
                 public Void execute() throws Exception {
@@ -139,11 +146,21 @@ public final class SpecAcceptanceCommand implements Command {
                 }
             });
             context.out().println("acceptance_key: " + acceptanceKey);
-            context.out().println("status: " + status);
+            context.out().println("status: " + normalizedStatus);
+            if (!normalizedStatus.equals(status)) {
+                context.out().println("normalized_from: " + status);
+            }
             return ExitCodes.SUCCESS;
         } catch (Exception ex) {
             context.err().println("ERROR spec acceptance update failed: " + ex.getMessage());
             return ExitCodes.RUNTIME_ERROR;
         }
+    }
+
+    private int statuses(CommandContext context) {
+        context.out().println("allowed_acceptance_statuses: " + SpecAcceptanceService.ALLOWED_STATUS_TEXT);
+        context.out().println("aliases: " + SpecAcceptanceService.STATUS_ALIAS_TEXT);
+        context.out().println("closed_statuses: passed, waived");
+        return ExitCodes.SUCCESS;
     }
 }

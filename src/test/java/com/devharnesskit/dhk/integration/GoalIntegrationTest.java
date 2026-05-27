@@ -119,7 +119,8 @@ final class GoalIntegrationTest {
         assertTrue(nextJson.stdout().contains("\"current_action\": \"inspect_existing_code\""));
         assertTrue(nextJson.stdout().contains("\"evidence_contract\": {"));
         assertTrue(nextJson.stdout().contains("\"required_evidence\": [\"existing_controller\", \"existing_service\", \"existing_mapper\", \"existing_tests\"]"));
-        assertTrue(nextJson.stdout().contains("\"structured_evidence_fields\": [\"--read-files\", \"--changed-files\", \"--tests-run\", \"--compile-result\", \"--risks\", \"--pending\"]"));
+        assertTrue(nextJson.stdout().contains("\"structured_evidence_fields\": [\"--read-files\", \"--changed-files\", \"--tests-run\", \"--compile-result\", \"--risks\", \"--pending\", \"--field existing_controller=<value>\""));
+        assertTrue(nextJson.stdout().contains("\"--field existing_tests=<value>\""));
         assertTrue(nextJson.stdout().contains("\"allowed_actions\": [\"perform_current_action_only\", \"record_goal_step_after_work\", \"run_goal_next_before_continuing\"]"));
         assertTrue(nextJson.stdout().contains("\"forbidden_actions\": [\"do_not_archive_spec\""));
         assertTrue(nextJson.stdout().contains("\"required_checks\": ["));
@@ -190,6 +191,15 @@ final class GoalIntegrationTest {
         }, implementStep.context());
         assertEquals(ExitCodes.SUCCESS, implementStepExit);
         assertTrue(implementStep.stdout().contains("current_action: verify"));
+
+        Harness verifyNext = new Harness(tempDir);
+        int verifyNextExit = new CommandRouter().run(new String[]{
+                "goal", "next", "--project-root", "demo", "--goal", goalKey
+        }, verifyNext.context());
+        assertEquals(ExitCodes.SUCCESS, verifyNextExit);
+        assertTrue(verifyNext.stdout().contains("--field compile_result=<value>"));
+        assertTrue(verifyNext.stdout().contains("--field test_result=<value>"));
+        assertTrue(verifyNext.stdout().contains("--field sensitive_result=<value>"));
 
         Harness verifyStep = new Harness(tempDir);
         int verifyStepExit = new CommandRouter().run(new String[]{

@@ -287,6 +287,10 @@ next_command
 context_path
 ```
 
+`structured_evidence_fields` contains the stable dedicated options and dynamic
+`--field <required_evidence>=<value>` entries for each required evidence key in
+the current action.
+
 `evidence_contract` repeats the current action, required evidence keys,
 structured evidence fields, and the rule for recording the next `goal step`.
 

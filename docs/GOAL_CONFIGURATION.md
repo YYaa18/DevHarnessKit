@@ -82,6 +82,10 @@ dhk goal next --goal <goal-key> --json
 The JSON output includes `evidence_contract`, `required_evidence`,
 `structured_evidence_fields`, `allowed_actions`, `forbidden_actions`,
 `required_checks`, `completion_blockers`, and `next_command`.
+`structured_evidence_fields` includes the stable dedicated options plus
+`--field <required_evidence>=<value>` entries for every action-specific
+required evidence key, so agent adapters do not need to guess fields such as
+`sensitive_result`.
 
 Use `goal step --template` before recording evidence when the current action is
 unclear:
@@ -419,6 +423,18 @@ Business acceptance mappings create managed spec acceptance items. Automatic com
 - `source=manual` creates the acceptance but never auto-passes it, so `goal verify` and `goal complete` remain blocked until it is explicitly confirmed.
 
 Mappings remain alpha and are validated by `dhk doctor`.
+
+Manual acceptance status values are intentionally small:
+
+```bash
+dhk spec acceptance statuses
+```
+
+Canonical values are `pending`, `passed`, `failed`, and `waived`.
+Common user-facing aliases are accepted and normalized: `done`, `closed`,
+`accepted`, `resolved`, and `approved` become `passed`; `open` and
+`in_progress` become `pending`; `rejected` becomes `failed`; `waive` becomes
+`waived`. `waived` still requires `--evidence` or `--reason`.
 
 See [GOAL_SYNC_STRICTNESS.md](GOAL_SYNC_STRICTNESS.md) for the controller model,
 automatic sync rules, manual boundaries, and completion gates.

@@ -14,7 +14,7 @@ Usage:
   ./scripts/release-gate.sh [--skip-package] [--skip-smoke]
 
 Options:
-  --skip-package  Reuse existing target artifacts instead of running mvn clean package.
+  --skip-package  Reuse existing target artifacts instead of running mvn clean package -P release-archive.
   --skip-smoke    Skip archive and packaged CLI smoke checks.
   -h, --help      Show this help.
 USAGE
@@ -83,8 +83,8 @@ TGZ="target/devharnesskit-$VERSION.tar.gz"
 log "version=$VERSION"
 
 if [ "$RUN_PACKAGE" = "true" ]; then
-  log "running mvn clean package"
-  mvn -B clean package
+  log "running mvn clean package -P release-archive"
+  mvn -B clean package -P release-archive
 fi
 
 require_file "$JAR"

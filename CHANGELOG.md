@@ -11,8 +11,18 @@ Release-readiness, control-panel, and onboarding hardening beta.
   matching `docs/releases/v<version>.md` note.
 - Added a release coverage gate that requires the generated JaCoCo line
   coverage report to stay at or above 60% before beta release packaging.
+- Added CI performance smoke coverage for packaged CLI cold-start commands,
+  doctor, memory search/export, jar size budgets, and lingering-process checks
+  on the Ubuntu Java 17 smoke lane.
+- Added a class-size structural gate and split the largest God Classes:
+  `MigrationRunner` now delegates versioned schema work to migration steps,
+  `GoalCheckService` delegates checks to focused runners, and goal
+  orchestration/sync responsibilities are split out of `GoalOrchestrator` and
+  `GoalActionSyncService`.
 - Added `docs/INDEX.md` as the documentation map for onboarding, core
   references, experimental surfaces, release notes, and historical design notes.
+- Added `docs/STABLE_CONTRACT.md` to define the stable-beta CLI, JSON,
+  Markdown export, and `goal verify` blocker-category contract.
 - `scripts/devharness-control-panel.sh` is the recommended setup/readiness
   entrypoint; `scripts/install-agent-adapters.sh` remains a deprecated
   compatibility wrapper for one beta minor line.

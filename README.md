@@ -13,6 +13,10 @@ Current beta release target: `0.4.6-beta.1`. Maven `project.version` is the
 artifact source of truth; CI and `scripts/check-version-metadata.sh` fail if the
 README, changelog, or release note for that version drift.
 
+Stable-beta automation should start from the narrow
+[stable contract](docs/STABLE_CONTRACT.md), not from the full experimental
+command surface.
+
 | Area | Status | Notes |
 | --- | --- | --- |
 | Memory core | Beta | Usable for local project memory, draft confirmation, search, export, checkpoint, and recovery. |

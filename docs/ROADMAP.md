@@ -20,11 +20,15 @@ Focus: freeze the smallest dependable public surface before any stable claim.
 
 - Promote only memory core, doctor, goal core, migration recovery, and release
   packaging into the first stable-candidate surface.
-- Keep DB readonly beta until SQL safety fuzz/property tests and real-version
+- Keep DB inspection beta until SQL safety fuzz/property tests and real-version
   compatibility checks are stronger.
 - Keep Graph, BDD, Skill Contract, Policy/Governance, Routine, and ECC Control
   Panel experimental until each has its own compatibility contract and release
   gate.
+- Before 1.0, classify Graph, BDD, Skill, Policy/Governance, Routine, and ECC
+  as optional-dependency or independent-artifact candidates against
+  [STABLE_CONTRACT.md](STABLE_CONTRACT.md); do not let experimental
+  dependencies leak into the stable core promise.
 - Use Maven `project.version` as the artifact version source for CI, release,
   and local release-gate scripts.
 - Run `scripts/release-gate.sh` before stable-candidate tags.
@@ -103,8 +107,11 @@ Focus: stable CLI and schema compatibility.
 - Promote the beta compatibility contract into a stricter stable command/output/schema contract.
 - Define post-1.0 semantic versioning and deprecation windows before claiming stability.
 - Revisit coverage threshold enforcement using [decisions/0002-coverage-threshold-and-sql-safety-fuzz.md](decisions/0002-coverage-threshold-and-sql-safety-fuzz.md) after the CLI surface and DB safety tests stabilize.
-- Split optional modules only if dependency licensing, redistribution, package size, or user demand justifies the extra artifact surface.
-- Refactor `GoalCheckService` and `MigrationRunner` into smaller components
-  after the stable-candidate command surface stops changing.
+- Before any stable tag, produce an artifact-boundary decision for each
+  experimental module: keep bundled, mark optional dependency, or split into an
+  independent artifact. Use dependency licensing, redistribution, package size,
+  installation complexity, and user demand as the decision criteria.
+- Keep the current shaded CLI as the default until the optional-artifact decision
+  proves that a split reduces user risk more than it increases install friction.
 - Add shell completion only after command families and option names are less
   volatile.

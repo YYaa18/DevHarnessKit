@@ -21,9 +21,13 @@ final class CommandRouterTest {
         assertEquals(ExitCodes.SUCCESS, exitCode);
         assertTrue(harness.stdout().contains("DevHarness Kit CLI"));
         assertTrue(harness.stdout().contains("dhk memory init"));
+        assertTrue(harness.stdout().contains("dhk quickstart"));
+        assertTrue(harness.stdout().contains("dhk completion bash|zsh|fish"));
         assertTrue(harness.stdout().contains("dhk goal verify"));
         assertTrue(harness.stdout().contains("dhk bdd init"));
         assertTrue(harness.stdout().contains("dhk configure init"));
+        assertTrue(harness.stdout().contains("Current build: beta developer preview; not stable or 1.0-ready."));
+        assertTrue(harness.stdout().contains("Experimental surface: graph, BDD, skill contract/trust"));
     }
 
     @Test
@@ -43,8 +47,11 @@ final class CommandRouterTest {
         int exitCode = new CommandRouter().run(new String[]{"version"}, harness.context());
 
         assertEquals(ExitCodes.SUCCESS, exitCode);
-        assertTrue(harness.stdout().contains("DevHarness Kit 0.4.4-beta.1"));
+        assertTrue(harness.stdout().contains("DevHarness Kit " + VersionInfo.version()));
         assertTrue(harness.stdout().contains("release_channel: beta / developer preview"));
+        assertTrue(harness.stdout().contains("stability: beta developer preview; not stable or 1.0-ready"));
+        assertTrue(harness.stdout().contains("stable_candidate_surface: help,version,doctor,memory-core,goal-core,release-packaging"));
+        assertTrue(harness.stdout().contains("experimental_surface: graph,bdd,skill-contract,policy-governance,ecc-control-panel,routine"));
         assertTrue(harness.stdout().contains("schema_version: 13"));
     }
 
@@ -55,7 +62,7 @@ final class CommandRouterTest {
         int exitCode = new CommandRouter().run(new String[]{"--version"}, harness.context());
 
         assertEquals(ExitCodes.SUCCESS, exitCode);
-        assertTrue(harness.stdout().contains("DevHarness Kit 0.4.4-beta.1"));
+        assertTrue(harness.stdout().contains("DevHarness Kit " + VersionInfo.version()));
     }
 
     private static final class Harness {

@@ -23,6 +23,7 @@ final class ConfigureCommandSupport {
                 JsonOutput.stringField("test_command", config.testCommand()),
                 JsonOutput.stringField("test_trigger", config.testTrigger()),
                 JsonOutput.stringField("test_cost", config.testCost()),
+                JsonOutput.stringField("graph_mode", config.graphMode()),
                 JsonOutput.booleanField("graph_required", config.graphRequired()),
                 JsonOutput.booleanField("graph_fresh_snapshot_required", config.graphFreshSnapshotRequired()),
                 JsonOutput.booleanField("impact_map_required", config.impactMapRequired()),
@@ -46,6 +47,7 @@ final class ConfigureCommandSupport {
         context.out().println("test_command: " + config.testCommand());
         context.out().println("test_trigger: " + config.testTrigger());
         context.out().println("test_cost: " + config.testCost());
+        context.out().println("graph_mode: " + config.graphMode());
         context.out().println("graph_required: " + config.graphRequired());
         context.out().println("graph_fresh_snapshot_required: " + config.graphFreshSnapshotRequired());
         context.out().println("impact_map_required: " + config.impactMapRequired());

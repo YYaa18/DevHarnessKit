@@ -1,5 +1,6 @@
 package com.devharnesskit.dhk.db;
 
+import com.devharnesskit.dhk.db.migration.MigrationStep;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.repository.ProjectRepository;
 import com.devharnesskit.dhk.util.Clock;
@@ -17,6 +18,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.Arrays;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -317,6 +319,179 @@ final class MigrationRunnerTest {
             assertTrue(MigrationRunner.hasTable(connection, "code_graph_snapshot"));
             assertTrue(MigrationRunner.hasTable(connection, "goal_graph_binding"));
             assertTrue(MigrationRunner.hasTable(connection, "human_checkpoint"));
+        }
+    }
+
+    @Test
+    void migrationUpgradesV9GraphFixtureToBddSkillAndHumanCheckpointSchemas() throws Exception {
+        PathUtil.createMemoryDirectories(tempDir);
+        loadFixture("v9-graph-before-bdd.sql");
+
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(tempDir))) {
+            MigrationResult result = new MigrationRunner().migrate(connection, new FixedClock());
+
+            assertEquals(MigrationRunner.V13, result.schemaVersion());
+            assertTrue(result.backupPath().contains("pre-migration-v9-to-v13"));
+            assertTrue(Files.isRegularFile(Paths.get(result.backupPath())));
+            assertEquals(1, countRows(connection, "code_graph_snapshot"));
+            assertEquals(1, countRows(connection, "code_graph_file"));
+            assertEquals(1, countRows(connection, "code_graph_node"));
+            assertEquals(1, countRows(connection, "code_graph_edge"));
+            assertEquals(1, countRows(connection, "code_graph_query_cache"));
+            assertEquals(1, countRows(connection, "goal_graph_binding"));
+            assertEquals(1, countRowsWhere(connection, "code_graph_snapshot",
+                    "snapshot_key = 'fixture-snapshot' AND status = 'completed'"));
+            assertEquals(1, countRowsWhere(connection, "goal_graph_binding",
+                    "goal_key = 'fixture-goal' AND impact_hash = 'impact-hash'"));
+            assertTrue(MigrationRunner.hasTable(connection, "bdd_feature"));
+            assertTrue(MigrationRunner.hasTable(connection, "skill_contract"));
+            assertTrue(MigrationRunner.hasTable(connection, "human_checkpoint"));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V10));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V11));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V12));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V13));
+        }
+    }
+
+    @Test
+    void migrationUpgradesV10BddFixtureToSkillAndHumanCheckpointSchemas() throws Exception {
+        PathUtil.createMemoryDirectories(tempDir);
+        loadFixture("v10-bdd-before-skill.sql");
+
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(tempDir))) {
+            MigrationResult result = new MigrationRunner().migrate(connection, new FixedClock());
+
+            assertEquals(MigrationRunner.V13, result.schemaVersion());
+            assertTrue(result.backupPath().contains("pre-migration-v10-to-v13"));
+            assertTrue(Files.isRegularFile(Paths.get(result.backupPath())));
+            assertEquals(1, countRows(connection, "bdd_feature"));
+            assertEquals(1, countRows(connection, "bdd_scenario"));
+            assertEquals(1, countRows(connection, "bdd_step"));
+            assertEquals(1, countRows(connection, "bdd_binding"));
+            assertEquals(1, countRows(connection, "bdd_evidence"));
+            assertEquals(1, countRows(connection, "bdd_quality_issue"));
+            assertEquals(1, countRowsWhere(connection, "bdd_scenario",
+                    "scenario_key = 'fixture-scenario' AND status = 'verified'"));
+            assertEquals(1, countRowsWhere(connection, "bdd_evidence",
+                    "scenario_key = 'fixture-scenario' AND status = 'passed'"));
+            assertTrue(MigrationRunner.hasTable(connection, "skill_contract"));
+            assertTrue(MigrationRunner.hasTable(connection, "human_checkpoint"));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V11));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V12));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V13));
+        }
+    }
+
+    @Test
+    void migrationUpgradesV11SkillFixtureToTrustSourceHashSchema() throws Exception {
+        PathUtil.createMemoryDirectories(tempDir);
+        loadFixture("v11-skill-before-trust.sql");
+
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(tempDir))) {
+            MigrationResult result = new MigrationRunner().migrate(connection, new FixedClock());
+
+            assertEquals(MigrationRunner.V13, result.schemaVersion());
+            assertTrue(result.backupPath().contains("pre-migration-v11-to-v13"));
+            assertTrue(Files.isRegularFile(Paths.get(result.backupPath())));
+            assertEquals(1, countRows(connection, "skill_contract"));
+            assertEquals(1, countRowsWhere(connection, "skill_contract",
+                    "skill_key = 'fixture-skill' AND trusted = 1 AND trust_status = 'unknown'"));
+            assertTrue(columnExists(connection, "skill_contract", "source_hash"));
+            assertTrue(columnExists(connection, "skill_contract", "trusted_source_hash"));
+            assertTrue(columnExists(connection, "skill_contract", "trust_status"));
+            assertTrue(MigrationRunner.hasTable(connection, "human_checkpoint"));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V12));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V13));
+        }
+    }
+
+    @Test
+    void migrationUpgradesV12HumanCheckpointFixtureToSkillTrustSchema() throws Exception {
+        PathUtil.createMemoryDirectories(tempDir);
+        loadFixture("v12-human-checkpoint-before-skill-trust.sql");
+
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(tempDir))) {
+            MigrationResult result = new MigrationRunner().migrate(connection, new FixedClock());
+
+            assertEquals(MigrationRunner.V13, result.schemaVersion());
+            assertTrue(result.backupPath().contains("pre-migration-v12-to-v13"));
+            assertTrue(Files.isRegularFile(Paths.get(result.backupPath())));
+            assertEquals(1, countRows(connection, "human_checkpoint"));
+            assertEquals(1, countRowsWhere(connection, "human_checkpoint",
+                    "goal_key = 'fixture-goal' AND status = 'approved' AND approver = 'lead'"));
+            assertEquals(1, countRowsWhere(connection, "skill_contract",
+                    "skill_key = 'fixture-skill' AND trust_status = 'unknown'"));
+            assertTrue(columnExists(connection, "skill_contract", "source_hash"));
+            assertTrue(columnExists(connection, "skill_contract", "trusted_source_hash"));
+            assertTrue(columnExists(connection, "skill_contract", "trust_status"));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V13));
+        }
+    }
+
+    @Test
+    void migrationKeepsV13CurrentFixtureIdempotentWithoutBackup() throws Exception {
+        PathUtil.createMemoryDirectories(tempDir);
+        loadFixture("v13-current-minimal.sql");
+
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(tempDir))) {
+            MigrationRunner runner = new MigrationRunner();
+            MigrationResult first = runner.migrate(connection, new FixedClock());
+            MigrationResult second = runner.migrate(connection, new FixedClock());
+
+            assertEquals(MigrationRunner.V13, first.schemaVersion());
+            assertEquals(MigrationRunner.V13, second.schemaVersion());
+            assertEquals("", first.backupPath());
+            assertEquals("", second.backupPath());
+            assertTrue(MigrationRunner.hasTable(connection, "project"));
+            assertTrue(MigrationRunner.hasTable(connection, "goal_check"));
+            assertTrue(MigrationRunner.hasTable(connection, "code_graph_snapshot"));
+            assertTrue(MigrationRunner.hasTable(connection, "bdd_feature"));
+            assertTrue(MigrationRunner.hasTable(connection, "skill_contract"));
+            assertTrue(MigrationRunner.hasTable(connection, "human_checkpoint"));
+            assertEquals(1, countSchemaVersionRows(connection, MigrationRunner.V13));
+        }
+    }
+
+    @Test
+    void migrationRollsBackAppliedStepsWhenLaterStepFails() throws Exception {
+        PathUtil.createMemoryDirectories(tempDir);
+
+        MigrationStep first = new MigrationStep() {
+            public int version() {
+                return 1;
+            }
+
+            public String description() {
+                return "rollback fixture first step";
+            }
+
+            public void apply(Connection connection, Clock clock) throws SQLException {
+                try (Statement statement = connection.createStatement()) {
+                    statement.execute("CREATE TABLE rollback_marker (id INTEGER PRIMARY KEY)");
+                    statement.execute("INSERT INTO rollback_marker(id) VALUES (1)");
+                }
+            }
+        };
+        MigrationStep failing = new MigrationStep() {
+            public int version() {
+                return 2;
+            }
+
+            public String description() {
+                return "rollback fixture failing step";
+            }
+
+            public void apply(Connection connection, Clock clock) throws SQLException {
+                throw new SQLException("intentional migration failure");
+            }
+        };
+
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(tempDir))) {
+            SQLException ex = assertThrows(SQLException.class,
+                    () -> new MigrationRunner(Arrays.asList(first, failing)).migrate(connection, new FixedClock()));
+
+            assertTrue(ex.getMessage().contains("intentional migration failure"));
+            assertFalse(MigrationRunner.hasTable(connection, "rollback_marker"));
         }
     }
 

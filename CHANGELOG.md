@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.4.6-beta.1
+
+Release-readiness, control-panel, and onboarding hardening beta.
+
+- Maven `project.version`, README status, release notes, release archives, and
+  `CHANGELOG.md` now agree on `0.4.6-beta.1`.
+- Added release metadata gates so CI and the local release gate fail when the
+  current Maven version has no changelog entry, README version marker, or
+  matching `docs/releases/v<version>.md` note.
+- Added a release coverage gate that requires the generated JaCoCo line
+  coverage report to stay at or above 60% before beta release packaging.
+- Added `docs/INDEX.md` as the documentation map for onboarding, core
+  references, experimental surfaces, release notes, and historical design notes.
+- `scripts/devharness-control-panel.sh` is the recommended setup/readiness
+  entrypoint; `scripts/install-agent-adapters.sh` remains a deprecated
+  compatibility wrapper for one beta minor line.
+- Goal skill documentation now opens with the 5-step core path and keeps the
+  stricter full protocol as the advanced/auditable path.
+- Release archive smoke now verifies dynamic wrapper jar fallback for Unix and
+  Windows wrappers and blocks legacy memory-first Comate rules from packaged
+  archives.
+
+## 0.4.5-beta.1
+
+Goal UX and agent-adapter hardening beta.
+
+- Added `dhk goal next --json`, `goal step --template`, structured
+  `goal step --field key=value`, and `goal step --dry-run` to make the goal
+  protocol easier for agents and humans to follow.
+- Added `dhk goal audit`, `dhk goal recheck`, and
+  `goal verify --level fast|standard|release`.
+- Added project-level `configure init/show/doctor/explain` commands and the
+  flat `devharness-config/v1-alpha` dotted-key config schema.
+- Added manual compile/test evidence modes and verification-risk handling for
+  environments where Maven checks must run in an IDE, company runtime, or CI.
+- Added agent adapter packaging for Claude Code, OpenCode, and Comate, with
+  goal-first skills/rules and cleanup for the old memory-first skill.
+- Added packaging tests for adapter install, control-panel compatibility, and
+  wrapper project-root behavior.
+
 ## 0.4.4-beta.1
 
 Governance and release-hardening beta.
@@ -11,7 +51,7 @@ Governance and release-hardening beta.
 - Added project policy field `graph_allow_stale_requires_approval` with default `true`.
 - Graph-aware skill wrappers block weak-model self-service use of `--allow-stale` unless external approval sets `DHK_ALLOW_STALE_APPROVED=true`.
 - Added `dhk graph prune --dry-run` to audit snapshots/files/nodes/edges/query-cache rows/goal bindings that would be deleted without modifying SQLite.
-- Release packaging now targets `dhk-cli-0.4.4-beta.1-all.jar` and `devharnesskit-0.4.4-beta.1.{zip,tar.gz}`.
+- Release packaging reads Maven `project.version` for jar and archive names.
 - Full Maven test suite, package build, release archive smoke, graph stale override tests, graph prune dry-run tests, and checksum generation are required before tagging.
 
 ## 0.1.0-alpha

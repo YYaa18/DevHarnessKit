@@ -41,15 +41,33 @@ jobs:
       - name: Package
         run: mvn -B -DskipTests package
 
+      - name: Resolve artifact version
+        shell: bash
+        run: |
+          VERSION="$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)"
+          echo "DHK_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "DHK_JAR=target/dhk-cli-$VERSION-all.jar" >> "$GITHUB_ENV"
+          echo "DHK_ARCHIVE_PREFIX=target/devharnesskit-$VERSION" >> "$GITHUB_ENV"
+
+      - name: Version metadata gate
+        shell: bash
+        run: scripts/check-version-metadata.sh "$DHK_VERSION"
+
+      - name: Coverage threshold gate
+        shell: bash
+        run: scripts/check-coverage-threshold.sh 60
+
       - name: Version smoke
-        run: java -jar target/dhk-cli-0.4.4-beta.1-all.jar version
+        shell: bash
+        run: java -jar "$DHK_JAR" version
 
       - name: Workflow smoke
         if: matrix.smoke
+        shell: bash
         run: |
           set -euo pipefail
           DEMO="$(mktemp -d)"
-          JAR="target/dhk-cli-0.4.4-beta.1-all.jar"
+          JAR="$DHK_JAR"
           java -jar "$JAR" memory init --project-root "$DEMO"
           java -jar "$JAR" workflow template seed --project-root "$DEMO"
           START_OUT="$(java -jar "$JAR" workflow start --project-root "$DEMO" --workflow api-change --task "ci smoke" --module order --mode api)"
@@ -68,4 +86,5 @@ jobs:
 
       - name: Record artifacts
         if: matrix.os == 'ubuntu-latest'
-        run: ls -lh target/dhk-cli-0.4.4-beta.1-all.jar target/devharnesskit-0.4.4-beta.1.*
+        shell: bash
+        run: ls -lh "$DHK_JAR" "$DHK_ARCHIVE_PREFIX".*

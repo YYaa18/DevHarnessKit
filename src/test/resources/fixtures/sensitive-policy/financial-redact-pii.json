@@ -4,7 +4,11 @@
   "identity_number": "redact",
   "jwt": "reject",
   "api_key": "reject",
+  "private_key": "reject",
   "jdbc:mysql://": "reject",
   "private key block": "reject",
-  "authorization:": "reject"
+  "authorization:": "reject",
+  "github token": "reject",
+  "github pat": "reject",
+  "url credential": "reject"
 }

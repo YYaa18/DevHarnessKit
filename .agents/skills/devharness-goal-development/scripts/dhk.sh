@@ -8,7 +8,10 @@ if [ ! -f "$JAR" ]; then
   JAR="$PROJECT_ROOT/lib/dhk.jar"
 fi
 if [ ! -f "$JAR" ]; then
-  JAR="$PROJECT_ROOT/target/dhk-cli-0.4.4-beta.1-all.jar"
+  TARGET_JAR="$(ls -t "$PROJECT_ROOT"/target/dhk-cli-*-all.jar 2>/dev/null | head -n 1 || true)"
+  if [ -n "$TARGET_JAR" ]; then
+    JAR="$TARGET_JAR"
+  fi
 fi
 
 if [ ! -f "$JAR" ]; then

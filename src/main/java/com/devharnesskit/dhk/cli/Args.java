@@ -137,6 +137,32 @@ public final class Args {
                 new LinkedHashSet<String>(flags));
     }
 
+    public String sensitiveScanText(Set<String> excludedOptions) {
+        StringBuilder builder = new StringBuilder();
+        for (String positional : positionals) {
+            appendSensitiveValue(builder, positional);
+        }
+        for (Map.Entry<String, List<String>> entry : optionValues.entrySet()) {
+            if (excludedOptions.contains(entry.getKey())) {
+                continue;
+            }
+            for (String value : entry.getValue()) {
+                appendSensitiveValue(builder, value);
+            }
+        }
+        return builder.toString();
+    }
+
+    private static void appendSensitiveValue(StringBuilder builder, String value) {
+        if (value == null || value.length() == 0) {
+            return;
+        }
+        if (builder.length() > 0) {
+            builder.append('\n');
+        }
+        builder.append(value);
+    }
+
     private static void appendOptionValue(Map<String, List<String>> optionValues, String key, String value) {
         List<String> values = optionValues.get(key);
         if (values == null) {

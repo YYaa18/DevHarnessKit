@@ -18,7 +18,20 @@ This skill is governed by `contract.json`.
 
 Do not use commands outside this contract unless `GOAL_CONTEXT.md` explicitly authorizes them or the user directly requests them.
 
-## Required Protocol
+## Core Path
+
+For ordinary code tasks, keep the flow simple:
+
+1. `goal-start.sh` or `goal-resume.sh` creates or restores the task.
+2. `goal-next.sh` tells you the current action and required evidence.
+3. Do only that action, then record the work with `goal-step.sh`.
+4. `goal-verify.sh` runs the readiness checks.
+5. `goal-complete.sh` is allowed only after verification reports
+   `ready_to_complete`.
+
+The full protocol below keeps weak-model and release-sensitive work auditable.
+
+## Full Protocol
 
 1. Do not start by editing code.
 2. Start a new goal with the skill wrapper `scripts/goal-start.sh`, or resume the current goal with `scripts/goal-resume.sh`. From the repository root, call them as `.agents/skills/devharness-goal-development/scripts/goal-start.sh` and `.agents/skills/devharness-goal-development/scripts/goal-resume.sh`.
@@ -45,7 +58,7 @@ Do not use commands outside this contract unless `GOAL_CONTEXT.md` explicitly au
 8. During development, `dhk goal verify --level fast` may be used as a quick
    preflight, but it is not completion proof.
 9. Before claiming completion, run `scripts/goal-verify.sh`; if it is not ready, follow its `next_command`.
-   - Do not bypass failed discipline checks. If `goal verify` reports `think-before-coding`, `goal-driven`, `simplicity`, or `surgical-change` as failed or pending, add the missing evidence or reduce the change scope, then rerun `goal verify`.
+   - If verification reports `think-before-coding`, `goal-driven`, `simplicity`, or `surgical-change` as failed or pending, review the failure details and address them before retrying. Add missing evidence or reduce the change scope, then rerun `goal verify`.
 10. Only run `scripts/goal-complete.sh` when standard `goal verify` returns
     `ready_to_complete`. For release review, prefer
     `dhk goal verify --level release` before completing or tagging. Use

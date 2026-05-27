@@ -1,0 +1,16 @@
+---
+description: DevHarnessKit goal-first development protocol.
+alwaysApply: true
+---
+
+For any code change:
+1. Do not start by editing code.
+2. Run `.agents/skills/devharness-goal-development/scripts/goal-start.sh` or `goal-resume.sh`.
+3. Run `goal-next.sh` before every work step.
+4. Read `.agents/memory/exports/GOAL_CONTEXT.md`.
+5. Perform only current_action.
+6. Record every investigation, plan, edit, or verification with `goal-step.sh`.
+7. Run `goal-verify.sh` before claiming completion.
+8. Run `goal-complete.sh` only when ready_to_complete.
+
+Do not bypass goal with direct memory/workflow/spec/db commands.

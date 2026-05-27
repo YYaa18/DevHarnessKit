@@ -2,7 +2,9 @@
 setlocal enabledelayedexpansion
 
 set "JAR=%~1"
-if "%JAR%"=="" set "JAR=target\dhk-cli-0.1.0-alpha-all.jar"
+if "%JAR%"=="" (
+  for %%F in (target\dhk-cli-*-all.jar) do if "%JAR%"=="" set "JAR=%%F"
+)
 if not exist "%JAR%" (
   echo Jar not found: %JAR% 1>&2
   echo Run: mvn -DskipTests package 1>&2

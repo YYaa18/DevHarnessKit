@@ -68,7 +68,22 @@ public final class DevHarnessConfig {
     }
 
     public boolean graphRequired() {
+        String mode = graphMode();
+        if ("required".equals(mode)) {
+            return true;
+        }
+        if ("advisory".equals(mode) || "off".equals(mode)) {
+            return false;
+        }
         return booleanValue("verification.graph.required", false);
+    }
+
+    public String graphMode() {
+        String configured = value("verification.graph.mode", "");
+        if (configured.length() > 0) {
+            return configured.toLowerCase();
+        }
+        return booleanValue("verification.graph.required", false) ? "required" : "off";
     }
 
     public boolean graphFreshSnapshotRequired() {

@@ -1,5 +1,6 @@
 package com.devharnesskit.dhk.db;
 
+import com.devharnesskit.dhk.db.migration.MigrationStep;
 import com.devharnesskit.dhk.service.MemoryBackupService;
 import com.devharnesskit.dhk.util.Clock;
 import com.devharnesskit.dhk.util.PathUtil;
@@ -12,6 +13,9 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 public final class MigrationRunner {
     public static final int V1 = 1;
@@ -28,8 +32,148 @@ public final class MigrationRunner {
     public static final int V12 = 12;
     public static final int V13 = 13;
 
+    private final List<MigrationStep> steps;
+
+    public MigrationRunner() {
+        this.steps = Collections.unmodifiableList(defaultStepsFor(this));
+    }
+
+    MigrationRunner(List<MigrationStep> steps) {
+        this.steps = Collections.unmodifiableList(new ArrayList<MigrationStep>(steps));
+    }
+
     public MigrationResult migrate(Connection connection, Clock clock) throws SQLException {
         String backupPath = backupBeforeUpgrade(connection, clock);
+        boolean originalAutoCommit = connection.getAutoCommit();
+        if (originalAutoCommit) {
+            connection.setAutoCommit(false);
+        }
+        try {
+            for (MigrationStep step : steps) {
+                step.apply(connection, clock);
+            }
+            if (originalAutoCommit) {
+                connection.commit();
+            }
+        } catch (SQLException ex) {
+            if (originalAutoCommit) {
+                connection.rollback();
+            }
+            throw ex;
+        } catch (RuntimeException ex) {
+            if (originalAutoCommit) {
+                connection.rollback();
+            }
+            throw ex;
+        } finally {
+            if (originalAutoCommit) {
+                connection.setAutoCommit(true);
+            }
+        }
+
+        boolean ftsAvailable = true;
+        String ftsError = "";
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(title, content, tags)");
+        } catch (SQLException ex) {
+            ftsAvailable = false;
+            ftsError = ex.getMessage();
+        }
+        return new MigrationResult(currentSchemaVersion(connection), ftsAvailable, ftsError, backupPath);
+    }
+
+    private static List<MigrationStep> defaultStepsFor(final MigrationRunner runner) {
+        List<MigrationStep> result = new ArrayList<MigrationStep>();
+        result.add(step(runner, V1, "MVP memory schema", new StepApplier() {
+            public void apply(MigrationRunner runner, Connection connection, Clock clock) throws SQLException {
+                runner.migrateV1(connection, clock);
+            }
+        }));
+        result.add(step(runner, V2, "V0.2 workflow persistence schema", new StepApplier() {
+            public void apply(MigrationRunner runner, Connection connection, Clock clock) throws SQLException {
+                runner.migrateV2(connection, clock);
+            }
+        }));
+        result.add(step(runner, V3, "V0.2-B workflow artifact binding schema", new StepApplier() {
+            public void apply(MigrationRunner runner, Connection connection, Clock clock) throws SQLException {
+                runner.migrateV3(connection, clock);
+            }
+        }));
+        result.add(step(runner, V4, "V0.3 spec persistence schema", new StepApplier() {
+            public void apply(MigrationRunner runner, Connection connection, Clock clock) throws SQLException {
+                runner.migrateV4(connection, clock);
+            }
+        }));
+        result.add(step(runner, V5, "V0.4 goal orchestration schema", new StepApplier() {
+            public void apply(MigrationRunner runner, Connection connection, Clock clock) throws SQLException {
+                runner.migrateV5(connection, clock);
+            }
+        }));
+        result.add(step(runner, V6, "V0.4 goal check freshness schema", new StepApplier() {
+            public void apply(MigrationRunner runner, Connection connection, Clock clock) throws SQLException {
+                runner.migrateV6(connection, clock);
+            }
+        }));
+        result.add(step(runner, V7, "V0.4 goal context export failure schema", new StepApplier() {
+            public void apply(MigrationRunner runner, Connection connection, Clock clock) throws SQLException {
+                runner.migrateV7(connection, clock);
+            }
+        }));
+        result.add(step(runner, V8, "V0.4 goal workflow/spec sync schema", new StepApplier() {
+            public void apply(MigrationRunner runner, Connection connection, Clock clock) throws SQLException {
+                runner.migrateV8(connection, clock);
+            }
+        }));
+        result.add(step(runner, V9, "V0.4 graph lite schema", new StepApplier() {
+            public void apply(MigrationRunner runner, Connection connection, Clock clock) throws SQLException {
+                runner.migrateV9(connection, clock);
+            }
+        }));
+        result.add(step(runner, V10, "V0.4 BDD acceptance schema", new StepApplier() {
+            public void apply(MigrationRunner runner, Connection connection, Clock clock) throws SQLException {
+                runner.migrateV10(connection, clock);
+            }
+        }));
+        result.add(step(runner, V11, "V0.4 skill contract schema", new StepApplier() {
+            public void apply(MigrationRunner runner, Connection connection, Clock clock) throws SQLException {
+                runner.migrateV11(connection, clock);
+            }
+        }));
+        result.add(step(runner, V12, "V0.4 human checkpoint schema", new StepApplier() {
+            public void apply(MigrationRunner runner, Connection connection, Clock clock) throws SQLException {
+                runner.migrateV12(connection, clock);
+            }
+        }));
+        result.add(step(runner, V13, "V0.4 skill trust hardening schema", new StepApplier() {
+            public void apply(MigrationRunner runner, Connection connection, Clock clock) throws SQLException {
+                runner.migrateV13(connection, clock);
+            }
+        }));
+        return result;
+    }
+
+    private static MigrationStep step(final MigrationRunner runner, final int version, final String description,
+                                      final StepApplier applier) {
+        return new MigrationStep() {
+            public int version() {
+                return version;
+            }
+
+            public String description() {
+                return description;
+            }
+
+            public void apply(Connection connection, Clock clock) throws SQLException {
+                applier.apply(runner, connection, clock);
+            }
+        };
+    }
+
+    private interface StepApplier {
+        void apply(MigrationRunner runner, Connection connection, Clock clock) throws SQLException;
+    }
+
+    private void migrateV1(Connection connection, Clock clock) throws SQLException {
         try (Statement statement = connection.createStatement()) {
             statement.execute("CREATE TABLE IF NOT EXISTS schema_version ("
                     + "version INTEGER PRIMARY KEY,"
@@ -106,28 +250,6 @@ public final class MigrationRunner {
             }
         }
         repairProjectColumns(connection);
-        migrateV2(connection, clock);
-        migrateV3(connection, clock);
-        migrateV4(connection, clock);
-        migrateV5(connection, clock);
-        migrateV6(connection, clock);
-        migrateV7(connection, clock);
-        migrateV8(connection, clock);
-        migrateV9(connection, clock);
-        migrateV10(connection, clock);
-        migrateV11(connection, clock);
-        migrateV12(connection, clock);
-        migrateV13(connection, clock);
-
-        boolean ftsAvailable = true;
-        String ftsError = "";
-        try (Statement statement = connection.createStatement()) {
-            statement.execute("CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(title, content, tags)");
-        } catch (SQLException ex) {
-            ftsAvailable = false;
-            ftsError = ex.getMessage();
-        }
-        return new MigrationResult(currentSchemaVersion(connection), ftsAvailable, ftsError, backupPath);
     }
 
     private String backupBeforeUpgrade(Connection connection, Clock clock) throws SQLException {

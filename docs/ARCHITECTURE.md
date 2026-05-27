@@ -2,18 +2,48 @@
 
 DevHarness Kit is a local Java CLI. It does not start a daemon, expose an HTTP API, or call LLM providers.
 
-## Module Boundaries
+## Logical Module Boundaries
 
 ```text
 DevHarnessKit
-|-- memory core
-|-- db readonly
-|-- goal
-|-- graph lite
-|-- workflow
-|-- spec
-`-- agent packaging
+|-- dhk-core
+|   |-- memory core
+|   |-- project/local SQLite migration
+|   |-- sensitive policy
+|   |-- goal core
+|   |-- workflow/spec audit state
+|   `-- doctor/status/quickstart readiness primitives
+|-- dhk-db
+|   `-- readonly business database inspection
+|-- dhk-graph
+|   `-- Graph Lite snapshots, impact maps, and graph-aware goal preflight
+|-- dhk-bdd
+|   `-- BDD acceptance harness and scenario evidence
+|-- dhk-governance
+|   `-- skill contract, policy hooks, artifact passports, checkpoints, routine
+`-- dhk-cli
+    `-- command router, output contracts, scripts, packaging, release archives
 ```
+
+These are logical boundaries for the current beta line. The repository still
+builds one Maven artifact, `dhk-cli`, and one shaded jar. Do not split Maven
+modules until the preview conditions at the end of this document are met.
+
+Expected dependency direction:
+
+```text
+dhk-cli
+  -> dhk-governance
+  -> dhk-bdd
+  -> dhk-graph
+  -> dhk-db
+  -> dhk-core
+```
+
+Higher layers may depend on lower layers. Lower layers must not depend on CLI
+commands or packaging scripts. Cross-cutting utilities such as JSON rendering,
+path resolution, and clocks stay in core-compatible utility packages until a
+future module split creates a dedicated shared package.
 
 ## Memory Core
 
@@ -152,3 +182,57 @@ src/main/java/com/devharnesskit/dhk/util
 ```
 
 Commands should stay thin: parse inputs, call services, and print stable output. Repositories own SQL persistence. Services own validation and workflow rules. Renderers own Markdown output.
+
+## Package Ownership
+
+| Logical module | Current packages and files | Ownership notes |
+| --- | --- | --- |
+| `dhk-cli` | `cli`, `command`, `Main`, release assembly, shell/bat scripts | Parses arguments, routes commands, renders text/JSON, and packages the single shaded jar. |
+| `dhk-core` | `db`, `db.migration`, `model`, root `repository`, `repository.goal`, `repository.spec`, `repository.workflow`, `service.goal`, `service.spec`, `service.workflow`, `service.config`, `service.checkpoint`, root `service`, `export`, `util` | Owns local source-of-truth state, migration, memory/context exports, goal orchestration, workflow/spec audit layers, status/readiness primitives, and sensitive policy. |
+| `dhk-db` | `command.projectdb`, `sql`, DB-facing services inside root `service` | Owns readonly business DB connection, SQL safety guard, query rendering, and DB risk notices. It should depend on core policy/sensitive utilities only. |
+| `dhk-graph` | `command.graph`, `model.graph`, `repository.graph`, `service.graph` | Owns Graph Lite config, index, snapshot persistence, impact maps, prune, and graph-aware goal preflight/check evidence. |
+| `dhk-bdd` | `command.bdd`, `model.bdd`, `repository.bdd`, `service.bdd` | Owns feature/scenario/evidence storage and BDD exports/checks. |
+| `dhk-governance` | `command.skill`, `command.artifact`, `command.checkpoint`, `model.policy`, `model.skill`, `repository.skill`, `service.policy`, `service.skill`, artifact passport/checkpoint services | Owns skill contract/trust, policy hooks, human checkpoint, artifact passport, and future routine/reporting rules. |
+
+## Known Boundary Debt
+
+- `GoalCheckService` still coordinates checks from graph, BDD, governance, workflow, spec, and command execution. AI-151 introduced `GoalCheckRunner` and a static registry, but the physical check implementations still live in `service.goal`. Before Maven modules, graph/BDD/governance checks should move behind module-owned runners.
+- `MigrationRunner` now has a `MigrationStep` contract and versioned methods, but all schema SQL still lives in one class. Before a module split, schema ownership should be documented per step and future steps should be introduced as small migration classes.
+- Root `service` still contains cross-module helpers such as sensitive guard, SQL guard, and backup service. A future split should decide whether these stay in `dhk-core` or move to smaller shared internal packages.
+- `command` is a single tree containing all command families. This is acceptable while the jar is single-artifact, but Maven preview should keep command packages in `dhk-cli` and move only implementation services/repositories into module artifacts.
+- `model.Project` and several generic repositories are shared by all domains. This should remain core until there is a stable public persistence contract.
+
+## Multi-Module Preview Plan
+
+Phase 0, current beta:
+
+- Keep one `pom.xml`, one shaded jar, one release archive, and current install scripts.
+- Maintain logical package ownership in this document.
+- Continue reducing large cross-domain services (`GoalCheckService`, `MigrationRunner`) before moving files.
+
+Phase 1, logical boundary hardening:
+
+- Move graph/BDD/governance check implementations behind module-owned `GoalCheckRunner` classes.
+- Keep migration steps small and version-addressable.
+- Add a package dependency report to CI before changing Maven modules.
+- Keep `scripts/devharness-control-panel.sh`, generated adapters, and release archive paths unchanged.
+
+Phase 2, Maven multi-module preview:
+
+- Introduce modules without changing the published CLI entrypoint:
+  `dhk-core`, `dhk-db`, `dhk-graph`, `dhk-bdd`, `dhk-governance`, and `dhk-cli`.
+- Keep `dhk-cli` as the only packaged shaded jar in preview.
+- Run the existing integration suite against the assembled `dhk-cli` artifact.
+- Do not introduce core/full distribution until install scripts and adapter paths understand both forms.
+
+Phase 3, optional core/full distribution:
+
+- `dhk-core.jar` may exclude readonly DB, Graph Lite, BDD, and governance extras only after README, release archives, wrapper scripts, and third-party notices describe the split.
+- `dhk-full.jar` remains the compatibility artifact for existing users.
+
+## Release And Adapter Risks
+
+- Generated agent adapters expect a single `dhk.jar` or `target/dhk-cli-*-all.jar`.
+- Release archives currently include one CLI jar plus scripts, licenses, and notices.
+- Splitting artifacts too early would require installer, wrapper, docs, CI, and `THIRD_PARTY_NOTICES.md` updates in the same release.
+- MySQL 5.1 compatibility is intentionally retained for the user's mixed local/company environment; any future `dhk-db` module must preserve that compatibility unless the release plan says otherwise.

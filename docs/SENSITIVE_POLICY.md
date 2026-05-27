@@ -29,9 +29,13 @@ Recommended financial-system baseline:
   "identity_number": "redact",
   "jwt": "reject",
   "api_key": "reject",
+  "private_key": "reject",
   "jdbc:mysql://": "reject",
   "private key block": "reject",
-  "authorization:": "reject"
+  "authorization:": "reject",
+  "github token": "reject",
+  "github pat": "reject",
+  "url credential": "reject"
 }
 ```
 
@@ -52,8 +56,11 @@ Credential-like values still reject by default. For example:
 | `11010519491231002X` | `redact` or `allow` | Common business PII and high-risk if exported raw. |
 | `jwt eyJ...` | `reject` | Authentication credential. |
 | `api_key=...` | `reject` | Application credential. |
+| `private_key=...` | `reject` | Key material should not enter project context. |
 | `jdbc:mysql://...` | `reject` | May expose host, schema, user, or connection options. |
 | `Authorization: ...` | `reject` | Request credential. |
+| `ghp_...` / `github_pat_...` | `reject` | GitHub access token. |
+| `https://user:password@...` | `reject` | URL-embedded credentials. |
 | `-----BEGIN OPENSSH PRIVATE KEY-----` | `reject` | Private key material. |
 
 ## Supported Keys
@@ -87,7 +94,7 @@ phone
 identity number
 ```
 
-Aliases are accepted for common names such as `identity_number`, `id_card`, `mobile`, `phone_number`, and `api_key`.
+Aliases are accepted for common names such as `identity_number`, `id_card`, `mobile`, `phone_number`, `api_key`, and `private_key`.
 
 ## Financial Project Examples
 
@@ -100,9 +107,13 @@ Use this when PII should never be written raw to memory or context exports:
   "identity_number": "redact",
   "jwt": "reject",
   "api_key": "reject",
+  "private_key": "reject",
   "jdbc:mysql://": "reject",
   "private key block": "reject",
-  "authorization:": "reject"
+  "authorization:": "reject",
+  "github token": "reject",
+  "github pat": "reject",
+  "url credential": "reject"
 }
 ```
 
@@ -115,9 +126,13 @@ Use this only when local development data is synthetic or otherwise safe for age
   "identity_number": "allow",
   "jwt": "reject",
   "api_key": "reject",
+  "private_key": "reject",
   "jdbc:mysql://": "reject",
   "private key block": "reject",
-  "authorization:": "reject"
+  "authorization:": "reject",
+  "github token": "reject",
+  "github pat": "reject",
+  "url credential": "reject"
 }
 ```
 
@@ -130,9 +145,13 @@ Use this for public examples or repositories where personal data should hard-sto
   "identity_number": "reject",
   "jwt": "reject",
   "api_key": "reject",
+  "private_key": "reject",
   "jdbc:mysql://": "reject",
   "private key block": "reject",
-  "authorization:": "reject"
+  "authorization:": "reject",
+  "github token": "reject",
+  "github pat": "reject",
+  "url credential": "reject"
 }
 ```
 
@@ -149,6 +168,8 @@ Keep credentials and secrets at the default `reject` action:
   "identity_number": "redact",
   "password=": "reject",
   "token=": "reject",
+  "api_key": "reject",
+  "private_key": "reject",
   "jdbc:mysql://": "reject",
   "private key block": "reject"
 }

@@ -1,23 +1,27 @@
 # Compatibility Contract
 
-Current release channel: `v0.4.4-beta.1` beta developer preview.
+Current release channel: beta developer preview. The artifact version is defined
+by Maven `project.version` and printed by `dhk version`.
 
 This document defines what users and scripts may cautiously depend on before
 1.0, and what remains experimental. It is a contract for release notes and
 documentation, not a promise that every current behavior is stable.
 
+See [STABLE_CANDIDATE.md](STABLE_CANDIDATE.md) for the narrower
+stable-candidate boundary. The stable-candidate track is intentionally smaller
+than the full current command surface.
+
 ## Stability Levels
 
 | Level | Meaning |
 | --- | --- |
-| Stable-ish alpha | Intended to change conservatively across beta patch releases; breaking changes require a changelog note and migration guidance. |
-| Beta | Useful for real workflows, but still has safety, environment, or dependency constraints that users must review. |
+| Beta | Useful for real workflows before 1.0; breaking changes require a changelog note and migration guidance. Some beta areas still have safety, environment, or dependency constraints that users must review. |
 | Alpha | Usable for developer preview feedback. Shape may change before 1.0 with documented release notes. |
 | Internal | Historical plans, implementation notes, tests, and helper internals. Do not build automation against these. |
 
 ## Command Surface
 
-Stable-ish alpha:
+Beta core:
 
 - `dhk help`
 - `dhk version`
@@ -31,6 +35,19 @@ Stable-ish alpha:
 - `dhk memory recover`
 - `dhk memory backup`
 
+Stable-candidate beta:
+
+- `dhk goal start`
+- `dhk goal resume`
+- `dhk goal next`
+- `dhk goal step`
+- `dhk goal status`
+- `dhk goal export`
+- `dhk goal verify`
+- `dhk goal complete`
+- `dhk goal audit`
+- `dhk goal recheck`
+
 Beta:
 
 - `dhk db test`
@@ -41,21 +58,16 @@ Beta:
 
 Alpha:
 
-- `dhk goal start`
-- `dhk goal resume`
-- `dhk goal next`
-- `dhk goal step`
-- `dhk goal status`
-- `dhk goal export`
 - `dhk goal check`
 - `dhk goal evaluate`
-- `dhk goal verify`
-- `dhk goal complete`
 - `dhk graph init`
+- `dhk graph doctor`
 - `dhk graph status`
 - `dhk graph index`
 - `dhk graph impact`
 - `dhk graph export`
+- `dhk graph prune`
+- `dhk configure ...`
 - `dhk bdd init`
 - `dhk bdd add`
 - `dhk bdd list`
@@ -63,12 +75,23 @@ Alpha:
 - `dhk bdd export`
 - `dhk bdd lint`
 - `dhk bdd evidence add`
+- `dhk bdd evidence junit`
+- `dhk bdd evidence report`
 - `dhk bdd verify`
 - `dhk bdd coverage`
 - `dhk bdd bind-spec`
 - `dhk bdd bind-goal`
+- `dhk bdd bind-graph`
+- `dhk bdd bind-test`
 - `dhk skill lint`
 - `dhk skill verify`
+- `dhk skill trust`
+- `dhk skill audit`
+- `dhk skill score`
+- `dhk skill report`
+- `dhk skill gate ...`
+- `dhk checkpoint ...`
+- `dhk artifact passport verify`
 - `dhk workflow ...`
 - `dhk spec ...`
 - agent skill/rule packaging under `.agents/` and `.comate/`
@@ -77,6 +100,9 @@ Alpha:
 Internal/experimental:
 
 - Skill contract enforcement commands are experimental and introduced in stages.
+- Graph-aware Goal, BDD acceptance, Policy/Hook governance, Skill Evaluation,
+  Routine, and ECC Control Panel remain outside the first stable-candidate
+  surface even when their commands are useful for internal dogfood.
 - Graph Lite SQLite tables, `.agents/graph/config.json`, snapshot rows, and
   generated graph exports beyond `GRAPH_INDEX_REPORT.md`, `IMPACT_MAP.md`,
   `GRAPH_CONTEXT.md`, and `GRAPH_SNAPSHOT.json`.
@@ -117,7 +143,7 @@ fields rather than exact formatting or field order.
 SQLite is the source of truth. Markdown files under `.agents/memory/exports/`
 are generated context artifacts.
 
-Stable-ish alpha exports:
+Beta exports:
 
 - `CURRENT_CONTEXT.md`
 - `RECOVERY_CONTEXT.md`
@@ -192,7 +218,7 @@ boundary. Always use database-level read-only credentials.
 
 Before 1.0:
 
-- stable-ish alpha command changes require a changelog note;
+- beta command changes require a changelog note;
 - beta/alpha command changes require a changelog note when they affect scripts,
   export shapes, or persisted data;
 - compatibility aliases should be kept for at least one minor release when
@@ -210,7 +236,7 @@ Each public release should state:
 - release channel and stability level;
 - current schema version;
 - supported migration paths and downgrade stance;
-- command families that are stable-ish alpha, beta, or alpha;
+- command families that are beta, alpha, or internal;
 - JSON/export contract changes;
 - DB driver and MySQL compatibility constraints;
 - any breaking changes, deprecations, or compatibility aliases.

@@ -3,7 +3,7 @@
 DevHarness Kit Markdown files under `.agents/memory/exports/` are generated context artifacts. SQLite remains the source of truth for memory, workflow, spec, and goal state.
 
 Alpha agents and scripts may depend on the required sections below. New fields may be added inside a section before 1.0, but existing section names and order should change only with a changelog note.
-See [COMPATIBILITY.md](COMPATIBILITY.md) for which exports are stable-ish alpha
+See [COMPATIBILITY.md](COMPATIBILITY.md) for which exports are beta
 versus alpha in the broader release contract.
 
 ## WORKFLOW_CONTEXT.md

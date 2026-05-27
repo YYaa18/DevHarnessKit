@@ -11,8 +11,30 @@ Focus: beta release readiness without expanding major feature scope.
 - Keep `doctor` dependable across platforms.
 - Keep sensitive-data checks fail-closed where persistence or export is involved.
 - Keep automatic pre-migration backups covered by fixture tests.
-- Treat [COMPATIBILITY.md](COMPATIBILITY.md) as the source for stable-ish alpha, beta, and alpha contract wording.
+- Treat [COMPATIBILITY.md](COMPATIBILITY.md) as the source for beta, alpha, and internal contract wording.
 - Publish beta developer-preview releases with third-party notices, security notes, checksums, and release archives.
+
+## Stable Candidate Closure
+
+Focus: freeze the smallest dependable public surface before any stable claim.
+
+- Promote only memory core, doctor, goal core, migration recovery, and release
+  packaging into the first stable-candidate surface.
+- Keep DB readonly beta until SQL safety fuzz/property tests and real-version
+  compatibility checks are stronger.
+- Keep Graph, BDD, Skill Contract, Policy/Governance, Routine, and ECC Control
+  Panel experimental until each has its own compatibility contract and release
+  gate.
+- Use Maven `project.version` as the artifact version source for CI, release,
+  and local release-gate scripts.
+- Run `scripts/release-gate.sh` before stable-candidate tags.
+- Keep `CHANGELOG.md`, README current-version marker, and
+  `docs/releases/v<version>.md` synchronized through CI/release-gate checks.
+- Keep the conservative JaCoCo line-coverage release gate active, then raise it
+  only after targeted coverage and two consecutive beta releases support the new
+  floor.
+- Reduce onboarding friction by treating [INDEX.md](INDEX.md) as the docs map
+  and `scripts/devharness-control-panel.sh` as the recommended setup entrypoint.
 
 ## 0.2.x
 
@@ -82,3 +104,7 @@ Focus: stable CLI and schema compatibility.
 - Define post-1.0 semantic versioning and deprecation windows before claiming stability.
 - Revisit coverage threshold enforcement using [decisions/0002-coverage-threshold-and-sql-safety-fuzz.md](decisions/0002-coverage-threshold-and-sql-safety-fuzz.md) after the CLI surface and DB safety tests stabilize.
 - Split optional modules only if dependency licensing, redistribution, package size, or user demand justifies the extra artifact surface.
+- Refactor `GoalCheckService` and `MigrationRunner` into smaller components
+  after the stable-candidate command surface stops changing.
+- Add shell completion only after command families and option names are less
+  volatile.

@@ -22,15 +22,6 @@ public final class SqlSafetyGuard {
         if (containsRiskyPattern(lower)) {
             return SqlSafetyResult.rejected("high risk SQL pattern is not allowed");
         }
-        if ("explain".equals(first)) {
-            String explained = lower.substring("explain".length()).trim();
-            String explainedFirst = firstKeyword(explained);
-            if (!"select".equals(explainedFirst) && !"show".equals(explainedFirst)
-                    && !"desc".equals(explainedFirst) && !"describe".equals(explainedFirst)) {
-                return SqlSafetyResult.rejected("EXPLAIN is only allowed for readonly statements");
-            }
-            return SqlSafetyResult.allowed(normalized);
-        }
         if (!isReadonlyKeyword(first)) {
             return SqlSafetyResult.rejected("only SELECT, SHOW, DESC, DESCRIBE, and EXPLAIN are allowed");
         }
@@ -39,6 +30,15 @@ public final class SqlSafetyGuard {
                 return SqlSafetyResult.rejected("--explain only supports SELECT");
             }
             return SqlSafetyResult.allowed("EXPLAIN " + normalized);
+        }
+        if ("explain".equals(first)) {
+            String explained = lower.substring("explain".length()).trim();
+            String explainedFirst = firstKeyword(explained);
+            if (!"select".equals(explainedFirst) && !"show".equals(explainedFirst)
+                    && !"desc".equals(explainedFirst) && !"describe".equals(explainedFirst)) {
+                return SqlSafetyResult.rejected("EXPLAIN is only allowed for readonly statements");
+            }
+            return SqlSafetyResult.allowed(normalized);
         }
         return SqlSafetyResult.allowed(normalized);
     }
@@ -49,11 +49,11 @@ public final class SqlSafetyGuard {
     }
 
     private boolean containsRiskyPattern(String lower) {
-        return lower.contains(" into outfile")
-                || lower.contains(" into dumpfile")
-                || lower.contains("sleep(")
-                || lower.contains("load_file(")
-                || lower.matches(".*\\b(insert|update|delete|drop|alter|truncate|create|grant|revoke|call|set|replace|load)\\b.*");
+        String riskText = maskQuotedContent(lower);
+        return riskText.matches(".*\\binto\\s+(outfile|dumpfile)\\b.*")
+                || riskText.matches(".*\\bsleep\\s*\\(.*")
+                || riskText.matches(".*\\bload_file\\s*\\(.*")
+                || riskText.matches(".*\\b(insert|update|delete|drop|alter|truncate|create|grant|revoke|call|set|replace|load)\\b.*");
     }
 
     private String firstKeyword(String lower) {
@@ -148,6 +148,51 @@ public final class SqlSafetyGuard {
             for (int i = lastSemicolon + 1; i < out.length(); i++) {
                 if (!Character.isWhitespace(out.charAt(i))) {
                     return null;
+                }
+            }
+        }
+        return state == 0 ? out.toString() : null;
+    }
+
+    private String maskQuotedContent(String sql) {
+        StringBuilder out = new StringBuilder();
+        int state = 0;
+        for (int i = 0; i < sql.length(); i++) {
+            char ch = sql.charAt(i);
+            char next = i + 1 < sql.length() ? sql.charAt(i + 1) : '\0';
+            if (state == 0) {
+                if (ch == '\'') {
+                    state = 1;
+                    out.append(' ');
+                } else if (ch == '"') {
+                    state = 2;
+                    out.append(' ');
+                } else if (ch == '`') {
+                    state = 3;
+                    out.append(' ');
+                } else {
+                    out.append(ch);
+                }
+            } else if (state == 1) {
+                out.append(' ');
+                if (ch == '\\' && next != '\0') {
+                    out.append(' ');
+                    i++;
+                } else if (ch == '\'') {
+                    state = 0;
+                }
+            } else if (state == 2) {
+                out.append(' ');
+                if (ch == '\\' && next != '\0') {
+                    out.append(' ');
+                    i++;
+                } else if (ch == '"') {
+                    state = 0;
+                }
+            } else if (state == 3) {
+                out.append(' ');
+                if (ch == '`') {
+                    state = 0;
                 }
             }
         }

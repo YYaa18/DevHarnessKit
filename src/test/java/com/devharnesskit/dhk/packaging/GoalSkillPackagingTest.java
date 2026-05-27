@@ -47,6 +47,9 @@ final class GoalSkillPackagingTest {
         assertTrue(skill.contains("## Core Path"));
         assertTrue(skill.contains("## Full Protocol"));
         assertTrue(skill.contains("goal-verify.sh"));
+        assertTrue(skill.contains("Work Brief"));
+        assertTrue(skill.contains("AGENT_BRIEF.json"));
+        assertTrue(skill.contains("Do not show `harness_commands`"));
         assertTrue(skill.contains("goal-check.sh --all"));
         assertTrue(skill.contains("goal-evaluate.sh"));
         assertTrue(skill.contains("goal-complete.sh"));
@@ -125,6 +128,7 @@ final class GoalSkillPackagingTest {
         assertTrue(skill.contains("IMPACT_MAP.md"));
         assertTrue(skill.contains("ready_to_complete"));
         assertTrue(skill.contains("snapshot-bound generated facts"));
+        assertTrue(skill.contains("AGENT_BRIEF.json"));
         assertTrue(skill.contains("legacy-java-small-fix-with-graph"));
         assertTrue(skill.contains("rollback_plan"));
 

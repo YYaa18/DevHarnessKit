@@ -21,7 +21,7 @@ command surface.
 | --- | --- | --- |
 | Memory core | Beta | Usable for local project memory, draft confirmation, search, export, checkpoint, and recovery. |
 | Doctor | Beta | Validates project memory storage and export paths. |
-| Onboarding/status | Stable-candidate beta | `configure`, `status`, `readiness`, and `quickstart` are the preferred setup and troubleshooting entrypoints for stable-beta testing. |
+| Onboarding/status | Stable-candidate beta | `configure`, `status`, `readiness`, `advise`, and `quickstart` are the preferred setup and troubleshooting entrypoints for stable-beta testing. |
 | Sensitive guard | Beta | Best-effort heuristic guard with project-level reject/redact/allow policy. It reviews persisted/exported content; users still review outputs because it is not a complete DLP system. |
 | DB inspection | Beta | Useful for personal development database inspection. SQL guard is not a permission boundary; use credentials appropriate to your trusted development environment, with lower privileges recommended when practical. |
 | Goal core | Stable-candidate beta | High-level `dhk goal` protocol for start/resume/next/step/status/export/verify/complete/audit/recheck and short context export. It is the preferred harness entry for agent work, but not stable. |
@@ -31,7 +31,7 @@ command surface.
 | BDD acceptance harness | Internal alpha | `dhk bdd init/add/list/show/export/lint/evidence/verify/coverage/bind-spec/bind-goal/bind-graph` can record, export, lint, verify, cover, and trace specification-level BDD features, scenarios, Given/When/Then steps, evidence, spec acceptance rows, goal runs, and Graph Lite impact inputs. BDD-required goal profiles can block completion on missing scenario evidence. Executable adapters are not enabled yet. |
 | Workflow | Alpha | Records process state for audit and context export. It is not a workflow engine. |
 | Spec | Alpha | Records change documents, tasks, acceptance, and status. Markdown is export only. |
-| Agent packaging | Alpha | Ships `.agents/skills` and `.comate/rules` helpers for agent workflows. |
+| Agent packaging | Alpha | Ships `.agents/skills` and `.comate/rules` helpers for agent workflows. Work Brief is user-facing; Agent Brief is machine-facing and command details stay internal to adapters. |
 | SQLite schema | Alpha | Current schema version is v13. Compatibility policy is documented, but not yet guaranteed as stable. |
 
 Stable-candidate work is now being narrowed around memory core, doctor, goal
@@ -80,6 +80,7 @@ DevHarness Kit CLI
 SQLite memory.db + controlled DB inspection
         |
         v
+WORK_BRIEF.md / AGENT_BRIEF.json
 CURRENT_CONTEXT.md / GOAL_CONTEXT.md / GOAL_SUMMARY.md
 RECOVERY_CONTEXT.md / SQL_RESULT.md / SPEC_CONTEXT.md / WORKFLOW_CONTEXT.md
 BDD_CONTEXT.md / BDD_EVIDENCE.md / BDD_COVERAGE.md
@@ -202,9 +203,23 @@ scripts/devharness-control-panel.sh doctor --project-root .
 alias: combine it with `--exit-code`, `--markdown`, or `--write` for CI and
 release gates.
 
+For an agent-mounted first run, start with a Work Brief. `advise` is read-only
+with respect to goal/workflow/spec state: it writes a human Work Brief and an
+Agent Execution Brief, but it does not start a goal.
+
+```bash
+java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" advise \
+  --project-root . \
+  --task "Implement order query endpoint" \
+  --module order \
+  --mode recommend
+```
+
 For a shorter first run, `quickstart` creates the project config when missing,
-starts or reuses the first open goal, and prints the exact next command. It does
-not install adapters, execute a goal step, run verification, or complete work:
+writes the same Work Brief / Agent Brief pair, starts or reuses the first open
+goal only when the brief is safe to start, and keeps low-level commands as
+agent-internal details. It does not install adapters, execute a goal step, run
+verification, or complete work:
 
 ```bash
 java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" quickstart \
@@ -213,6 +228,7 @@ java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" quickstart \
   --task "Implement order query endpoint" \
   --module order \
   --graph required \
+  --mode recommend \
   --dry-run
 
 java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" quickstart \
@@ -220,7 +236,8 @@ java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" quickstart \
   --preset springboot-manual-ide-test \
   --task "Implement order query endpoint" \
   --module order \
-  --graph required
+  --graph required \
+  --mode recommend
 ```
 
 If adapters are not installed yet, quickstart still creates the goal but reports
@@ -231,6 +248,11 @@ The control panel writes `.agents/devharness/config.json`,
 `.agents/devharness/policy.json`, `.agents/devharness/agent-manifest.json`,
 `.agents/devharness/install-state.json`, `.agents/graph/config.json`, and
 generated Claude Code, OpenCode, and Comate adapters.
+
+Work Brief / Agent Brief protocol details are documented in
+[docs/BRIEF_PROTOCOL.md](docs/BRIEF_PROTOCOL.md). The short version:
+users see intent, risk, recommended mode, and confirmation needs; agents consume
+structured execution policy; SQLite and goal artifacts remain the audit source.
 
 To preview the plan without writing files:
 

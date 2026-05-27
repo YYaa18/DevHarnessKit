@@ -7,6 +7,8 @@
   "mode": "strict",
   "data_access_level": "context",
   "allowed_commands": [
+    "dhk advise",
+    "dhk quickstart",
     "dhk goal start",
     "dhk goal resume",
     "dhk goal next",
@@ -23,6 +25,8 @@
     "dhk db sql"
   ],
   "declared_commands": [
+    "dhk advise",
+    "dhk quickstart",
     "dhk goal start",
     "dhk goal resume",
     "dhk goal next",

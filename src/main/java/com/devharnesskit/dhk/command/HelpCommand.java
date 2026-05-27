@@ -16,7 +16,9 @@ public final class HelpCommand implements Command {
         context.out().println("  dhk status --project-root <path> [--json|--markdown] [--write <path>] [--exit-code]");
         context.out().println("  dhk readiness --project-root <path> [--json|--markdown] [--write <path>] [--exit-code]");
         context.out().println("    status is the human read-only snapshot; readiness is the CI/release gate alias.");
-        context.out().println("  dhk quickstart --project-root <path> --task <task> [--preset <preset>] [--dry-run]");
+        context.out().println("  dhk advise --project-root <path> --task <task> [--mode recommend|patch|standard|strict|ask|analyze-only]");
+        context.out().println("    advise writes Work Brief for users and Agent Brief for mounted agents; it does not start a goal.");
+        context.out().println("  dhk quickstart --project-root <path> --task <task> [--preset <preset>] [--mode recommend|patch|standard|strict|ask|analyze-only] [--dry-run]");
         context.out().println("  dhk completion bash|zsh|fish");
         context.out().println("  dhk memory init --project-root <path>");
         context.out().println("  dhk memory add --type <type> --title <title> --content <content>|--content-file <path>|--content-stdin");
@@ -32,10 +34,10 @@ public final class HelpCommand implements Command {
         context.out().println("  dhk goal start --profile <profile> --task <task> [--module <module>] [--mode <mode>]");
         context.out().println("  dhk goal resume [--goal <goal-key>]");
         context.out().println("  dhk goal next [--goal <goal-key>]");
-        context.out().println("  dhk goal step --goal <goal-key> --summary <summary> [--changed-files <files>] [--evidence <evidence>]");
+        context.out().println("  dhk goal step --goal <goal-key> --summary <summary> [--auto] [--changed-files <files>] [--evidence <evidence>]");
         context.out().println("  dhk goal check [--goal <goal-key>] --check <check-key>|--all");
         context.out().println("  dhk goal evaluate [--goal <goal-key>]");
-        context.out().println("  dhk goal verify [--goal <goal-key>] [--level fast|standard|release]");
+        context.out().println("  dhk goal verify [--goal <goal-key>] [--level fast|standard|release] [--markdown]");
         context.out().println("  dhk goal audit [--goal <goal-key>]");
         context.out().println("  dhk goal recheck [--goal <goal-key>]");
         context.out().println("  dhk goal complete [--goal <goal-key>]");

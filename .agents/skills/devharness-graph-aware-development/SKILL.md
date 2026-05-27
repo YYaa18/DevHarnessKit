@@ -8,6 +8,8 @@ description: Use DevHarnessKit graph-aware goal protocol for code changes that r
 Use this skill when a task uses a `*-with-graph` goal profile or GOAL_CONTEXT has `graph_required: true`.
 It extends the goal-first protocol with mandatory graph evidence.
 
+When a Work Brief exists, show the user the brief-level intent, risk, and confirmation needs. Keep Graph and Harness commands agent-internal through `AGENT_BRIEF.json` unless the user asks for debugging details.
+
 ## Required Protocol
 
 1. Start or resume the goal with the goal skill wrappers.
@@ -36,6 +38,7 @@ Graph facts are snapshot-bound generated facts. They are not confirmed long-term
 - Do not treat graph output as confirmed memory.
 - Do not complete when graph or impact checks are failed, stale, or missing.
 - Do not use lower-level workflow/spec/db commands unless GOAL_CONTEXT explicitly allows them.
+- Do not expose Agent Brief `harness_commands` as the normal user-facing experience.
 - Do not perform large refactors, whole-file formatting, or broad cleanup in legacy graph profiles.
 - Do not complete a legacy graph profile without `rollback_plan`, `manual_evidence_status=passed`,
   and `manual_evidence_path` evidence.

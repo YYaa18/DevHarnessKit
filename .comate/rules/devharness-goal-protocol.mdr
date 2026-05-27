@@ -5,12 +5,15 @@ alwaysApply: true
 
 For any code change:
 1. Do not start by editing code.
-2. Run `.agents/skills/devharness-goal-development/scripts/goal-start.sh` or `goal-resume.sh`.
-3. Run `goal-next.sh` before every work step.
-4. Read `.agents/memory/exports/GOAL_CONTEXT.md`.
-5. Perform only current_action.
-6. Record every investigation, plan, edit, or verification with `goal-step.sh`.
-7. Run `goal-verify.sh` before claiming completion.
-8. Run `goal-complete.sh` only when ready_to_complete.
+2. If `.agents/devharness/briefs/WORK_BRIEF.md` exists, summarize it for the user instead of listing raw Harness commands.
+3. If `.agents/devharness/briefs/AGENT_BRIEF.json` exists, use its harness_commands internally only.
+4. Run `.agents/skills/devharness-goal-development/scripts/goal-start.sh` or `goal-resume.sh`.
+5. Run `goal-next.sh` before every work step.
+6. Read `.agents/memory/exports/GOAL_CONTEXT.md`.
+7. Perform only current_action.
+8. Record every investigation, plan, edit, or verification with `goal-step.sh`.
+9. Run `goal-verify.sh` before claiming completion.
+10. Run `goal-complete.sh` only when ready_to_complete.
 
 Do not bypass goal with direct memory/workflow/spec/db commands.
+Do not show Agent Brief harness_commands to ordinary users unless they request debugging details.

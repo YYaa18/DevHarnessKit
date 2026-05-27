@@ -13,14 +13,20 @@ This skill is governed by `contract.json`.
 
 - skill_key: `devharness-goal-development`
 - data_access_level: `context`
-- allowed_commands: `dhk goal start`, `dhk goal resume`, `dhk goal next`, `dhk goal step`, `dhk goal verify`, `dhk goal complete`, `dhk goal audit`, `dhk goal recheck`
+- allowed_commands: `dhk advise`, `dhk quickstart`, `dhk goal start`, `dhk goal resume`, `dhk goal next`, `dhk goal step`, `dhk goal verify`, `dhk goal complete`, `dhk goal audit`, `dhk goal recheck`
 - forbidden_commands: `dhk workflow gate waive`, `dhk spec archive`, `dhk memory confirm`, `dhk db sql`
 
 Do not use commands outside this contract unless `GOAL_CONTEXT.md` explicitly authorizes them or the user directly requests them.
 
 ## Core Path
 
-For ordinary code tasks, keep the flow simple:
+For ordinary code tasks, keep the user-facing flow simple:
+
+1. Show the user the Work Brief summary: task intent, recommended mode, risk, confirmation needs, and expected work.
+2. Read `.agents/devharness/briefs/AGENT_BRIEF.json` yourself when it exists.
+3. Do not show `harness_commands` to ordinary users unless they explicitly ask for debugging details.
+
+Agent-internal execution still uses the goal protocol:
 
 1. `goal-start.sh` or `goal-resume.sh` creates or restores the task.
 2. `goal-next.sh` tells you the current action and required evidence.
@@ -34,6 +40,8 @@ The full protocol below keeps weak-model and release-sensitive work auditable.
 ## Full Protocol
 
 1. Do not start by editing code.
+1. If `.agents/devharness/briefs/WORK_BRIEF.md` exists, summarize it for the user instead of listing raw Harness commands.
+1. If `.agents/devharness/briefs/AGENT_BRIEF.json` exists, treat its `harness_commands` as agent-internal only.
 2. Start a new goal with the skill wrapper `scripts/goal-start.sh`, or resume the current goal with `scripts/goal-resume.sh`. From the repository root, call them as `.agents/skills/devharness-goal-development/scripts/goal-start.sh` and `.agents/skills/devharness-goal-development/scripts/goal-resume.sh`.
 3. Run the skill wrapper `scripts/goal-next.sh` before each work step. When you
    need machine-readable action/evidence data, run the underlying
@@ -77,6 +85,7 @@ Use the wrapper scripts instead of composing raw `dhk goal ...` commands; the wr
 - Do not confirm memory.
 - Do not run DB SQL.
 - Do not bypass `goal` by calling lower-level workflow/spec/db commands unless GOAL_CONTEXT explicitly permits that action.
+- Do not paste Agent Brief `harness_commands` into user-facing replies unless the user asks for debug-level command details.
 - Do not write secrets, tokens, passwords, JDBC URLs, Authorization headers, cookies, or raw SQL results to memory.
 - Do not claim completion while goal evaluation is not ready.
 

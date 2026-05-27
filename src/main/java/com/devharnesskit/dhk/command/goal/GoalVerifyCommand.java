@@ -32,7 +32,9 @@ public final class GoalVerifyCommand implements Command {
             List<GoalCheck> checks = runSelectedChecks(context, projectRoot, goal.goalKey(), selectedChecks);
             GoalEvaluation evaluation = orchestrator.evaluate(context, projectRoot, goal.goalKey());
             ReleaseChecks releaseChecks = "release".equals(level) ? runReleaseChecks(projectRoot) : ReleaseChecks.none();
-            if (JsonOutput.enabled(args)) {
+            if (args.hasFlag("markdown")) {
+                printMarkdown(context, projectRoot, goal, checks, evaluation, level, selectedChecks, releaseChecks);
+            } else if (JsonOutput.enabled(args)) {
                 printJson(context, projectRoot, goal, checks, evaluation, level, selectedChecks, releaseChecks);
             } else {
                 printText(context, projectRoot, goal, checks, evaluation, level, selectedChecks, releaseChecks);
@@ -58,6 +60,7 @@ public final class GoalVerifyCommand implements Command {
         printArray(context, selectedChecks);
         context.out().println("decision: " + evaluation.decision());
         context.out().println("ready_to_complete: " + evaluation.readyToComplete());
+        context.out().println("user_guidance: " + userGuidance(blockers, evaluation));
         context.out().println("checks:");
         for (GoalCheck check : checks) {
             context.out().println("  - " + check.checkKey() + ": " + check.status()
@@ -108,6 +111,8 @@ public final class GoalVerifyCommand implements Command {
                 JsonOutput.rawField("selected_checks", JsonOutput.stringArray(selectedChecks)),
                 JsonOutput.stringField("decision", evaluation.decision()),
                 JsonOutput.booleanField("ready_to_complete", evaluation.readyToComplete()),
+                JsonOutput.stringField("user_guidance", userGuidance(blockers, evaluation)),
+                JsonOutput.stringField("progress_brief_format", "markdown_available_with_--markdown"),
                 JsonOutput.numberField("check_count", checks.size()),
                 JsonOutput.rawField("checks", JsonOutput.array(rawChecks)),
                 JsonOutput.numberField("failed_count", failedChecks(checks).length),
@@ -127,6 +132,42 @@ public final class GoalVerifyCommand implements Command {
                 JsonOutput.stringField("next_command", evaluation.nextCommand()),
                 JsonOutput.stringField("context_path", PathUtil.goalContext(projectRoot).toString())
         ));
+    }
+
+    private void printMarkdown(CommandContext context, Path projectRoot, GoalRun goal, List<GoalCheck> checks,
+                               GoalEvaluation evaluation, String level, String[] selectedChecks,
+                               ReleaseChecks releaseChecks) {
+        List<BlockerDetail> blockers = blockerDetails(goal, checks, evaluation);
+        context.out().println("# Goal Progress Brief");
+        context.out().println();
+        context.out().println("- goal_key: " + goal.goalKey());
+        context.out().println("- level: " + level);
+        context.out().println("- decision: " + evaluation.decision());
+        context.out().println("- ready_to_complete: " + evaluation.readyToComplete());
+        context.out().println();
+        context.out().println("## 用户下一步");
+        context.out().println();
+        context.out().println(userGuidance(blockers, evaluation));
+        context.out().println();
+        context.out().println("## 还差什么");
+        context.out().println();
+        if (blockers.isEmpty()) {
+            context.out().println("- 没有阻塞项，可以完成。");
+        } else {
+            for (BlockerDetail blocker : blockers) {
+                context.out().println("- " + blocker.explanation + " (" + blocker.category + ")");
+            }
+        }
+        context.out().println();
+        context.out().println("## Agent 调试信息");
+        context.out().println();
+        context.out().println("- selected_checks: " + join(selectedChecks));
+        context.out().println("- failed_checks: " + join(failedChecks(checks)));
+        context.out().println("- stale_checks: " + join(evaluation.staleChecks()));
+        context.out().println("- context_path: " + PathUtil.goalContext(projectRoot));
+        if (releaseChecks.enabled) {
+            context.out().println("- release_package: " + releaseChecks.packageStatus);
+        }
     }
 
     private String level(Args args) {
@@ -271,6 +312,35 @@ public final class GoalVerifyCommand implements Command {
             return "none";
         }
         return blockers.get(0).category + ": " + blockers.get(0).message;
+    }
+
+    private String userGuidance(List<BlockerDetail> blockers, GoalEvaluation evaluation) {
+        if (evaluation.readyToComplete()) {
+            return "验证已满足完成条件，Agent 可以进入完成收口。";
+        }
+        if (blockers.isEmpty()) {
+            return "当前还不能完成，请查看缺失项并让 Agent 继续处理。";
+        }
+        BlockerDetail first = blockers.get(0);
+        if ("incomplete_goal_steps".equals(first.category)) {
+            return "还需要完成当前工作步骤并记录证据。";
+        }
+        if ("missing_evidence".equals(first.category)) {
+            return "还缺少必要证据，请让 Agent 补充对应的变更、验证或人工确认。";
+        }
+        if ("stale_check".equals(first.category)) {
+            return "已有检查结果过期，需要重新验证最新代码。";
+        }
+        if ("pending_check".equals(first.category)) {
+            return "还有必要检查未执行，需要先完成验证。";
+        }
+        if ("skipped_required_check".equals(first.category)) {
+            return "当前流程不接受跳过该检查，需要提供通过结果或人工证据。";
+        }
+        if ("missing_spec".equals(first.category)) {
+            return "规格或验收信息不完整，需要先补齐任务/验收状态。";
+        }
+        return "当前还有阻塞项，请按 Progress Brief 的下一步处理。";
     }
 
     private String[] blockerCategories(List<BlockerDetail> blockers) {
@@ -450,6 +520,20 @@ public final class GoalVerifyCommand implements Command {
             }
         }
         return false;
+    }
+
+    private String join(String[] values) {
+        if (values == null || values.length == 0) {
+            return "none";
+        }
+        StringBuilder builder = new StringBuilder();
+        for (String value : values) {
+            if (builder.length() > 0) {
+                builder.append(", ");
+            }
+            builder.append(value);
+        }
+        return builder.toString();
     }
 
     private void printReleaseChecks(CommandContext context, ReleaseChecks releaseChecks) {

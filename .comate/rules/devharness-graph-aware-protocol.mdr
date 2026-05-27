@@ -11,3 +11,5 @@ If GOAL_CONTEXT contains graph_required=true:
 5. Run graph impact again after code changes and record graph_reimpact evidence.
 6. Do not use --allow-stale unless explicit approval evidence is provided.
 7. Run goal verify before completion.
+
+If Work Brief / Agent Brief files exist, show graph risk and expected work to the user through Work Brief language. Keep graph and Harness command argv internal to the agent.

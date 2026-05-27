@@ -23,6 +23,9 @@ public final class GoalProfileService {
         if ("java-api-change".equals(profileKey)) {
             return javaProfile(profileKey, "api-change", "api");
         }
+        if ("java-api-patch".equals(profileKey) || "safe-patch".equals(profileKey)) {
+            return patchProfile(profileKey);
+        }
         if ("java-api-change-with-bdd".equals(profileKey)) {
             return javaProfile(profileKey, "api-change", "api", false, true);
         }
@@ -222,6 +225,25 @@ public final class GoalProfileService {
             return new String[]{"compile", "test", "sensitive", "bdd", "workflow", "spec"};
         }
         return new String[]{"compile", "test", "sensitive", "workflow", "spec"};
+    }
+
+    private GoalProfile patchProfile(String profileKey) {
+        String[] actions = new String[]{"understand_patch", "apply_patch", "verify"};
+        Map<String, String[]> evidence = new LinkedHashMap<String, String[]>();
+        evidence.put("understand_patch",
+                new String[]{"goal_understanding", "assumptions", "read_files"});
+        evidence.put("apply_patch",
+                new String[]{"changed_files", "diff_stat", "implementation_summary", "risk_flags"});
+        evidence.put("verify",
+                new String[]{"sensitive_result", "verification", "manual_evidence_status"});
+        return new GoalProfile(profileKey, "api-change", false, "api", actions, evidence,
+                new String[]{"compile", "test", "sensitive",
+                        "think-before-coding", "goal-driven", "simplicity", "surgical-change"},
+                true, false, true, false, false, false,
+                new LinkedHashMap<String, GoalActionMapping>(),
+                new LinkedHashMap<String, GoalAcceptanceMapping>(),
+                false, "lite", false, false, 60, new String[0],
+                false, false, false, false, 5, false);
     }
 
     private String checkDescription(boolean graphAware, boolean bddAware) {

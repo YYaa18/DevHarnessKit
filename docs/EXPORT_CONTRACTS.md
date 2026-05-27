@@ -1,10 +1,36 @@
 # Export Contracts
 
-DevHarness Kit Markdown files under `.agents/memory/exports/` are generated context artifacts. SQLite remains the source of truth for memory, workflow, spec, and goal state.
+DevHarness Kit Markdown files under `.agents/memory/exports/` are generated context artifacts. SQLite remains the source of truth for memory, workflow, spec, and goal state. Work Brief files under `.agents/devharness/briefs/` are an agent-mounted entry layer, not a replacement source of truth.
 
 Alpha agents and scripts may depend on the required sections below. New fields may be added inside a section before 1.0, but existing section names and order should change only with a changelog note.
 See [COMPATIBILITY.md](COMPATIBILITY.md) for which exports are beta
 versus alpha in the broader release contract.
+
+## WORK_BRIEF.md
+
+Required user-facing anchors:
+
+```text
+# Work Brief
+## 本次工作
+## 建议模式
+## 为什么这样建议
+## 风险提示
+## 预计会做
+## 不会做
+## 你可以选择
+## 是否需要确认
+```
+
+The Work Brief must not instruct users to copy low-level `dhk goal ...`
+commands. Agent-internal command argv records belong in `AGENT_BRIEF.json`.
+
+## AGENT_BRIEF.json
+
+`AGENT_BRIEF.json` uses `schema_version=devharness-agent-brief/v1-alpha`.
+It is machine-readable adapter protocol and remains alpha. It must keep
+`execution_policy.show_commands_to_user=false` and every `harness_commands`
+entry must include `agent_internal_only=true`.
 
 ## WORKFLOW_CONTEXT.md
 

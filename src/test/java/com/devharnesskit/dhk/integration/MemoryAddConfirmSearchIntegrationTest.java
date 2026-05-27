@@ -122,6 +122,33 @@ final class MemoryAddConfirmSearchIntegrationTest {
     }
 
     @Test
+    void confirmRejectsInvalidIdConfidenceAndMissingMemory() {
+        initProject();
+
+        Harness invalidId = new Harness(tempDir);
+        int invalidIdExit = new CommandRouter().run(new String[]{
+                "memory", "confirm", "--project-root", "demo", "--id", "abc"
+        }, invalidId.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, invalidIdExit);
+        assertTrue(invalidId.stderr().contains("Invalid id, expected integer"));
+
+        addMemory("Confidence guard", "Confirm confidence must stay in range.", "confidence,confirm");
+        Harness invalidConfidence = new Harness(tempDir);
+        int invalidConfidenceExit = new CommandRouter().run(new String[]{
+                "memory", "confirm", "--project-root", "demo", "--id", "1", "--confidence", "101"
+        }, invalidConfidence.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, invalidConfidenceExit);
+        assertTrue(invalidConfidence.stderr().contains("Invalid confidence, expected 0..100"));
+
+        Harness missing = new Harness(tempDir);
+        int missingExit = new CommandRouter().run(new String[]{
+                "memory", "confirm", "--project-root", "demo", "--id", "999"
+        }, missing.context());
+        assertEquals(ExitCodes.NOT_FOUND, missingExit);
+        assertTrue(missing.stderr().contains("Memory item not found: 999"));
+    }
+
+    @Test
     void addReadsContentFileAndSearchExplainShowsScore() throws Exception {
         initProject();
         Path contentFile = tempDir.resolve("memory-content.md");

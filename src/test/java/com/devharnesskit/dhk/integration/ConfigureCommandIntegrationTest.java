@@ -162,6 +162,34 @@ final class ConfigureCommandIntegrationTest {
     }
 
     @Test
+    void configureInitAppliesVerificationOverridesAndAdapterTarget() throws Exception {
+        Harness init = new Harness(tempDir);
+        int initExit = new CommandRouter().run(new String[]{
+                "configure", "init",
+                "--project-root", "override-demo",
+                "--preset", "springboot-auto-test",
+                "--compile", "manual",
+                "--test", "disabled",
+                "--graph", "advisory",
+                "--target", "codex",
+                "--force",
+                "--json"
+        }, init.context());
+
+        Path config = PathUtil.devharnessConfig(tempDir.resolve("override-demo"));
+        String configText = read(config);
+        assertEquals(ExitCodes.SUCCESS, initExit);
+        assertTrue(init.stdout().contains("\"compile_mode\": \"manual\""));
+        assertTrue(init.stdout().contains("\"test_mode\": \"disabled\""));
+        assertTrue(init.stdout().contains("\"graph_mode\": \"advisory\""));
+        assertTrue(init.stdout().contains("\"graph_required\": false"));
+        assertTrue(configText.contains("\"verification.compile.mode\": \"manual\""));
+        assertTrue(configText.contains("\"verification.test.mode\": \"disabled\""));
+        assertTrue(configText.contains("\"verification.graph.mode\": \"advisory\""));
+        assertTrue(configText.contains("\"adapter.target\": \"codex\""));
+    }
+
+    @Test
     void configureInitRejectsOverwriteWithoutForce() {
         Harness first = new Harness(tempDir);
         int firstExit = new CommandRouter().run(new String[]{
@@ -208,6 +236,26 @@ final class ConfigureCommandIntegrationTest {
         assertTrue(doctor.stdout().contains("verification.compile.mode should be one of"));
         assertTrue(doctor.stdout().contains("verification.graph.required should be true/false"));
         assertTrue(doctor.stdout().contains("verification.test.required_evidence should include"));
+    }
+
+    @Test
+    void configureDoctorJsonReportsInvalidJson() throws Exception {
+        Path root = tempDir.resolve("invalid-json-demo");
+        Path config = PathUtil.devharnessConfig(root);
+        Files.createDirectories(config.getParent());
+        Files.write(config, "{ invalid json".getBytes("UTF-8"));
+
+        Harness doctor = new Harness(tempDir);
+        int doctorExit = new CommandRouter().run(new String[]{
+                "configure", "doctor",
+                "--project-root", root.toString(),
+                "--json"
+        }, doctor.context());
+
+        assertEquals(ExitCodes.VALIDATION_ERROR, doctorExit);
+        assertTrue(doctor.stdout().contains("\"command\": \"configure doctor\""));
+        assertTrue(doctor.stdout().contains("\"status\": \"warning\""));
+        assertTrue(doctor.stdout().contains("invalid JSON"));
     }
 
     @Test

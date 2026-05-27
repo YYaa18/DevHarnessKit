@@ -100,6 +100,63 @@ final class StatusCommandIntegrationTest {
         assertTrue(markdownText.contains("- next_command: dhk goal start"));
     }
 
+    @Test
+    void statusReportsActiveGoalAndCreatesWriteParentDirectory() throws Exception {
+        Harness configure = new Harness(tempDir);
+        int configureExit = new CommandRouter().run(new String[]{
+                "configure", "init",
+                "--project-root", "active-goal-project",
+                "--preset", "springboot-auto-test",
+                "--force"
+        }, configure.context());
+        assertEquals(ExitCodes.SUCCESS, configureExit);
+
+        Path root = tempDir.resolve("active-goal-project");
+        Files.createDirectories(PathUtil.devharnessDirectory(root));
+        Files.write(PathUtil.devharnessDirectory(root).resolve("install-state.json"), ("{\n"
+                + "  \"schema_version\": \"devharness-install-state/v1-alpha\",\n"
+                + "  \"managed_files\": []\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", root.toString(),
+                "--profile", "bugfix",
+                "--task", "Fix status active goal reporting",
+                "--module", "status"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        Path nestedMarkdown = tempDir.resolve("nested/status/readiness.md");
+        Harness status = new Harness(tempDir);
+        int statusExit = new CommandRouter().run(new String[]{
+                "status",
+                "--project-root", root.toString(),
+                "--markdown",
+                "--write", nestedMarkdown.toString()
+        }, status.context());
+
+        assertEquals(ExitCodes.SUCCESS, statusExit);
+        assertTrue(Files.isRegularFile(nestedMarkdown));
+        String rendered = new String(Files.readAllBytes(nestedMarkdown), "UTF-8");
+        assertTrue(rendered.contains("- readiness: ready"));
+        assertTrue(rendered.contains("- active_goal: " + goalKey));
+        assertTrue(rendered.contains("- current_action: collect_error"));
+        assertTrue(rendered.contains("- next_command: dhk goal next"));
+    }
+
+    private String firstValue(String text, String prefix) {
+        String[] lines = text.split("\\r?\\n");
+        for (String line : lines) {
+            if (line.startsWith(prefix)) {
+                return line.substring(prefix.length()).trim();
+            }
+        }
+        return "";
+    }
+
     private static final class Harness {
         private final Path workingDirectory;
         private final ByteArrayOutputStream out = new ByteArrayOutputStream();

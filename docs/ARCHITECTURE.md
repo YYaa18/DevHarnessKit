@@ -196,6 +196,10 @@ Commands should stay thin: parse inputs, call services, and print stable output.
 
 ## Known Boundary Debt
 
+- `scripts/check-module-boundaries.sh` is the current lightweight guard. It
+  fails when non-command packages import CLI command packages, and it reports
+  the known goal-to-graph/BDD/governance crossings so they stay visible during
+  stable-candidate work. It is intentionally not a Maven module replacement.
 - `GoalCheckService` still coordinates checks from graph, BDD, governance, workflow, spec, and command execution. AI-151 introduced `GoalCheckRunner` and a static registry, but the physical check implementations still live in `service.goal`. Before Maven modules, graph/BDD/governance checks should move behind module-owned runners.
 - `MigrationRunner` now has a `MigrationStep` contract and versioned methods, but all schema SQL still lives in one class. Before a module split, schema ownership should be documented per step and future steps should be introduced as small migration classes.
 - Root `service` still contains cross-module helpers such as sensitive guard, SQL guard, and backup service. A future split should decide whether these stay in `dhk-core` or move to smaller shared internal packages.

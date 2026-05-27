@@ -55,7 +55,13 @@ jobs:
 
       - name: Coverage threshold gate
         shell: bash
-        run: scripts/check-coverage-threshold.sh 60
+        run: |
+          source scripts/release-thresholds.env
+          scripts/check-coverage-threshold.sh "$DHK_MIN_LINE_COVERAGE"
+
+      - name: Module boundary gate
+        shell: bash
+        run: scripts/check-module-boundaries.sh
 
       - name: Version smoke
         shell: bash

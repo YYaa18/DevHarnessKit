@@ -58,6 +58,10 @@ proof of correctness.
 Before a stable-candidate tag:
 
 1. `scripts/release-gate.sh` must pass.
+   The line coverage threshold is sourced from
+   `scripts/release-thresholds.env` and is currently 60%. Lowering it requires
+   a separate governance issue and explicit review; do not reduce the threshold
+   to make a release pass.
 2. README, `docs/COMPATIBILITY.md`, `docs/MIGRATIONS.md`, and release notes must
    agree on release channel, schema version, and stable/beta/experimental
    boundaries.
@@ -68,6 +72,10 @@ Before a stable-candidate tag:
    pre-migration backup must remain fail-closed.
 6. Security-sensitive guards must have targeted tests, especially SQL readonly
    and sensitive-data policy behavior.
+7. `scripts/check-module-boundaries.sh` must pass so stable core packages do
+   not accidentally import CLI command implementations. Known goal-to-graph,
+   goal-to-BDD, and goal-to-governance debt is reported as boundary debt until
+   the next physical runner split.
 
 ## Non-Goals Before 1.0
 

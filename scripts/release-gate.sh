@@ -33,6 +33,9 @@ done
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 cd "$ROOT"
 
+. "$ROOT/scripts/release-thresholds.env"
+: "${DHK_MIN_LINE_COVERAGE:=60}"
+
 log() {
   printf '[release-gate] %s\n' "$*"
 }
@@ -95,6 +98,8 @@ require_file "docs/INDEX.md"
 require_file "docs/STABLE_CANDIDATE.md"
 require_file "scripts/check-version-metadata.sh"
 require_file "scripts/check-coverage-threshold.sh"
+require_file "scripts/check-module-boundaries.sh"
+require_file "scripts/release-thresholds.env"
 
 log "checking version smoke"
 java -jar "$JAR" version | grep "$VERSION" >/dev/null || fail "version smoke did not print $VERSION"
@@ -103,7 +108,10 @@ log "checking version metadata"
 scripts/check-version-metadata.sh "$VERSION" >/dev/null
 
 log "checking coverage threshold"
-scripts/check-coverage-threshold.sh 60 >/dev/null
+scripts/check-coverage-threshold.sh "$DHK_MIN_LINE_COVERAGE" >/dev/null
+
+log "checking module boundaries"
+scripts/check-module-boundaries.sh >/dev/null
 
 log "checking status wording"
 grep -n "developer preview" README.md RELEASE.md >/dev/null || fail "developer preview wording missing"
@@ -139,6 +147,8 @@ for entry in \
   "docs/INDEX.md" \
   "scripts/check-version-metadata.sh" \
   "scripts/check-coverage-threshold.sh" \
+  "scripts/check-module-boundaries.sh" \
+  "scripts/release-thresholds.env" \
   "scripts/devharness-control-panel.sh" \
   "scripts/install-agent-adapters.sh"
 do

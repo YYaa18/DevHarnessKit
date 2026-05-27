@@ -38,7 +38,12 @@ jobs:
         run: scripts/check-version-metadata.sh "$DHK_VERSION"
 
       - name: Coverage threshold gate
-        run: scripts/check-coverage-threshold.sh 60
+        run: |
+          source scripts/release-thresholds.env
+          scripts/check-coverage-threshold.sh "$DHK_MIN_LINE_COVERAGE"
+
+      - name: Module boundary gate
+        run: scripts/check-module-boundaries.sh
 
       - name: Verify version
         run: java -jar "$DHK_JAR" version

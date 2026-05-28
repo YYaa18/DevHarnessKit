@@ -4,6 +4,7 @@ import com.devharnesskit.dhk.cli.Args;
 import com.devharnesskit.dhk.cli.Command;
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
+import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.goal.GoalCheck;
 import com.devharnesskit.dhk.model.goal.GoalEvaluation;
 import com.devharnesskit.dhk.model.goal.GoalRun;
@@ -27,8 +28,14 @@ public final class GoalVerifyCommand implements Command {
 
     public int run(CommandContext context, Args args) {
         Path projectRoot = GoalCommandSupport.projectRoot(args, context);
+        String level = level(args);
+        if (level.length() == 0) {
+            return EnumGuidance.printInvalid(context, args, "INVALID_GOAL_VERIFY_LEVEL",
+                    "goal verify level", args.option("level", "standard"),
+                    EnumGuidance.GOAL_VERIFY_LEVELS, new String[0],
+                    "dhk goal verify --goal <goal> --level standard", "README.md#core-path");
+        }
         try {
-            String level = level(args);
             GoalRun goal = GoalCommandSupport.goal(orchestrator, context, args, projectRoot);
             String[] selectedChecks = checksForLevel(context, projectRoot, goal.goalKey(), level);
             List<GoalCheck> checks = runSelectedChecks(context, projectRoot, goal.goalKey(), selectedChecks);
@@ -187,7 +194,7 @@ public final class GoalVerifyCommand implements Command {
         if ("fast".equals(level) || "standard".equals(level) || "release".equals(level)) {
             return level;
         }
-        throw new IllegalArgumentException("Unsupported goal verify level: " + level);
+        return "";
     }
 
     private String[] checksForLevel(CommandContext context, Path projectRoot, String goalKey, String level)

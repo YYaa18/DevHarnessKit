@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.spec.SpecChange;
 import com.devharnesskit.dhk.model.spec.SpecTask;
@@ -94,14 +95,17 @@ public final class SpecTaskCommand implements Command {
     private int update(CommandContext context, Args args) {
         String changeKey = args.option("change").trim();
         String taskKey = args.option("task").trim();
-        String status = args.option("status").trim();
+        String rawStatus = args.option("status").trim();
+        String status = EnumGuidance.normalizeSpecTaskStatus(rawStatus);
         if (changeKey.length() == 0 || taskKey.length() == 0 || status.length() == 0) {
             context.err().println("Missing required parameters: --change, --task, --status");
             return ExitCodes.USAGE_ERROR;
         }
         if (!SpecTaskService.isTaskStatusAllowed(status)) {
-            context.err().println("Invalid task status: " + status);
-            return ExitCodes.VALIDATION_ERROR;
+            return EnumGuidance.printInvalid(context, args, "INVALID_SPEC_TASK_STATUS", "spec task status",
+                    rawStatus, EnumGuidance.SPEC_TASK_STATUSES, EnumGuidance.SPEC_TASK_ALIASES,
+                    "dhk spec task update --change <change> --task <task> --status done --evidence \"<evidence>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         String evidence = args.option("evidence", "").trim();
         if (SpecCommandSupport.rejectSensitive(context, sensitiveDataGuard, "spec task update",
@@ -135,6 +139,9 @@ public final class SpecTaskCommand implements Command {
             });
             context.out().println("task_key: " + taskKey);
             context.out().println("status: " + status);
+            if (!rawStatus.equals(status)) {
+                context.out().println("normalized_from: " + rawStatus);
+            }
             return ExitCodes.SUCCESS;
         } catch (Exception ex) {
             context.err().println("ERROR spec task update failed: " + ex.getMessage());

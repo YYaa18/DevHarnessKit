@@ -301,6 +301,55 @@ final class SpecIntegrationTest {
     }
 
     @Test
+    void specEnumErrorsIncludeValidValuesAndTaskStatusAliasesNormalize() throws Exception {
+        createSpec();
+
+        Harness invalidMode = new Harness(tempDir);
+        int invalidModeExit = new CommandRouter().run(new String[]{
+                "spec", "create", "--project-root", "demo",
+                "--change", "bad-mode",
+                "--title", "Bad mode",
+                "--mode", "robot"
+        }, invalidMode.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, invalidModeExit);
+        assertTrue(invalidMode.stderr().contains("error_code: INVALID_SPEC_MODE"));
+        assertTrue(invalidMode.stderr().contains("valid_values:"));
+        assertTrue(invalidMode.stderr().contains("api"));
+
+        Harness taskAdd = new Harness(tempDir);
+        new CommandRouter().run(new String[]{
+                "spec", "task", "add", "--project-root", "demo",
+                "--change", "order-query-api",
+                "--task", "T001",
+                "--title", "Implement DTO"
+        }, taskAdd.context());
+
+        Harness invalidTask = new Harness(tempDir);
+        int invalidTaskExit = new CommandRouter().run(new String[]{
+                "spec", "task", "update", "--project-root", "demo",
+                "--change", "order-query-api",
+                "--task", "T001",
+                "--status", "accepted"
+        }, invalidTask.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, invalidTaskExit);
+        assertTrue(invalidTask.stderr().contains("error_code: INVALID_SPEC_TASK_STATUS"));
+        assertTrue(invalidTask.stderr().contains("valid_values:"));
+        assertTrue(invalidTask.stderr().contains("complete -> done"));
+
+        Harness aliasTask = new Harness(tempDir);
+        int aliasTaskExit = new CommandRouter().run(new String[]{
+                "spec", "task", "update", "--project-root", "demo",
+                "--change", "order-query-api",
+                "--task", "T001",
+                "--status", "complete",
+                "--evidence", "Implementation task is complete"
+        }, aliasTask.context());
+        assertEquals(ExitCodes.SUCCESS, aliasTaskExit);
+        assertTrue(aliasTask.stdout().contains("status: done"));
+        assertTrue(aliasTask.stdout().contains("normalized_from: complete"));
+    }
+
+    @Test
     void archiveRejectsBlockedOrFailedStateAndAllowsSkippedOrWaivedState() {
         createSpec();
         Harness taskAdd = new Harness(tempDir);

@@ -5,6 +5,7 @@ import com.devharnesskit.dhk.cli.Command;
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.cli.VersionInfo;
+import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.brief.BriefRequest;
 import com.devharnesskit.dhk.model.brief.BriefResult;
 import com.devharnesskit.dhk.model.brief.ModeAdvice;
@@ -70,6 +71,36 @@ public final class QuickstartCommand implements Command {
         }
         if (profile.length() == 0) {
             profile = "java-api-change";
+        }
+        if (!EnumGuidance.isConfigurePresetAllowed(preset)) {
+            return EnumGuidance.printInvalid(context, args, "INVALID_CONFIGURE_PRESET",
+                    "configure preset", preset, EnumGuidance.CONFIGURE_PRESETS,
+                    new String[]{"auto -> springboot-manual-ide-test"},
+                    "dhk quickstart --preset springboot-manual-ide-test --task \"<task>\"",
+                    "docs/GOAL_CONFIGURATION.md");
+        }
+        if (!EnumGuidance.isRecommendationModeAllowed(mode)) {
+            return EnumGuidance.printInvalid(context, args, "INVALID_RECOMMENDATION_MODE",
+                    "recommendation mode", mode, EnumGuidance.RECOMMENDATION_MODES,
+                    new String[]{"auto -> recommend", "full -> strict"},
+                    "dhk quickstart --mode recommend --task \"<task>\"", "README.md#quickstart");
+        }
+        if (!EnumGuidance.isGraphModeAllowed(graph)) {
+            return EnumGuidance.printInvalid(context, args, "INVALID_GRAPH_MODE", "graph mode", graph,
+                    EnumGuidance.GRAPH_MODES, new String[]{"optional -> advisory", "disabled -> off"},
+                    "dhk quickstart --graph advisory --task \"<task>\"", "docs/GOAL_CONFIGURATION.md");
+        }
+        if (!EnumGuidance.isVerificationModeAllowed(args.option("compile", ""))) {
+            return EnumGuidance.printInvalid(context, args, "INVALID_VERIFICATION_MODE",
+                    "verification compile mode", args.option("compile", ""), EnumGuidance.VERIFICATION_MODES,
+                    new String[0], "dhk quickstart --compile manual --task \"<task>\"",
+                    "docs/GOAL_CONFIGURATION.md");
+        }
+        if (!EnumGuidance.isVerificationModeAllowed(args.option("test", ""))) {
+            return EnumGuidance.printInvalid(context, args, "INVALID_VERIFICATION_MODE",
+                    "verification test mode", args.option("test", ""), EnumGuidance.VERIFICATION_MODES,
+                    new String[0], "dhk quickstart --test manual --task \"<task>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
 
         try {

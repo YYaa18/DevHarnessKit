@@ -249,6 +249,50 @@ final class WorkflowIntegrationTest {
     }
 
     @Test
+    void workflowEnumErrorsIncludeValidValues() throws Exception {
+        seed();
+
+        Harness invalidMode = new Harness(tempDir);
+        int invalidModeExit = new CommandRouter().run(new String[]{
+                "workflow", "start",
+                "--project-root", "demo",
+                "--workflow", "api-change",
+                "--task", "新增订单查询接口",
+                "--module", "order",
+                "--mode", "robot"
+        }, invalidMode.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, invalidModeExit);
+        assertTrue(invalidMode.stderr().contains("error_code: INVALID_WORKFLOW_MODE"));
+        assertTrue(invalidMode.stderr().contains("valid_values:"));
+        assertTrue(invalidMode.stderr().contains("api"));
+
+        String runKey = startApiChangeRun();
+        Harness invalidGate = new Harness(tempDir);
+        int invalidGateExit = new CommandRouter().run(new String[]{
+                "workflow", "gate", "close",
+                "--project-root", "demo",
+                "--run", runKey,
+                "--gate", "current_context_exists"
+        }, invalidGate.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, invalidGateExit);
+        assertTrue(invalidGate.stderr().contains("error_code: INVALID_WORKFLOW_GATE_ACTION"));
+        assertTrue(invalidGate.stderr().contains("valid_values:"));
+        assertTrue(invalidGate.stderr().contains("pass"));
+
+        Harness invalidPhase = new Harness(tempDir);
+        int invalidPhaseExit = new CommandRouter().run(new String[]{
+                "workflow", "phase", "waive",
+                "--project-root", "demo",
+                "--run", runKey,
+                "--phase", "export_context"
+        }, invalidPhase.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, invalidPhaseExit);
+        assertTrue(invalidPhase.stderr().contains("error_code: INVALID_WORKFLOW_PHASE_ACTION"));
+        assertTrue(invalidPhase.stderr().contains("valid_values:"));
+        assertTrue(invalidPhase.stderr().contains("fail"));
+    }
+
+    @Test
     void hardGatesBlockPhasePassAndWaiveCanResume() {
         seed();
         String runKey = startApiChangeRun();

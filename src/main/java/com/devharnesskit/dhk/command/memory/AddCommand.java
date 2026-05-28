@@ -6,6 +6,7 @@ import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.MemoryItem;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.repository.FtsRepository;
@@ -61,8 +62,10 @@ public final class AddCommand implements Command {
             return ExitCodes.USAGE_ERROR;
         }
         if (!MemoryType.isAllowed(type)) {
-            context.err().println("Invalid memory type: " + type);
-            return ExitCodes.VALIDATION_ERROR;
+            return EnumGuidance.printInvalid(context, args, "INVALID_MEMORY_TYPE", "memory type", type,
+                    EnumGuidance.MEMORY_TYPES, new String[0],
+                    "dhk memory add --type project_fact --title \"<title>\" --content \"<content>\"",
+                    "README.md#core-path");
         }
         if (args.hasOption("status") && !"draft".equals(args.option("status"))) {
             context.err().println("memory add only supports --status draft; use memory confirm to confirm facts");

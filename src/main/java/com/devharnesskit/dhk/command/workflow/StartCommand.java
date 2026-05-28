@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.workflow.WorkflowRun;
 import com.devharnesskit.dhk.model.workflow.WorkflowTemplate;
@@ -52,8 +53,10 @@ public final class StartCommand implements Command {
         }
         String mode = args.option("mode", "auto").trim();
         if (!WorkflowCommandSupport.isModeAllowed(mode)) {
-            context.err().println("Invalid workflow mode: " + mode);
-            return ExitCodes.VALIDATION_ERROR;
+            return EnumGuidance.printInvalid(context, args, "INVALID_WORKFLOW_MODE", "workflow mode", mode,
+                    EnumGuidance.WORKFLOW_MODES, new String[0],
+                    "dhk workflow start --workflow <workflow> --task \"<task>\" --mode api",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         String summary = args.option("summary", "");
         if (WorkflowCommandSupport.rejectSensitive(context, sensitiveDataGuard, "workflow start",

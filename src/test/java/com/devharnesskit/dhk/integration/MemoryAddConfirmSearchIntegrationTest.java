@@ -107,11 +107,33 @@ final class MemoryAddConfirmSearchIntegrationTest {
         assertTrue(listJson.stdout().contains("\"command\": \"memory list\""));
         assertTrue(listJson.stdout().contains("\"count\": 1"));
         assertTrue(listJson.stdout().contains("\"memory_id\": 1"));
+
+        Harness invalidListStatus = new Harness(tempDir);
+        int invalidListStatusExit = new CommandRouter().run(new String[]{
+                "memory", "list", "--project-root", "demo", "--status", "active"
+        }, invalidListStatus.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, invalidListStatusExit);
+        assertTrue(invalidListStatus.stderr().contains("error_code: INVALID_MEMORY_STATUS"));
+        assertTrue(invalidListStatus.stderr().contains("valid_values:"));
+        assertTrue(invalidListStatus.stderr().contains("confirmed"));
     }
 
     @Test
     void addRejectsConfirmedStatusAndSensitiveContent() {
         initProject();
+
+        Harness invalidType = new Harness(tempDir);
+        int invalidTypeExit = new CommandRouter().run(new String[]{
+                "memory", "add",
+                "--project-root", "demo",
+                "--type", "note",
+                "--title", "Bad type",
+                "--content", "Ordinary content"
+        }, invalidType.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, invalidTypeExit);
+        assertTrue(invalidType.stderr().contains("error_code: INVALID_MEMORY_TYPE"));
+        assertTrue(invalidType.stderr().contains("valid_values:"));
+        assertTrue(invalidType.stderr().contains("project_fact"));
 
         Harness confirmedStatus = new Harness(tempDir);
         int confirmedStatusExit = new CommandRouter().run(new String[]{

@@ -47,6 +47,33 @@ final class QuickstartCommandIntegrationTest {
     }
 
     @Test
+    void quickstartEnumErrorsIncludeValidValuesBeforeWritingFiles() {
+        Harness invalidMode = new Harness(tempDir);
+        int invalidModeExit = new CommandRouter().run(new String[]{
+                "quickstart",
+                "--project-root", "quick-invalid-mode",
+                "--task", "Implement order query endpoint",
+                "--mode", "robot"
+        }, invalidMode.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, invalidModeExit);
+        assertTrue(invalidMode.stderr().contains("error_code: INVALID_RECOMMENDATION_MODE"));
+        assertTrue(invalidMode.stderr().contains("valid_values:"));
+        assertFalse(Files.exists(PathUtil.workBrief(tempDir.resolve("quick-invalid-mode"))));
+
+        Harness invalidGraph = new Harness(tempDir);
+        int invalidGraphExit = new CommandRouter().run(new String[]{
+                "quickstart",
+                "--project-root", "quick-invalid-graph",
+                "--task", "Implement order query endpoint",
+                "--graph", "maybe"
+        }, invalidGraph.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, invalidGraphExit);
+        assertTrue(invalidGraph.stderr().contains("error_code: INVALID_GRAPH_MODE"));
+        assertTrue(invalidGraph.stderr().contains("valid_values:"));
+        assertFalse(Files.exists(PathUtil.workBrief(tempDir.resolve("quick-invalid-graph"))));
+    }
+
+    @Test
     void quickstartCreatesConfigAndFirstGoalWithoutCompletingIt() throws Exception {
         Harness quickstart = new Harness(tempDir);
         int exit = new CommandRouter().run(new String[]{
@@ -272,6 +299,10 @@ final class QuickstartCommandIntegrationTest {
 
         String stdout() {
             return out.toString();
+        }
+
+        String stderr() {
+            return err.toString();
         }
     }
 

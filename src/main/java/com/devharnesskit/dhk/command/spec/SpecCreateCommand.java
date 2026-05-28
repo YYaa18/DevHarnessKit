@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.spec.SpecChange;
 import com.devharnesskit.dhk.repository.ProjectRepository;
@@ -50,12 +51,16 @@ public final class SpecCreateCommand implements Command {
         String mode = args.option("mode", "auto").trim();
         String priority = args.option("priority", "normal").trim();
         if (!SpecService.isModeAllowed(mode)) {
-            context.err().println("Invalid spec mode: " + mode);
-            return ExitCodes.VALIDATION_ERROR;
+            return EnumGuidance.printInvalid(context, args, "INVALID_SPEC_MODE", "spec mode", mode,
+                    EnumGuidance.SPEC_MODES, new String[0],
+                    "dhk spec create --change <key> --title \"<title>\" --mode api",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (!SpecService.isPriorityAllowed(priority)) {
-            context.err().println("Invalid spec priority: " + priority);
-            return ExitCodes.VALIDATION_ERROR;
+            return EnumGuidance.printInvalid(context, args, "INVALID_SPEC_PRIORITY", "spec priority", priority,
+                    EnumGuidance.SPEC_PRIORITIES, new String[0],
+                    "dhk spec create --change <key> --title \"<title>\" --priority normal",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (SpecCommandSupport.rejectSensitive(context, sensitiveDataGuard, "spec create",
                 changeKey, title, summary, module, mode, priority)) {

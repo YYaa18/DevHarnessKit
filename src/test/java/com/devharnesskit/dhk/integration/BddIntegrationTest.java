@@ -120,6 +120,45 @@ final class BddIntegrationTest {
     }
 
     @Test
+    void bddEnumErrorsIncludeValidValues() {
+        Harness invalidScenarioType = new Harness(tempDir);
+        int invalidScenarioTypeExit = new CommandRouter().run(new String[]{
+                "bdd", "add", "--project-root", "demo",
+                "--feature", "order-query",
+                "--title", "订单查询",
+                "--scenario", "order-query-happy-path",
+                "--scenario-title", "分页查询订单成功",
+                "--type", "robot"
+        }, invalidScenarioType.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, invalidScenarioTypeExit);
+        assertTrue(invalidScenarioType.stderr().contains("error_code: INVALID_BDD_SCENARIO_TYPE"));
+        assertTrue(invalidScenarioType.stderr().contains("valid_values:"));
+        assertTrue(invalidScenarioType.stderr().contains("acceptance"));
+
+        Harness add = new Harness(tempDir);
+        int addExit = new CommandRouter().run(new String[]{
+                "bdd", "add", "--project-root", "demo",
+                "--feature", "order-query",
+                "--title", "订单查询",
+                "--scenario", "order-query-happy-path",
+                "--scenario-title", "分页查询订单成功"
+        }, add.context());
+        assertEquals(ExitCodes.SUCCESS, addExit);
+
+        Harness invalidEvidenceStatus = new Harness(tempDir);
+        int invalidEvidenceStatusExit = new CommandRouter().run(new String[]{
+                "bdd", "evidence", "add", "--project-root", "demo",
+                "--scenario", "order-query-happy-path",
+                "--status", "complete",
+                "--summary", "Manual check passed"
+        }, invalidEvidenceStatus.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, invalidEvidenceStatusExit);
+        assertTrue(invalidEvidenceStatus.stderr().contains("error_code: INVALID_BDD_EVIDENCE_STATUS"));
+        assertTrue(invalidEvidenceStatus.stderr().contains("valid_values:"));
+        assertTrue(invalidEvidenceStatus.stderr().contains("passed"));
+    }
+
+    @Test
     void bddAddMissingCoreStepsCreatesDraftAndSensitiveInputIsRejected() throws Exception {
         Harness draft = new Harness(tempDir);
         int draftExit = new CommandRouter().run(new String[]{

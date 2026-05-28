@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.bdd.BddEvidence;
 import com.devharnesskit.dhk.model.goal.GoalRun;
@@ -75,12 +76,16 @@ public final class BddEvidenceCommand implements Command {
             return ExitCodes.VALIDATION_ERROR;
         }
         if (!BddService.isEvidenceTypeAllowed(type)) {
-            context.err().println("Invalid BDD evidence type: " + type);
-            return ExitCodes.VALIDATION_ERROR;
+            return EnumGuidance.printInvalid(context, args, "INVALID_BDD_EVIDENCE_TYPE",
+                    "BDD evidence type", type, EnumGuidance.BDD_EVIDENCE_TYPES, new String[0],
+                    "dhk bdd evidence add --scenario <scenario> --type manual --status passed --summary \"<summary>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (!BddService.isEvidenceStatusAllowed(status)) {
-            context.err().println("Invalid BDD evidence status: " + status);
-            return ExitCodes.VALIDATION_ERROR;
+            return EnumGuidance.printInvalid(context, args, "INVALID_BDD_EVIDENCE_STATUS",
+                    "BDD evidence status", status, EnumGuidance.BDD_EVIDENCE_STATUSES, new String[0],
+                    "dhk bdd evidence add --scenario <scenario> --status passed --summary \"<summary>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (BddCommandSupport.rejectSensitive(context, sensitiveDataGuard, "bdd evidence add",
                 scenarioKey, goalKey, type, status, path, summary, command)) {

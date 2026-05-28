@@ -46,6 +46,7 @@ public final class SearchCommand implements Command {
         String status = args.option("status", "").trim();
         if (status.length() > 0 && !MemoryStatus.isAllowed(status)) {
             context.err().println("Invalid status: " + status);
+            context.err().println("valid_values: draft, confirmed, deprecated, archived");
             return ExitCodes.VALIDATION_ERROR;
         }
         String module = args.option("module", "").trim();

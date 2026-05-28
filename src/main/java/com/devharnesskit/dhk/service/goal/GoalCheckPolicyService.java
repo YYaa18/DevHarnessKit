@@ -50,7 +50,7 @@ public final class GoalCheckPolicyService {
                     parsePercent(raw.get("bdd_min_quality_score"), 0),
                     parseBoolean(raw.get("bdd_fail_on_quality_errors"), false),
                     parseBoolean(raw.get("bdd_fail_on_quality_warnings"), false),
-                    config.compileMode(), config.testMode());
+                    config.compileMode(), config.testMode(), config.demoMode());
         } catch (Exception ex) {
             return withConfig(GoalCheckPolicy.defaults(), config, new String[0], new String[0], new String[0],
                     false, false, new String[0], new String[0], new String[0], new String[0],
@@ -78,7 +78,7 @@ public final class GoalCheckPolicyService {
                 acceptedSpecStatuses, acceptedWorkflowStatuses, acceptedGraphStatuses,
                 acceptedImpactStatuses, acceptedArchitectureStatuses, acceptedBddStatuses,
                 bddMinCoveragePercent, bddMinQualityScore, bddFailOnQualityErrors, bddFailOnQualityWarnings,
-                config.compileMode(), config.testMode());
+                config.compileMode(), config.testMode(), config.demoMode());
     }
 
     private DevHarnessConfig loadConfig(Path projectRoot) {

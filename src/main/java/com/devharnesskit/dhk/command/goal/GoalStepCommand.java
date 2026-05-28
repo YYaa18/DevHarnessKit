@@ -4,11 +4,17 @@ import com.devharnesskit.dhk.cli.Args;
 import com.devharnesskit.dhk.cli.Command;
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
+import com.devharnesskit.dhk.guidance.ActionableError;
+import com.devharnesskit.dhk.guidance.ActionableErrorRenderer;
+import com.devharnesskit.dhk.model.goal.GoalEvidenceContract;
 import com.devharnesskit.dhk.service.goal.GoalStepAutoEvidenceCollector;
 import com.devharnesskit.dhk.service.goal.GoalOrchestrator;
+import com.devharnesskit.dhk.service.goal.GoalStepEvidenceException;
+import com.devharnesskit.dhk.service.brief.BlockingInteractionException;
 import com.devharnesskit.dhk.service.brief.BriefLifecycleService;
 import com.devharnesskit.dhk.service.policy.PolicyHookService;
 import com.devharnesskit.dhk.service.policy.PolicyViolationException;
+import com.devharnesskit.dhk.util.JsonOutput;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -18,6 +24,7 @@ public final class GoalStepCommand implements Command {
     private final PolicyHookService policyHookService = new PolicyHookService();
     private final GoalStepAutoEvidenceCollector autoEvidenceCollector = new GoalStepAutoEvidenceCollector();
     private final BriefLifecycleService briefLifecycleService = new BriefLifecycleService();
+    private final ActionableErrorRenderer actionableErrorRenderer = new ActionableErrorRenderer();
 
     public int run(CommandContext context, Args args) {
         String goalKey = args.option("goal").trim();
@@ -66,15 +73,38 @@ public final class GoalStepCommand implements Command {
                     summary, changedFiles, combinedEvidence);
             Path progressPath = briefLifecycleService.writeProgressBrief(projectRoot, result.goal(),
                     result.stepId(), summary);
-            context.out().println("step_id: " + result.stepId());
-            context.out().println("step_number: " + result.goal().stepCount());
-            context.out().println("goal_key: " + result.goal().goalKey());
-            context.out().println("status: " + result.goal().status());
-            context.out().println("current_action: " + result.goal().currentAction());
-            context.out().println("next_command: dhk goal next --goal " + result.goal().goalKey());
-            context.out().println("context_path: " + result.contextPath());
-            context.out().println("progress_brief_path: " + progressPath);
+            if (JsonOutput.enabled(args)) {
+                context.out().print(JsonOutput.object(
+                        JsonOutput.stringField("command", "goal step"),
+                        JsonOutput.stringField("goal_key", result.goal().goalKey()),
+                        JsonOutput.numberField("step_id", result.stepId()),
+                        JsonOutput.numberField("goal_step_index", result.goal().stepCount()),
+                        JsonOutput.stringField("status", result.goal().status()),
+                        JsonOutput.stringField("current_action", result.goal().currentAction()),
+                        JsonOutput.stringField("next_command", "dhk goal next --goal " + result.goal().goalKey()),
+                        JsonOutput.stringField("context_path", result.contextPath().toString()),
+                        JsonOutput.stringField("progress_brief_path", progressPath.toString())
+                ));
+            } else {
+                context.out().println("step: " + result.goal().stepCount());
+                context.out().println("goal_step_index: " + result.goal().stepCount());
+                context.out().println("step_number: " + result.goal().stepCount());
+                context.out().println("internal_step_id: " + result.stepId());
+                context.out().println("step_id: " + result.stepId());
+                context.out().println("goal_key: " + result.goal().goalKey());
+                context.out().println("status: " + result.goal().status());
+                context.out().println("current_action: " + result.goal().currentAction());
+                context.out().println("next_command: dhk goal next --goal " + result.goal().goalKey());
+                context.out().println("context_path: " + result.contextPath());
+                context.out().println("progress_brief_path: " + progressPath);
+            }
             return ExitCodes.SUCCESS;
+        } catch (GoalStepEvidenceException ex) {
+            printMissingEvidence(context, args, goalKey, ex);
+            return ExitCodes.VALIDATION_ERROR;
+        } catch (BlockingInteractionException ex) {
+            printBlockingInteraction(context, args, ex);
+            return ExitCodes.VALIDATION_ERROR;
         } catch (IllegalArgumentException ex) {
             context.err().println(ex.getMessage());
             return ExitCodes.VALIDATION_ERROR;
@@ -91,23 +121,23 @@ public final class GoalStepCommand implements Command {
         try {
             com.devharnesskit.dhk.model.goal.GoalRun goal = orchestrator.find(context, projectRoot, goalKey);
             com.devharnesskit.dhk.model.goal.GoalPlan plan = orchestrator.plan(projectRoot, goal);
+            GoalEvidenceContract contract = GoalEvidenceContract.from(goal, plan);
             context.out().println("goal step template");
             context.out().println("goal_key: " + goal.goalKey());
-            context.out().println("current_action: " + plan.currentAction());
+            context.out().println("current_action: " + contract.currentAction());
             context.out().println("summary: <summary>");
             context.out().println("required_evidence:");
-            for (String required : plan.requiredEvidence()) {
+            for (String required : contract.requiredEvidence()) {
                 context.out().println("  --field " + required + "=<value>");
             }
             context.out().println("structured_fields:");
-            context.out().println("  --read-files <files>");
-            context.out().println("  --changed-files <files>");
-            context.out().println("  --tests-run <command/result>");
-            context.out().println("  --compile-result <result>");
-            context.out().println("  --risks <risks>");
-            context.out().println("  --pending <pending-or-none>");
+            for (String field : contract.structuredEvidenceFields()) {
+                context.out().println("  " + field);
+            }
             context.out().println("auto_fields:");
             context.out().println("  --auto collects changed_files, diff_stat, touched_modules, protected_file_hits, risk_flags");
+            context.out().println("example_evidence: " + valueOrNone(contract.exampleEvidence()));
+            context.out().println("example_command: " + contract.exampleCommand());
             context.out().println("dry_run_command: dhk goal step --goal " + goal.goalKey()
                     + " --summary \"<summary>\" --field <key=value> --dry-run");
             return ExitCodes.SUCCESS;
@@ -198,6 +228,48 @@ public final class GoalStepCommand implements Command {
             builder.append(text);
         }
         return builder.toString();
+    }
+
+    private void printMissingEvidence(CommandContext context, Args args, String goalKey,
+                                      GoalStepEvidenceException ex) {
+        GoalEvidenceContract contract = GoalEvidenceContract.from(null, ex.plan());
+        ActionableError error = ActionableError.builder("GOAL_STEP_EVIDENCE_MISSING",
+                        "Goal step evidence missing required items")
+                .reason("The current action requires every required_evidence key to appear in goal step evidence.")
+                .missing(ex.missing())
+                .validValues(contract.requiredEvidence())
+                .nextCommand("dhk goal evidence-template --goal " + goalKey)
+                .docs("docs/GOAL_CONFIGURATION.md#goal-evidence")
+                .detail("current_action", contract.currentAction())
+                .detail("example_evidence", contract.exampleEvidence())
+                .detail("example_command", contract.exampleCommand().replace("<goal-key>", goalKey))
+                .build();
+        if (JsonOutput.enabled(args)) {
+            context.out().print(actionableErrorRenderer.renderJson(error));
+        } else {
+            context.err().print(actionableErrorRenderer.renderText(error));
+        }
+    }
+
+    private void printBlockingInteraction(CommandContext context, Args args, BlockingInteractionException ex) {
+        ActionableError error = ActionableError.builder("BLOCKING_INTERACTION_REQUIRES_ANSWER",
+                        "blocking interaction requires user answer")
+                .reason(ex.question())
+                .validValues(ex.choices())
+                .nextCommand("dhk brief answer --request " + ex.requestId() + " --choice \"<choice>\"")
+                .docs("docs/WORK_BRIEF.md#interaction-request")
+                .detail("request_id", ex.requestId())
+                .detail("details_command", "dhk brief show --request " + ex.requestId())
+                .build();
+        if (JsonOutput.enabled(args)) {
+            context.out().print(actionableErrorRenderer.renderJson(error));
+        } else {
+            context.err().print(actionableErrorRenderer.renderText(error));
+        }
+    }
+
+    private String valueOrNone(String value) {
+        return value == null || value.length() == 0 ? "none" : value;
     }
 
 }

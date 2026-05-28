@@ -99,6 +99,38 @@ public final class MemoryRepository {
         }
     }
 
+    public List<MemoryItem> listMemory(Connection connection, String projectKey, String module,
+                                       String status, String tag, int limit) throws SQLException {
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT * FROM memory_item WHERE project_key = ?");
+        if (module != null && module.length() > 0) {
+            sql.append(" AND module_name = ?");
+        }
+        if (status != null && status.length() > 0) {
+            sql.append(" AND status = ?");
+        }
+        if (tag != null && tag.length() > 0) {
+            sql.append(" AND lower(tags) LIKE ? ESCAPE '\\'");
+        }
+        sql.append(" ORDER BY updated_at DESC, id DESC LIMIT ?");
+
+        try (PreparedStatement statement = connection.prepareStatement(sql.toString())) {
+            int index = 1;
+            statement.setString(index++, projectKey);
+            if (module != null && module.length() > 0) {
+                statement.setString(index++, module);
+            }
+            if (status != null && status.length() > 0) {
+                statement.setString(index++, status);
+            }
+            if (tag != null && tag.length() > 0) {
+                statement.setString(index++, "%" + escapeLike(tag.toLowerCase()) + "%");
+            }
+            statement.setInt(index, limit);
+            return list(statement);
+        }
+    }
+
     public List<MemoryItem> searchLike(Connection connection, String projectKey, List<String> tokens,
                                        String module, String status, int limit) throws SQLException {
         if (tokens == null || tokens.isEmpty() || limit <= 0) {

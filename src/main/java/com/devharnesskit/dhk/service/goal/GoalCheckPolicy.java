@@ -30,6 +30,7 @@ public final class GoalCheckPolicy {
     private final boolean bddFailOnQualityWarnings;
     private final String compileMode;
     private final String testMode;
+    private final boolean demoMode;
 
     public GoalCheckPolicy(String[] requiredChecks, String[] compileCommand,
                            String[] testCommand, boolean failPendingHardGates) {
@@ -90,7 +91,7 @@ public final class GoalCheckPolicy {
                 acceptedSensitiveStatuses, acceptedSpecStatuses, acceptedWorkflowStatuses,
                 acceptedGraphStatuses, acceptedImpactStatuses, acceptedArchitectureStatuses, acceptedBddStatuses,
                 bddMinCoveragePercent, bddMinQualityScore, bddFailOnQualityErrors, bddFailOnQualityWarnings,
-                "auto", "auto");
+                "auto", "auto", false);
     }
 
     public GoalCheckPolicy(String[] requiredChecks, boolean requiredChecksConfigured,
@@ -103,6 +104,25 @@ public final class GoalCheckPolicy {
                            String[] acceptedBddStatuses, int bddMinCoveragePercent,
                            int bddMinQualityScore, boolean bddFailOnQualityErrors,
                            boolean bddFailOnQualityWarnings, String compileMode, String testMode) {
+        this(requiredChecks, requiredChecksConfigured, compileCommand, testCommand, failPendingHardGates,
+                failPendingHardGatesConfigured, acceptedCompileStatuses, acceptedTestStatuses,
+                acceptedSensitiveStatuses, acceptedSpecStatuses, acceptedWorkflowStatuses,
+                acceptedGraphStatuses, acceptedImpactStatuses, acceptedArchitectureStatuses, acceptedBddStatuses,
+                bddMinCoveragePercent, bddMinQualityScore, bddFailOnQualityErrors,
+                bddFailOnQualityWarnings, compileMode, testMode, false);
+    }
+
+    public GoalCheckPolicy(String[] requiredChecks, boolean requiredChecksConfigured,
+                           String[] compileCommand, String[] testCommand, boolean failPendingHardGates,
+                           boolean failPendingHardGatesConfigured,
+                           String[] acceptedCompileStatuses, String[] acceptedTestStatuses,
+                           String[] acceptedSensitiveStatuses, String[] acceptedSpecStatuses,
+                           String[] acceptedWorkflowStatuses, String[] acceptedGraphStatuses,
+                           String[] acceptedImpactStatuses, String[] acceptedArchitectureStatuses,
+                           String[] acceptedBddStatuses, int bddMinCoveragePercent,
+                           int bddMinQualityScore, boolean bddFailOnQualityErrors,
+                           boolean bddFailOnQualityWarnings, String compileMode, String testMode,
+                           boolean demoMode) {
         this.requiredChecks = requiredChecks == null || requiredChecks.length == 0
                 ? DEFAULT_REQUIRED_CHECKS
                 : requiredChecks;
@@ -131,6 +151,7 @@ public final class GoalCheckPolicy {
         this.bddFailOnQualityWarnings = bddFailOnQualityWarnings;
         this.compileMode = normalizeMode(compileMode);
         this.testMode = normalizeMode(testMode);
+        this.demoMode = demoMode;
     }
 
     public GoalCheckPolicy(String[] requiredChecks, boolean requiredChecksConfigured,
@@ -370,7 +391,9 @@ public final class GoalCheckPolicy {
         if ("manual".equals(mode)) {
             checks.add("manual-" + baseCheck);
         } else if ("disabled".equals(mode)) {
-            checks.add("verification-risk");
+            if (!demoMode) {
+                checks.add("verification-risk");
+            }
         } else {
             checks.add(baseCheck);
         }

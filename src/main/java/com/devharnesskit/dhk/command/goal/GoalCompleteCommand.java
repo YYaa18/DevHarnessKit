@@ -18,8 +18,9 @@ public final class GoalCompleteCommand implements Command {
 
     public int run(CommandContext context, Args args) {
         Path projectRoot = GoalCommandSupport.projectRoot(args, context);
+        GoalRun goal = null;
         try {
-            GoalRun goal = GoalCommandSupport.goal(orchestrator, context, args, projectRoot);
+            goal = GoalCommandSupport.goal(orchestrator, context, args, projectRoot);
             GoalOrchestrator.GoalCompleteResult result = orchestrator.complete(context, projectRoot, goal.goalKey());
             Path completionBriefPath = briefLifecycleService.writeCompletionBrief(projectRoot, result.goal(),
                     result.checkpointId(), result.summaryPath());
@@ -41,21 +42,14 @@ public final class GoalCompleteCommand implements Command {
             }
             return ExitCodes.SUCCESS;
         } catch (GoalOrchestrator.GoalNotReadyException ex) {
+            if (goal == null) {
+                context.err().println("ERROR goal complete failed: unable to reload goal for blocker report");
+                return ExitCodes.RUNTIME_ERROR;
+            }
             if (JsonOutput.enabled(args)) {
-                context.out().print(JsonOutput.object(
-                        JsonOutput.stringField("command", "goal complete"),
-                        JsonOutput.stringField("status", "not_ready"),
-                        JsonOutput.stringField("decision", ex.evaluation().decision()),
-                        JsonOutput.booleanField("ready_to_complete", ex.evaluation().readyToComplete()),
-                        JsonOutput.numberField("missing_count", ex.evaluation().missing().length),
-                        JsonOutput.rawField("missing", JsonOutput.stringArray(ex.evaluation().missing())),
-                        JsonOutput.numberField("stale_count", ex.evaluation().staleChecks().length),
-                        JsonOutput.rawField("stale_checks", JsonOutput.stringArray(ex.evaluation().staleChecks())),
-                        JsonOutput.stringField("next_action", ex.evaluation().nextAction()),
-                        JsonOutput.stringField("next_command", ex.evaluation().nextCommand())
-                ));
+                context.out().print(GoalBlockerReport.renderJson(goal, ex.evaluation()));
             } else {
-                GoalEvaluateCommand.print(context, args, ex.evaluation());
+                context.out().print(GoalBlockerReport.renderText(goal, ex.evaluation()));
             }
             return ExitCodes.VALIDATION_ERROR;
         } catch (PolicyViolationException ex) {

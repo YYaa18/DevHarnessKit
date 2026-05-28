@@ -53,7 +53,7 @@ public final class QuickstartCommand implements Command {
         }
 
         String preset = args.option("preset", "springboot-manual-ide-test").trim();
-        String profile = args.option("profile", "java-api-change").trim();
+        String profile = args.option("profile", defaultProfile(preset)).trim();
         String module = args.option("module", "global").trim();
         String target = args.option("target", "all").trim();
         String graph = args.option("graph", "").trim();
@@ -61,6 +61,7 @@ public final class QuickstartCommand implements Command {
         String condition = args.option("condition", "").trim();
         boolean force = args.hasFlag("force");
         boolean dryRun = args.hasFlag("dry-run");
+        boolean resumeExisting = args.hasFlag("resume-existing");
         if (module.length() == 0) {
             module = "global";
         }
@@ -96,7 +97,9 @@ public final class QuickstartCommand implements Command {
             ConfigureInitResult configResult = ensureConfig(projectRoot, preset, force,
                     args.option("compile", ""), args.option("test", ""), graph, target);
             String selectedProfile = initialBrief.agentBrief().profileKey();
-            GoalRun existingGoal = matchingOpenGoal(context, projectRoot, selectedProfile, task, module);
+            GoalRun existingGoal = resumeExisting
+                    ? matchingOpenGoal(context, projectRoot, selectedProfile, task, module)
+                    : null;
             QuickstartResult result;
             if (existingGoal != null) {
                 GoalPlan plan = orchestrator.plan(projectRoot, existingGoal);
@@ -117,6 +120,14 @@ public final class QuickstartCommand implements Command {
                 result = QuickstartResult.started(projectRoot, configResult, start.goal(), start.contextPath().toString(),
                         start.workflowRun().runKey(), spec == null ? "" : spec.changeKey(),
                         installStateStatus(projectRoot), brief);
+                if (!resumeExisting) {
+                    GoalRun similar = matchingOpenGoal(context, projectRoot, selectedProfile, task, module);
+                    if (similar != null && !similar.goalKey().equals(start.goal().goalKey())) {
+                        result.similarGoal = similar.goalKey();
+                        result.resumeDecision = "create_new";
+                        result.resumeReason = "resume_existing_not_requested";
+                    }
+                }
             }
             printResult(context, args, result);
             return ExitCodes.SUCCESS;
@@ -144,6 +155,11 @@ public final class QuickstartCommand implements Command {
             return defaultMode == null || defaultMode.trim().length() == 0 ? "api" : defaultMode.trim();
         }
         return normalized;
+    }
+
+    private String defaultProfile(String preset) {
+        String normalized = preset == null ? "" : preset.trim().toLowerCase(java.util.Locale.ROOT);
+        return "demo-no-build".equals(normalized) ? "java-api-patch" : "java-api-change";
     }
 
     private ConfigureInitResult ensureConfig(Path projectRoot, String preset, boolean force,
@@ -212,6 +228,11 @@ public final class QuickstartCommand implements Command {
         builder.append("current_action: ").append(result.currentAction).append('\n');
         builder.append("context_path: ").append(result.contextPath).append('\n');
         builder.append("next_command: ").append(result.nextCommand).append('\n');
+        if (result.resumeDecision.length() > 0) {
+            builder.append("resume_decision: ").append(result.resumeDecision).append('\n');
+            builder.append("resume_reason: ").append(result.resumeReason).append('\n');
+            builder.append("similar_goal: ").append(result.similarGoal).append('\n');
+        }
         if (result.adapterNextCommand.length() > 0) {
             builder.append("adapter_next_command: ").append(result.adapterNextCommand).append('\n');
         }
@@ -244,6 +265,9 @@ public final class QuickstartCommand implements Command {
                 JsonOutput.stringField("current_action", result.currentAction),
                 JsonOutput.stringField("context_path", result.contextPath),
                 JsonOutput.stringField("next_command", result.nextCommand),
+                JsonOutput.stringField("resume_decision", result.resumeDecision),
+                JsonOutput.stringField("resume_reason", result.resumeReason),
+                JsonOutput.stringField("similar_goal", result.similarGoal),
                 JsonOutput.stringField("adapter_next_command", result.adapterNextCommand)
         );
     }
@@ -276,6 +300,9 @@ public final class QuickstartCommand implements Command {
         private String safeToStart = "";
         private String confirmationRequired = "";
         private String confirmationReason = "";
+        private String resumeDecision = "";
+        private String resumeReason = "";
+        private String similarGoal = "";
 
         private static QuickstartResult dryRun(Path projectRoot, ConfigureInitResult plan, String profile,
                                                String task, String module, String recommendation,

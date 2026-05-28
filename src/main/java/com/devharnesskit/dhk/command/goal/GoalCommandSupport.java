@@ -23,6 +23,8 @@ final class GoalCommandSupport {
     private static final GoalCheckPolicyService CHECK_POLICY_SERVICE = new GoalCheckPolicyService();
     private static final GoalProfileService PROFILE_SERVICE = new GoalProfileService();
     private static final GoalGraphStateService GRAPH_STATE_SERVICE = new GoalGraphStateService();
+    private static final String GOAL_SCRIPT_DIR = ".agents/skills/devharness-goal-development/scripts/";
+    private static final String GRAPH_SCRIPT_DIR = ".agents/skills/devharness-graph-aware-development/scripts/";
     private static final String[] ALLOWED_ACTIONS = new String[]{
             "perform_current_action_only",
             "record_goal_step_after_work",
@@ -95,7 +97,8 @@ final class GoalCommandSupport {
             }
         }
         context.out().println("next_command: " + nextCommand(plan, graph, profile, projectRoot));
-        context.out().println("evidence_template_command: dhk goal evidence-template --goal " + goal.goalKey());
+        context.out().println("evidence_template_command: " + GOAL_SCRIPT_DIR
+                + "dhk.sh goal evidence-template --goal " + goal.goalKey());
         context.out().println("context_path: " + PathUtil.goalContext(projectRoot));
     }
 
@@ -126,7 +129,7 @@ final class GoalCommandSupport {
                 JsonOutput.rawField("scenario_impact", scenarioImpactJson(projectRoot, profile)),
                 JsonOutput.stringField("next_command", nextCommand),
                 JsonOutput.stringField("evidence_template_command",
-                        "dhk goal evidence-template --goal " + goal.goalKey()),
+                        GOAL_SCRIPT_DIR + "dhk.sh goal evidence-template --goal " + goal.goalKey()),
                 JsonOutput.stringField("context_path", PathUtil.goalContext(projectRoot).toString())
         ));
     }
@@ -169,6 +172,7 @@ final class GoalCommandSupport {
                 JsonOutput.booleanField("graph_context_exists", graph.graphContextExists()),
                 JsonOutput.stringField("impact_map_path", graph.impactMapPath()),
                 JsonOutput.booleanField("impact_map_exists", graph.impactMapExists()),
+                JsonOutput.booleanField("integrated_into_main_flow", true),
                 JsonOutput.stringField("required_graph_action", graph.requiredGraphAction()),
                 JsonOutput.stringField("graph_next_command", graph.graphNextCommand())
         );
@@ -208,9 +212,11 @@ final class GoalCommandSupport {
         context.out().println("  exists: " + graph.graphContextExists());
         context.out().println("  impact_map_path: " + graph.impactMapPath());
         context.out().println("  impact_map_exists: " + graph.impactMapExists());
-        context.out().println("required_graph_action: " + graph.requiredGraphAction());
+        context.out().println("graph_assist:");
+        context.out().println("  integrated_into_main_flow: true");
+        context.out().println("  recommended_internal_action: " + graph.requiredGraphAction());
         if (graph.graphNextCommand().length() > 0) {
-            context.out().println("graph_next_command: " + graph.graphNextCommand());
+            context.out().println("  internal_helper: " + localCommand(graph.graphNextCommand()));
         }
     }
 
@@ -223,22 +229,49 @@ final class GoalCommandSupport {
         context.out().println("  required: true");
         context.out().println("  path: " + scenarioImpact);
         context.out().println("  exists: " + Files.isRegularFile(scenarioImpact));
-        context.out().println("  next_command: " + scenarioImpactCommand(projectRoot));
+        context.out().println("  integrated_into_main_flow: true");
+        context.out().println("  internal_helper: " + scenarioImpactCommand(projectRoot));
     }
 
     private static String nextCommand(GoalPlan plan, GoalGraphState graph, GoalProfile profile, Path projectRoot) {
-        if (graph != null && graph.enabled() && graph.graphNextCommand().length() > 0) {
-            return graph.graphNextCommand();
-        }
-        if (profile != null && profile.graphRequired() && profile.bddRequired()
-                && !Files.isRegularFile(PathUtil.scenarioImpactMap(projectRoot))) {
-            return scenarioImpactCommand(projectRoot);
-        }
-        return plan.nextCommand();
+        return localCommand(plan.nextCommand());
     }
 
     private static String scenarioImpactCommand(Path projectRoot) {
-        return "dhk graph impact --project-root " + projectRoot.toAbsolutePath().normalize()
+        return GRAPH_SCRIPT_DIR + "graph-impact.sh --project-root " + projectRoot.toAbsolutePath().normalize()
                 + " --scenario <scenario-key>";
+    }
+
+    private static String localCommand(String command) {
+        if (command == null) {
+            return "";
+        }
+        if (command.startsWith("dhk goal step ")) {
+            return GOAL_SCRIPT_DIR + "goal-step.sh " + command.substring("dhk goal step ".length());
+        }
+        if (command.startsWith("dhk goal next ")) {
+            return GOAL_SCRIPT_DIR + "goal-next.sh " + command.substring("dhk goal next ".length());
+        }
+        if (command.startsWith("dhk goal resume ")) {
+            return GOAL_SCRIPT_DIR + "goal-resume.sh " + command.substring("dhk goal resume ".length());
+        }
+        if (command.startsWith("dhk goal verify ")) {
+            return GOAL_SCRIPT_DIR + "goal-verify.sh " + command.substring("dhk goal verify ".length());
+        }
+        if (command.startsWith("dhk goal complete ")) {
+            return GOAL_SCRIPT_DIR + "goal-complete.sh " + command.substring("dhk goal complete ".length());
+        }
+        if (command.startsWith("dhk graph impact ")) {
+            return GRAPH_SCRIPT_DIR + "graph-impact.sh " + command.substring("dhk graph impact ".length());
+        }
+        if (command.startsWith("dhk graph index ")) {
+            String args = command.substring("dhk graph index ".length());
+            int andIndex = args.indexOf(" && ");
+            if (andIndex >= 0) {
+                args = args.substring(0, andIndex);
+            }
+            return GRAPH_SCRIPT_DIR + "graph-index-export.sh " + args;
+        }
+        return command;
     }
 }

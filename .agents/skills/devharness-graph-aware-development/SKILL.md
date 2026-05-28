@@ -1,24 +1,25 @@
 ---
 name: devharness-graph-aware-development
-description: Use DevHarnessKit graph-aware goal protocol for code changes that require dependency impact maps and post-change graph evidence.
+description: Compatibility helper for DevHarnessKit graph evidence. The main goal skill owns graph-required flows.
 ---
 
-# DevHarness Graph-Aware Development
+# DevHarness Graph Evidence Helper
 
-Use this skill when a task uses a `*-with-graph` goal profile or GOAL_CONTEXT has `graph_required: true`.
-It extends the goal-first protocol with mandatory graph evidence.
+Do not treat this as a separate development workflow. For graph-required work,
+use `devharness-goal-development` as the primary skill and treat graph as
+evidence inside the current main goal action.
 
 When a Work Brief exists, show the user the brief-level intent, risk, and confirmation needs. Keep Graph and Harness commands agent-internal through `AGENT_BRIEF.json` unless the user asks for debugging details.
 
-## Required Protocol
+## Integrated Protocol
 
 1. Start or resume the goal with the goal skill wrappers.
 2. Run `goal-next.sh` and read `.agents/memory/exports/GOAL_CONTEXT.md`.
-3. If GOAL_CONTEXT requires `graph_index_export`, run `scripts/graph-index-export.sh`, then run `goal-next.sh` again.
-4. If GOAL_CONTEXT requires `graph_impact`, run `scripts/graph-impact.sh` with the file, symbol, or SQL table named by the task, then run `goal-next.sh` again.
+3. If GOAL_CONTEXT has `<graph-assist>`, run the listed graph helper internally as part of the current action.
+4. If impact evidence is missing, run `scripts/graph-impact.sh` with the file, symbol, or SQL table named by the task.
 5. Before editing, read `.agents/graph/exports/GRAPH_CONTEXT.md` and `.agents/graph/exports/IMPACT_MAP.md`.
 6. Edit only files covered by `IMPACT_MAP.md`. If a needed file is outside the map, record the risk and regenerate impact for that file or symbol before editing it.
-7. After implementation, run graph impact again for changed files or the main changed symbol, then record the `graph_reimpact` goal step.
+7. After implementation, run graph impact again for changed files or the main changed symbol, then record the post-change graph evidence in the current `verify` goal step.
 8. Run `goal-verify.sh`; graph-required goals must pass `graph` and `impact` checks before completion.
 9. Run `goal-complete.sh` only after `goal verify` returns `ready_to_complete`.
 

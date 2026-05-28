@@ -26,6 +26,7 @@ public final class BriefService {
     private final AgentBriefRenderer agentRenderer;
     private final BriefLifecycleService lifecycleService;
     private final ProfessionalKnowledgeService knowledgeService;
+    private static final String GOAL_SCRIPT_DIR = ".agents/skills/devharness-goal-development/scripts/";
 
     public BriefService() {
         this(new DevHarnessConfigService(), new ModeAdvisor(),
@@ -142,7 +143,10 @@ public final class BriefService {
 
     private String[] forbiddenActions() {
         return new String[]{"show_harness_commands_to_user", "skip_goal_context",
-                "complete_without_verify", "bypass_hard_escalation"};
+                "complete_without_verify", "bypass_hard_escalation",
+                "start_new_goal_when_agent_brief_has_goal_key",
+                "reuse_historical_task_for_new_request",
+                "complete_when_goal_task_does_not_match_user_request"};
     }
 
     private String[] defaultRequiredEvidence(ModeAdvice advice) {
@@ -165,19 +169,36 @@ public final class BriefService {
                             new String[]{"quickstart", "--project-root", request.projectRoot().toString(),
                                     "--task", request.task(), "--module", request.module(),
                                     "--mode", advice.modeId(), "--profile", advice.profileKey()},
+                            GOAL_SCRIPT_DIR + "dhk.sh",
+                            new String[]{"quickstart", "--project-root", request.projectRoot().toString(),
+                                    "--task", request.task(), "--module", request.module(),
+                                    "--mode", advice.modeId(), "--profile", advice.profileKey()},
+                            request.projectRoot().toString(),
                             "after_user_confirmation", false, true)
             };
         }
         return new HarnessCommand[]{
                 new HarnessCommand("goal_next",
-                        new String[]{"goal", "next", "--goal", goalKey}, "before_each_step", false, true),
+                        new String[]{"goal", "next", "--goal", goalKey},
+                        GOAL_SCRIPT_DIR + "goal-next.sh", new String[]{"--goal", goalKey},
+                        request.projectRoot().toString(), "before_each_step", false, true),
                 new HarnessCommand("goal_step",
                         new String[]{"goal", "step", "--goal", goalKey, "--auto", "--summary", "<summary>"},
+                        GOAL_SCRIPT_DIR + "goal-step.sh",
+                        new String[]{"--goal", goalKey, "--auto", "--summary", "<summary>",
+                                "--field", "goal_understanding=<value>",
+                                "--field", "assumptions=<value>",
+                                "--field", "read_files=<value>"},
+                        request.projectRoot().toString(),
                         "after_each_step", false, true),
                 new HarnessCommand("goal_verify",
-                        new String[]{"goal", "verify", "--goal", goalKey}, "before_completion", false, true),
+                        new String[]{"goal", "verify", "--goal", goalKey},
+                        GOAL_SCRIPT_DIR + "goal-verify.sh", new String[]{"--goal", goalKey},
+                        request.projectRoot().toString(), "before_completion", false, true),
                 new HarnessCommand("goal_complete",
-                        new String[]{"goal", "complete", "--goal", goalKey}, "only_when_ready", false, true)
+                        new String[]{"goal", "complete", "--goal", goalKey},
+                        GOAL_SCRIPT_DIR + "goal-complete.sh", new String[]{"--goal", goalKey},
+                        request.projectRoot().toString(), "only_when_ready", false, true)
         };
     }
 

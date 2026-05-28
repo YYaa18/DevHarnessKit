@@ -157,6 +157,15 @@ Create a project-level DevHarness configuration and install generated agent
 adapters through the local control panel. For Spring Boot projects where
 compile/test must be run from the IDE or company runtime, use the manual preset:
 
+For release packages, the recommended path is simpler: unzip the package and run
+the root installer. It will ask for the target project, agent adapter, preset,
+and jar path, then copy the packaged resources into the project:
+
+```bash
+cd devharnesskit-${DHK_VERSION}
+./install.sh
+```
+
 ```bash
 java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" configure init \
   --project-root . \
@@ -341,11 +350,14 @@ java -jar "target/dhk-cli-${DHK_VERSION}-all.jar" goal start \
   --module order
 ```
 
-When graph is required, `goal next` and `GOAL_CONTEXT.md` will tell the agent
-when to run graph index/export or graph impact. Graph Lite output is heuristic:
-use it for impact discovery and recommended read files, not as a correctness
-proof. Strict skills must not use `graph impact --allow-stale` unless policy or
-human evidence explicitly authorizes it.
+When graph is required, it is integrated into the same goal actions instead of
+becoming a separate graph workflow. `goal next` still returns the current main
+action such as `inspect_existing_code`, `create_change_plan`, or `verify`;
+`GOAL_CONTEXT.md` adds a `graph-assist` section with agent-internal graph
+helpers and evidence fields to record in the current step. Graph Lite output is
+heuristic: use it for impact discovery and recommended read files, not as a
+correctness proof. Strict skills must not use `graph impact --allow-stale`
+unless policy or human evidence explicitly authorizes it.
 
 `goal verify` runs the required checks and evaluates readiness in one command.
 `goal check` and `goal evaluate` remain available for lower-level debugging.

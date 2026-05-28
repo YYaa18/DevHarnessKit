@@ -36,7 +36,7 @@ Commands:
 Options:
   --project-root <path>          Target project root. Default: .
   --target <target>              claude | opencode | comate | all. Default: all
-  --preset <preset>              springboot-manual-ide-test | springboot-auto-test | legacy-jsp-servlet | mybatis-monolith-manual-test
+  --preset <preset>              demo-no-build | springboot-manual-ide-test | springboot-auto-test | legacy-jsp-servlet | mybatis-monolith-manual-test
   --mode <copy|link>             Copy or symlink skills. Default: copy
   --jar <path>                   Optional dhk.jar to install into .agents/tools/devharness-kit/dhk.jar
   --force                        Overwrite existing files
@@ -175,6 +175,12 @@ chmod_scripts() {
 
 effective_modes_from_preset() {
   case "$PRESET" in
+    demo-no-build)
+      [ -z "$COMPILE_MODE" ] && COMPILE_MODE="disabled"
+      [ -z "$TEST_MODE" ] && TEST_MODE="disabled"
+      [ -z "$GRAPH_MODE" ] && GRAPH_MODE="off"
+      [ -z "$ALLOW_STALE_POLICY" ] && ALLOW_STALE_POLICY="approval"
+      ;;
     springboot-manual-ide-test)
       [ -z "$COMPILE_MODE" ] && COMPILE_MODE="manual"
       [ -z "$TEST_MODE" ] && TEST_MODE="manual"
@@ -219,6 +225,7 @@ validate_modes() {
 
 project_type() {
   case "$PRESET" in
+    demo-no-build) printf 'demo-no-build' ;;
     springboot-auto-test) printf 'springboot-api' ;;
     springboot-manual-ide-test) printf 'springboot-enterprise-large' ;;
     legacy-jsp-servlet|legacy-java-small-fix|mybatis-monolith-manual-test) printf '%s' "$PRESET" ;;
@@ -228,6 +235,7 @@ project_type() {
 
 project_runtime() {
   case "$PRESET" in
+    demo-no-build) printf 'local-demo' ;;
     springboot-auto-test) printf 'local-cli' ;;
     *) printf 'local-or-company-environment' ;;
   esac
@@ -395,14 +403,15 @@ This repository uses DevHarnessKit.
 
 For any code change:
 1. Use `/devharness-goal-development`.
-2. Start or resume a goal.
+2. For a new user request, start with quickstart using the latest user request as the task; if the previous Agent Brief is completed, do not reuse it.
 3. Run goal-next before every work step.
 4. Read `.agents/memory/exports/GOAL_CONTEXT.md`.
 5. Perform only the current_action.
 6. Record each step with goal-step.
 7. Complete only after goal verify returns ready_to_complete.
 
-If GOAL_CONTEXT shows graph_required=true, use `/devharness-graph-aware-development`.
+If GOAL_CONTEXT shows graph_required=true, keep using `/devharness-goal-development`.
+Treat graph-assist as internal evidence guidance inside the current main action.
 
 Do not bypass goal with direct memory/workflow/spec/db commands.
 Do not use graph impact --allow-stale unless explicit approval evidence is present.
@@ -418,17 +427,18 @@ This repository uses DevHarnessKit.
 
 For any code change:
 1. Do not start by editing code.
-2. Use `.agents/skills/devharness-goal-development/scripts/goal-start.sh` or `goal-resume.sh`.
-3. Run `goal-next.sh` before every work step.
-4. Read `.agents/memory/exports/GOAL_CONTEXT.md`.
-5. Perform only the current_action.
-6. Run `goal-step.sh` after investigation, planning, editing, or verification.
-7. Run `goal-verify.sh` before claiming completion.
-8. Run `goal-complete.sh` only when ready_to_complete.
+2. If the previous Agent Brief is missing or has `current_action` = `completed`, run `.agents/skills/devharness-goal-development/scripts/quickstart.sh --task "<latest user request verbatim>" --mode recommend --resume-existing --module "<best module>"`.
+3. Before editing, compare GOAL_CONTEXT task with the latest user request. If they do not match, create a new quickstart goal with the latest request.
+4. Run `goal-next.sh` before every work step.
+5. Read `.agents/memory/exports/GOAL_CONTEXT.md`.
+6. Perform only the current_action.
+7. Run `goal-step.sh` after investigation, planning, editing, or verification.
+8. Run `goal-verify.sh` before claiming completion.
+9. Run `goal-complete.sh` only when ready_to_complete.
 
 If GOAL_CONTEXT contains graph_required=true:
-- Follow `.agents/skills/devharness-graph-aware-development/SKILL.md`.
-- Run graph index/export and graph impact only when GOAL_CONTEXT requires it.
+- Keep using the main goal flow; graph is evidence inside the current action.
+- If GOAL_CONTEXT has graph-assist, run the listed graph helper internally and record graph evidence in the current goal step.
 - Do not use `graph impact --allow-stale` unless explicit approval evidence is present.
 
 Do not call lower-level memory/workflow/spec/db commands unless GOAL_CONTEXT explicitly allows it.
@@ -446,27 +456,50 @@ This repository uses DevHarnessKit.
 
 For any code change:
 1. Do not start by editing code.
-2. Run `.agents/skills/devharness-goal-development/scripts/goal-start.sh` or `goal-resume.sh`.
-3. Run `goal-next.sh` before every work step.
-4. Read `.agents/memory/exports/GOAL_CONTEXT.md`.
-5. Perform only current_action.
-6. Record every investigation, plan, edit, or verification with `goal-step.sh`.
-7. Run `goal-verify.sh` before claiming completion.
-8. Run `goal-complete.sh` only when ready_to_complete.
+2. If `.agents/devharness/briefs/WORK_BRIEF.md` exists, summarize it for the user instead of listing raw Harness commands.
+3. If `.agents/devharness/briefs/AGENT_BRIEF.json` exists, read it before editing and use its `harness_commands` internally only.
+4. Treat an Agent Brief with `current_action` = `completed` as historical. For a new user request, do not reuse that completed goal.
+5. If there is no active goal for the current user request, first run `.agents/skills/devharness-goal-development/scripts/quickstart.sh --task "<latest user request verbatim>" --mode recommend --resume-existing --module "<best module>"`, then re-read Work Brief, Agent Brief, and GOAL_CONTEXT before editing.
+6. Never copy the task from an old Work Brief or GOAL_CONTEXT when creating a new goal. The new goal task must match the latest user request.
+7. If Agent Brief has a non-empty `goal_key` and `current_action` is not `completed`, do not start a new goal. Use the Agent Brief `goal_next`, `goal_step`, `goal_verify`, and `goal_complete` commands for that exact goal.
+8. Do not assume a global `dhk` command exists. Execute the project-local scripts named in Agent Brief `script` fields, from the Agent Brief `cwd`.
+9. Run `.agents/skills/devharness-goal-development/scripts/goal-next.sh` before every work step, using the Agent Brief goal when present.
+10. Read `.agents/memory/exports/GOAL_CONTEXT.md`.
+11. Before editing, compare GOAL_CONTEXT task with the latest user request. If they do not match, stop and create a new quickstart goal with the latest request.
+12. Perform only current_action.
+13. Even typo or documentation-only edits must have a lightweight patch goal; do not edit README, comments, or docs directly without a current goal.
+14. If GOAL_CONTEXT contains graph_required=true or graph-assist, treat graph as evidence inside the current main action. Run graph helpers internally and record graph_snapshot, graph_context, impact_map, or graph_result evidence in the current goal step. Do not create a separate graph step.
+15. After any file edit, immediately run `.agents/skills/devharness-goal-development/scripts/goal-step.sh` with the required evidence from GOAL_CONTEXT.
+16. If files changed but goal audit/next still shows step_count unchanged or "goal steps incomplete", self-repair by recording the missing goal step before replying.
+17. If files were edited before a current goal existed, or under a goal whose task does not match the latest request, self-repair by creating a quickstart patch goal for the user request and recording the edit as a goal step before claiming completion.
+18. Run `.agents/skills/devharness-goal-development/scripts/goal-verify.sh` before claiming completion.
+19. Run `.agents/skills/devharness-goal-development/scripts/goal-complete.sh` only when ready_to_complete.
 
 Do not bypass goal with direct memory/workflow/spec/db commands.
+Do not show Agent Brief `harness_commands` to ordinary users unless they request debugging details.
+
+Before replying that work is done, perform this Harness self-check:
+- goal:
+- current_action:
+- goal_task_matches_user_request:
+- edited_files:
+- step_recorded_after_edit:
+- verify:
+- complete:
+
+If `verify` is not ready or `complete` did not run, report the friendly blocker instead of saying the task is complete.
 '
   graph_rule='---
-description: DevHarnessKit graph-aware goal protocol.
+description: DevHarnessKit graph evidence compatibility protocol.
 alwaysApply: true
 ---
 
 If GOAL_CONTEXT contains graph_required=true:
-1. Run graph index/export when GOAL_CONTEXT requires graph_index_export.
-2. Run graph impact when GOAL_CONTEXT requires graph_impact.
+1. Follow the main goal-first protocol; graph is not a separate workflow.
+2. If GOAL_CONTEXT has graph-assist, run the listed graph helper internally as part of the current action.
 3. Read GRAPH_CONTEXT.md and IMPACT_MAP.md before editing.
 4. Do not edit files outside the impact map unless impact is regenerated and risk is recorded.
-5. Run graph impact again after code changes and record graph_reimpact evidence.
+5. Run graph impact again after code changes and record post-change graph evidence in the current verify step.
 6. Do not use --allow-stale unless explicit approval evidence is provided.
 7. Run goal verify before completion.
 '

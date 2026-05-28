@@ -6,6 +6,7 @@ End each response with:
 DevHarness self-check:
 - goal: <goal-key or not-started>
 - current_action: <action>
+- goal_task_matches_user_request: <yes/no, compare GOAL_CONTEXT task with latest user request>
 - changed_files: <files or none>
 - checks: <passed/pending/failed>
 - completion: <not-ready/ready/completed>

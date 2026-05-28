@@ -20,4 +20,18 @@ final class GoalCheckPolicyTest {
         assertFalse(policy.accepts("compile", "skipped", strict));
         assertFalse(policy.accepts("test", "skipped", strict));
     }
+
+    @Test
+    void strictProfileAcceptsApprovedManualVerificationWaiver() {
+        GoalCheckPolicy policy = GoalCheckPolicy.defaults();
+        GoalProfile strict = new GoalProfileService().find("java-api-change");
+
+        assertTrue(policy.accepts("manual-compile", "passed", strict));
+        assertTrue(policy.accepts("manual-compile", "waived", strict));
+        assertTrue(policy.accepts("manual-test", "passed", strict));
+        assertTrue(policy.accepts("manual-test", "waived", strict));
+
+        assertFalse(policy.accepts("compile", "waived", strict));
+        assertFalse(policy.accepts("test", "waived", strict));
+    }
 }

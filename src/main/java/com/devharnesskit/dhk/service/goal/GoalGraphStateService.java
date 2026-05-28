@@ -51,40 +51,24 @@ public final class GoalGraphStateService {
     private String requiredGraphAction(GoalProfile profile, String currentAction, boolean snapshotExists,
                                        boolean graphContextExists, boolean impactMapExists, boolean snapshotStale) {
         if (!snapshotExists || !graphContextExists) {
-            return "graph_index_export";
+            return "refresh_graph_context";
         }
         if (profile.graphRequireFreshSnapshot() && snapshotStale) {
-            return "graph_index_export";
-        }
-        if (("graph_impact_analysis".equals(currentAction) || "graph_reimpact".equals(currentAction))
-                && profile.graphRequireImpactMap() && !impactMapExists) {
-            return "graph_impact";
-        }
-        if (isGraphAction(profile, currentAction)) {
-            return "record_goal_step";
+            return "refresh_graph_context";
         }
         if (profile.graphRequireImpactMap() && !impactMapExists) {
-            return "graph_impact";
+            return "prepare_impact_map";
         }
         return "none";
     }
 
-    private boolean isGraphAction(GoalProfile profile, String action) {
-        for (String graphAction : profile.graphActions()) {
-            if (graphAction.equals(action)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private String graphCommand(Path projectRoot, String required) {
         String root = projectRoot.toAbsolutePath().normalize().toString();
-        if ("graph_index_export".equals(required)) {
+        if ("refresh_graph_context".equals(required)) {
             return "dhk graph index --project-root " + root
                     + " && dhk graph export --project-root " + root;
         }
-        if ("graph_impact".equals(required)) {
+        if ("prepare_impact_map".equals(required)) {
             return "dhk graph impact --project-root " + root
                     + " --file <path>|--symbol <symbol>|--sql-table <table>";
         }

@@ -259,6 +259,9 @@ public final class GoalCheckPolicy {
         if (isPatchProfile(profile) && ("compile".equals(checkKey) || "test".equals(checkKey))) {
             return DEFAULT_ACCEPTED_STATUSES;
         }
+        if ("manual-compile".equals(checkKey) || "manual-test".equals(checkKey)) {
+            return MANUAL_ACCEPTED_STATUSES;
+        }
         if (profile != null && !profile.completionAllowSkippedChecks()) {
             return PASSED_ONLY;
         }
@@ -270,9 +273,6 @@ public final class GoalCheckPolicy {
         }
         if ("bdd".equals(checkKey)) {
             return PASSED_ONLY;
-        }
-        if ("manual-compile".equals(checkKey) || "manual-test".equals(checkKey)) {
-            return MANUAL_ACCEPTED_STATUSES;
         }
         if ("verification-risk".equals(checkKey)) {
             return PASSED_ONLY;

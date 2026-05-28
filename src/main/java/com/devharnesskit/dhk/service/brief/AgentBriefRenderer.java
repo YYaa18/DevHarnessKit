@@ -93,11 +93,39 @@ public final class AgentBriefRenderer {
             raw.add(JsonOutput.object(
                     JsonOutput.stringField("name", command.name()),
                     JsonOutput.rawField("argv", JsonOutput.stringArray(command.argv())),
+                    JsonOutput.stringField("script", command.script()),
+                    JsonOutput.rawField("args", JsonOutput.stringArray(command.args())),
+                    JsonOutput.stringField("cwd", command.cwd()),
+                    JsonOutput.stringField("command_line", commandLine(command)),
+                    JsonOutput.stringField("execution_hint",
+                            "run script from cwd with args; do not require a global dhk command"),
                     JsonOutput.stringField("when", command.when()),
                     JsonOutput.booleanField("user_visible", command.userVisible()),
                     JsonOutput.booleanField("agent_internal_only", command.agentInternalOnly())
             ).trim());
         }
         return JsonOutput.array(raw);
+    }
+
+    private String commandLine(HarnessCommand command) {
+        if (command.script().length() == 0) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder();
+        builder.append(shellQuote(command.script()));
+        for (String arg : command.args()) {
+            builder.append(' ').append(shellQuote(arg));
+        }
+        return builder.toString();
+    }
+
+    private String shellQuote(String value) {
+        if (value == null || value.length() == 0) {
+            return "''";
+        }
+        if (value.matches("[A-Za-z0-9_./:=@%+,-]+")) {
+            return value;
+        }
+        return "'" + value.replace("'", "'\"'\"'") + "'";
     }
 }

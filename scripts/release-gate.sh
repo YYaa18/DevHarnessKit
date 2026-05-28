@@ -142,6 +142,7 @@ check_no_hardcoded_wrapper_version
 
 log "checking archive contents"
 for entry in \
+  "install.sh" \
   "lib/dhk.jar" \
   "LICENSE" \
   "THIRD_PARTY_NOTICES.md" \
@@ -199,6 +200,8 @@ if [ "$RUN_SMOKE" = "true" ]; then
   require_dir "$DIST"
   java -jar "$DIST/lib/dhk.jar" version | grep "$VERSION" >/dev/null \
     || fail "archive jar version smoke failed"
+  "$DIST/install.sh" --help | grep "DevHarnessKit 安装向导" >/dev/null \
+    || fail "archive root installer help smoke failed"
   grep -F 'dhk-cli-*-all.jar' "$DIST/.agents/skills/devharness-goal-development/scripts/dhk.sh" >/dev/null \
     || fail "archive Unix goal wrapper missing dynamic target jar fallback"
   grep -F 'dhk-cli-*-all.jar' "$DIST/.agents/skills/devharness-goal-development/scripts/dhk.bat" >/dev/null \

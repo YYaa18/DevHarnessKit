@@ -13,6 +13,12 @@
             <outputDirectory>lib</outputDirectory>
             <destName>dhk.jar</destName>
         </file>
+        <file>
+            <source>${project.basedir}/install.sh</source>
+            <outputDirectory>.</outputDirectory>
+            <destName>install.sh</destName>
+            <fileMode>0755</fileMode>
+        </file>
     </files>
     <fileSets>
         <fileSet>

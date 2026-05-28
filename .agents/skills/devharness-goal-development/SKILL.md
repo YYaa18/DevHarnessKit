@@ -25,14 +25,23 @@ For ordinary code tasks, keep the user-facing flow simple:
 1. Show the user the Work Brief summary: task intent, recommended mode, risk, confirmation needs, and expected work.
 2. Read `.agents/devharness/briefs/AGENT_BRIEF.json` yourself when it exists.
 3. Do not show `harness_commands` to ordinary users unless they explicitly ask for debugging details.
+4. Do not assume a global `dhk` command exists. Prefer the Agent Brief `script` + `args` fields or the project-local wrapper scripts under `.agents/skills/devharness-goal-development/scripts/`.
+5. If Agent Brief contains a non-empty `goal_key` and `current_action` is not `completed`, do not start a second goal for the same task. Use the Agent Brief commands for that exact goal.
+6. If Agent Brief is missing, has no `goal_key`, or has `current_action` = `completed`, treat the current user request as a new task. Run `quickstart.sh --task "<latest user request verbatim>" --mode recommend --resume-existing --module "<best module>"`, then re-read Work Brief, Agent Brief, and GOAL_CONTEXT before editing.
+7. Even typo or documentation-only edits use the lightweight patch flow; do not directly edit README, comments, or docs without a current goal.
+8. Never copy a task from an old Work Brief or GOAL_CONTEXT when starting a new goal. Before editing, compare GOAL_CONTEXT task with the latest user request; if they do not match, create a new quickstart goal with the latest request.
 
 Agent-internal execution still uses the goal protocol:
 
-1. `goal-start.sh` or `goal-resume.sh` creates or restores the task.
+1. `quickstart.sh` creates the task brief and first goal for a new user request. Use `goal-start.sh` or `goal-resume.sh` only when GOAL_CONTEXT or debug instructions explicitly require them.
+   - If Agent Brief already has an active `goal_key`, skip `quickstart.sh` and run `goal-next.sh --goal <goal_key>` instead.
+   - If Agent Brief has `current_action` = `completed`, it is historical; run `quickstart.sh` for the new request instead of reusing the completed goal.
 2. `goal-next.sh` tells you the current action and required evidence.
 3. Do only that action, then record the work with `goal-step.sh`.
-4. `goal-verify.sh` runs the readiness checks.
-5. `goal-complete.sh` is allowed only after verification reports
+4. If you changed files and `goal audit` or `goal next` still shows `step_count` unchanged or "goal steps incomplete", self-repair by recording the missing step before replying.
+5. If files were edited before any current goal existed, or under a goal whose task does not match the latest user request, self-repair by creating a quickstart patch goal for the user request, then record the already-made edit as a goal step before claiming completion.
+6. `goal-verify.sh` runs the readiness checks.
+7. `goal-complete.sh` is allowed only after verification reports
    `ready_to_complete`.
 
 The full protocol below keeps weak-model and release-sensitive work auditable.
@@ -42,18 +51,26 @@ The full protocol below keeps weak-model and release-sensitive work auditable.
 1. Do not start by editing code.
 1. If `.agents/devharness/briefs/WORK_BRIEF.md` exists, summarize it for the user instead of listing raw Harness commands.
 1. If `.agents/devharness/briefs/AGENT_BRIEF.json` exists, treat its `harness_commands` as agent-internal only.
-2. Start a new goal with the skill wrapper `scripts/goal-start.sh`, or resume the current goal with `scripts/goal-resume.sh`. From the repository root, call them as `.agents/skills/devharness-goal-development/scripts/goal-start.sh` and `.agents/skills/devharness-goal-development/scripts/goal-resume.sh`.
+2. For a new user request, start through `.agents/skills/devharness-goal-development/scripts/quickstart.sh --task "<latest user request verbatim>" --mode recommend --resume-existing --module "<best module>"`. This creates a fresh Work Brief, Agent Brief, and patch/standard/strict goal without exposing raw commands to the user.
+   - If `.agents/devharness/briefs/AGENT_BRIEF.json` has a non-empty `goal_key` and `current_action` is not `completed`, do not start another goal. Use that active goal and its `harness_commands`.
+   - If `current_action` is `completed`, the brief is historical. Create a new quickstart goal for the new request before editing.
+   - Use `scripts/goal-start.sh` or `scripts/goal-resume.sh` only when GOAL_CONTEXT or debug instructions explicitly require lower-level goal control.
 3. Run the skill wrapper `scripts/goal-next.sh` before each work step. When you
    need machine-readable action/evidence data, run the underlying
    `dhk goal next --json` through the wrapper only if the wrapper supports it;
    otherwise read `GOAL_CONTEXT.md`.
 4. Read `.agents/memory/exports/GOAL_CONTEXT.md`.
 5. Perform only the `current_action` from GOAL_CONTEXT, and stay within its `<allowed-commands>`, `<forbidden-actions>`, `<evidence-contract>`, and `<freshness-status>` sections.
-   - If `<required-graph-action>` is present, run the listed graph command first and do not skip to code edits.
-   - `graph_index_export` means run graph index/export, then run `goal next` again.
-   - `graph_impact` means generate `IMPACT_MAP.md`, then run `goal next` again.
+   - If `<graph-assist>` is present, treat graph as part of the current action, not as a separate workflow.
+   - Run the listed graph helper internally when the current action needs fresh graph context or impact evidence.
+   - Record graph evidence such as `graph_snapshot`, `graph_context`, `impact_map`, `recommended_read_files`, or `graph_result` in the current `goal step`.
+   - Do not create or expect a separate `graph_*` goal step.
 6. Do not use lower-level `memory`, `workflow`, `spec`, or `db` commands unless GOAL_CONTEXT explicitly allows it.
 7. After every investigation, plan, edit, or verification step, run `scripts/goal-step.sh` with summary, structured fields, changed files, and the required evidence keys from GOAL_CONTEXT.
+   - If Agent Brief provides `script`, `args`, and `cwd`, execute that project-local script from `cwd`; do not depend on a global `dhk` binary.
+   - If files changed but `step_count` did not increase, the action is not recorded. Re-read the required evidence and record the missing `goal step` before replying.
+   - If files changed before a current goal existed, create a quickstart patch goal for that request, then record the already-made edit with `goal-step.sh --auto` and the required fields.
+   - If GOAL_CONTEXT task does not match the latest user request, do not continue on that goal. Create a new quickstart patch goal with the latest request and record the edit there.
    - Prefer structured evidence fields and `dhk goal step --field key=value`
      over long hand-written evidence strings when using the CLI directly.
    - Use `dhk goal step --template --goal <goal>` to inspect the current
@@ -97,6 +114,7 @@ End each response with:
 DevHarness self-check:
 - goal:
 - current_action:
+- goal_task_matches_user_request:
 - changed_files:
 - checks:
 - completion:

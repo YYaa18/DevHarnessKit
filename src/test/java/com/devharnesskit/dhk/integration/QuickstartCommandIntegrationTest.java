@@ -91,7 +91,7 @@ final class QuickstartCommandIntegrationTest {
         assertTrue(quickstart.stdout().contains("readiness: ready_with_warnings"));
         assertTrue(quickstart.stdout().contains("config: created"));
         assertTrue(quickstart.stdout().contains("install_state: missing"));
-        assertTrue(quickstart.stdout().contains("next_command: dhk goal next"));
+        assertTrue(quickstart.stdout().contains("next_command: .agents/skills/devharness-goal-development/scripts/goal-next.sh"));
         assertTrue(Files.isRegularFile(PathUtil.devharnessConfig(root)));
         assertTrue(Files.isRegularFile(PathUtil.memoryDb(root)));
         assertTrue(Files.isRegularFile(PathUtil.goalContext(root)));

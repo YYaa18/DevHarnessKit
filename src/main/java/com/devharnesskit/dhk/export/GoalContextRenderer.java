@@ -11,6 +11,8 @@ import com.devharnesskit.dhk.model.knowledge.ProfessionalKnowledgeContext;
 
 public final class GoalContextRenderer {
     private static final int MAX_CHARS = 16 * 1024;
+    private static final String GOAL_SCRIPT_DIR = ".agents/skills/devharness-goal-development/scripts/";
+    private static final String GRAPH_SCRIPT_DIR = ".agents/skills/devharness-graph-aware-development/scripts/";
 
     public String render(GoalRun goal, GoalPlan plan, String generatedAt) {
         return render(goal, plan, new String[0], new String[0], generatedAt);
@@ -112,24 +114,28 @@ public final class GoalContextRenderer {
         builder.append("</allowed-actions>\n\n");
 
         builder.append("<allowed-commands>\n");
-        builder.append("- dhk goal next --goal ").append(goal.goalKey()).append('\n');
-        builder.append("- dhk goal step --goal ").append(goal.goalKey())
+        builder.append("- ").append(GOAL_SCRIPT_DIR).append("goal-next.sh --goal ")
+                .append(goal.goalKey()).append('\n');
+        builder.append("- ").append(GOAL_SCRIPT_DIR).append("goal-step.sh --goal ").append(goal.goalKey())
                 .append(" --summary \"<summary>\" --evidence \"<evidence>\"\n");
         if (graph.enabled()) {
-            builder.append("- dhk graph index --project-root <project-root>\n");
-            builder.append("- dhk graph export --project-root <project-root>\n");
-            builder.append("- dhk graph impact --project-root <project-root> --file|--symbol|--sql-table <query>\n");
+            builder.append("- internal graph helper: ").append(GRAPH_SCRIPT_DIR).append("graph-index-export.sh\n");
+            builder.append("- ").append(GRAPH_SCRIPT_DIR)
+                    .append("graph-impact.sh --file|--symbol|--sql-table <query> (internal helper)\n");
         }
         if (bdd.enabled()) {
-            builder.append("- dhk bdd bind-goal --scenario <scenario-key> --goal ")
+            builder.append("- ").append(GOAL_SCRIPT_DIR).append("dhk.sh bdd bind-goal --scenario <scenario-key> --goal ")
                     .append(goal.goalKey()).append('\n');
-            builder.append("- dhk bdd evidence add --scenario <scenario-key> --goal ")
+            builder.append("- ").append(GOAL_SCRIPT_DIR).append("dhk.sh bdd evidence add --scenario <scenario-key> --goal ")
                     .append(goal.goalKey()).append(" --status passed --summary \"<evidence>\"\n");
-            builder.append("- dhk bdd verify --goal ").append(goal.goalKey()).append('\n');
-            builder.append("- dhk graph impact --project-root <project-root> --scenario <scenario-key>\n");
+            builder.append("- ").append(GOAL_SCRIPT_DIR).append("dhk.sh bdd verify --goal ")
+                    .append(goal.goalKey()).append('\n');
+            builder.append("- internal graph helper: ").append(GRAPH_SCRIPT_DIR)
+                    .append("graph-impact.sh --scenario <scenario-key>\n");
         }
-        builder.append("- dhk goal verify --goal ").append(goal.goalKey()).append('\n');
-        builder.append("- dhk goal complete --goal ").append(goal.goalKey())
+        builder.append("- ").append(GOAL_SCRIPT_DIR).append("goal-verify.sh --goal ")
+                .append(goal.goalKey()).append('\n');
+        builder.append("- ").append(GOAL_SCRIPT_DIR).append("goal-complete.sh --goal ").append(goal.goalKey())
                 .append(" only when ready_to_complete\n");
         builder.append("</allowed-commands>\n\n");
 
@@ -153,7 +159,8 @@ public final class GoalContextRenderer {
         builder.append("- include every required-evidence key in goal step evidence\n");
         builder.append("- put modified paths in --changed-files when files changed\n");
         builder.append("- use --field key=value for required evidence that has no dedicated option\n");
-        builder.append("- evidence_template_command: dhk goal evidence-template --goal ")
+        builder.append("- evidence_template_command: ").append(GOAL_SCRIPT_DIR)
+                .append("dhk.sh goal evidence-template --goal ")
                 .append(goal.goalKey()).append('\n');
         builder.append("- example_evidence: ").append(valueOrNone(evidenceContract.exampleEvidence())).append('\n');
         builder.append("</evidence-contract>\n\n");
@@ -286,10 +293,11 @@ public final class GoalContextRenderer {
         builder.append("- scenario_impact_map_path: ").append(valueOrNone(bdd.scenarioImpactMapPath())).append('\n');
         builder.append("- scenario_impact_map_exists: ").append(bdd.scenarioImpactMapExists()).append('\n');
         if (bdd.nextCommand().length() > 0) {
-            builder.append("- next_command: ").append(bdd.nextCommand()).append('\n');
+            builder.append("- next_command: ").append(localCommand(bdd.nextCommand())).append('\n');
         }
         if (!bdd.scenarioImpactMapExists()) {
-            builder.append("- scenario_impact_next_command: dhk graph impact --project-root <project-root> --scenario <scenario-key>\n");
+            builder.append("- scenario_impact_next_command: ").append(GRAPH_SCRIPT_DIR)
+                    .append("graph-impact.sh --scenario <scenario-key>\n");
         }
         builder.append("- rule: bdd_required profiles need goal-bound scenarios with latest passed evidence\n");
         builder.append("</bdd-status>\n\n");
@@ -340,16 +348,17 @@ public final class GoalContextRenderer {
         builder.append("- impact_map_exists: ").append(graph.impactMapExists()).append('\n');
         builder.append("</graph-context>\n\n");
 
-        builder.append("<required-graph-action>\n");
-        builder.append("- action: ").append(graph.requiredGraphAction()).append('\n');
+        builder.append("<graph-assist>\n");
+        builder.append("- integrated_into_main_flow: true\n");
+        builder.append("- recommended_internal_action: ").append(graph.requiredGraphAction()).append('\n');
         if (graph.graphNextCommand().length() > 0) {
-            builder.append("- next_command: ").append(graph.graphNextCommand()).append('\n');
+            builder.append("- internal_helper: ").append(localCommand(graph.graphNextCommand())).append('\n');
         }
-        builder.append("- rule: graph_required profiles must not skip required graph actions\n");
+        builder.append("- rule: graph evidence is recorded inside the current goal action; do not create a separate graph step\n");
         if (graph.snapshotStale()) {
             builder.append("- stale_rule: fresh graph snapshot required before graph impact or completion\n");
         }
-        builder.append("</required-graph-action>\n\n");
+        builder.append("</graph-assist>\n\n");
 
         if (graph.protectedImpactFiles().length > 0) {
             builder.append("<protected-impact-risk>\n");
@@ -391,13 +400,40 @@ public final class GoalContextRenderer {
     }
 
     private String nextCommand(GoalPlan plan, GoalGraphState graph, GoalBddState bdd) {
-        if (graph.enabled() && graph.graphNextCommand().length() > 0) {
-            return graph.graphNextCommand();
+        return localCommand(plan.nextCommand());
+    }
+
+    private String localCommand(String command) {
+        if (command == null) {
+            return "";
         }
-        if (graph.enabled() && bdd.enabled() && !bdd.scenarioImpactMapExists()) {
-            return "dhk graph impact --project-root <project-root> --scenario <scenario-key>";
+        if (command.startsWith("dhk goal step ")) {
+            return GOAL_SCRIPT_DIR + "goal-step.sh " + command.substring("dhk goal step ".length());
         }
-        return plan.nextCommand();
+        if (command.startsWith("dhk goal next ")) {
+            return GOAL_SCRIPT_DIR + "goal-next.sh " + command.substring("dhk goal next ".length());
+        }
+        if (command.startsWith("dhk goal resume ")) {
+            return GOAL_SCRIPT_DIR + "goal-resume.sh " + command.substring("dhk goal resume ".length());
+        }
+        if (command.startsWith("dhk goal verify ")) {
+            return GOAL_SCRIPT_DIR + "goal-verify.sh " + command.substring("dhk goal verify ".length());
+        }
+        if (command.startsWith("dhk goal complete ")) {
+            return GOAL_SCRIPT_DIR + "goal-complete.sh " + command.substring("dhk goal complete ".length());
+        }
+        if (command.startsWith("dhk graph impact ")) {
+            return GRAPH_SCRIPT_DIR + "graph-impact.sh " + command.substring("dhk graph impact ".length());
+        }
+        if (command.startsWith("dhk graph index ")) {
+            String args = command.substring("dhk graph index ".length());
+            int andIndex = args.indexOf(" && ");
+            if (andIndex >= 0) {
+                args = args.substring(0, andIndex);
+            }
+            return GRAPH_SCRIPT_DIR + "graph-index-export.sh " + args;
+        }
+        return command;
     }
 
     private void appendList(StringBuilder builder, String[] values, String emptyValue) {

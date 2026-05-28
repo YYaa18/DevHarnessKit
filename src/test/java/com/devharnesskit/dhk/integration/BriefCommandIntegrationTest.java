@@ -194,6 +194,12 @@ final class BriefCommandIntegrationTest {
         assertTrue(agentBrief.contains("\"profile_key\": \"java-api-patch\""));
         assertTrue(agentBrief.contains("\"name\": \"goal_next\""));
         assertTrue(agentBrief.contains("\"name\": \"goal_step\""));
+        assertTrue(agentBrief.contains("start_new_goal_when_agent_brief_has_goal_key"));
+        assertTrue(agentBrief.contains("reuse_historical_task_for_new_request"));
+        assertTrue(agentBrief.contains("complete_when_goal_task_does_not_match_user_request"));
+        assertTrue(agentBrief.contains("\"script\": \".agents/skills/devharness-goal-development/scripts/goal-step.sh\""));
+        assertTrue(agentBrief.contains("\"cwd\": \"" + root.toString().replace("\\", "\\\\").replace("\"", "\\\"") + "\""));
+        assertTrue(agentBrief.contains("\"execution_hint\": \"run script from cwd with args; do not require a global dhk command\""));
         assertTrue(agentBrief.contains("\"agent_internal_only\": true"));
     }
 
@@ -279,6 +285,36 @@ final class BriefCommandIntegrationTest {
         assertEquals(ExitCodes.SUCCESS, stepExit);
         assertTrue(step.stdout().contains("step_id: "));
         assertTrue(step.stdout().contains("current_action: apply_patch"));
+        assertTrue(read(PathUtil.agentBrief(tempDir.resolve("auto-step-project")))
+                .contains("\"current_action\": \"apply_patch\""));
+    }
+
+    @Test
+    void lifecycleBriefsRefreshAgentBriefCurrentActionForSameGoal() throws Exception {
+        com.devharnesskit.dhk.service.brief.BriefLifecycleService service =
+                new com.devharnesskit.dhk.service.brief.BriefLifecycleService();
+        Path root = tempDir.resolve("brief-refresh-project");
+        Files.createDirectories(PathUtil.devharnessBriefsDirectory(root));
+        Files.write(PathUtil.agentBrief(root), (
+                "{\n"
+                        + "  \"schema_version\": \"devharness-agent-brief/v1-alpha\",\n"
+                        + "  \"goal_key\": \"goal-refresh\",\n"
+                        + "  \"current_action\": \"understand_patch\"\n"
+                        + "}\n").getBytes("UTF-8"));
+
+        com.devharnesskit.dhk.model.goal.GoalRun applyGoal = new com.devharnesskit.dhk.model.goal.GoalRun(
+                "goal-refresh", "project", "", "", "java-api-patch",
+                "Create README", "demo", "api", "", "implementing", "apply_patch",
+                3, 1, "", "", "");
+        service.writeProgressBrief(root, applyGoal, 1L, "Ready to apply patch");
+        assertTrue(read(PathUtil.agentBrief(root)).contains("\"current_action\": \"apply_patch\""));
+
+        com.devharnesskit.dhk.model.goal.GoalRun completedGoal = new com.devharnesskit.dhk.model.goal.GoalRun(
+                "goal-refresh", "project", "", "", "java-api-patch",
+                "Create README", "demo", "api", "", "completed", "completed",
+                3, 3, "", "", "");
+        service.writeCompletionBrief(root, completedGoal, 2L, root.resolve("GOAL_SUMMARY.md"));
+        assertTrue(read(PathUtil.agentBrief(root)).contains("\"current_action\": \"completed\""));
     }
 
     @Test

@@ -885,7 +885,7 @@ final class BddIntegrationTest {
         assertEquals(ExitCodes.SUCCESS, nextExit);
         assertTrue(next.stdout().contains("scenario_impact:"));
         assertTrue(next.stdout().contains("exists: false"));
-        assertTrue(next.stdout().contains("graph impact --project-root"));
+        assertTrue(next.stdout().contains("graph-impact.sh --project-root"));
         assertTrue(next.stdout().contains("--scenario <scenario-key>"));
 
         Harness verifyMissing = new Harness(tempDir);

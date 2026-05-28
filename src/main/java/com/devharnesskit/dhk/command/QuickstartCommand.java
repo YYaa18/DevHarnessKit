@@ -395,7 +395,8 @@ public final class QuickstartCommand implements Command {
             result.goalKey = goal.goalKey();
             result.currentAction = goal.currentAction();
             result.contextPath = contextPath;
-            result.nextCommand = "dhk goal next --project-root \"" + projectRoot + "\" --goal " + goal.goalKey();
+            result.nextCommand = ".agents/skills/devharness-goal-development/scripts/goal-next.sh --goal "
+                    + goal.goalKey();
             result.adapterNextCommand = adapterNextCommand(projectRoot, installState);
             applyBrief(result, brief);
             return result;

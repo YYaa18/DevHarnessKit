@@ -131,29 +131,32 @@ public final class GoalProfileService {
 
     private GoalProfile javaProfile(String profileKey, String workflowKey, String defaultMode,
                                     boolean graphAware, boolean bddAware) {
-        String[] actions = graphAware
-                ? new String[]{"graph_index_or_refresh", "graph_impact_analysis", "inspect_existing_code",
-                "create_change_plan", "implement_minimal_change", "graph_reimpact", "verify"}
-                : new String[]{"inspect_existing_code", "create_change_plan",
+        String[] actions = new String[]{"inspect_existing_code", "create_change_plan",
                 "implement_minimal_change", "verify"};
         Map<String, String[]> evidence = new LinkedHashMap<String, String[]>();
         if (graphAware) {
-            evidence.put("graph_index_or_refresh",
-                    new String[]{"graph_snapshot", "graph_context"});
-            evidence.put("graph_impact_analysis",
-                    new String[]{"impact_map", "impacted_files", "risk_nodes", "recommended_read_files"});
-            evidence.put("graph_reimpact",
-                    new String[]{"post_change_impact_map", "impact_delta", "changed_files_covered"});
+            evidence.put("inspect_existing_code",
+                    new String[]{"existing_controller", "existing_service", "existing_mapper", "existing_tests",
+                            "graph_snapshot", "graph_context", "impact_map", "recommended_read_files"});
+        } else {
+            evidence.put("inspect_existing_code",
+                    new String[]{"existing_controller", "existing_service", "existing_mapper", "existing_tests"});
         }
-        evidence.put("inspect_existing_code",
-                new String[]{"existing_controller", "existing_service", "existing_mapper", "existing_tests"});
         evidence.put("create_change_plan",
-                new String[]{"impacted_files", "risk_points", "verification_plan"});
+                graphAware
+                        ? new String[]{"impacted_files", "risk_points", "verification_plan", "graph_risk_nodes"}
+                        : new String[]{"impacted_files", "risk_points", "verification_plan"});
         evidence.put("implement_minimal_change",
                 new String[]{"changed_files", "implementation_summary"});
         evidence.put("verify",
                 bddAware
-                        ? new String[]{"compile_result", "test_result", "sensitive_result", "bdd_result"}
+                        ? graphAware
+                        ? new String[]{"compile_result", "test_result", "sensitive_result",
+                        "graph_result", "impact_result", "architecture_result", "bdd_result"}
+                        : new String[]{"compile_result", "test_result", "sensitive_result", "bdd_result"}
+                        : graphAware
+                        ? new String[]{"compile_result", "test_result", "sensitive_result",
+                        "graph_result", "impact_result", "architecture_result"}
                         : new String[]{"compile_result", "test_result", "sensitive_result"});
 
         Map<String, GoalActionMapping> mappings = new LinkedHashMap<String, GoalActionMapping>();
@@ -193,9 +196,7 @@ public final class GoalProfileService {
         return new GoalProfile(profileKey, workflowKey, true, defaultMode, actions, evidence,
                 requiredChecks(graphAware, bddAware),
                 true, false, true, true, true, true, mappings, acceptances,
-                graphAware, "lite", true, true, 60,
-                graphAware ? new String[]{"graph_index_or_refresh", "graph_impact_analysis", "graph_reimpact"}
-                        : new String[0],
+                graphAware, "lite", true, true, 60, new String[0],
                 false, false, false, false, 8, bddAware);
     }
 
@@ -260,26 +261,23 @@ public final class GoalProfileService {
     }
 
     private GoalProfile legacyGraphProfile(String profileKey, String workflowKey, String defaultMode) {
-        String[] actions = new String[]{"graph_index_or_refresh", "graph_impact_analysis",
-                "inspect_existing_code", "create_change_plan", "implement_minimal_change",
-                "graph_reimpact", "create_rollback_plan", "record_manual_evidence", "verify"};
+        String[] actions = new String[]{"inspect_existing_code", "create_change_plan",
+                "implement_minimal_change", "create_rollback_plan", "record_manual_evidence", "verify"};
         Map<String, String[]> evidence = new LinkedHashMap<String, String[]>();
-        evidence.put("graph_index_or_refresh", new String[]{"graph_snapshot", "graph_context"});
-        evidence.put("graph_impact_analysis",
-                new String[]{"impact_map", "impacted_files", "risk_nodes", "recommended_read_files"});
         evidence.put("inspect_existing_code",
-                new String[]{"existing_entrypoints", "existing_service", "existing_data_access", "existing_tests"});
+                new String[]{"existing_entrypoints", "existing_service", "existing_data_access", "existing_tests",
+                        "graph_snapshot", "graph_context", "impact_map", "recommended_read_files"});
         evidence.put("create_change_plan",
-                new String[]{"impacted_files", "risk_points", "verification_plan", "rollback_strategy"});
+                new String[]{"impacted_files", "risk_points", "verification_plan", "rollback_strategy",
+                        "graph_risk_nodes"});
         evidence.put("implement_minimal_change",
                 new String[]{"changed_files", "implementation_summary", "scope_guard"});
-        evidence.put("graph_reimpact",
-                new String[]{"post_change_impact_map", "impact_delta", "changed_files_covered"});
         evidence.put("create_rollback_plan", new String[]{"rollback_plan", "rollback_scope"});
         evidence.put("record_manual_evidence",
                 new String[]{"manual_evidence", "manual_evidence_status", "manual_evidence_path"});
         evidence.put("verify",
-                new String[]{"sensitive_result", "graph_result", "impact_result", "legacy_result"});
+                new String[]{"sensitive_result", "graph_result", "impact_result", "legacy_result",
+                        "post_change_impact_map", "impact_delta", "changed_files_covered"});
 
         Map<String, GoalActionMapping> mappings = new LinkedHashMap<String, GoalActionMapping>();
         mappings.put("inspect_existing_code", new GoalActionMapping("inspect_existing_code",
@@ -313,30 +311,25 @@ public final class GoalProfileService {
         return new GoalProfile(profileKey, workflowKey, false, defaultMode, actions, evidence,
                 new String[]{"sensitive", "graph", "impact", "legacy", "workflow"},
                 true, false, true, true, false, false, mappings, acceptances,
-                true, "lite", true, true, 60,
-                new String[]{"graph_index_or_refresh", "graph_impact_analysis", "graph_reimpact"},
+                true, "lite", true, true, 60, new String[0],
                 true, true, true, true, 8);
     }
 
     private GoalProfile safeRefactorGraphProfile(String profileKey) {
-        String[] actions = new String[]{"graph_index_or_refresh", "graph_impact_analysis",
-                "identify_behavior_boundary", "create_refactor_plan", "apply_small_refactor",
-                "graph_reimpact", "verify"};
+        String[] actions = new String[]{"identify_behavior_boundary", "create_refactor_plan",
+                "apply_small_refactor", "verify"};
         Map<String, String[]> evidence = new LinkedHashMap<String, String[]>();
-        evidence.put("graph_index_or_refresh", new String[]{"graph_snapshot", "graph_context"});
-        evidence.put("graph_impact_analysis",
-                new String[]{"impact_map", "impacted_files", "risk_nodes", "recommended_read_files"});
         evidence.put("identify_behavior_boundary",
-                new String[]{"behavior_boundary", "preserved_behavior", "related_tests"});
+                new String[]{"behavior_boundary", "preserved_behavior", "related_tests",
+                        "graph_snapshot", "graph_context", "impact_map", "recommended_read_files"});
         evidence.put("create_refactor_plan",
-                new String[]{"refactor_plan", "rollback_plan", "risk_points"});
+                new String[]{"refactor_plan", "rollback_plan", "risk_points", "graph_risk_nodes"});
         evidence.put("apply_small_refactor",
                 new String[]{"changed_files", "implementation_summary", "scope_guard"});
-        evidence.put("graph_reimpact",
-                new String[]{"post_change_impact_map", "impact_delta", "changed_files_covered"});
         evidence.put("verify",
                 new String[]{"compile_result", "test_result", "sensitive_result",
-                        "graph_result", "impact_result"});
+                        "graph_result", "impact_result", "post_change_impact_map",
+                        "impact_delta", "changed_files_covered"});
 
         Map<String, GoalActionMapping> mappings = new LinkedHashMap<String, GoalActionMapping>();
         mappings.put("identify_behavior_boundary", new GoalActionMapping("identify_behavior_boundary",
@@ -367,8 +360,7 @@ public final class GoalProfileService {
         return new GoalProfile(profileKey, "safe-refactor", false, "auto", actions, evidence,
                 new String[]{"compile", "test", "sensitive", "graph", "impact", "workflow"},
                 true, false, true, true, false, false, mappings, acceptances,
-                true, "lite", true, true, 60,
-                new String[]{"graph_index_or_refresh", "graph_impact_analysis", "graph_reimpact"});
+                true, "lite", true, true, 60, new String[0]);
     }
 
     private Map<String, String[]> requiredEvidence(Map<String, String> raw) {

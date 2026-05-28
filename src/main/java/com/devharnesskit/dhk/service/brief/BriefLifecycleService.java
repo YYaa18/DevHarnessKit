@@ -31,6 +31,7 @@ import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Matcher;
 
 public final class BriefLifecycleService {
     private final DbConnectionFactory connectionFactory;
@@ -180,6 +181,7 @@ public final class BriefLifecycleService {
         appendOpenInteractions(builder, projectRoot, goal.goalKey());
         Path path = PathUtil.progressBrief(projectRoot);
         Files.write(path, builder.toString().getBytes("UTF-8"));
+        refreshAgentBriefGoalState(projectRoot, goal);
         return path;
     }
 
@@ -233,7 +235,23 @@ public final class BriefLifecycleService {
         Path path = PathUtil.completionBrief(projectRoot);
         Files.write(path, builder.toString().getBytes("UTF-8"));
         writeKnowledgeBrief(projectRoot);
+        refreshAgentBriefGoalState(projectRoot, goal);
         return path;
+    }
+
+    public void refreshAgentBriefGoalState(Path projectRoot, GoalRun goal) throws Exception {
+        Path path = PathUtil.agentBrief(projectRoot);
+        if (!Files.isRegularFile(path) || goal == null || goal.goalKey().length() == 0) {
+            return;
+        }
+        String text = new String(Files.readAllBytes(path), "UTF-8");
+        String goalField = "\"goal_key\": \"" + jsonEscape(goal.goalKey()) + "\"";
+        if (!text.contains(goalField)) {
+            return;
+        }
+        String updated = text.replaceFirst("\\\"current_action\\\"\\s*:\\s*\\\"[^\\\"]*\\\"",
+                Matcher.quoteReplacement("\"current_action\": \"" + jsonEscape(goal.currentAction()) + "\""));
+        Files.write(path, updated.getBytes("UTF-8"));
     }
 
     public List<KnowledgeCandidate> ensureDefaultKnowledgeCandidates(Path projectRoot, GoalRun goal) throws Exception {
@@ -606,6 +624,9 @@ public final class BriefLifecycleService {
         text = text.replace("\"current_action\": \"wait_for_user_answer\"",
                 "\"current_action\": \"answered_continue\"");
         Files.write(path, text.getBytes("UTF-8"));
+    }
+    private String jsonEscape(String value) {
+        return (value == null ? "" : value).replace("\\", "\\\\").replace("\"", "\\\"");
     }
     private String userFriendlyBlocker(String missing) {
         String lower = missing.toLowerCase(Locale.ROOT);

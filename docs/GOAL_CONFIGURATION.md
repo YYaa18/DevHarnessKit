@@ -280,7 +280,7 @@ Supported profile fields:
 | `bdd_min_quality_score` | Goal check policy key. Minimum BDD quality score. Defaults to `0` so lint warnings stay advisory unless configured. |
 | `bdd_fail_on_quality_errors` | Goal check policy key. When `true`, any BDD lint error on a goal-bound scenario fails the BDD check. |
 | `bdd_fail_on_quality_warnings` | Goal check policy key. When `true`, any BDD lint warning on a goal-bound scenario fails the BDD check. |
-| `graph_actions` | Comma-separated action keys that are graph-specific and must also be present in `actions`. |
+| `graph_actions` | Legacy/custom compatibility field for profiles that still model graph as separate actions. Built-in profiles keep graph integrated into main actions and leave this empty. |
 | `bdd_required` | If true, `goal verify` requires the `bdd` check. The check passes only when the goal has bound BDD scenarios and the latest goal-specific evidence for each scenario is accepted. |
 
 BDD policy fields are governance gates for acceptance evidence quality. They do
@@ -328,10 +328,12 @@ dhk graph impact --project-root <project-root> --scenario <scenario-key>
 
 `goal next` and `GOAL_CONTEXT.md` surface graph preflight fields when graph is
 required: `snapshot_workspace_fingerprint`, `current_workspace_fingerprint`,
-`graph_stale`, `freshness_status`, and the required graph action. If a fresh
-snapshot is required and the snapshot is stale, the next command points back to
-`dhk graph index` + `dhk graph export` before graph impact analysis can
-continue.
+`graph_stale`, `freshness_status`, and a `graph_assist` / `<graph-assist>`
+section. Graph is integrated into the current main action: `goal next` still
+points to the current `goal step`, while graph helper commands are shown as
+agent-internal evidence helpers. If a fresh snapshot is required and the
+snapshot is stale, the agent refreshes graph context as part of the current
+action and records the resulting graph evidence in that same step.
 
 Built-in graph-aware Java profiles also require the alpha `architecture` check.
 It reads `.agents/graph/architecture.json` when present, otherwise uses default
@@ -350,20 +352,21 @@ default mode is `warn`, which records a passing check with an
 `architecture warning` summary. Set `"mode": "fail"` in
 `.agents/graph/architecture.json` to make violations block completion.
 
-Their action sequence is:
+Their action sequence is the same main flow as the non-graph Java profiles:
 
 ```text
-graph_index_or_refresh
-graph_impact_analysis
 inspect_existing_code
 create_change_plan
 implement_minimal_change
-graph_reimpact
 verify
 ```
 
-`safe-refactor-with-graph` uses the same graph index/impact flow, but its
-`graph_reimpact` evidence is stricter. It requires:
+Graph-required profiles add graph evidence to those actions. For example,
+`inspect_existing_code` records fresh snapshot/context and impact-map evidence,
+and `verify` records accepted graph/impact/architecture check results.
+
+`safe-refactor-with-graph` uses the same integrated flow, but its post-change
+graph evidence is stricter. It requires:
 
 ```text
 post_change_impact_map

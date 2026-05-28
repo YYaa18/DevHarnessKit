@@ -46,21 +46,23 @@ skip reason so users can see what was omitted.
 
 ## Agent Use
 
-For graph-aware work, the expected flow is:
+For graph-required work, Graph Lite is integrated into the main goal flow. The
+agent still follows `goal next -> current action -> goal step`; graph commands
+are internal evidence helpers, not separate user-facing phases.
 
 ```text
-dhk graph index
-dhk graph export
-dhk graph impact --file|--symbol|--sql-table ...
+goal next
+if GOAL_CONTEXT has graph-assist, run graph index/export or impact internally
 read GRAPH_CONTEXT.md and IMPACT_MAP.md
-make the minimal change
-rerun graph index/export/impact when files changed
+record graph evidence in the current goal step
+make the minimal change under the main action
+rerun graph impact after changes and record the evidence in verify
 ```
 
 Graph output should guide impact analysis, not replace compile, test, sensitive,
 workflow, or spec checks.
 
-`GRAPH_CONTEXT.md`, `IMPACT_MAP.md`, and graph-aware `GOAL_CONTEXT.md` include
+`GRAPH_CONTEXT.md`, `IMPACT_MAP.md`, and graph-integrated `GOAL_CONTEXT.md` include
 `graph-confidence` metadata with provider, heuristic precision, freshness, and
 test/manual-review reminders. Stale graph snapshots must be refreshed before a
 graph-required goal continues impact analysis.

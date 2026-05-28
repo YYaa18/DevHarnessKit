@@ -18,7 +18,7 @@
       "domain": "methodology",
       "severity": "must",
       "applies_to_profiles": ["*"],
-      "applies_to_actions": ["graph_index_or_refresh", "graph_impact_analysis", "inspect_existing_code"],
+      "applies_to_actions": ["inspect_existing_code"],
       "risk_flags": ["inspect", "impact", "read"],
       "budget_lines": 6
     },
@@ -48,7 +48,7 @@
       "domain": "methodology",
       "severity": "must",
       "applies_to_profiles": ["*"],
-      "applies_to_actions": ["verify", "graph_reimpact"],
+      "applies_to_actions": ["verify"],
       "risk_flags": ["verify", "test", "manual"],
       "budget_lines": 6
     }

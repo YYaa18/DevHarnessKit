@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 public final class GoalStepCommand implements Command {
+    private static final String GOAL_SCRIPT_DIR = ".agents/skills/devharness-goal-development/scripts/";
     private final GoalOrchestrator orchestrator = new GoalOrchestrator();
     private final PolicyHookService policyHookService = new PolicyHookService();
     private final GoalStepAutoEvidenceCollector autoEvidenceCollector = new GoalStepAutoEvidenceCollector();
@@ -65,7 +66,7 @@ public final class GoalStepCommand implements Command {
                 context.out().println("current_action: " + result.plan().currentAction());
                 context.out().println("would_record: true");
                 context.out().println("step_count: " + result.goal().stepCount());
-                context.out().println("next_command: dhk goal step --goal " + result.goal().goalKey()
+                context.out().println("next_command: " + GOAL_SCRIPT_DIR + "goal-step.sh --goal " + result.goal().goalKey()
                         + " --summary \"<summary>\" --evidence \"<evidence>\"");
                 return ExitCodes.SUCCESS;
             }
@@ -83,7 +84,7 @@ public final class GoalStepCommand implements Command {
                         JsonOutput.numberField("goal_step_index", result.goal().stepCount()),
                         JsonOutput.stringField("status", result.goal().status()),
                         JsonOutput.stringField("current_action", result.goal().currentAction()),
-                        JsonOutput.stringField("next_command", "dhk goal next --goal " + result.goal().goalKey()),
+                        JsonOutput.stringField("next_command", GOAL_SCRIPT_DIR + "goal-next.sh --goal " + result.goal().goalKey()),
                         JsonOutput.stringField("context_path", result.contextPath().toString()),
                         JsonOutput.stringField("progress_brief_path", progressPath.toString())
                 ));
@@ -96,7 +97,7 @@ public final class GoalStepCommand implements Command {
                 context.out().println("goal_key: " + result.goal().goalKey());
                 context.out().println("status: " + result.goal().status());
                 context.out().println("current_action: " + result.goal().currentAction());
-                context.out().println("next_command: dhk goal next --goal " + result.goal().goalKey());
+                context.out().println("next_command: " + GOAL_SCRIPT_DIR + "goal-next.sh --goal " + result.goal().goalKey());
                 context.out().println("context_path: " + result.contextPath());
                 context.out().println("progress_brief_path: " + progressPath);
             }
@@ -140,7 +141,7 @@ public final class GoalStepCommand implements Command {
             context.out().println("  --auto collects changed_files, diff_stat, touched_modules, protected_file_hits, risk_flags");
             context.out().println("example_evidence: " + valueOrNone(contract.exampleEvidence()));
             context.out().println("example_command: " + contract.exampleCommand());
-            context.out().println("dry_run_command: dhk goal step --goal " + goal.goalKey()
+            context.out().println("dry_run_command: " + GOAL_SCRIPT_DIR + "goal-step.sh --goal " + goal.goalKey()
                     + " --summary \"<summary>\" --field <key=value> --dry-run");
             return ExitCodes.SUCCESS;
         } catch (Exception ex) {
@@ -240,7 +241,7 @@ public final class GoalStepCommand implements Command {
                 .reason("The current action requires every required_evidence key to appear in goal step evidence.")
                 .missing(ex.missing())
                 .validValues(contract.requiredEvidence())
-                .nextCommand("dhk goal evidence-template --goal " + goalKey)
+                .nextCommand(GOAL_SCRIPT_DIR + "dhk.sh goal evidence-template --goal " + goalKey)
                 .docs("docs/GOAL_CONFIGURATION.md#goal-evidence")
                 .detail("current_action", contract.currentAction())
                 .detail("example_evidence", contract.exampleEvidence())

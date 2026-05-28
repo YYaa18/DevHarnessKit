@@ -73,7 +73,7 @@ final class GoalIntegrationTest {
         assertTrue(initialContext.contains("inspect_existing_code"));
         assertTrue(initialContext.contains("- perform_current_action_only"));
         assertTrue(initialContext.contains("<allowed-commands>"));
-        assertTrue(initialContext.contains("dhk goal verify --goal " + goalKey));
+        assertTrue(initialContext.contains(".agents/skills/devharness-goal-development/scripts/goal-verify.sh --goal " + goalKey));
         assertTrue(initialContext.contains("- do_not_archive_spec"));
         assertTrue(initialContext.contains("- do_not_claim_completion_before_goal_evaluate"));
         assertTrue(initialContext.contains("- existing_controller"));
@@ -86,7 +86,7 @@ final class GoalIntegrationTest {
         assertTrue(initialContext.contains("- .agents/memory/exports/SPEC_CONTEXT.md"));
         assertTrue(initialContext.contains("<freshness-status>"));
         assertTrue(initialContext.contains("- status: fresh"));
-        assertTrue(initialContext.contains("dhk goal step --goal " + goalKey));
+        assertTrue(initialContext.contains(".agents/skills/devharness-goal-development/scripts/goal-step.sh --goal " + goalKey));
         assertTrue(initialContext.length() <= 16 * 1024);
         assertTrue(Files.isRegularFile(PathUtil.currentContext(root)));
         assertTrue(Files.isRegularFile(PathUtil.workflowContext(root)));
@@ -131,7 +131,7 @@ final class GoalIntegrationTest {
         assertTrue(nextJson.stdout().contains("\"workflow\""));
         assertTrue(nextJson.stdout().contains("\"spec\""));
         assertTrue(nextJson.stdout().contains("\"completion_blockers\": [\"goal steps incomplete: expected 4 actions, recorded 0\""));
-        assertTrue(nextJson.stdout().contains("\"next_command\": \"dhk goal step --goal " + goalKey));
+        assertTrue(nextJson.stdout().contains("\"next_command\": \".agents/skills/devharness-goal-development/scripts/goal-step.sh --goal " + goalKey));
 
         Harness step = new Harness(tempDir);
         int stepExit = new CommandRouter().run(new String[]{
@@ -533,7 +533,7 @@ final class GoalIntegrationTest {
         assertTrue(template.stdout().contains("--field existing_controller=<value>"));
         assertTrue(template.stdout().contains("--field existing_service=<value>"));
         assertTrue(template.stdout().contains("example_command: dhk goal step --goal " + goalKey));
-        assertTrue(template.stdout().contains("dry_run_command: dhk goal step --goal " + goalKey));
+        assertTrue(template.stdout().contains("dry_run_command: .agents/skills/devharness-goal-development/scripts/goal-step.sh --goal " + goalKey));
 
         Harness evidenceTemplate = new Harness(tempDir);
         int evidenceTemplateExit = new CommandRouter().run(new String[]{
@@ -556,7 +556,7 @@ final class GoalIntegrationTest {
         assertEquals(ExitCodes.VALIDATION_ERROR, missingExit);
         assertTrue(missing.stderr().contains("error_code: GOAL_STEP_EVIDENCE_MISSING"));
         assertTrue(missing.stderr().contains("missing:"));
-        assertTrue(missing.stderr().contains("next_command: dhk goal evidence-template --goal " + goalKey));
+        assertTrue(missing.stderr().contains("next_command: .agents/skills/devharness-goal-development/scripts/dhk.sh goal evidence-template --goal " + goalKey));
 
         Harness dryRun = new Harness(tempDir);
         int dryRunExit = new CommandRouter().run(new String[]{
@@ -707,7 +707,7 @@ final class GoalIntegrationTest {
         }, next.context());
         assertEquals(ExitCodes.SUCCESS, nextExit);
         assertTrue(next.stdout().contains("current_action: recover_context_export"));
-        assertTrue(next.stdout().contains("next_command: dhk goal resume --goal " + goalKey));
+        assertTrue(next.stdout().contains("next_command: .agents/skills/devharness-goal-development/scripts/goal-resume.sh --goal " + goalKey));
 
         Files.delete(PathUtil.goalContext(root));
         Harness resume = new Harness(tempDir);
@@ -2033,7 +2033,7 @@ final class GoalIntegrationTest {
     }
 
     @Test
-    void builtInGraphAwareJavaProfileStartsWithGraphActionContract() throws Exception {
+    void builtInGraphAwareJavaProfileKeepsGraphInsideMainActionContract() throws Exception {
         Harness start = new Harness(tempDir);
         int startExit = new CommandRouter().run(new String[]{
                 "goal", "start",
@@ -2045,7 +2045,7 @@ final class GoalIntegrationTest {
 
         assertEquals(ExitCodes.SUCCESS, startExit);
         assertTrue(start.stdout().contains("profile: java-api-change-with-graph"));
-        assertTrue(start.stdout().contains("current_action: graph_index_or_refresh"));
+        assertTrue(start.stdout().contains("current_action: inspect_existing_code"));
         String goalKey = firstValue(start.stdout(), "goal_key: ");
 
         Harness next = new Harness(tempDir);
@@ -2054,23 +2054,30 @@ final class GoalIntegrationTest {
         }, next.context());
 
         assertEquals(ExitCodes.SUCCESS, nextExit);
-        assertTrue(next.stdout().contains("current_action: graph_index_or_refresh"));
-        assertTrue(next.stdout().contains("required_graph_action: graph_index_export"));
-        assertTrue(next.stdout().contains("next_command: dhk graph index --project-root"));
+        assertTrue(next.stdout().contains("current_action: inspect_existing_code"));
+        assertTrue(next.stdout().contains("graph_assist:"));
+        assertTrue(next.stdout().contains("integrated_into_main_flow: true"));
+        assertTrue(next.stdout().contains("recommended_internal_action: refresh_graph_context"));
+        assertTrue(next.stdout().contains("internal_helper: .agents/skills/devharness-graph-aware-development/scripts/graph-index-export.sh"));
+        assertTrue(next.stdout().contains("next_command: .agents/skills/devharness-goal-development/scripts/goal-step.sh"));
         assertTrue(next.stdout().contains("graph_snapshot"));
         assertTrue(next.stdout().contains("graph_context"));
+        assertTrue(next.stdout().contains("impact_map"));
+        assertTrue(next.stdout().contains("recommended_read_files"));
         assertTrue(next.stdout().contains("  - architecture"));
-        assertFalse(next.stdout().contains("current_action: inspect_existing_code"));
+        assertFalse(next.stdout().contains("current_action: graph_index_or_refresh"));
 
         String context = new String(Files.readAllBytes(PathUtil.goalContext(tempDir.resolve("demo"))), "UTF-8");
         assertTrue(context.contains("<graph-snapshot>"));
         assertTrue(context.contains("<graph-context>"));
-        assertTrue(context.contains("<required-graph-action>"));
-        assertTrue(context.contains("- action: graph_index_export"));
+        assertTrue(context.contains("<graph-assist>"));
+        assertTrue(context.contains("- integrated_into_main_flow: true"));
+        assertTrue(context.contains("- recommended_internal_action: refresh_graph_context"));
+        assertFalse(context.contains("<required-graph-action>"));
     }
 
     @Test
-    void graphAwareJavaProfileRequestsImpactMapAfterGraphSnapshotStep() throws Exception {
+    void graphAwareJavaProfileRequestsImpactMapInsideInspectAction() throws Exception {
         Path root = tempDir.resolve("demo-impact");
         Path source = root.resolve("src/main/java/com/example/App.java");
         Files.createDirectories(source.getParent());
@@ -2098,26 +2105,16 @@ final class GoalIntegrationTest {
         }, export.context());
         assertEquals(ExitCodes.SUCCESS, exportExit);
 
-        Harness graphStep = new Harness(tempDir);
-        int graphStepExit = new CommandRouter().run(new String[]{
-                "goal", "step",
-                "--project-root", "demo-impact",
-                "--goal", goalKey,
-                "--summary", "Graph snapshot ready",
-                "--evidence", "graph_snapshot=GRAPH_SNAPSHOT.json; graph_context=GRAPH_CONTEXT.md"
-        }, graphStep.context());
-        assertEquals(ExitCodes.SUCCESS, graphStepExit);
-        assertTrue(graphStep.stdout().contains("current_action: graph_impact_analysis"));
-
         Harness next = new Harness(tempDir);
         int nextExit = new CommandRouter().run(new String[]{
                 "goal", "next", "--project-root", "demo-impact", "--goal", goalKey
         }, next.context());
 
         assertEquals(ExitCodes.SUCCESS, nextExit);
-        assertTrue(next.stdout().contains("current_action: graph_impact_analysis"));
-        assertTrue(next.stdout().contains("required_graph_action: graph_impact"));
-        assertTrue(next.stdout().contains("next_command: dhk graph impact --project-root"));
+        assertTrue(next.stdout().contains("current_action: inspect_existing_code"));
+        assertTrue(next.stdout().contains("recommended_internal_action: prepare_impact_map"));
+        assertTrue(next.stdout().contains("internal_helper: .agents/skills/devharness-graph-aware-development/scripts/graph-impact.sh"));
+        assertTrue(next.stdout().contains("next_command: .agents/skills/devharness-goal-development/scripts/goal-step.sh"));
     }
 
     @Test
@@ -2145,16 +2142,6 @@ final class GoalIntegrationTest {
                 "graph", "export", "--project-root", "demo-stale-preflight"
         }, new Harness(tempDir).context()));
 
-        Harness graphStep = new Harness(tempDir);
-        int graphStepExit = new CommandRouter().run(new String[]{
-                "goal", "step",
-                "--project-root", "demo-stale-preflight",
-                "--goal", goalKey,
-                "--summary", "Graph snapshot ready",
-                "--evidence", "graph_snapshot=GRAPH_SNAPSHOT.json; graph_context=GRAPH_CONTEXT.md"
-        }, graphStep.context());
-        assertEquals(ExitCodes.SUCCESS, graphStepExit);
-
         Files.write(source, "\n// changed after graph snapshot\n".getBytes("UTF-8"), StandardOpenOption.APPEND);
 
         Harness next = new Harness(tempDir);
@@ -2163,18 +2150,19 @@ final class GoalIntegrationTest {
         }, next.context());
 
         assertEquals(ExitCodes.SUCCESS, nextExit);
-        assertTrue(next.stdout().contains("current_action: graph_impact_analysis"));
+        assertTrue(next.stdout().contains("current_action: inspect_existing_code"));
         assertTrue(next.stdout().contains("graph_stale: true"));
         assertTrue(next.stdout().contains("freshness_status: stale"));
         assertTrue(next.stdout().contains("snapshot_workspace_fingerprint: fallback:"));
         assertTrue(next.stdout().contains("current_workspace_fingerprint: fallback:"));
-        assertTrue(next.stdout().contains("required_graph_action: graph_index_export"));
-        assertTrue(next.stdout().contains("graph_next_command: dhk graph index --project-root"));
+        assertTrue(next.stdout().contains("recommended_internal_action: refresh_graph_context"));
+        assertTrue(next.stdout().contains("internal_helper: .agents/skills/devharness-graph-aware-development/scripts/graph-index-export.sh"));
+        assertTrue(next.stdout().contains("next_command: .agents/skills/devharness-goal-development/scripts/goal-step.sh"));
 
         String context = new String(Files.readAllBytes(PathUtil.goalContext(root)), "UTF-8");
         assertTrue(context.contains("- graph_stale: true"));
         assertTrue(context.contains("- freshness_status: stale"));
-        assertTrue(context.contains("- action: graph_index_export"));
+        assertTrue(context.contains("- recommended_internal_action: refresh_graph_context"));
         assertTrue(context.contains("- warning: STALE_GRAPH_SNAPSHOT"));
         assertTrue(context.contains("- precision: heuristic"));
         assertTrue(context.contains("- graph_usage: advisory_preflight_not_completion_proof"));
@@ -3145,50 +3133,41 @@ final class GoalIntegrationTest {
 
     private void recordSafeRefactorGraphGoalSteps(String projectRoot, String goalKey,
                                                   boolean includeExpansionRisk) {
-        step(projectRoot, goalKey, "Graph snapshot exported", "",
-                "graph_snapshot=GRAPH_SNAPSHOT.json; graph_context=GRAPH_CONTEXT.md");
-        step(projectRoot, goalKey, "Graph impact analysis recorded", "",
-                "impact_map=IMPACT_MAP.md; impacted_files=src/main/java/com/acme/modern/account/service/AccountService.java"
-                        + "; risk_nodes=repository; recommended_read_files=src/main/java/com/acme/modern/account/service/AccountService.java");
-        step(projectRoot, goalKey, "Behavior boundary identified", "",
+        step(projectRoot, goalKey, "Behavior boundary identified with graph context", "",
                 "behavior_boundary=AccountService public behavior; preserved_behavior=account lookup semantics"
-                        + "; related_tests=AccountServiceTest");
+                        + "; related_tests=AccountServiceTest; graph_snapshot=GRAPH_SNAPSHOT.json"
+                        + "; graph_context=GRAPH_CONTEXT.md; impact_map=IMPACT_MAP.md"
+                        + "; recommended_read_files=src/main/java/com/acme/modern/account/service/AccountService.java");
         step(projectRoot, goalKey, "Refactor plan created", "",
                 "refactor_plan=small service cleanup; rollback_plan=revert service change"
-                        + "; risk_points=repository test gap remains visible");
+                        + "; risk_points=repository test gap remains visible"
+                        + "; graph_risk_nodes=repository");
         step(projectRoot, goalKey, "Applied bounded refactor", "src/main/java/com/acme/modern/account/service/AccountService.java",
                 "changed_files=src/main/java/com/acme/modern/account/service/AccountService.java"
                         + "; implementation_summary=small safe refactor; scope_guard=single service boundary");
         String risk = includeExpansionRisk
                 ? "; impact_expansion_risk=reviewed expanded repository test gap" : "";
-        step(projectRoot, goalKey, "Post-change impact recorded", "",
-                "post_change_impact_map=IMPACT_MAP.md; impact_delta=expanded: repository test gap surfaced"
-                        + "; changed_files_covered=covered" + risk);
-        step(projectRoot, goalKey, "Verification evidence recorded", "",
+        step(projectRoot, goalKey, "Verification evidence and post-change impact recorded", "",
                 "compile_result=pending; test_result=pending; sensitive_result=pending"
-                        + "; graph_result=pending; impact_result=pending");
+                        + "; graph_result=pending; impact_result=pending"
+                        + "; post_change_impact_map=IMPACT_MAP.md; impact_delta=expanded: repository test gap surfaced"
+                        + "; changed_files_covered=covered" + risk);
     }
 
     private void recordLegacyGraphGoalSteps(String projectRoot, String goalKey, String changedFile,
                                             String rollbackPlan, String manualStatus,
                                             String manualEvidencePath, String protectedConfirmation) {
-        step(projectRoot, goalKey, "Graph snapshot exported", "",
-                "graph_snapshot=GRAPH_SNAPSHOT.json; graph_context=GRAPH_CONTEXT.md");
-        step(projectRoot, goalKey, "Graph impact analysis recorded", "",
-                "impact_map=IMPACT_MAP.md; impacted_files=" + changedFile
-                        + "; risk_nodes=route; recommended_read_files=" + changedFile);
-        step(projectRoot, goalKey, "Inspected legacy entrypoints and tests", "",
-                "existing_entrypoints=App; existing_service=App; existing_data_access=none; existing_tests=manual");
+        step(projectRoot, goalKey, "Inspected legacy entrypoints and graph context", "",
+                "existing_entrypoints=App; existing_service=App; existing_data_access=none; existing_tests=manual"
+                        + "; graph_snapshot=GRAPH_SNAPSHOT.json; graph_context=GRAPH_CONTEXT.md"
+                        + "; impact_map=IMPACT_MAP.md; recommended_read_files=" + changedFile);
         step(projectRoot, goalKey, "Planned bounded legacy change", "",
                 "impacted_files=" + changedFile
                         + "; risk_points=legacy behavior; verification_plan=manual evidence"
-                        + "; rollback_strategy=revert changed file");
+                        + "; rollback_strategy=revert changed file; graph_risk_nodes=route");
         step(projectRoot, goalKey, "Implemented minimal legacy change", changedFile,
                 "changed_files=" + changedFile
                         + "; implementation_summary=small change; scope_guard=single impacted file");
-        step(projectRoot, goalKey, "Post-change impact remains covered", "",
-                "post_change_impact_map=IMPACT_MAP.md; impact_delta=changed files remain inside related-files"
-                        + "; changed_files_covered=" + changedFile);
         step(projectRoot, goalKey, "Rollback plan recorded", "",
                 "rollback_plan=" + rollbackPlan + "; rollback_scope=single impacted file");
         String confirmation = protectedConfirmation == null || protectedConfirmation.length() == 0
@@ -3196,8 +3175,11 @@ final class GoalIntegrationTest {
         step(projectRoot, goalKey, "Manual legacy evidence recorded", "",
                 "manual_evidence=legacy behavior checked; manual_evidence_status=" + manualStatus
                         + "; manual_evidence_path=" + manualEvidencePath + confirmation);
-        step(projectRoot, goalKey, "Verification evidence recorded", "",
-                "sensitive_result=pending; graph_result=pending; impact_result=pending; legacy_result=pending");
+        step(projectRoot, goalKey, "Verification evidence and post-change impact recorded", "",
+                "sensitive_result=pending; graph_result=pending; impact_result=pending; legacy_result=pending"
+                        + "; post_change_impact_map=IMPACT_MAP.md"
+                        + "; impact_delta=changed files remain inside related-files"
+                        + "; changed_files_covered=" + changedFile);
     }
 
     private void step(String projectRoot, String goalKey, String summary, String changedFiles, String evidence) {

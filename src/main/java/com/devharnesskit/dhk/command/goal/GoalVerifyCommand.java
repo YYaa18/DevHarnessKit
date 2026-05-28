@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.model.goal.GoalCheck;
 import com.devharnesskit.dhk.model.goal.GoalEvaluation;
 import com.devharnesskit.dhk.model.goal.GoalRun;
+import com.devharnesskit.dhk.service.brief.BriefLifecycleService;
 import com.devharnesskit.dhk.service.goal.GoalOrchestrator;
 import com.devharnesskit.dhk.util.JsonOutput;
 import com.devharnesskit.dhk.util.PathUtil;
@@ -22,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 
 public final class GoalVerifyCommand implements Command {
     private final GoalOrchestrator orchestrator = new GoalOrchestrator();
+    private final BriefLifecycleService briefLifecycleService = new BriefLifecycleService();
 
     public int run(CommandContext context, Args args) {
         Path projectRoot = GoalCommandSupport.projectRoot(args, context);
@@ -31,13 +33,17 @@ public final class GoalVerifyCommand implements Command {
             String[] selectedChecks = checksForLevel(context, projectRoot, goal.goalKey(), level);
             List<GoalCheck> checks = runSelectedChecks(context, projectRoot, goal.goalKey(), selectedChecks);
             GoalEvaluation evaluation = orchestrator.evaluate(context, projectRoot, goal.goalKey());
+            Path verifyBriefPath = briefLifecycleService.writeVerifyBrief(projectRoot, goal, checks, evaluation);
             ReleaseChecks releaseChecks = "release".equals(level) ? runReleaseChecks(projectRoot) : ReleaseChecks.none();
             if (args.hasFlag("markdown")) {
-                printMarkdown(context, projectRoot, goal, checks, evaluation, level, selectedChecks, releaseChecks);
+                printMarkdown(context, projectRoot, goal, checks, evaluation, level, selectedChecks,
+                        releaseChecks, verifyBriefPath);
             } else if (JsonOutput.enabled(args)) {
-                printJson(context, projectRoot, goal, checks, evaluation, level, selectedChecks, releaseChecks);
+                printJson(context, projectRoot, goal, checks, evaluation, level, selectedChecks,
+                        releaseChecks, verifyBriefPath);
             } else {
-                printText(context, projectRoot, goal, checks, evaluation, level, selectedChecks, releaseChecks);
+                printText(context, projectRoot, goal, checks, evaluation, level, selectedChecks,
+                        releaseChecks, verifyBriefPath);
             }
             return ExitCodes.SUCCESS;
         } catch (IllegalArgumentException ex) {
@@ -51,7 +57,7 @@ public final class GoalVerifyCommand implements Command {
 
     private void printText(CommandContext context, Path projectRoot, GoalRun goal, List<GoalCheck> checks,
                            GoalEvaluation evaluation, String level, String[] selectedChecks,
-                           ReleaseChecks releaseChecks) {
+                           ReleaseChecks releaseChecks, Path verifyBriefPath) {
         List<BlockerDetail> blockers = blockerDetails(goal, checks, evaluation);
         context.out().println("goal_key: " + goal.goalKey());
         context.out().println("level: " + level);
@@ -84,11 +90,12 @@ public final class GoalVerifyCommand implements Command {
         context.out().println("next_action: " + evaluation.nextAction());
         context.out().println("next_command: " + evaluation.nextCommand());
         context.out().println("context_path: " + PathUtil.goalContext(projectRoot));
+        context.out().println("verify_brief_path: " + verifyBriefPath);
     }
 
     private void printJson(CommandContext context, Path projectRoot, GoalRun goal, List<GoalCheck> checks,
                            GoalEvaluation evaluation, String level, String[] selectedChecks,
-                           ReleaseChecks releaseChecks) {
+                           ReleaseChecks releaseChecks, Path verifyBriefPath) {
         List<String> rawChecks = new ArrayList<String>();
         for (GoalCheck check : checks) {
             rawChecks.add(JsonOutput.object(
@@ -130,13 +137,14 @@ public final class GoalVerifyCommand implements Command {
                 JsonOutput.rawField("release_checks", releaseChecks.json()),
                 JsonOutput.stringField("next_action", evaluation.nextAction()),
                 JsonOutput.stringField("next_command", evaluation.nextCommand()),
-                JsonOutput.stringField("context_path", PathUtil.goalContext(projectRoot).toString())
+                JsonOutput.stringField("context_path", PathUtil.goalContext(projectRoot).toString()),
+                JsonOutput.stringField("verify_brief_path", verifyBriefPath.toString())
         ));
     }
 
     private void printMarkdown(CommandContext context, Path projectRoot, GoalRun goal, List<GoalCheck> checks,
                                GoalEvaluation evaluation, String level, String[] selectedChecks,
-                               ReleaseChecks releaseChecks) {
+                               ReleaseChecks releaseChecks, Path verifyBriefPath) {
         List<BlockerDetail> blockers = blockerDetails(goal, checks, evaluation);
         context.out().println("# Goal Progress Brief");
         context.out().println();
@@ -168,6 +176,7 @@ public final class GoalVerifyCommand implements Command {
         if (releaseChecks.enabled) {
             context.out().println("- release_package: " + releaseChecks.packageStatus);
         }
+        context.out().println("- verify_brief_path: " + verifyBriefPath);
     }
 
     private String level(Args args) {

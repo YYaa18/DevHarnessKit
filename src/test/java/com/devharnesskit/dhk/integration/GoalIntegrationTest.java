@@ -143,6 +143,7 @@ final class GoalIntegrationTest {
         }, step.context());
         assertEquals(ExitCodes.SUCCESS, stepExit);
         assertTrue(step.stdout().contains("step_id: 1"));
+        assertTrue(step.stdout().contains("step_number: 1"));
         assertTrue(step.stdout().contains("current_action: create_change_plan"));
 
         Harness status = new Harness(tempDir);
@@ -341,6 +342,61 @@ final class GoalIntegrationTest {
         assertTrue(recheckJson.stdout().contains("\"status_before\": \"completed\""));
         assertTrue(recheckJson.stdout().contains("\"ready_to_complete\": true"));
         assertTrue(recheckJson.stdout().contains("\"checks\": ["));
+    }
+
+    @Test
+    void goalStepPrintsGoalLocalStepNumberAcrossGoals() {
+        Harness firstStart = new Harness(tempDir);
+        int firstStartExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "local-step-demo",
+                "--profile", "java-api-patch",
+                "--task", "First patch",
+                "--module", "account",
+                "--mode", "api"
+        }, firstStart.context());
+        assertEquals(ExitCodes.SUCCESS, firstStartExit);
+        String firstGoal = firstValue(firstStart.stdout(), "goal_key: ");
+
+        Harness firstStep = new Harness(tempDir);
+        int firstStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "local-step-demo",
+                "--goal", firstGoal,
+                "--summary", "Understood first patch",
+                "--field", "goal_understanding=First patch boundary",
+                "--field", "assumptions=None",
+                "--field", "read_files=README.md"
+        }, firstStep.context());
+        assertEquals(ExitCodes.SUCCESS, firstStepExit);
+        assertTrue(firstStep.stdout().contains("step_number: 1"));
+
+        Harness secondStart = new Harness(tempDir);
+        int secondStartExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "local-step-demo",
+                "--profile", "java-api-patch",
+                "--task", "Second patch",
+                "--module", "account",
+                "--mode", "api"
+        }, secondStart.context());
+        assertEquals(ExitCodes.SUCCESS, secondStartExit);
+        String secondGoal = firstValue(secondStart.stdout(), "goal_key: ");
+        assertFalse(firstGoal.equals(secondGoal));
+
+        Harness secondStep = new Harness(tempDir);
+        int secondStepExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "local-step-demo",
+                "--goal", secondGoal,
+                "--summary", "Understood second patch",
+                "--field", "goal_understanding=Second patch boundary",
+                "--field", "assumptions=None",
+                "--field", "read_files=README.md"
+        }, secondStep.context());
+        assertEquals(ExitCodes.SUCCESS, secondStepExit);
+        assertTrue(secondStep.stdout().contains("step_number: 1"));
+        assertFalse(firstValue(secondStep.stdout(), "step_id: ").equals("1"));
     }
 
     @Test

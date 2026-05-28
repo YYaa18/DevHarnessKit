@@ -126,7 +126,7 @@ final class QuickstartCommandIntegrationTest {
                 "quickstart",
                 "--project-root", "reuse-project",
                 "--preset", "springboot-manual-ide-test",
-                "--task", "Second goal",
+                "--task", "First goal",
                 "--module", "order"
         }, second.context());
         assertEquals(ExitCodes.SUCCESS, secondExit);
@@ -139,7 +139,7 @@ final class QuickstartCommandIntegrationTest {
                 "quickstart",
                 "--project-root", "reuse-project",
                 "--preset", "springboot-manual-ide-test",
-                "--task", "Forced config update",
+                "--task", "First goal",
                 "--module", "order",
                 "--force"
         }, forced.context());
@@ -147,6 +147,39 @@ final class QuickstartCommandIntegrationTest {
         String forcedConfigText = read(PathUtil.devharnessConfig(tempDir.resolve("reuse-project")));
         assertTrue(forcedConfigText.contains("\"preset\": \"springboot-manual-ide-test\""));
         assertEquals(firstGoal, firstValue(forced.stdout(), "goal_key: "));
+    }
+
+    @Test
+    void quickstartDoesNotReuseOpenGoalFromDifferentModuleOrProfile() {
+        Harness prior = new Harness(tempDir);
+        int priorExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "cross-module-project",
+                "--profile", "java-api-change-with-graph",
+                "--task", "Payment graph-aware change",
+                "--module", "payment",
+                "--mode", "api"
+        }, prior.context());
+        assertEquals(ExitCodes.SUCCESS, priorExit);
+        String priorGoal = firstValue(prior.stdout(), "goal_key: ");
+
+        Harness patch = new Harness(tempDir);
+        int patchExit = new CommandRouter().run(new String[]{
+                "quickstart",
+                "--project-root", "cross-module-project",
+                "--preset", "springboot-manual-ide-test",
+                "--task", "Fix user NPE bug",
+                "--module", "user",
+                "--mode", "patch"
+        }, patch.context());
+        assertEquals(ExitCodes.SUCCESS, patchExit);
+
+        String patchGoal = firstValue(patch.stdout(), "goal_key: ");
+        assertTrue(patch.stdout().contains("quickstart: ready"));
+        assertTrue(patch.stdout().contains("profile: java-api-patch"));
+        assertTrue(patch.stdout().contains("module: user"));
+        assertTrue(patchGoal.length() > 0);
+        assertFalse(priorGoal.equals(patchGoal));
     }
 
     @Test

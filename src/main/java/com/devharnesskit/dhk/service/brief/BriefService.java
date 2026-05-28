@@ -21,18 +21,21 @@ public final class BriefService {
     private final ModeAdvisor advisor;
     private final WorkBriefRenderer workRenderer;
     private final AgentBriefRenderer agentRenderer;
+    private final BriefLifecycleService lifecycleService;
 
     public BriefService() {
         this(new DevHarnessConfigService(), new ModeAdvisor(),
-                new WorkBriefRenderer(), new AgentBriefRenderer());
+                new WorkBriefRenderer(), new AgentBriefRenderer(), new BriefLifecycleService());
     }
 
     BriefService(DevHarnessConfigService configService, ModeAdvisor advisor,
-                 WorkBriefRenderer workRenderer, AgentBriefRenderer agentRenderer) {
+                 WorkBriefRenderer workRenderer, AgentBriefRenderer agentRenderer,
+                 BriefLifecycleService lifecycleService) {
         this.configService = configService;
         this.advisor = advisor;
         this.workRenderer = workRenderer;
         this.agentRenderer = agentRenderer;
+        this.lifecycleService = lifecycleService;
     }
 
     public BriefResult prepare(BriefRequest request, boolean writeFiles) throws Exception {
@@ -53,6 +56,7 @@ public final class BriefService {
             Files.createDirectories(PathUtil.devharnessBriefsDirectory(request.projectRoot()));
             Files.write(workPath, workRenderer.render(workBrief).getBytes("UTF-8"));
             Files.write(agentPath, agentRenderer.render(agentBrief).getBytes("UTF-8"));
+            lifecycleService.recordPreWorkInteraction(request.projectRoot(), workBrief);
         }
         return new BriefResult(workBrief, agentBrief, workPath, agentPath);
     }
@@ -92,7 +96,9 @@ public final class BriefService {
     private AgentBrief agentBrief(BriefRequest request, ModeAdvice advice, DevHarnessConfig config,
                                   WorkBrief workBrief, GoalRun goal, GoalPlan plan) {
         String goalKey = goal == null ? "" : goal.goalKey();
-        String currentAction = plan == null ? "" : plan.currentAction();
+        String currentAction = plan == null
+                ? (workBrief.confirmationRequired() || !workBrief.safeToStart() ? "wait_for_user_answer" : "")
+                : plan.currentAction();
         String[] requiredEvidence = plan == null ? defaultRequiredEvidence(advice) : plan.requiredEvidence();
         return new AgentBrief(workBrief.briefId(), workBrief.recommendationId(),
                 stableKey(request.task(), request.module(), request.target()), goalKey,

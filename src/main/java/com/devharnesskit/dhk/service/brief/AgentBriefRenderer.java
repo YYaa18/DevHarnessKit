@@ -24,6 +24,8 @@ public final class AgentBriefRenderer {
                 JsonOutput.rawField("escalation_rules", escalationRules(brief)),
                 JsonOutput.rawField("verification_policy", verificationPolicy(brief)),
                 JsonOutput.stringField("user_brief_path", brief.userBriefPath()),
+                JsonOutput.stringField("user_visible_summary_ref", brief.userBriefPath()),
+                JsonOutput.rawField("growth_context", growthContext(brief)),
                 JsonOutput.rawField("execution_policy", executionPolicy(brief)),
                 JsonOutput.rawField("harness_commands", commands(brief.harnessCommands()))
         );
@@ -49,6 +51,14 @@ public final class AgentBriefRenderer {
         return JsonOutput.object(
                 JsonOutput.booleanField("show_commands_to_user", false),
                 JsonOutput.booleanField("require_user_confirmation", brief.requireUserConfirmation())
+        );
+    }
+
+    private String growthContext(AgentBrief brief) {
+        String path = brief.userBriefPath().replace("WORK_BRIEF.md", "GROWTH_CONTEXT.md");
+        return JsonOutput.object(
+                JsonOutput.stringField("path", path),
+                JsonOutput.booleanField("advisory_only", true)
         );
     }
 

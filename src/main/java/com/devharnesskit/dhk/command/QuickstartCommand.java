@@ -95,7 +95,8 @@ public final class QuickstartCommand implements Command {
 
             ConfigureInitResult configResult = ensureConfig(projectRoot, preset, force,
                     args.option("compile", ""), args.option("test", ""), graph, target);
-            GoalRun existingGoal = latestOpenGoal(context, projectRoot);
+            String selectedProfile = initialBrief.agentBrief().profileKey();
+            GoalRun existingGoal = matchingOpenGoal(context, projectRoot, selectedProfile, task, module);
             QuickstartResult result;
             if (existingGoal != null) {
                 GoalPlan plan = orchestrator.plan(projectRoot, existingGoal);
@@ -103,7 +104,6 @@ public final class QuickstartCommand implements Command {
                 result = QuickstartResult.existing(projectRoot, configResult, existingGoal,
                         installStateStatus(projectRoot), PathUtil.goalContext(projectRoot).toString(), brief);
             } else {
-                String selectedProfile = initialBrief.agentBrief().profileKey();
                 GoalProfile selected = profileService.find(projectRoot, selectedProfile);
                 String goalMode = goalMode(initialBrief.workBrief().recommendation(),
                         selected == null ? "" : selected.defaultMode());
@@ -156,12 +156,13 @@ public final class QuickstartCommand implements Command {
         return configService.init(projectRoot, preset, force, compileOverride, testOverride, graphOverride, target, false);
     }
 
-    private GoalRun latestOpenGoal(CommandContext context, Path projectRoot) {
+    private GoalRun matchingOpenGoal(CommandContext context, Path projectRoot, String profile, String task,
+                                     String module) {
         if (!Files.isRegularFile(PathUtil.memoryDb(projectRoot)) || !Files.isRegularFile(PathUtil.projectJson(projectRoot))) {
             return null;
         }
         try {
-            return orchestrator.latestOpen(context, projectRoot);
+            return orchestrator.findOpenByIdentity(context, projectRoot, profile, task, module);
         } catch (Exception ex) {
             return null;
         }

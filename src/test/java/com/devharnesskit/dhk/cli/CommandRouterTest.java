@@ -52,7 +52,7 @@ final class CommandRouterTest {
         assertTrue(harness.stdout().contains("stability: beta developer preview; not stable or 1.0-ready"));
         assertTrue(harness.stdout().contains("stable_candidate_surface: help,version,doctor,memory-core,goal-core,release-packaging"));
         assertTrue(harness.stdout().contains("experimental_surface: graph,bdd,skill-contract,policy-governance,ecc-control-panel,routine"));
-        assertTrue(harness.stdout().contains("schema_version: 13"));
+        assertTrue(harness.stdout().contains("schema_version: 14"));
     }
 
     @Test

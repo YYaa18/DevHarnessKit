@@ -12,6 +12,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -106,6 +110,8 @@ final class BriefCommandIntegrationTest {
         String interactions = read(PathUtil.interactionRequests(root));
         assertTrue(interactions.contains("clarification"));
         assertTrue(interactions.contains("open"));
+        assertEquals(1, countRowsWhere(root, "interaction_request",
+                "interaction_type = 'clarification' AND status = 'open'"));
         assertTrue(read(PathUtil.agentBrief(root)).contains("\"current_action\": \"wait_for_user_answer\""));
 
         String requestId = interactions.split("\\t", -1)[0];
@@ -157,7 +163,8 @@ final class BriefCommandIntegrationTest {
         assertTrue(harness.stdout().contains("goal_key: none"));
         assertTrue(Files.isRegularFile(PathUtil.workBrief(root)));
         assertTrue(Files.isRegularFile(PathUtil.agentBrief(root)));
-        assertFalse(Files.exists(PathUtil.memoryDb(root)));
+        assertTrue(Files.isRegularFile(PathUtil.memoryDb(root)));
+        assertEquals(0, countRows(root, "goal_run"));
         assertFalse(Files.exists(PathUtil.devharnessConfig(root)));
     }
 
@@ -319,6 +326,7 @@ final class BriefCommandIntegrationTest {
         String candidates = read(PathUtil.knowledgeCandidatesBrief(root));
         assertTrue(candidates.contains("status: draft"));
         assertTrue(candidates.contains("suggested_destination: growth"));
+        assertEquals(2, countRows(root, "knowledge_candidate"));
 
         Harness initMemory = new Harness(tempDir);
         int initExit = new CommandRouter().run(new String[]{
@@ -355,6 +363,26 @@ final class BriefCommandIntegrationTest {
         assertEquals(ExitCodes.SUCCESS, growthExportExit);
         assertTrue(Files.isRegularFile(PathUtil.growthContext(root)));
         assertTrue(read(PathUtil.growthContext(root)).contains("advisory_only: true"));
+        assertEquals(1, countRowsWhere(root, "growth_lesson",
+                "lesson_id = 'growth-kc-goal-knowledge-growth' AND status = 'draft'"));
+    }
+
+    private int countRows(Path projectRoot, String tableName) throws Exception {
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(projectRoot));
+             Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery("SELECT COUNT(*) FROM " + tableName)) {
+            resultSet.next();
+            return resultSet.getInt(1);
+        }
+    }
+
+    private int countRowsWhere(Path projectRoot, String tableName, String where) throws Exception {
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(projectRoot));
+             Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery("SELECT COUNT(*) FROM " + tableName + " WHERE " + where)) {
+            resultSet.next();
+            return resultSet.getInt(1);
+        }
     }
 
     private String read(Path path) throws Exception {

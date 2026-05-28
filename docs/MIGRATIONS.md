@@ -6,7 +6,7 @@ DevHarness Kit stores project state in:
 .agents/memory/memory.db
 ```
 
-Current schema version: `13`.
+Current schema version: `14`.
 
 ## Current Schema Versions
 
@@ -25,6 +25,7 @@ Current schema version: `13`.
 | v11 | Skill contract metadata for local skill governance. |
 | v12 | Human checkpoint approvals for policy-controlled goal completion. |
 | v13 | Skill trust source hashes and trust review status. |
+| v14 | Brief lifecycle source-of-truth tables for knowledge candidates, interaction requests, and growth lessons. |
 
 ## Alpha Compatibility Policy
 
@@ -37,7 +38,7 @@ When an existing non-empty database is below the current schema version, DevHarn
 .agents/memory/backups/
 ```
 
-The backup filename includes the old and new schema versions, for example `pre-migration-v1-to-v13`.
+The backup filename includes the old and new schema versions, for example `pre-migration-v1-to-v14`.
 
 Current fixture coverage includes:
 
@@ -54,19 +55,19 @@ v11-skill-before-trust.sql
                          skill contract rows before trust source hashes
 v12-human-checkpoint-before-skill-trust.sql
                          human checkpoint rows before skill trust source hashes
-v13-current-minimal.sql current-version fixture used to verify idempotent
-                         v13 migration without pre-migration backup churn
+v13-current-minimal.sql v13 fixture used to verify the additive v14
+                         migration and post-upgrade idempotency
 ```
 
-These fixtures verify that old databases are backed up before upgrade, important rows are preserved, and the current v13 schema is created.
+These fixtures verify that old databases are backed up before upgrade, important rows are preserved, and the current v14 schema is created.
 
-The workflow fixture verifies that v2 `workflow_template`, `workflow_run`, `workflow_phase_run`, `workflow_gate_run`, and `workflow_event` rows survive upgrade while v3 artifact binding tables, v4 spec tables, v5 goal tables, v6 check metadata, v7 export recovery state, v8 fingerprint columns, v9 graph tables, v10 BDD tables, v11 skill contract tables, v12 human checkpoint tables, and v13 skill trust fields are added.
+The workflow fixture verifies that v2 `workflow_template`, `workflow_run`, `workflow_phase_run`, `workflow_gate_run`, and `workflow_event` rows survive upgrade while v3 artifact binding tables, v4 spec tables, v5 goal tables, v6 check metadata, v7 export recovery state, v8 fingerprint columns, v9 graph tables, v10 BDD tables, v11 skill contract tables, v12 human checkpoint tables, v13 skill trust fields, and v14 brief lifecycle tables are added.
 
-The spec fixture verifies that v4 `spec_change`, `spec_document`, `spec_task`, `spec_acceptance`, `workflow_spec_binding`, and `spec_event` rows survive upgrade while v5 goal tables, v6 check metadata, v7 export recovery state, v8 fingerprint columns, v9 graph tables, v10 BDD tables, v11 skill contract tables, v12 human checkpoint tables, and v13 skill trust fields are added.
+The spec fixture verifies that v4 `spec_change`, `spec_document`, `spec_task`, `spec_acceptance`, `workflow_spec_binding`, and `spec_event` rows survive upgrade while v5 goal tables, v6 check metadata, v7 export recovery state, v8 fingerprint columns, v9 graph tables, v10 BDD tables, v11 skill contract tables, v12 human checkpoint tables, v13 skill trust fields, and v14 brief lifecycle tables are added.
 
-The goal fixture verifies that v5 `goal_check` rows survive upgrade, receive a default `step_count_at_check = 0` value, can be extended with v8 fingerprint metadata, and receives v9 graph tables, v10 BDD tables, v11 skill contract tables, v12 human checkpoint tables, and v13 skill trust fields without losing rows.
+The goal fixture verifies that v5 `goal_check` rows survive upgrade, receive a default `step_count_at_check = 0` value, can be extended with v8 fingerprint metadata, and receives v9 graph tables, v10 BDD tables, v11 skill contract tables, v12 human checkpoint tables, v13 skill trust fields, and v14 brief lifecycle tables without losing rows.
 
-The Graph fixture verifies that v9 `code_graph_snapshot`, `code_graph_file`, `code_graph_node`, `code_graph_edge`, `code_graph_query_cache`, and `goal_graph_binding` rows survive upgrade while BDD, skill contract, human checkpoint, and skill trust schema is added.
+The Graph fixture verifies that v9 `code_graph_snapshot`, `code_graph_file`, `code_graph_node`, `code_graph_edge`, `code_graph_query_cache`, and `goal_graph_binding` rows survive upgrade while BDD, skill contract, human checkpoint, skill trust, and brief lifecycle schema is added.
 
 The BDD fixture verifies that v10 `bdd_feature`, `bdd_scenario`, `bdd_step`, `bdd_binding`, `bdd_evidence`, and `bdd_quality_issue` rows survive upgrade while skill contract, human checkpoint, and skill trust schema is added.
 
@@ -75,8 +76,8 @@ The skill fixture verifies that v11 `skill_contract` rows survive upgrade and re
 The human checkpoint fixture verifies that v12 `human_checkpoint` rows survive upgrade while existing skill contract rows receive v13 trust columns.
 
 The current-version fixture verifies that a database already reporting schema
-v13 can be migrated repeatedly without duplicate `schema_version` rows or
-automatic pre-migration backup churn.
+v13 is upgraded to v14 once and then can be migrated repeatedly without
+duplicate `schema_version` rows or automatic backup churn.
 
 ## MigrationStep Mapping
 
@@ -101,9 +102,22 @@ behind a versioned step class.
 | v11 | `V0.4 skill contract schema` | `V11SkillContractMigration` |
 | v12 | `V0.4 human checkpoint schema` | `V12HumanCheckpointMigration` |
 | v13 | `V0.4 skill trust hardening schema` | `V13SkillTrustHardeningMigration` |
+| v14 | `V0.8 brief lifecycle SQLite schema` | `V14BriefLifecycleSQLiteMigration` |
 
 Adding a future migration should add one `MigrationStep` entry, one fixture or
 upgrade test, and one row in this table.
+
+Brief Lifecycle v14 tables are additive. They make SQLite the source of truth
+for user/agent lifecycle data that was previously stored only in `.tsv` files:
+
+```text
+knowledge_candidate
+interaction_request
+growth_lesson
+```
+
+The legacy `.tsv` files remain compatibility exports and are imported during
+the v14 migration when present.
 
 Graph Lite v9 tables are additive. They store snapshot-bound machine facts:
 

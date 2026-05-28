@@ -48,7 +48,7 @@ Shared infrastructure moved to:
 - `GoalCheckRecorder`: log writing, check persistence, and fingerprint metadata.
 - `GoalCheckSupport`: shared parsing, evidence, artifact, and impact helpers.
 
-`MigrationRunner` is now transaction/backup/registry focused. Each schema migration is a dedicated `MigrationStep` class under `db.migration`, from `V1InitialMemoryMigration` through `V13SkillTrustHardeningMigration`.
+`MigrationRunner` is now transaction/backup/registry focused. Each schema migration is a dedicated `MigrationStep` class under `db.migration`, from `V1InitialMemoryMigration` through `V14BriefLifecycleSQLiteMigration`.
 
 ## Size Targets
 

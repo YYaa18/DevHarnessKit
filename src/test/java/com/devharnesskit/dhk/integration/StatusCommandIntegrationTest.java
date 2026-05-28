@@ -82,7 +82,7 @@ final class StatusCommandIntegrationTest {
         assertTrue(json.stdout().contains("\"preset\": \"springboot-manual-ide-test\""));
         assertTrue(json.stdout().contains("\"compile_mode\": \"manual\""));
         assertTrue(json.stdout().contains("\"install_state\": \"ok\""));
-        assertTrue(json.stdout().contains("\"schema_version\": \"13\""));
+        assertTrue(json.stdout().contains("\"schema_version\": \"14\""));
 
         Path markdown = tempDir.resolve("status.md");
         Harness markdownHarness = new Harness(tempDir);

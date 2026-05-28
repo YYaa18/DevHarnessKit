@@ -2,6 +2,7 @@ package com.devharnesskit.dhk.service.brief;
 
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
+import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.db.TransactionTemplate;
 import com.devharnesskit.dhk.model.MemoryItem;
 import com.devharnesskit.dhk.model.Project;
@@ -14,9 +15,15 @@ import com.devharnesskit.dhk.model.goal.GoalEvaluation;
 import com.devharnesskit.dhk.model.goal.GoalRun;
 import com.devharnesskit.dhk.repository.FtsRepository;
 import com.devharnesskit.dhk.repository.MemoryRepository;
+import com.devharnesskit.dhk.repository.ProjectRepository;
+import com.devharnesskit.dhk.repository.brief.GrowthLessonRepository;
+import com.devharnesskit.dhk.repository.brief.InteractionRequestRepository;
+import com.devharnesskit.dhk.repository.brief.KnowledgeCandidateRepository;
 import com.devharnesskit.dhk.service.ProjectService;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
+import com.devharnesskit.dhk.util.Clock;
 import com.devharnesskit.dhk.util.PathUtil;
+import com.devharnesskit.dhk.util.SystemClock;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -27,24 +34,44 @@ import java.util.Locale;
 
 public final class BriefLifecycleService {
     private final DbConnectionFactory connectionFactory;
+    private final MigrationRunner migrationRunner;
     private final ProjectService projectService;
+    private final ProjectRepository projectRepository;
     private final MemoryRepository memoryRepository;
     private final FtsRepository ftsRepository;
+    private final KnowledgeCandidateRepository candidateRepository;
+    private final InteractionRequestRepository interactionRepository;
+    private final GrowthLessonRepository growthLessonRepository;
+    private final BriefLifecycleCompatibilityStoreWriter compatibilityStoreWriter;
     private final TransactionTemplate transactionTemplate;
     private final SensitiveDataGuard sensitiveDataGuard;
+    private final Clock systemClock = new SystemClock();
 
     public BriefLifecycleService() {
-        this(new DbConnectionFactory(), new ProjectService(), new MemoryRepository(),
-                new FtsRepository(), new TransactionTemplate(), new SensitiveDataGuard());
+        this(new DbConnectionFactory(), new MigrationRunner(), new ProjectService(), new ProjectRepository(),
+                new MemoryRepository(), new FtsRepository(), new KnowledgeCandidateRepository(),
+                new InteractionRequestRepository(), new GrowthLessonRepository(),
+                new BriefLifecycleCompatibilityStoreWriter(), new TransactionTemplate(), new SensitiveDataGuard());
     }
 
-    BriefLifecycleService(DbConnectionFactory connectionFactory, ProjectService projectService,
+    BriefLifecycleService(DbConnectionFactory connectionFactory, MigrationRunner migrationRunner,
+                          ProjectService projectService, ProjectRepository projectRepository,
                           MemoryRepository memoryRepository, FtsRepository ftsRepository,
+                          KnowledgeCandidateRepository candidateRepository,
+                          InteractionRequestRepository interactionRepository,
+                          GrowthLessonRepository growthLessonRepository,
+                          BriefLifecycleCompatibilityStoreWriter compatibilityStoreWriter,
                           TransactionTemplate transactionTemplate, SensitiveDataGuard sensitiveDataGuard) {
         this.connectionFactory = connectionFactory;
+        this.migrationRunner = migrationRunner;
         this.projectService = projectService;
+        this.projectRepository = projectRepository;
         this.memoryRepository = memoryRepository;
         this.ftsRepository = ftsRepository;
+        this.candidateRepository = candidateRepository;
+        this.interactionRepository = interactionRepository;
+        this.growthLessonRepository = growthLessonRepository;
+        this.compatibilityStoreWriter = compatibilityStoreWriter;
         this.transactionTemplate = transactionTemplate;
         this.sensitiveDataGuard = sensitiveDataGuard;
     }
@@ -209,15 +236,16 @@ public final class BriefLifecycleService {
     }
 
     public List<KnowledgeCandidate> loadCandidates(Path projectRoot) {
-        List<KnowledgeCandidate> result = new ArrayList<KnowledgeCandidate>();
-        for (String[] row : readRows(PathUtil.knowledgeCandidatesStore(projectRoot))) {
-            if (row.length < 11) {
-                continue;
-            }
-            result.add(new KnowledgeCandidate(row[0], row[1], row[2], row[3], row[4], row[5],
-                    row[6], row[7], Boolean.parseBoolean(row[8]), row[9], row[10]));
+        try {
+            return withLifecycleStore(projectRoot, new LifecycleStoreWork<List<KnowledgeCandidate>>() {
+                public List<KnowledgeCandidate> execute(Connection connection, Project project, String now)
+                        throws Exception {
+                    return candidateRepository.list(connection);
+                }
+            });
+        } catch (Exception ex) {
+            throw new IllegalStateException("Failed to load knowledge candidates from SQLite: " + ex.getMessage(), ex);
         }
-        return result;
     }
 
     public KnowledgeCandidate rejectCandidate(Path projectRoot, String candidateId) throws Exception {
@@ -272,14 +300,16 @@ public final class BriefLifecycleService {
     }
 
     public List<GrowthLesson> loadGrowthLessons(Path projectRoot) {
-        List<GrowthLesson> result = new ArrayList<GrowthLesson>();
-        for (String[] row : readRows(PathUtil.growthLessonsStore(projectRoot))) {
-            if (row.length < 6) {
-                continue;
-            }
-            result.add(new GrowthLesson(row[0], row[1], row[2], row[3], row[4], Boolean.parseBoolean(row[5])));
+        try {
+            return withLifecycleStore(projectRoot, new LifecycleStoreWork<List<GrowthLesson>>() {
+                public List<GrowthLesson> execute(Connection connection, Project project, String now)
+                        throws Exception {
+                    return growthLessonRepository.list(connection);
+                }
+            });
+        } catch (Exception ex) {
+            throw new IllegalStateException("Failed to load growth lessons from SQLite: " + ex.getMessage(), ex);
         }
-        return result;
     }
 
     public GrowthLesson confirmGrowth(Path projectRoot, String lessonId) throws Exception {
@@ -453,68 +483,66 @@ public final class BriefLifecycleService {
     }
 
     private List<InteractionRequest> loadInteractions(Path projectRoot) {
-        List<InteractionRequest> result = new ArrayList<InteractionRequest>();
-        for (String[] row : readRows(PathUtil.interactionRequests(projectRoot))) {
-            if (row.length < 12) {
-                continue;
-            }
-            result.add(new InteractionRequest(row[0], row[1], row[2], row[3], row[4], row[5],
-                    row[6], row[7], row[8], Boolean.parseBoolean(row[9]), row[10], row[11]));
+        try {
+            return withLifecycleStore(projectRoot, new LifecycleStoreWork<List<InteractionRequest>>() {
+                public List<InteractionRequest> execute(Connection connection, Project project, String now)
+                        throws Exception {
+                    return interactionRepository.list(connection);
+                }
+            });
+        } catch (Exception ex) {
+            throw new IllegalStateException("Failed to load interaction requests from SQLite: " + ex.getMessage(), ex);
         }
-        return result;
     }
 
     private void saveInteractions(Path projectRoot, List<InteractionRequest> requests) throws Exception {
-        Files.createDirectories(PathUtil.devharnessBriefsDirectory(projectRoot));
-        StringBuilder builder = new StringBuilder();
-        for (InteractionRequest request : requests) {
-            builder.append(escape(request.requestId())).append('\t')
-                    .append(escape(request.goalKey())).append('\t')
-                    .append(escape(request.phase())).append('\t')
-                    .append(escape(request.type())).append('\t')
-                    .append(escape(request.priority())).append('\t')
-                    .append(escape(request.question())).append('\t')
-                    .append(escape(request.why())).append('\t')
-                    .append(escape(request.choices())).append('\t')
-                    .append(escape(request.defaultChoice())).append('\t')
-                    .append(request.blocksProgress()).append('\t')
-                    .append(escape(request.status())).append('\t')
-                    .append(escape(request.answer())).append('\n');
-        }
-        Files.write(PathUtil.interactionRequests(projectRoot), builder.toString().getBytes("UTF-8"));
+        withLifecycleStore(projectRoot, new LifecycleStoreWork<Void>() {
+            public Void execute(Connection connection, Project project, String now) throws Exception {
+                for (InteractionRequest request : requests) {
+                    interactionRepository.upsert(connection, project.projectKey(), request, now);
+                }
+                return null;
+            }
+        });
+        compatibilityStoreWriter.writeInteractions(projectRoot, requests);
     }
 
     private void saveCandidates(Path projectRoot, List<KnowledgeCandidate> candidates) throws Exception {
-        Files.createDirectories(PathUtil.devharnessBriefsDirectory(projectRoot));
-        StringBuilder builder = new StringBuilder();
-        for (KnowledgeCandidate candidate : candidates) {
-            builder.append(escape(candidate.candidateId())).append('\t')
-                    .append(escape(candidate.goalKey())).append('\t')
-                    .append(escape(candidate.type())).append('\t')
-                    .append(escape(candidate.title())).append('\t')
-                    .append(escape(candidate.summary())).append('\t')
-                    .append(escape(candidate.evidenceRefs())).append('\t')
-                    .append(escape(candidate.suggestedDestination())).append('\t')
-                    .append(escape(candidate.confidence())).append('\t')
-                    .append(candidate.requiresConfirmation()).append('\t')
-                    .append(escape(candidate.sensitiveScanStatus())).append('\t')
-                    .append(escape(candidate.status())).append('\n');
-        }
-        Files.write(PathUtil.knowledgeCandidatesStore(projectRoot), builder.toString().getBytes("UTF-8"));
+        withLifecycleStore(projectRoot, new LifecycleStoreWork<Void>() {
+            public Void execute(Connection connection, Project project, String now) throws Exception {
+                for (KnowledgeCandidate candidate : candidates) {
+                    candidateRepository.upsert(connection, project.projectKey(), candidate, now);
+                }
+                return null;
+            }
+        });
+        compatibilityStoreWriter.writeCandidates(projectRoot, candidates);
     }
 
     private void saveGrowthLessons(Path projectRoot, List<GrowthLesson> lessons) throws Exception {
-        Files.createDirectories(PathUtil.devharnessBriefsDirectory(projectRoot));
-        StringBuilder builder = new StringBuilder();
-        for (GrowthLesson lesson : lessons) {
-            builder.append(escape(lesson.lessonId())).append('\t')
-                    .append(escape(lesson.sourceCandidateId())).append('\t')
-                    .append(escape(lesson.title())).append('\t')
-                    .append(escape(lesson.summary())).append('\t')
-                    .append(escape(lesson.status())).append('\t')
-                    .append(lesson.advisoryOnly()).append('\n');
+        withLifecycleStore(projectRoot, new LifecycleStoreWork<Void>() {
+            public Void execute(Connection connection, Project project, String now) throws Exception {
+                for (GrowthLesson lesson : lessons) {
+                    growthLessonRepository.upsert(connection, project.projectKey(), lesson, now);
+                }
+                return null;
+            }
+        });
+        compatibilityStoreWriter.writeGrowthLessons(projectRoot, lessons);
+    }
+
+    private <T> T withLifecycleStore(Path projectRoot, LifecycleStoreWork<T> work) throws Exception {
+        PathUtil.createMemoryDirectories(projectRoot);
+        try (Connection connection = connectionFactory.open(projectRoot)) {
+            migrationRunner.migrate(connection, systemClock);
+            Project project = projectService.ensureProject(projectRoot, systemClock);
+            projectRepository.upsert(connection, project);
+            return work.execute(connection, project, systemClock.now().toString());
         }
-        Files.write(PathUtil.growthLessonsStore(projectRoot), builder.toString().getBytes("UTF-8"));
+    }
+
+    private interface LifecycleStoreWork<T> {
+        T execute(Connection connection, Project project, String now) throws Exception;
     }
 
     private void writeInteractionsBrief(Path projectRoot) throws Exception {
@@ -586,29 +614,6 @@ public final class BriefLifecycleService {
         return null;
     }
 
-    private List<String[]> readRows(Path path) {
-        List<String[]> rows = new ArrayList<String[]>();
-        if (!Files.isRegularFile(path)) {
-            return rows;
-        }
-        try {
-            for (String line : Files.readAllLines(path)) {
-                if (line.trim().length() == 0) {
-                    continue;
-                }
-                String[] raw = line.split("\\t", -1);
-                String[] unescaped = new String[raw.length];
-                for (int i = 0; i < raw.length; i++) {
-                    unescaped[i] = unescape(raw[i]);
-                }
-                rows.add(unescaped);
-            }
-        } catch (Exception ex) {
-            throw new IllegalStateException("Failed to read brief lifecycle store: " + ex.getMessage(), ex);
-        }
-        return rows;
-    }
-
     private String join(String[] values, String delimiter) {
         StringBuilder builder = new StringBuilder();
         for (String value : values) {
@@ -620,36 +625,4 @@ public final class BriefLifecycleService {
         return builder.toString();
     }
 
-    private String escape(String value) {
-        return value == null ? "" : value.replace("\\", "\\\\")
-                .replace("\t", "\\t").replace("\n", "\\n").replace("\r", "\\r");
-    }
-
-    private String unescape(String value) {
-        StringBuilder builder = new StringBuilder();
-        boolean slash = false;
-        for (int i = 0; i < value.length(); i++) {
-            char ch = value.charAt(i);
-            if (slash) {
-                if (ch == 't') {
-                    builder.append('\t');
-                } else if (ch == 'n') {
-                    builder.append('\n');
-                } else if (ch == 'r') {
-                    builder.append('\r');
-                } else {
-                    builder.append(ch);
-                }
-                slash = false;
-            } else if (ch == '\\') {
-                slash = true;
-            } else {
-                builder.append(ch);
-            }
-        }
-        if (slash) {
-            builder.append('\\');
-        }
-        return builder.toString();
-    }
 }

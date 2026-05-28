@@ -9,7 +9,7 @@ import java.util.Properties;
 public final class VersionInfo {
     public static final String FALLBACK_VERSION = "dev";
     public static final String RELEASE_CHANNEL = "beta / developer preview";
-    public static final int CURRENT_SCHEMA_VERSION = MigrationRunner.V13;
+    public static final int CURRENT_SCHEMA_VERSION = MigrationRunner.V14;
 
     private VersionInfo() {
     }

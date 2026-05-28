@@ -4,6 +4,7 @@ import com.devharnesskit.dhk.cli.Args;
 import com.devharnesskit.dhk.cli.Command;
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.model.goal.GoalCheck;
 import com.devharnesskit.dhk.model.goal.GoalRun;
 import com.devharnesskit.dhk.service.goal.GoalOrchestrator;
@@ -23,8 +24,9 @@ public final class GoalCheckCommand implements Command {
         boolean all = args.hasFlag("all");
         String check = args.option("check").trim();
         if (!all && check.length() == 0) {
-            context.err().println("Missing required parameter: --check <check-key> or --all");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "GOAL_CHECK_ARGUMENTS_MISSING",
+                    new String[]{"--check <check-key> or --all"},
+                    "dhk goal check --goal <goal> --all", "README.md#core-path");
         }
         Path projectRoot = GoalCommandSupport.projectRoot(args, context);
         try {

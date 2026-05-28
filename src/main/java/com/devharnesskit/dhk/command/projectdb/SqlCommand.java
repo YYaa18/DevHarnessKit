@@ -5,6 +5,7 @@ import com.devharnesskit.dhk.cli.Command;
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.export.SqlResultRenderer;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.service.MysqlConnectionService;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
 import com.devharnesskit.dhk.service.SqlExecutionService;
@@ -52,12 +53,14 @@ public final class SqlCommand implements Command {
         try {
             sql = InputUtil.readExclusiveText(context, args, "sql", "sql-file", "sql-stdin", false).trim();
         } catch (InputUtil.InputException ex) {
-            context.err().println(ex.getMessage());
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.invalidUsage(context, args, "DB_SQL_INPUT_CONFLICT",
+                    ex.getMessage(), "Provide SQL through only one input source.",
+                    "dhk db sql --sql \"select 1\"", "docs/DB_READONLY_THREAT_MODEL.md");
         }
         if (sql.length() == 0) {
-            context.err().println("Missing required SQL text");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "DB_SQL_TEXT_MISSING",
+                    new String[]{"--sql|--sql-file|--sql-stdin"},
+                    "dhk db sql --sql \"select 1\"", "docs/DB_READONLY_THREAT_MODEL.md");
         }
         boolean explain = args.hasFlag("explain");
         boolean dryRun = args.hasFlag("dry-run");

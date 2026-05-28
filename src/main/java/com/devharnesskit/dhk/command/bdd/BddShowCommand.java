@@ -6,6 +6,7 @@ import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.bdd.BddBinding;
 import com.devharnesskit.dhk.model.bdd.BddFeature;
@@ -37,8 +38,10 @@ public final class BddShowCommand implements Command {
         String scenarioKey = args.option("scenario", "").trim();
         String featureKey = args.option("feature", "").trim();
         if (scenarioKey.length() == 0 && featureKey.length() == 0) {
-            context.err().println("Missing required parameter: --scenario or --feature");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "BDD_SHOW_TARGET_MISSING",
+                    new String[]{"--scenario|--feature"},
+                    "dhk bdd show --scenario <scenario>",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         Path projectRoot = BddCommandSupport.projectRoot(args, context);
         try (Connection connection = connectionFactory.open(projectRoot)) {
@@ -58,8 +61,9 @@ public final class BddShowCommand implements Command {
                              Project project, String scenarioKey) throws Exception {
         BddScenarioView view = bddService.findScenario(connection, project, scenarioKey);
         if (view == null) {
-            context.err().println("BDD scenario not found: " + scenarioKey);
-            return ExitCodes.NOT_FOUND;
+            return CommandErrorGuidance.notFound(context, args, "BDD_SCENARIO_NOT_FOUND",
+                    "BDD scenario", scenarioKey, "dhk bdd show --feature <feature>",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (JsonOutput.enabled(args)) {
             context.out().print(JsonOutput.object(
@@ -99,8 +103,9 @@ public final class BddShowCommand implements Command {
                             Project project, String featureKey) throws Exception {
         BddFeature feature = bddService.findFeature(connection, project, featureKey);
         if (feature == null) {
-            context.err().println("BDD feature not found: " + featureKey);
-            return ExitCodes.NOT_FOUND;
+            return CommandErrorGuidance.notFound(context, args, "BDD_FEATURE_NOT_FOUND",
+                    "BDD feature", featureKey, "dhk bdd add --feature <feature> --title \"<title>\" --scenario <scenario> --scenario-title \"<title>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         List<BddScenario> scenarios = bddService.listScenarios(connection, project, featureKey);
         if (JsonOutput.enabled(args)) {

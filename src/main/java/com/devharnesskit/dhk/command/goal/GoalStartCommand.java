@@ -4,6 +4,7 @@ import com.devharnesskit.dhk.cli.Args;
 import com.devharnesskit.dhk.cli.Command;
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.model.goal.GoalRun;
 import com.devharnesskit.dhk.model.spec.SpecChange;
 import com.devharnesskit.dhk.service.goal.GoalOrchestrator;
@@ -18,8 +19,10 @@ public final class GoalStartCommand implements Command {
         String profile = args.option("profile").trim();
         String task = args.option("task").trim();
         if (profile.length() == 0 || task.length() == 0) {
-            context.err().println("Missing required parameters: --profile, --task");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "GOAL_START_ARGUMENTS_MISSING",
+                    new String[]{"--profile", "--task"},
+                    "dhk goal start --profile java-api-change --task \"<task>\"",
+                    "README.md#core-path");
         }
         String module = args.option("module", "global").trim();
         if (module.length() == 0) {
@@ -58,8 +61,13 @@ public final class GoalStartCommand implements Command {
             context.out().println("context_path: " + result.contextPath());
             return ExitCodes.SUCCESS;
         } catch (IllegalArgumentException ex) {
-            context.err().println(ex.getMessage());
-            return ExitCodes.VALIDATION_ERROR;
+            if (ex.getMessage() != null && ex.getMessage().startsWith("Sensitive data rejected")) {
+                context.err().println(ex.getMessage());
+                return ExitCodes.VALIDATION_ERROR;
+            }
+            return CommandErrorGuidance.invalidUsage(context, args, "GOAL_START_REJECTED",
+                    ex.getMessage(), "Goal start rejected the requested profile, mode, or task input.",
+                    "dhk advise --task \"" + task + "\"", "docs/GOAL_CONFIGURATION.md");
         } catch (Exception ex) {
             context.err().println("ERROR goal start failed: " + ex.getMessage());
             return ExitCodes.RUNTIME_ERROR;

@@ -5,6 +5,7 @@ import com.devharnesskit.dhk.cli.Command;
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.model.Checkpoint;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.repository.CheckpointRepository;
@@ -42,12 +43,15 @@ public final class CheckpointCommand implements Command {
         try {
             summary = InputUtil.readExclusiveText(context, args, "summary", "summary-file", "summary-stdin").trim();
         } catch (InputUtil.InputException ex) {
-            context.err().println(ex.getMessage());
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.invalidUsage(context, args, "MEMORY_CHECKPOINT_INPUT_CONFLICT",
+                    ex.getMessage(), "Provide checkpoint summary through only one input source.",
+                    "dhk memory checkpoint --task <task> \"<summary>\"", "README.md#core-path");
         }
         if (task.length() == 0 || summary.length() == 0) {
-            context.err().println("Missing required parameters: --task and summary");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "MEMORY_CHECKPOINT_ARGUMENTS_MISSING",
+                    new String[]{"--task", "summary"},
+                    "dhk memory checkpoint --task <task> \"<summary>\"",
+                    "README.md#core-path");
         }
         String module = args.option("module", "global").trim();
         if (module.length() == 0) {

@@ -6,6 +6,7 @@ import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.guidance.ActionableError;
 import com.devharnesskit.dhk.guidance.ActionableErrorRenderer;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.db.TransactionTemplate;
@@ -48,9 +49,10 @@ public final class SpecAcceptanceCommand implements Command {
         if ("statuses".equals(action) || "status-values".equals(action)) {
             return statuses(context);
         }
-        context.err().println("Unknown spec acceptance action: " + action);
-        context.err().println("Available actions: add, update, statuses");
-        return ExitCodes.USAGE_ERROR;
+        return com.devharnesskit.dhk.guidance.EnumGuidance.printInvalid(context, args,
+                "INVALID_SPEC_ACCEPTANCE_ACTION", "spec acceptance action", action,
+                new String[]{"add", "update", "statuses"}, new String[0],
+                "dhk spec acceptance statuses", "docs/GOAL_CONFIGURATION.md");
     }
 
     private int add(CommandContext context, Args args) {
@@ -58,12 +60,16 @@ public final class SpecAcceptanceCommand implements Command {
         String acceptanceKey = args.option("acceptance").trim();
         String description = args.option("description").trim();
         if (changeKey.length() == 0 || acceptanceKey.length() == 0 || description.length() == 0) {
-            context.err().println("Missing required parameters: --change, --acceptance, --description");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "SPEC_ACCEPTANCE_ADD_ARGUMENTS_MISSING",
+                    new String[]{"--change", "--acceptance", "--description"},
+                    "dhk spec acceptance add --change <change> --acceptance <key> --description \"<description>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (!SpecCommandSupport.isKeyAllowed(acceptanceKey)) {
-            context.err().println("Invalid acceptance key: " + acceptanceKey);
-            return ExitCodes.VALIDATION_ERROR;
+            return CommandErrorGuidance.invalidKey(context, args, "INVALID_SPEC_ACCEPTANCE_KEY",
+                    "spec acceptance key", acceptanceKey,
+                    "dhk spec acceptance add --change <change> --acceptance acceptance-1 --description \"<description>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         String expected = args.option("expected", args.option("expected-result", "")).trim();
         if (SpecCommandSupport.rejectSensitive(context, sensitiveDataGuard, "spec acceptance add",
@@ -76,8 +82,9 @@ public final class SpecAcceptanceCommand implements Command {
                     projectService, projectRepository, migrationRunner);
             SpecChange change = changeRepository.findByKey(connection, changeKey);
             if (!SpecCommandSupport.belongsToProject(change, project)) {
-                context.err().println("Spec change not found: " + changeKey);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "SPEC_CHANGE_NOT_FOUND",
+                        "spec change", changeKey, "dhk spec status --change <change>",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             final SpecChange selectedChange = change;
             final String selectedAcceptance = acceptanceKey;
@@ -105,8 +112,10 @@ public final class SpecAcceptanceCommand implements Command {
         String acceptanceKey = args.option("acceptance").trim();
         String status = args.option("status").trim();
         if (changeKey.length() == 0 || acceptanceKey.length() == 0 || status.length() == 0) {
-            context.err().println("Missing required parameters: --change, --acceptance, --status");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "SPEC_ACCEPTANCE_UPDATE_ARGUMENTS_MISSING",
+                    new String[]{"--change", "--acceptance", "--status"},
+                    "dhk spec acceptance update --change <change> --acceptance <key> --status passed --evidence \"<evidence>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         String normalizedStatus = SpecAcceptanceService.normalizeAcceptanceStatus(status);
         if (normalizedStatus.length() == 0) {
@@ -129,8 +138,11 @@ public final class SpecAcceptanceCommand implements Command {
         }
         String evidence = args.option("evidence", args.option("reason", "")).trim();
         if ("waived".equals(normalizedStatus) && evidence.length() == 0) {
-            context.err().println("Waived acceptance requires --evidence or --reason");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "SPEC_ACCEPTANCE_WAIVE_EVIDENCE_MISSING",
+                    new String[]{"--evidence or --reason"},
+                    "dhk spec acceptance update --change " + changeKey + " --acceptance "
+                            + acceptanceKey + " --status waived --reason \"<reason>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (SpecCommandSupport.rejectSensitive(context, sensitiveDataGuard, "spec acceptance update",
                 changeKey, acceptanceKey, status, evidence)) {
@@ -142,13 +154,17 @@ public final class SpecAcceptanceCommand implements Command {
                     projectService, projectRepository, migrationRunner);
             SpecChange change = changeRepository.findByKey(connection, changeKey);
             if (!SpecCommandSupport.belongsToProject(change, project)) {
-                context.err().println("Spec change not found: " + changeKey);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "SPEC_CHANGE_NOT_FOUND",
+                        "spec change", changeKey, "dhk spec status --change <change>",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             SpecAcceptance acceptance = acceptanceRepository.findByKey(connection, changeKey, acceptanceKey);
             if (acceptance == null) {
-                context.err().println("Spec acceptance not found: " + acceptanceKey);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "SPEC_ACCEPTANCE_NOT_FOUND",
+                        "spec acceptance", acceptanceKey,
+                        "dhk spec acceptance add --change " + changeKey
+                                + " --acceptance <key> --description \"<description>\"",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             final SpecChange selectedChange = change;
             final SpecAcceptance selectedAcceptance = acceptance;

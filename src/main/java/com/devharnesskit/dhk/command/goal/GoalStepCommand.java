@@ -6,6 +6,7 @@ import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.guidance.ActionableError;
 import com.devharnesskit.dhk.guidance.ActionableErrorRenderer;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.model.goal.GoalEvidenceContract;
 import com.devharnesskit.dhk.service.goal.GoalStepAutoEvidenceCollector;
 import com.devharnesskit.dhk.service.goal.GoalOrchestrator;
@@ -30,16 +31,17 @@ public final class GoalStepCommand implements Command {
         String goalKey = args.option("goal").trim();
         Path projectRoot = GoalCommandSupport.projectRoot(args, context);
         if (goalKey.length() == 0) {
-            context.err().println("Missing required parameter: --goal");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "GOAL_STEP_GOAL_MISSING",
+                    new String[]{"--goal"}, "dhk goal next", "README.md#core-path");
         }
         if (args.hasFlag("template")) {
             return printTemplate(context, args, projectRoot, goalKey);
         }
         String summary = args.option("summary").trim();
         if (summary.length() == 0) {
-            context.err().println("Missing required parameter: --summary");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "GOAL_STEP_SUMMARY_MISSING",
+                    new String[]{"--summary"},
+                    "dhk goal evidence-template --goal " + goalKey, "README.md#core-path");
         }
         String changedFiles = changedFiles(args);
         if (args.hasFlag("auto") && changedFiles.length() == 0) {

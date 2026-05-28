@@ -170,7 +170,8 @@ final class MemoryAddConfirmSearchIntegrationTest {
                 "memory", "confirm", "--project-root", "demo", "--id", "abc"
         }, invalidId.context());
         assertEquals(ExitCodes.VALIDATION_ERROR, invalidIdExit);
-        assertTrue(invalidId.stderr().contains("Invalid id, expected integer"));
+        assertTrue(invalidId.stderr().contains("error_code: MEMORY_CONFIRM_INVALID_ID"));
+        assertTrue(invalidId.stderr().contains("next_command:"));
 
         addMemory("Confidence guard", "Confirm confidence must stay in range.", "confidence,confirm");
         Harness invalidConfidence = new Harness(tempDir);
@@ -178,14 +179,16 @@ final class MemoryAddConfirmSearchIntegrationTest {
                 "memory", "confirm", "--project-root", "demo", "--id", "1", "--confidence", "101"
         }, invalidConfidence.context());
         assertEquals(ExitCodes.VALIDATION_ERROR, invalidConfidenceExit);
-        assertTrue(invalidConfidence.stderr().contains("Invalid confidence, expected 0..100"));
+        assertTrue(invalidConfidence.stderr().contains("error_code: MEMORY_CONFIRM_INVALID_CONFIDENCE"));
+        assertTrue(invalidConfidence.stderr().contains("reason: confidence must be an integer from 0 to 100."));
 
         Harness missing = new Harness(tempDir);
         int missingExit = new CommandRouter().run(new String[]{
                 "memory", "confirm", "--project-root", "demo", "--id", "999"
         }, missing.context());
         assertEquals(ExitCodes.NOT_FOUND, missingExit);
-        assertTrue(missing.stderr().contains("Memory item not found: 999"));
+        assertTrue(missing.stderr().contains("error_code: MEMORY_ITEM_NOT_FOUND"));
+        assertTrue(missing.stderr().contains("next_action:"));
     }
 
     @Test
@@ -316,7 +319,30 @@ final class MemoryAddConfirmSearchIntegrationTest {
         }, confirm.context());
 
         assertEquals(ExitCodes.NOT_FOUND, exitCode);
-        assertTrue(confirm.stderr().contains("Memory item not found: 99"));
+        assertTrue(confirm.stderr().contains("error_code: MEMORY_ITEM_NOT_FOUND"));
+        assertTrue(confirm.stderr().contains("memory item not found: 99"));
+    }
+
+    @Test
+    void memoryUsageErrorsIncludeActionableFields() {
+        initProject();
+
+        Harness addMissing = new Harness(tempDir);
+        int addMissingExit = new CommandRouter().run(new String[]{
+                "memory", "add", "--project-root", "demo", "--type", "project_fact"
+        }, addMissing.context());
+        assertEquals(ExitCodes.USAGE_ERROR, addMissingExit);
+        assertTrue(addMissing.stderr().contains("error_code: MEMORY_ADD_ARGUMENTS_MISSING"));
+        assertTrue(addMissing.stderr().contains("missing:"));
+        assertTrue(addMissing.stderr().contains("--title"));
+
+        Harness searchLimit = new Harness(tempDir);
+        int searchLimitExit = new CommandRouter().run(new String[]{
+                "memory", "search", "--project-root", "demo", "--q", "x", "--limit", "zero"
+        }, searchLimit.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, searchLimitExit);
+        assertTrue(searchLimit.stderr().contains("error_code: INVALID_MEMORY_LIMIT"));
+        assertTrue(searchLimit.stderr().contains("next_command:"));
     }
 
     @Test

@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.spec.SpecChange;
@@ -39,14 +40,18 @@ public final class SpecDocumentCommand implements Command {
     public int run(CommandContext context, Args args) {
         String action = args.positional(2);
         if (!"set".equals(action)) {
-            context.err().println("Unknown spec document action: " + action);
-            return ExitCodes.USAGE_ERROR;
+            return EnumGuidance.printInvalid(context, args, "INVALID_SPEC_DOCUMENT_ACTION",
+                    "spec document action", action, new String[]{"set"}, new String[0],
+                    "dhk spec document set --change <change> --type proposal --content \"<content>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         String changeKey = args.option("change").trim();
         String type = args.option("type").trim();
         if (changeKey.length() == 0 || type.length() == 0) {
-            context.err().println("Missing required parameters: --change, --type");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "SPEC_DOCUMENT_ARGUMENTS_MISSING",
+                    new String[]{"--change", "--type", "--content or --content-file or --content-stdin"},
+                    "dhk spec document set --change <change> --type proposal --content \"<content>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (!SpecDocumentService.isDocumentTypeAllowed(type)) {
             return EnumGuidance.printInvalid(context, args, "INVALID_SPEC_DOCUMENT_TYPE",
@@ -77,8 +82,9 @@ public final class SpecDocumentCommand implements Command {
                         projectService, projectRepository, migrationRunner);
                 SpecChange change = changeRepository.findByKey(connection, changeKey);
                 if (!SpecCommandSupport.belongsToProject(change, project)) {
-                    context.err().println("Spec change not found: " + changeKey);
-                    return ExitCodes.NOT_FOUND;
+                    return CommandErrorGuidance.notFound(context, args, "SPEC_CHANGE_NOT_FOUND",
+                            "spec change", changeKey, "dhk spec status --change <change>",
+                            "docs/GOAL_CONFIGURATION.md");
                 }
                 final SpecChange selectedChange = change;
                 final String selectedType = type;

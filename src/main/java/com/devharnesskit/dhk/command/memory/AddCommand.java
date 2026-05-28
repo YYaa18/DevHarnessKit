@@ -6,6 +6,7 @@ import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.MemoryItem;
 import com.devharnesskit.dhk.model.Project;
@@ -54,12 +55,16 @@ public final class AddCommand implements Command {
         try {
             content = InputUtil.readExclusiveText(context, args, "content", "content-file", "content-stdin").trim();
         } catch (InputUtil.InputException ex) {
-            context.err().println(ex.getMessage());
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "MEMORY_ADD_ARGUMENTS_MISSING",
+                    new String[]{"--type", "--title", "--content or --content-file or --content-stdin"},
+                    "dhk memory add --type project_fact --title \"<title>\" --content \"<content>\"",
+                    "README.md#core-path");
         }
         if (type.length() == 0 || title.length() == 0 || content.length() == 0) {
-            context.err().println("Missing required parameters: --type, --title, and content");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "MEMORY_ADD_ARGUMENTS_MISSING",
+                    new String[]{"--type", "--title", "--content or --content-file or --content-stdin"},
+                    "dhk memory add --type project_fact --title \"<title>\" --content \"<content>\"",
+                    "README.md#core-path");
         }
         if (!MemoryType.isAllowed(type)) {
             return EnumGuidance.printInvalid(context, args, "INVALID_MEMORY_TYPE", "memory type", type,
@@ -72,7 +77,7 @@ public final class AddCommand implements Command {
             return ExitCodes.VALIDATION_ERROR;
         }
 
-        int confidence = parseConfidence(context, args.option("confidence", "50"));
+        int confidence = parseConfidence(context, args, args.option("confidence", "50"));
         if (confidence < 0) {
             return ExitCodes.VALIDATION_ERROR;
         }
@@ -126,16 +131,20 @@ public final class AddCommand implements Command {
         }
     }
 
-    private int parseConfidence(CommandContext context, String rawValue) {
+    private int parseConfidence(CommandContext context, Args args, String rawValue) {
         try {
             int value = Integer.parseInt(rawValue);
             if (value < 0 || value > 100) {
-                context.err().println("Invalid confidence, expected 0..100: " + rawValue);
+                CommandErrorGuidance.invalidNumber(context, args, "INVALID_MEMORY_CONFIDENCE",
+                        "memory confidence", rawValue, "confidence must be an integer from 0 to 100.",
+                        "dhk memory add --confidence 70 ...", "README.md#core-path");
                 return -1;
             }
             return value;
         } catch (NumberFormatException ex) {
-            context.err().println("Invalid confidence, expected integer 0..100: " + rawValue);
+            CommandErrorGuidance.invalidNumber(context, args, "INVALID_MEMORY_CONFIDENCE",
+                    "memory confidence", rawValue, "confidence must be an integer from 0 to 100.",
+                    "dhk memory add --confidence 70 ...", "README.md#core-path");
             return -1;
         }
     }

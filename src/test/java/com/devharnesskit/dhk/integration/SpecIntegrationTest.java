@@ -241,7 +241,8 @@ final class SpecIntegrationTest {
                 "--status", "waived"
         }, waive.context());
         assertEquals(ExitCodes.USAGE_ERROR, waiveExit);
-        assertTrue(waive.stderr().contains("requires --evidence or --reason"));
+        assertTrue(waive.stderr().contains("error_code: SPEC_ACCEPTANCE_WAIVE_EVIDENCE_MISSING"));
+        assertTrue(waive.stderr().contains("--evidence or --reason"));
     }
 
     @Test
@@ -297,7 +298,8 @@ final class SpecIntegrationTest {
                 "--status", "waive"
         }, waiveAlias.context());
         assertEquals(ExitCodes.USAGE_ERROR, waiveAliasExit);
-        assertTrue(waiveAlias.stderr().contains("requires --evidence or --reason"));
+        assertTrue(waiveAlias.stderr().contains("error_code: SPEC_ACCEPTANCE_WAIVE_EVIDENCE_MISSING"));
+        assertTrue(waiveAlias.stderr().contains("--evidence or --reason"));
     }
 
     @Test

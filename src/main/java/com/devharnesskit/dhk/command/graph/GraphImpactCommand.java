@@ -4,6 +4,7 @@ import com.devharnesskit.dhk.cli.Args;
 import com.devharnesskit.dhk.cli.Command;
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.model.graph.GraphImpactRequest;
 import com.devharnesskit.dhk.model.graph.GraphImpactResult;
 import com.devharnesskit.dhk.model.graph.GraphNode;
@@ -41,8 +42,10 @@ public final class GraphImpactCommand implements Command {
     public int run(CommandContext context, Args args) {
         ImpactTarget target = target(args);
         if (target == null) {
-            context.err().println("Missing required parameter: exactly one of --file, --symbol, --sql-table, or --scenario");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "GRAPH_IMPACT_TARGET_MISSING",
+                    new String[]{"exactly one of --file|--symbol|--sql-table|--scenario"},
+                    "dhk graph impact --file <path>",
+                    "docs/GRAPH.md");
         }
         Path projectRoot = PathUtil.resolveProjectRoot(args, context.workingDirectory());
         try {

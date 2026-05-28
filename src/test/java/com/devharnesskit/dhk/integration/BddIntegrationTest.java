@@ -159,6 +159,45 @@ final class BddIntegrationTest {
     }
 
     @Test
+    void bddUsageInvalidKeyAndNotFoundErrorsAreActionable() {
+        Harness missingAddArgs = new Harness(tempDir);
+        int missingAddArgsExit = new CommandRouter().run(new String[]{
+                "bdd", "add", "--project-root", "demo", "--feature", "order-query"
+        }, missingAddArgs.context());
+        assertEquals(ExitCodes.USAGE_ERROR, missingAddArgsExit);
+        assertTrue(missingAddArgs.stderr().contains("error_code: BDD_ADD_ARGUMENTS_MISSING"));
+        assertTrue(missingAddArgs.stderr().contains("missing:"));
+        assertTrue(missingAddArgs.stderr().contains("--scenario-title"));
+
+        Harness invalidKey = new Harness(tempDir);
+        int invalidKeyExit = new CommandRouter().run(new String[]{
+                "bdd", "add", "--project-root", "demo",
+                "--feature", "order/query",
+                "--title", "订单查询",
+                "--scenario", "order-query-happy-path",
+                "--scenario-title", "分页查询订单成功"
+        }, invalidKey.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, invalidKeyExit);
+        assertTrue(invalidKey.stderr().contains("error_code: BDD_ADD_INVALID_KEY"));
+        assertTrue(invalidKey.stderr().contains("next_command:"));
+
+        Harness showMissing = new Harness(tempDir);
+        int showMissingExit = new CommandRouter().run(new String[]{
+                "bdd", "show", "--project-root", "demo", "--scenario", "missing-scenario"
+        }, showMissing.context());
+        assertEquals(ExitCodes.NOT_FOUND, showMissingExit);
+        assertTrue(showMissing.stderr().contains("error_code: BDD_SCENARIO_NOT_FOUND"));
+        assertTrue(showMissing.stderr().contains("next_action:"));
+
+        Harness evidenceMissingArgs = new Harness(tempDir);
+        int evidenceMissingArgsExit = new CommandRouter().run(new String[]{
+                "bdd", "evidence", "add", "--project-root", "demo", "--scenario", "missing-scenario"
+        }, evidenceMissingArgs.context());
+        assertEquals(ExitCodes.USAGE_ERROR, evidenceMissingArgsExit);
+        assertTrue(evidenceMissingArgs.stderr().contains("error_code: BDD_EVIDENCE_ADD_ARGUMENTS_MISSING"));
+    }
+
+    @Test
     void bddAddMissingCoreStepsCreatesDraftAndSensitiveInputIsRejected() throws Exception {
         Harness draft = new Harness(tempDir);
         int draftExit = new CommandRouter().run(new String[]{

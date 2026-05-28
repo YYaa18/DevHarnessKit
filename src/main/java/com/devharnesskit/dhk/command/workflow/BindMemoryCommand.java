@@ -6,6 +6,7 @@ import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.MemoryItem;
 import com.devharnesskit.dhk.model.workflow.WorkflowRun;
@@ -35,12 +36,14 @@ public final class BindMemoryCommand implements Command {
         String runKey = args.option("run").trim();
         String memoryRaw = args.option("memory-id").trim();
         if (runKey.length() == 0 || memoryRaw.length() == 0) {
-            context.err().println("Missing required parameters: --run, --memory-id");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "WORKFLOW_BIND_MEMORY_ARGUMENTS_MISSING",
+                    new String[]{"--run", "--memory-id"},
+                    "dhk workflow bind-memory --run <run> --memory-id <id>",
+                    "docs/GOAL_CONFIGURATION.md");
         }
-        long memoryId = parseLong(context, memoryRaw, "memory-id");
+        long memoryId = parseLong(context, args, memoryRaw, "memory-id");
         if (memoryId <= 0) {
-            return ExitCodes.USAGE_ERROR;
+            return ExitCodes.VALIDATION_ERROR;
         }
         String type = args.option("type", "read").trim();
         if (!isMemoryBindingType(type)) {
@@ -60,13 +63,15 @@ public final class BindMemoryCommand implements Command {
             migrationRunner.migrate(connection, context.clock());
             WorkflowRun run = runRepository.findByKey(connection, runKey);
             if (run == null) {
-                context.err().println("Workflow run not found: " + runKey);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "WORKFLOW_RUN_NOT_FOUND",
+                        "workflow run", runKey, "dhk workflow status --run <run>",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             MemoryItem memory = memoryRepository.findById(connection, run.projectKey(), memoryId);
             if (memory == null) {
-                context.err().println("Memory not found: " + memoryId);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "WORKFLOW_MEMORY_NOT_FOUND",
+                        "memory", Long.toString(memoryId), "dhk memory list",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             String phaseKey = phase.length() == 0 ? run.currentPhaseKey() : phase;
             long id = artifactService.bindMemory(connection, run, memoryId, type, phaseKey,
@@ -81,11 +86,14 @@ public final class BindMemoryCommand implements Command {
         }
     }
 
-    private long parseLong(CommandContext context, String raw, String name) {
+    private long parseLong(CommandContext context, Args args, String raw, String name) {
         try {
             return Long.parseLong(raw);
         } catch (NumberFormatException ex) {
-            context.err().println("Invalid " + name + ": " + raw);
+            CommandErrorGuidance.invalidNumber(context, args, "WORKFLOW_BIND_MEMORY_INVALID_ID",
+                    name, raw, name + " must be a positive integer.",
+                    "dhk workflow bind-memory --run <run> --memory-id <id>",
+                    "docs/GOAL_CONFIGURATION.md");
             return -1L;
         }
     }

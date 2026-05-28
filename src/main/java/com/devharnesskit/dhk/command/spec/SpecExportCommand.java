@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.export.SpecContextRenderer;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.spec.SpecChange;
 import com.devharnesskit.dhk.repository.ProjectRepository;
@@ -39,8 +40,9 @@ public final class SpecExportCommand implements Command {
     public int run(CommandContext context, Args args) {
         String changeKey = args.option("change").trim();
         if (changeKey.length() == 0) {
-            context.err().println("Missing required parameter: --change");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "SPEC_EXPORT_CHANGE_MISSING",
+                    new String[]{"--change"}, "dhk spec export --change <change>",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         Path projectRoot = SpecCommandSupport.projectRoot(args, context);
         Path out = args.hasOption("out")
@@ -51,8 +53,9 @@ public final class SpecExportCommand implements Command {
                     projectService, projectRepository, migrationRunner);
             SpecChange change = changeRepository.findByKey(connection, changeKey);
             if (!SpecCommandSupport.belongsToProject(change, project)) {
-                context.err().println("Spec change not found: " + changeKey);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "SPEC_CHANGE_NOT_FOUND",
+                        "spec change", changeKey, "dhk spec status --change <change>",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             String markdown = exportService.renderFull(connection, change, context.clock().now().toString());
             markdown = sensitiveDataGuard.redact(markdown);

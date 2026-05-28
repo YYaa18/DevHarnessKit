@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.export.BddContextRenderer;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.bdd.BddFeature;
 import com.devharnesskit.dhk.model.bdd.BddScenario;
@@ -45,8 +46,10 @@ public final class BddExportCommand implements Command {
                     projectService, projectRepository, migrationRunner);
             List<BddFeature> features = selectedFeatures(connection, project, featureFilter);
             if (featureFilter.length() > 0 && features.isEmpty()) {
-                context.err().println("BDD feature not found: " + featureFilter);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "BDD_FEATURE_NOT_FOUND",
+                        "BDD feature", featureFilter,
+                        "dhk bdd show --feature <feature>",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             List<BddScenarioView> views = scenarioViews(connection, project, features);
             String contextMarkdown = guard(renderer.renderContext(features, views, context.clock().now().toString()));

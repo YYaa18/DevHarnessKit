@@ -6,6 +6,7 @@ import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.export.RecoveryContextRenderer;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.model.Checkpoint;
 import com.devharnesskit.dhk.model.MemoryItem;
 import com.devharnesskit.dhk.model.Project;
@@ -47,8 +48,9 @@ public final class RecoverCommand implements Command {
 
     public int run(CommandContext context, Args args) {
         if (!args.hasFlag("latest")) {
-            context.err().println("Missing required flag: --latest");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "MEMORY_RECOVER_LATEST_MISSING",
+                    new String[]{"--latest"}, "dhk memory recover --latest",
+                    "README.md#core-path");
         }
         String module = args.option("module", "").trim();
         Path projectRoot = PathUtil.resolveProjectRoot(args, context.workingDirectory());
@@ -62,10 +64,10 @@ public final class RecoverCommand implements Command {
             }
             Checkpoint checkpoint = checkpointRepository.latest(connection, project.projectKey(), module);
             if (checkpoint == null) {
-                context.err().println(module.length() == 0
-                        ? "No checkpoint found."
-                        : "No checkpoint found for module: " + module);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "MEMORY_CHECKPOINT_NOT_FOUND",
+                        "checkpoint", module.length() == 0 ? "latest" : module,
+                        "dhk memory checkpoint --task <task> \"<summary>\"",
+                        "README.md#core-path");
             }
             List<MemoryItem> memory = memoryRepository.listConfirmedForExport(connection, project.projectKey(),
                     checkpoint.moduleName(), 20);

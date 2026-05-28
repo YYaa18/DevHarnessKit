@@ -5,6 +5,7 @@ import com.devharnesskit.dhk.cli.Command;
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.SearchResult;
@@ -41,8 +42,8 @@ public final class SearchCommand implements Command {
     public int run(CommandContext context, Args args) {
         String query = args.option("q").trim();
         if (query.length() == 0) {
-            context.err().println("Missing required parameter: --q");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "MEMORY_SEARCH_QUERY_MISSING",
+                    new String[]{"--q"}, "dhk memory list", "README.md#core-path");
         }
         String status = args.option("status", "").trim();
         if (status.length() > 0 && !MemoryStatus.isAllowed(status)) {
@@ -51,7 +52,7 @@ public final class SearchCommand implements Command {
                     "dhk memory list --status confirmed", "README.md#core-path");
         }
         String module = args.option("module", "").trim();
-        int limit = parseLimit(context, args.option("limit", "20"));
+        int limit = parseLimit(context, args, args.option("limit", "20"));
         if (limit <= 0) {
             return ExitCodes.VALIDATION_ERROR;
         }
@@ -126,16 +127,20 @@ public final class SearchCommand implements Command {
         ));
     }
 
-    private int parseLimit(CommandContext context, String rawValue) {
+    private int parseLimit(CommandContext context, Args args, String rawValue) {
         try {
             int value = Integer.parseInt(rawValue);
             if (value < 1) {
-                context.err().println("Invalid limit, expected positive integer: " + rawValue);
+                CommandErrorGuidance.invalidNumber(context, args, "INVALID_MEMORY_LIMIT",
+                        "memory limit", rawValue, "limit must be a positive integer.",
+                        "dhk memory search --q \"<query>\" --limit 20", "README.md#core-path");
                 return -1;
             }
             return Math.min(value, 100);
         } catch (NumberFormatException ex) {
-            context.err().println("Invalid limit, expected positive integer: " + rawValue);
+            CommandErrorGuidance.invalidNumber(context, args, "INVALID_MEMORY_LIMIT",
+                    "memory limit", rawValue, "limit must be a positive integer.",
+                    "dhk memory search --q \"<query>\" --limit 20", "README.md#core-path");
             return -1;
         }
     }

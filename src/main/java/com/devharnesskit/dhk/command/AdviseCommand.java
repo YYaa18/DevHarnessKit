@@ -4,6 +4,7 @@ import com.devharnesskit.dhk.cli.Args;
 import com.devharnesskit.dhk.cli.Command;
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.brief.BriefRequest;
 import com.devharnesskit.dhk.model.brief.BriefResult;
@@ -29,8 +30,9 @@ public final class AdviseCommand implements Command {
         Path projectRoot = PathUtil.resolveProjectRoot(args, context.workingDirectory());
         String task = args.option("task", "").trim();
         if (task.length() == 0) {
-            context.err().println("Missing required parameter: --task");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "ADVISE_TASK_MISSING",
+                    new String[]{"--task"}, "dhk advise --task \"<task>\"",
+                    "README.md#quickstart");
         }
         String mode = args.option("mode", "recommend");
         String preset = args.option("preset", "springboot-manual-ide-test");

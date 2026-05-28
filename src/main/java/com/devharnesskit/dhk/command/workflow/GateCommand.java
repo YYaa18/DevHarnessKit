@@ -6,6 +6,7 @@ import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.workflow.WorkflowRun;
 import com.devharnesskit.dhk.repository.workflow.WorkflowEventRepository;
@@ -38,18 +39,25 @@ public final class GateCommand implements Command {
         String runKey = args.option("run").trim();
         String gateKey = args.option("gate").trim();
         if (runKey.length() == 0 || gateKey.length() == 0) {
-            context.err().println("Missing required parameters: --run, --gate");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "WORKFLOW_GATE_ARGUMENTS_MISSING",
+                    new String[]{"--run", "--gate"},
+                    "dhk workflow gate pass --run <run> --gate <gate> --summary \"<summary>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         String summary = args.option("summary", "").trim();
         String reason = args.option("reason", "").trim();
         if ("pass".equals(action) && summary.length() == 0) {
-            context.err().println("Missing required parameter for gate pass: --summary");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "WORKFLOW_GATE_SUMMARY_MISSING",
+                    new String[]{"--summary"},
+                    "dhk workflow gate pass --run " + runKey + " --gate " + gateKey + " --summary \"<summary>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (("fail".equals(action) || "waive".equals(action)) && reason.length() == 0) {
-            context.err().println("Missing required parameter for gate " + action + ": --reason");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "WORKFLOW_GATE_REASON_MISSING",
+                    new String[]{"--reason"},
+                    "dhk workflow gate " + action + " --run " + runKey + " --gate " + gateKey
+                            + " --reason \"<reason>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         String evidence = args.option("evidence", "");
         if (WorkflowCommandSupport.rejectSensitive(context, sensitiveDataGuard, "workflow gate",
@@ -61,8 +69,9 @@ public final class GateCommand implements Command {
         try (Connection connection = connectionFactory.open(projectRoot)) {
             WorkflowRun run = runRepository.findByKey(connection, runKey);
             if (run == null) {
-                context.err().println("Workflow run not found: " + runKey);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "WORKFLOW_RUN_NOT_FOUND",
+                        "workflow run", runKey, "dhk workflow status --run <run>",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             WorkflowGateService.GateUpdateResult result = transactionTemplate.execute(connection,
                     new TransactionTemplate.Work<WorkflowGateService.GateUpdateResult>() {

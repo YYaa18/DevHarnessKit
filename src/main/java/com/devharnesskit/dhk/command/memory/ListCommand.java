@@ -5,6 +5,7 @@ import com.devharnesskit.dhk.cli.Command;
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.MemoryItem;
 import com.devharnesskit.dhk.model.Project;
@@ -44,7 +45,7 @@ public final class ListCommand implements Command {
         }
         String module = args.option("module", "").trim();
         String tag = args.option("tag", "").trim();
-        int limit = parseLimit(context, args.option("limit", "20"));
+        int limit = parseLimit(context, args, args.option("limit", "20"));
         if (limit <= 0) {
             return ExitCodes.VALIDATION_ERROR;
         }
@@ -120,16 +121,20 @@ public final class ListCommand implements Command {
         ));
     }
 
-    private int parseLimit(CommandContext context, String rawValue) {
+    private int parseLimit(CommandContext context, Args args, String rawValue) {
         try {
             int value = Integer.parseInt(rawValue);
             if (value < 1) {
-                context.err().println("Invalid limit, expected positive integer: " + rawValue);
+                CommandErrorGuidance.invalidNumber(context, args, "INVALID_MEMORY_LIMIT",
+                        "memory limit", rawValue, "limit must be a positive integer.",
+                        "dhk memory list --limit 20", "README.md#core-path");
                 return -1;
             }
             return Math.min(value, 100);
         } catch (NumberFormatException ex) {
-            context.err().println("Invalid limit, expected positive integer: " + rawValue);
+            CommandErrorGuidance.invalidNumber(context, args, "INVALID_MEMORY_LIMIT",
+                    "memory limit", rawValue, "limit must be a positive integer.",
+                    "dhk memory list --limit 20", "README.md#core-path");
             return -1;
         }
     }

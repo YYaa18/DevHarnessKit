@@ -6,6 +6,8 @@ import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
+import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.workflow.WorkflowArtifact;
 import com.devharnesskit.dhk.model.workflow.WorkflowRun;
 import com.devharnesskit.dhk.repository.workflow.WorkflowArtifactRepository;
@@ -24,21 +26,24 @@ public final class ArtifactCommand implements Command {
     public int run(CommandContext context, Args args) {
         String action = args.positional(2);
         if (!"list".equals(action)) {
-            context.err().println("Unknown workflow artifact action: " + action);
-            return ExitCodes.USAGE_ERROR;
+            return EnumGuidance.printInvalid(context, args, "INVALID_WORKFLOW_ARTIFACT_ACTION",
+                    "workflow artifact action", action, new String[]{"list"}, new String[0],
+                    "dhk workflow artifact list --run <run>", "docs/GOAL_CONFIGURATION.md");
         }
         String runKey = args.option("run").trim();
         if (runKey.length() == 0) {
-            context.err().println("Missing required parameter: --run");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "WORKFLOW_ARTIFACT_RUN_MISSING",
+                    new String[]{"--run"}, "dhk workflow artifact list --run <run>",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         Path projectRoot = WorkflowCommandSupport.projectRoot(args, context);
         try (Connection connection = connectionFactory.open(projectRoot)) {
             migrationRunner.migrate(connection, context.clock());
             WorkflowRun run = runRepository.findByKey(connection, runKey);
             if (run == null) {
-                context.err().println("Workflow run not found: " + runKey);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "WORKFLOW_RUN_NOT_FOUND",
+                        "workflow run", runKey, "dhk workflow status --run <run>",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             List<WorkflowArtifact> artifacts = artifactRepository.listByRun(connection, runKey);
             for (WorkflowArtifact artifact : artifacts) {

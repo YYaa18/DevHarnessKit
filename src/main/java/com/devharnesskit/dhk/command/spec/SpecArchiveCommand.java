@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.spec.SpecAcceptance;
 import com.devharnesskit.dhk.model.spec.SpecChange;
@@ -45,8 +46,10 @@ public final class SpecArchiveCommand implements Command {
         String changeKey = args.option("change").trim();
         String reason = args.option("reason").trim();
         if (changeKey.length() == 0 || reason.length() == 0) {
-            context.err().println("Missing required parameters: --change, --reason");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "SPEC_ARCHIVE_ARGUMENTS_MISSING",
+                    new String[]{"--change", "--reason"},
+                    "dhk spec archive --change <change> --reason \"<reason>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (SpecCommandSupport.rejectSensitive(context, sensitiveDataGuard, "spec archive",
                 changeKey, reason)) {
@@ -58,17 +61,25 @@ public final class SpecArchiveCommand implements Command {
                     projectService, projectRepository, migrationRunner);
             SpecChange change = changeRepository.findByKey(connection, changeKey);
             if (!SpecCommandSupport.belongsToProject(change, project)) {
-                context.err().println("Spec change not found: " + changeKey);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "SPEC_CHANGE_NOT_FOUND",
+                        "spec change", changeKey, "dhk spec status --change <change>",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             List<SpecTask> tasks = taskRepository.listByChange(connection, change.changeKey());
             List<SpecAcceptance> acceptances = acceptanceRepository.listByChange(connection, change.changeKey());
             int openTasks = statusService.openTaskCount(tasks);
             int openAcceptances = statusService.openAcceptanceCount(acceptances);
             if (openTasks > 0 || openAcceptances > 0) {
-                context.err().println("Spec cannot be archived with open tasks or acceptance.");
-                context.err().println("open_task_count: " + openTasks);
-                context.err().println("open_acceptance_count: " + openAcceptances);
+                com.devharnesskit.dhk.guidance.ActionableError error =
+                        com.devharnesskit.dhk.guidance.ActionableError.builder("SPEC_ARCHIVE_BLOCKED",
+                                "Spec cannot be archived with open tasks or acceptance.")
+                                .reason("All spec tasks must be done/skipped and all acceptance must be passed/waived before archive.")
+                                .detail("open_task_count", Integer.toString(openTasks))
+                                .detail("open_acceptance_count", Integer.toString(openAcceptances))
+                                .nextCommand("dhk spec status --change " + changeKey)
+                                .docs("docs/GOAL_CONFIGURATION.md")
+                                .build();
+                CommandErrorGuidance.render(context, args, error);
                 return ExitCodes.VALIDATION_ERROR;
             }
             final SpecChange selectedChange = change;

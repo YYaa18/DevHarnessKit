@@ -6,6 +6,7 @@ import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.model.MemoryItem;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.repository.FtsRepository;
@@ -41,17 +42,17 @@ public final class ConfirmCommand implements Command {
 
     public int run(CommandContext context, Args args) {
         if (!args.hasOption("id")) {
-            context.err().println("Missing required parameter: --id");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "MEMORY_CONFIRM_ID_MISSING",
+                    new String[]{"--id"}, "dhk memory list --status draft", "README.md#core-path");
         }
-        long id = parseId(context, args.option("id"));
+        long id = parseId(context, args, args.option("id"));
         if (id <= 0) {
             return ExitCodes.VALIDATION_ERROR;
         }
 
         Integer requestedConfidence = null;
         if (args.hasOption("confidence")) {
-            requestedConfidence = parseConfidence(context, args.option("confidence"));
+            requestedConfidence = parseConfidence(context, args, args.option("confidence"));
             if (requestedConfidence == null) {
                 return ExitCodes.VALIDATION_ERROR;
             }
@@ -65,8 +66,8 @@ public final class ConfirmCommand implements Command {
             }
             MemoryItem item = memoryRepository.findById(connection, project.projectKey(), id);
             if (item == null) {
-                context.err().println("Memory item not found: " + id);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "MEMORY_ITEM_NOT_FOUND",
+                        "memory item", Long.toString(id), "dhk memory list", "README.md#core-path");
             }
             int confidence = requestedConfidence == null ? Math.max(item.confidence(), 70) : requestedConfidence.intValue();
             String confirmedBy = args.option("confirmed-by", "manual").trim();
@@ -104,25 +105,31 @@ public final class ConfirmCommand implements Command {
         }
     }
 
-    private long parseId(CommandContext context, String rawValue) {
+    private long parseId(CommandContext context, Args args, String rawValue) {
         try {
             return Long.parseLong(rawValue);
         } catch (NumberFormatException ex) {
-            context.err().println("Invalid id, expected integer: " + rawValue);
+            CommandErrorGuidance.invalidNumber(context, args, "MEMORY_CONFIRM_INVALID_ID",
+                    "memory id", rawValue, "memory id must be a positive integer.",
+                    "dhk memory list", "README.md#core-path");
             return -1L;
         }
     }
 
-    private Integer parseConfidence(CommandContext context, String rawValue) {
+    private Integer parseConfidence(CommandContext context, Args args, String rawValue) {
         try {
             int value = Integer.parseInt(rawValue);
             if (value < 0 || value > 100) {
-                context.err().println("Invalid confidence, expected 0..100: " + rawValue);
+                CommandErrorGuidance.invalidNumber(context, args, "MEMORY_CONFIRM_INVALID_CONFIDENCE",
+                        "memory confidence", rawValue, "confidence must be an integer from 0 to 100.",
+                        "dhk memory confirm --id <id> --confidence 70", "README.md#core-path");
                 return null;
             }
             return Integer.valueOf(value);
         } catch (NumberFormatException ex) {
-            context.err().println("Invalid confidence, expected integer 0..100: " + rawValue);
+            CommandErrorGuidance.invalidNumber(context, args, "MEMORY_CONFIRM_INVALID_CONFIDENCE",
+                    "memory confidence", rawValue, "confidence must be an integer from 0 to 100.",
+                    "dhk memory confirm --id <id> --confidence 70", "README.md#core-path");
             return null;
         }
     }

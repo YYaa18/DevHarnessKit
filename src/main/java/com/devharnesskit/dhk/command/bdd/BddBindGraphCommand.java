@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.bdd.BddBinding;
 import com.devharnesskit.dhk.repository.ProjectRepository;
@@ -36,12 +37,16 @@ public final class BddBindGraphCommand implements Command {
         String relation = defaultIfBlank(args.option("relation", "impacts"), "impacts");
         GraphTarget target = target(args);
         if (scenarioKey.length() == 0 || target == null) {
-            context.err().println("Missing required parameters: --scenario and exactly one of --file, --symbol, --sql-table");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "BDD_BIND_GRAPH_ARGUMENTS_MISSING",
+                    new String[]{"--scenario", "exactly one of --file|--symbol|--sql-table"},
+                    "dhk bdd bind-graph --scenario <scenario> --file <path>",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (!BddService.isKeyAllowed(scenarioKey) || !BddService.isKeyAllowed(relation)) {
-            context.err().println("Invalid BDD graph key. Scenario and relation use letters, numbers, dot, underscore, or dash.");
-            return ExitCodes.VALIDATION_ERROR;
+            return CommandErrorGuidance.invalidKey(context, args, "BDD_BIND_GRAPH_INVALID_KEY",
+                    "BDD graph key", scenarioKey + "/" + relation,
+                    "dhk bdd bind-graph --scenario <scenario> --file <path>",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (BddCommandSupport.rejectSensitive(context, sensitiveDataGuard, "bdd bind-graph",
                 scenarioKey, target.bindingType, target.bindingKey, relation, args.option("metadata", ""))) {
@@ -53,8 +58,9 @@ public final class BddBindGraphCommand implements Command {
             final Project project = BddCommandSupport.ensureProject(context, projectRoot, connection,
                     projectService, projectRepository, migrationRunner);
             if (bddService.findScenario(connection, project, scenarioKey) == null) {
-                context.err().println("BDD scenario not found: " + scenarioKey);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "BDD_SCENARIO_NOT_FOUND",
+                        "BDD scenario", scenarioKey, "dhk bdd show --scenario <scenario>",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             final String selectedScenarioKey = scenarioKey;
             final String selectedRelation = relation;

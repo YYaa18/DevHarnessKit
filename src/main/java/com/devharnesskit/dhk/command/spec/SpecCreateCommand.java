@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.spec.SpecChange;
@@ -36,12 +37,16 @@ public final class SpecCreateCommand implements Command {
         String changeKey = args.option("change").trim();
         String title = args.option("title").trim();
         if (changeKey.length() == 0 || title.length() == 0) {
-            context.err().println("Missing required parameters: --change, --title");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "SPEC_CREATE_ARGUMENTS_MISSING",
+                    new String[]{"--change", "--title"},
+                    "dhk spec create --change <key> --title \"<title>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (!SpecCommandSupport.isKeyAllowed(changeKey)) {
-            context.err().println("Invalid change key: " + changeKey);
-            return ExitCodes.VALIDATION_ERROR;
+            return CommandErrorGuidance.invalidKey(context, args, "INVALID_SPEC_CHANGE_KEY",
+                    "spec change key", changeKey,
+                    "dhk spec create --change change-1 --title \"<title>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         String summary = args.option("summary", "").trim();
         String module = args.option("module", "global").trim();

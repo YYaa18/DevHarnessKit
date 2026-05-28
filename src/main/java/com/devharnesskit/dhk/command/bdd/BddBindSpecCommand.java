@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.bdd.BddBinding;
 import com.devharnesskit.dhk.model.spec.SpecAcceptance;
@@ -43,13 +44,17 @@ public final class BddBindSpecCommand implements Command {
         String acceptanceKey = args.option("acceptance").trim();
         String relation = defaultIfBlank(args.option("relation", "verifies"), "verifies");
         if (scenarioKey.length() == 0 || changeKey.length() == 0 || acceptanceKey.length() == 0) {
-            context.err().println("Missing required parameters: --scenario, --change, --acceptance");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "BDD_BIND_SPEC_ARGUMENTS_MISSING",
+                    new String[]{"--scenario", "--change", "--acceptance"},
+                    "dhk bdd bind-spec --scenario <scenario> --change <change> --acceptance <acceptance>",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (!BddService.isKeyAllowed(scenarioKey) || !BddService.isKeyAllowed(changeKey)
                 || !BddService.isKeyAllowed(acceptanceKey) || !BddService.isKeyAllowed(relation)) {
-            context.err().println("Invalid BDD/spec key. Use letters, numbers, dot, underscore, or dash.");
-            return ExitCodes.VALIDATION_ERROR;
+            return CommandErrorGuidance.invalidKey(context, args, "BDD_BIND_SPEC_INVALID_KEY",
+                    "BDD/spec key", scenarioKey + "/" + changeKey + "/" + acceptanceKey,
+                    "dhk bdd bind-spec --scenario <scenario> --change <change> --acceptance <acceptance>",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (BddCommandSupport.rejectSensitive(context, sensitiveDataGuard, "bdd bind-spec",
                 scenarioKey, changeKey, acceptanceKey, relation)) {
@@ -61,18 +66,22 @@ public final class BddBindSpecCommand implements Command {
             final Project project = BddCommandSupport.ensureProject(context, projectRoot, connection,
                     projectService, projectRepository, migrationRunner);
             if (bddService.findScenario(connection, project, scenarioKey) == null) {
-                context.err().println("BDD scenario not found: " + scenarioKey);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "BDD_SCENARIO_NOT_FOUND",
+                        "BDD scenario", scenarioKey, "dhk bdd show --scenario <scenario>",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             SpecChange change = changeRepository.findByKey(connection, changeKey);
             if (change == null || !project.projectKey().equals(change.projectKey())) {
-                context.err().println("Spec change not found: " + changeKey);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "SPEC_CHANGE_NOT_FOUND",
+                        "spec change", changeKey, "dhk spec status --change <change>",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             SpecAcceptance acceptance = acceptanceRepository.findByKey(connection, changeKey, acceptanceKey);
             if (acceptance == null) {
-                context.err().println("Spec acceptance not found: " + acceptanceKey);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "SPEC_ACCEPTANCE_NOT_FOUND",
+                        "spec acceptance", acceptanceKey,
+                        "dhk spec acceptance add --change " + changeKey + " --key <acceptance> --text \"<text>\"",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             final String selectedScenarioKey = scenarioKey;
             final String selectedBindingKey = changeKey + ":" + acceptanceKey;

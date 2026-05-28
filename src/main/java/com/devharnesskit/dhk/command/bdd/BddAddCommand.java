@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.bdd.BddScenarioView;
@@ -42,12 +43,16 @@ public final class BddAddCommand implements Command {
         String scenarioTitle = args.option("scenario-title").trim();
         if (feature.length() == 0 || title.length() == 0
                 || scenario.length() == 0 || scenarioTitle.length() == 0) {
-            context.err().println("Missing required parameters: --feature, --title, --scenario, --scenario-title");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "BDD_ADD_ARGUMENTS_MISSING",
+                    new String[]{"--feature", "--title", "--scenario", "--scenario-title"},
+                    "dhk bdd add --feature <feature> --title \"<title>\" --scenario <scenario> --scenario-title \"<title>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (!BddService.isKeyAllowed(feature) || !BddService.isKeyAllowed(scenario)) {
-            context.err().println("Invalid BDD key. Use letters, numbers, dot, underscore, or dash.");
-            return ExitCodes.VALIDATION_ERROR;
+            return CommandErrorGuidance.invalidKey(context, args, "BDD_ADD_INVALID_KEY",
+                    "BDD key", feature + "/" + scenario,
+                    "dhk bdd add --feature <feature-key> --title \"<title>\" --scenario <scenario-key> --scenario-title \"<title>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         String module = defaultIfBlank(args.option("module", "global"), "global");
         String description = args.option("description", "").trim();

@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.workflow.WorkflowRun;
@@ -44,8 +45,10 @@ public final class StartCommand implements Command {
         String workflowKey = args.option("workflow").trim();
         String task = args.option("task").trim();
         if (workflowKey.length() == 0 || task.length() == 0) {
-            context.err().println("Missing required parameters: --workflow, --task");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "WORKFLOW_START_ARGUMENTS_MISSING",
+                    new String[]{"--workflow", "--task"},
+                    "dhk workflow start --workflow api-change --task \"<task>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         String module = args.option("module", "global").trim();
         if (module.length() == 0) {
@@ -70,9 +73,10 @@ public final class StartCommand implements Command {
                     projectService, projectRepository, migrationRunner);
             WorkflowTemplate template = templateRepository.findByKey(connection, workflowKey);
             if (template == null) {
-                context.err().println("Workflow template not found: " + workflowKey);
-                context.err().println("Run `dhk workflow template seed --project-root <path>` first.");
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "WORKFLOW_TEMPLATE_NOT_FOUND",
+                        "workflow template", workflowKey,
+                        "dhk workflow template seed --project-root " + projectRoot,
+                        "docs/GOAL_CONFIGURATION.md");
             }
             final Project currentProject = project;
             final WorkflowTemplate selectedTemplate = template;

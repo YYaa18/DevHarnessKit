@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.spec.SpecChange;
@@ -41,8 +42,10 @@ public final class SpecTaskCommand implements Command {
         if ("update".equals(action)) {
             return update(context, args);
         }
-        context.err().println("Unknown spec task action: " + action);
-        return ExitCodes.USAGE_ERROR;
+        return EnumGuidance.printInvalid(context, args, "INVALID_SPEC_TASK_ACTION", "spec task action",
+                action, new String[]{"add", "update"}, new String[0],
+                "dhk spec task add --change <change> --task <task> --title \"<title>\"",
+                "docs/GOAL_CONFIGURATION.md");
     }
 
     private int add(CommandContext context, Args args) {
@@ -50,12 +53,16 @@ public final class SpecTaskCommand implements Command {
         String taskKey = args.option("task").trim();
         String title = args.option("title").trim();
         if (changeKey.length() == 0 || taskKey.length() == 0 || title.length() == 0) {
-            context.err().println("Missing required parameters: --change, --task, --title");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "SPEC_TASK_ADD_ARGUMENTS_MISSING",
+                    new String[]{"--change", "--task", "--title"},
+                    "dhk spec task add --change <change> --task <task> --title \"<title>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (!SpecCommandSupport.isKeyAllowed(taskKey)) {
-            context.err().println("Invalid task key: " + taskKey);
-            return ExitCodes.VALIDATION_ERROR;
+            return CommandErrorGuidance.invalidKey(context, args, "INVALID_SPEC_TASK_KEY",
+                    "spec task key", taskKey,
+                    "dhk spec task add --change <change> --task task-1 --title \"<title>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         String description = args.option("description", "").trim();
         String phase = args.option("phase", "").trim();
@@ -69,8 +76,9 @@ public final class SpecTaskCommand implements Command {
                     projectService, projectRepository, migrationRunner);
             SpecChange change = changeRepository.findByKey(connection, changeKey);
             if (!SpecCommandSupport.belongsToProject(change, project)) {
-                context.err().println("Spec change not found: " + changeKey);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "SPEC_CHANGE_NOT_FOUND",
+                        "spec change", changeKey, "dhk spec status --change <change>",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             final SpecChange selectedChange = change;
             final String selectedTask = taskKey;
@@ -98,8 +106,10 @@ public final class SpecTaskCommand implements Command {
         String rawStatus = args.option("status").trim();
         String status = EnumGuidance.normalizeSpecTaskStatus(rawStatus);
         if (changeKey.length() == 0 || taskKey.length() == 0 || status.length() == 0) {
-            context.err().println("Missing required parameters: --change, --task, --status");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "SPEC_TASK_UPDATE_ARGUMENTS_MISSING",
+                    new String[]{"--change", "--task", "--status"},
+                    "dhk spec task update --change <change> --task <task> --status done --evidence \"<evidence>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (!SpecTaskService.isTaskStatusAllowed(status)) {
             return EnumGuidance.printInvalid(context, args, "INVALID_SPEC_TASK_STATUS", "spec task status",
@@ -118,13 +128,16 @@ public final class SpecTaskCommand implements Command {
                     projectService, projectRepository, migrationRunner);
             SpecChange change = changeRepository.findByKey(connection, changeKey);
             if (!SpecCommandSupport.belongsToProject(change, project)) {
-                context.err().println("Spec change not found: " + changeKey);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "SPEC_CHANGE_NOT_FOUND",
+                        "spec change", changeKey, "dhk spec status --change <change>",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             SpecTask task = taskRepository.findByKey(connection, changeKey, taskKey);
             if (task == null) {
-                context.err().println("Spec task not found: " + taskKey);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "SPEC_TASK_NOT_FOUND",
+                        "spec task", taskKey,
+                        "dhk spec task add --change " + changeKey + " --task <task> --title \"<title>\"",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             final SpecChange selectedChange = change;
             final SpecTask selectedTask = task;

@@ -233,7 +233,9 @@ final class MemoryExportRecoverIntegrationTest {
         }, recover.context());
 
         assertEquals(ExitCodes.NOT_FOUND, recoverExit);
-        assertTrue(recover.stderr().contains("No checkpoint found for module: order"));
+        assertTrue(recover.stderr().contains("error_code: MEMORY_CHECKPOINT_NOT_FOUND"));
+        assertTrue(recover.stderr().contains("checkpoint not found: order"));
+        assertTrue(recover.stderr().contains("next_command:"));
     }
 
     @Test

@@ -6,6 +6,7 @@ import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.spec.SpecAcceptance;
 import com.devharnesskit.dhk.model.spec.SpecChange;
@@ -38,8 +39,9 @@ public final class SpecStatusCommand implements Command {
     public int run(CommandContext context, Args args) {
         String changeKey = args.option("change").trim();
         if (changeKey.length() == 0) {
-            context.err().println("Missing required parameter: --change");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "SPEC_STATUS_CHANGE_MISSING",
+                    new String[]{"--change"}, "dhk spec status --change <change>",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         Path projectRoot = SpecCommandSupport.projectRoot(args, context);
         try (Connection connection = connectionFactory.open(projectRoot)) {
@@ -47,8 +49,9 @@ public final class SpecStatusCommand implements Command {
                     projectService, projectRepository, migrationRunner);
             SpecChange change = changeRepository.findByKey(connection, changeKey);
             if (!SpecCommandSupport.belongsToProject(change, project)) {
-                context.err().println("Spec change not found: " + changeKey);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "SPEC_CHANGE_NOT_FOUND",
+                        "spec change", changeKey, "dhk spec create --change <key> --title \"<title>\"",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             context.out().println("change: " + change.changeKey());
             context.out().println("title: " + change.title());

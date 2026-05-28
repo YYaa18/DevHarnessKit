@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.export.BddEvidenceRenderer;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.model.bdd.BddAdapterResult;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.repository.ProjectRepository;
@@ -46,8 +47,10 @@ public final class BddVerifyCommand implements Command {
         if (featureKey.length() > 0 && !BddService.isKeyAllowed(featureKey)
                 || scenarioKey.length() > 0 && !BddService.isKeyAllowed(scenarioKey)
                 || goalKey.length() > 0 && !BddService.isKeyAllowed(goalKey)) {
-            context.err().println("Invalid BDD/goal key. Use letters, numbers, dot, underscore, or dash.");
-            return ExitCodes.VALIDATION_ERROR;
+            return CommandErrorGuidance.invalidKey(context, args, "BDD_VERIFY_INVALID_KEY",
+                    "BDD/goal key", featureKey + "/" + scenarioKey + "/" + goalKey,
+                    "dhk bdd verify --scenario <scenario>",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         Path projectRoot = BddCommandSupport.projectRoot(args, context);
         try (Connection connection = connectionFactory.open(projectRoot)) {
@@ -56,8 +59,11 @@ public final class BddVerifyCommand implements Command {
             BddVerificationResult result = verificationService.evaluate(connection, project, bddService,
                     featureKey, scenarioKey, goalKey);
             if ((featureKey.length() > 0 || scenarioKey.length() > 0) && result.scenarioCount() == 0) {
-                context.err().println("BDD scenario selection not found");
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "BDD_SCENARIO_SELECTION_NOT_FOUND",
+                        "BDD scenario selection",
+                        scenarioKey.length() > 0 ? scenarioKey : featureKey,
+                        "dhk bdd show --feature <feature>",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             writeReports(projectRoot, result, context.clock().now().toString());
             if (JsonOutput.enabled(args)) {

@@ -87,6 +87,20 @@ final class GraphCommandIntegrationTest {
     }
 
     @Test
+    void graphImpactMissingTargetIsActionable() {
+        Harness harness = new Harness(tempDir);
+        int exit = new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", "demo-missing-target"
+        }, harness.context());
+
+        assertEquals(ExitCodes.USAGE_ERROR, exit);
+        assertTrue(harness.stderr().contains("error_code: GRAPH_IMPACT_TARGET_MISSING"));
+        assertTrue(harness.stderr().contains("missing:"));
+        assertTrue(harness.stderr().contains("--file|--symbol|--sql-table|--scenario"));
+        assertTrue(harness.stderr().contains("next_command:"));
+    }
+
+    @Test
     void graphDoctorReportsLiteProviderWithoutCgcRequirement() throws Exception {
         Path root = tempDir.resolve("demo-doctor-lite");
         Files.createDirectories(root);

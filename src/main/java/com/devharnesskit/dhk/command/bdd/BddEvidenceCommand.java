@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.bdd.BddEvidence;
@@ -55,8 +56,10 @@ public final class BddEvidenceCommand implements Command {
         if ("report".equals(action)) {
             return report(context, args);
         }
-        context.err().println("Unknown bdd evidence action: " + action);
-        return ExitCodes.USAGE_ERROR;
+        return EnumGuidance.printInvalid(context, args, "INVALID_BDD_EVIDENCE_ACTION",
+                "BDD evidence action", action, new String[]{"add", "junit", "report"}, new String[0],
+                "dhk bdd evidence add --scenario <scenario> --summary \"<summary>\"",
+                "docs/GOAL_CONFIGURATION.md");
     }
 
     private int add(CommandContext context, Args args) {
@@ -68,12 +71,16 @@ public final class BddEvidenceCommand implements Command {
         String summary = args.option("summary", "").trim();
         String command = args.option("command", "").trim();
         if (scenarioKey.length() == 0 || summary.length() == 0) {
-            context.err().println("Missing required parameters: --scenario, --summary");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "BDD_EVIDENCE_ADD_ARGUMENTS_MISSING",
+                    new String[]{"--scenario", "--summary"},
+                    "dhk bdd evidence add --scenario <scenario> --summary \"<summary>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (!BddService.isKeyAllowed(scenarioKey) || (goalKey.length() > 0 && !BddService.isKeyAllowed(goalKey))) {
-            context.err().println("Invalid BDD/goal key. Use letters, numbers, dot, underscore, or dash.");
-            return ExitCodes.VALIDATION_ERROR;
+            return CommandErrorGuidance.invalidKey(context, args, "BDD_EVIDENCE_ADD_INVALID_KEY",
+                    "BDD/goal key", scenarioKey + "/" + goalKey,
+                    "dhk bdd evidence add --scenario <scenario> --summary \"<summary>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (!BddService.isEvidenceTypeAllowed(type)) {
             return EnumGuidance.printInvalid(context, args, "INVALID_BDD_EVIDENCE_TYPE",
@@ -97,14 +104,16 @@ public final class BddEvidenceCommand implements Command {
             final Project project = BddCommandSupport.ensureProject(context, projectRoot, connection,
                     projectService, projectRepository, migrationRunner);
             if (bddService.findScenario(connection, project, scenarioKey) == null) {
-                context.err().println("BDD scenario not found: " + scenarioKey);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "BDD_SCENARIO_NOT_FOUND",
+                        "BDD scenario", scenarioKey, "dhk bdd show --scenario <scenario>",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             if (goalKey.length() > 0) {
                 GoalRun goal = goalRunRepository.findByKey(connection, goalKey);
                 if (goal == null || !project.projectKey().equals(goal.projectKey())) {
-                    context.err().println("Goal run not found: " + goalKey);
-                    return ExitCodes.NOT_FOUND;
+                    return CommandErrorGuidance.notFound(context, args, "GOAL_RUN_NOT_FOUND",
+                            "goal run", goalKey, "dhk goal status --goal <goal>",
+                            "docs/GOAL_CONFIGURATION.md");
                 }
             }
             final String selectedScenarioKey = scenarioKey;
@@ -160,8 +169,10 @@ public final class BddEvidenceCommand implements Command {
         String goalKey = args.option("goal", "").trim();
         if (scenarioKey.length() > 0 && !BddService.isKeyAllowed(scenarioKey)
                 || goalKey.length() > 0 && !BddService.isKeyAllowed(goalKey)) {
-            context.err().println("Invalid BDD/goal key. Use letters, numbers, dot, underscore, or dash.");
-            return ExitCodes.VALIDATION_ERROR;
+            return CommandErrorGuidance.invalidKey(context, args, "BDD_EVIDENCE_JUNIT_INVALID_KEY",
+                    "BDD/goal key", scenarioKey + "/" + goalKey,
+                    "dhk bdd evidence junit --scenario <scenario>",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (BddCommandSupport.rejectSensitive(context, sensitiveDataGuard, "bdd evidence junit",
                 scenarioKey, goalKey, args.option("reports", ""))) {
@@ -175,8 +186,9 @@ public final class BddEvidenceCommand implements Command {
             if (goalKey.length() > 0) {
                 GoalRun goal = goalRunRepository.findByKey(connection, goalKey);
                 if (goal == null || !project.projectKey().equals(goal.projectKey())) {
-                    context.err().println("Goal run not found: " + goalKey);
-                    return ExitCodes.NOT_FOUND;
+                    return CommandErrorGuidance.notFound(context, args, "GOAL_RUN_NOT_FOUND",
+                            "goal run", goalKey, "dhk goal status --goal <goal>",
+                            "docs/GOAL_CONFIGURATION.md");
                 }
             }
             final String selectedScenarioKey = scenarioKey;
@@ -191,8 +203,10 @@ public final class BddEvidenceCommand implements Command {
                         }
                     });
             if (result.scenarioCount() == 0) {
-                context.err().println("BDD scenario selection not found");
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "BDD_SCENARIO_SELECTION_NOT_FOUND",
+                        "BDD scenario selection", scenarioKey,
+                        "dhk bdd show --feature <feature>",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             printJunitResult(context, args, result);
             return ExitCodes.SUCCESS;
@@ -208,17 +222,24 @@ public final class BddEvidenceCommand implements Command {
         String adapterKey = args.option("adapter", "").trim();
         String report = args.option("report", "").trim();
         if (scenarioKey.length() == 0 || adapterKey.length() == 0 || report.length() == 0) {
-            context.err().println("Missing required parameters: --scenario, --adapter, --report");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "BDD_EVIDENCE_REPORT_ARGUMENTS_MISSING",
+                    new String[]{"--scenario", "--adapter", "--report"},
+                    "dhk bdd evidence report --scenario <scenario> --adapter <adapter> --report <path>",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (!BddService.isKeyAllowed(scenarioKey) || (goalKey.length() > 0 && !BddService.isKeyAllowed(goalKey))
                 || !BddService.isKeyAllowed(adapterKey)) {
-            context.err().println("Invalid BDD/goal/adapter key. Use letters, numbers, dot, underscore, or dash.");
-            return ExitCodes.VALIDATION_ERROR;
+            return CommandErrorGuidance.invalidKey(context, args, "BDD_EVIDENCE_REPORT_INVALID_KEY",
+                    "BDD/goal/adapter key", scenarioKey + "/" + goalKey + "/" + adapterKey,
+                    "dhk bdd evidence report --scenario <scenario> --adapter <adapter> --report <path>",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (!jsonReportEvidenceService.isAdapterAllowed(adapterKey)) {
-            context.err().println("Unsupported BDD report adapter: " + adapterKey);
-            return ExitCodes.VALIDATION_ERROR;
+            return CommandErrorGuidance.invalidUsage(context, args, "BDD_EVIDENCE_ADAPTER_UNSUPPORTED",
+                    "Unsupported BDD report adapter: " + adapterKey,
+                    "The adapter is not registered for BDD report imports.",
+                    "dhk bdd evidence report --adapter cucumber-json --scenario <scenario> --report <path>",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (BddCommandSupport.rejectSensitive(context, sensitiveDataGuard, "bdd evidence report",
                 scenarioKey, goalKey, adapterKey, report)) {
@@ -232,8 +253,9 @@ public final class BddEvidenceCommand implements Command {
             if (goalKey.length() > 0) {
                 GoalRun goal = goalRunRepository.findByKey(connection, goalKey);
                 if (goal == null || !project.projectKey().equals(goal.projectKey())) {
-                    context.err().println("Goal run not found: " + goalKey);
-                    return ExitCodes.NOT_FOUND;
+                    return CommandErrorGuidance.notFound(context, args, "GOAL_RUN_NOT_FOUND",
+                            "goal run", goalKey, "dhk goal status --goal <goal>",
+                            "docs/GOAL_CONFIGURATION.md");
                 }
             }
             final String selectedScenarioKey = scenarioKey;
@@ -249,8 +271,9 @@ public final class BddEvidenceCommand implements Command {
                         }
                     });
             if (result.scenarioCount() == 0) {
-                context.err().println("BDD scenario not found: " + scenarioKey);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "BDD_SCENARIO_NOT_FOUND",
+                        "BDD scenario", scenarioKey, "dhk bdd show --scenario <scenario>",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             printReportResult(context, args, result);
             return ExitCodes.SUCCESS;

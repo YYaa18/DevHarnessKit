@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.Checkpoint;
 import com.devharnesskit.dhk.model.workflow.WorkflowRun;
@@ -35,12 +36,14 @@ public final class BindCheckpointCommand implements Command {
         String runKey = args.option("run").trim();
         String checkpointRaw = args.option("checkpoint").trim();
         if (runKey.length() == 0 || checkpointRaw.length() == 0) {
-            context.err().println("Missing required parameters: --run, --checkpoint");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "WORKFLOW_BIND_CHECKPOINT_ARGUMENTS_MISSING",
+                    new String[]{"--run", "--checkpoint"},
+                    "dhk workflow bind-checkpoint --run <run> --checkpoint <id>",
+                    "docs/GOAL_CONFIGURATION.md");
         }
-        long checkpointId = parseLong(context, checkpointRaw, "checkpoint");
+        long checkpointId = parseLong(context, args, checkpointRaw, "checkpoint");
         if (checkpointId <= 0) {
-            return ExitCodes.USAGE_ERROR;
+            return ExitCodes.VALIDATION_ERROR;
         }
         String type = args.option("type", "created").trim();
         if (!isCheckpointBindingType(type)) {
@@ -54,13 +57,15 @@ public final class BindCheckpointCommand implements Command {
             migrationRunner.migrate(connection, context.clock());
             final WorkflowRun run = runRepository.findByKey(connection, runKey);
             if (run == null) {
-                context.err().println("Workflow run not found: " + runKey);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "WORKFLOW_RUN_NOT_FOUND",
+                        "workflow run", runKey, "dhk workflow status --run <run>",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             final Checkpoint checkpoint = checkpointRepository.findById(connection, run.projectKey(), checkpointId);
             if (checkpoint == null) {
-                context.err().println("Checkpoint not found: " + checkpointId);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "WORKFLOW_CHECKPOINT_NOT_FOUND",
+                        "checkpoint", Long.toString(checkpointId), "dhk memory checkpoint --task <task> \"<summary>\"",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             final String bindingType = type;
             Long id = transactionTemplate.execute(connection, new TransactionTemplate.Work<Long>() {
@@ -79,11 +84,14 @@ public final class BindCheckpointCommand implements Command {
         }
     }
 
-    private long parseLong(CommandContext context, String raw, String name) {
+    private long parseLong(CommandContext context, Args args, String raw, String name) {
         try {
             return Long.parseLong(raw);
         } catch (NumberFormatException ex) {
-            context.err().println("Invalid " + name + ": " + raw);
+            CommandErrorGuidance.invalidNumber(context, args, "WORKFLOW_BIND_CHECKPOINT_INVALID_ID",
+                    name, raw, name + " must be a positive integer.",
+                    "dhk workflow bind-checkpoint --run <run> --checkpoint <id>",
+                    "docs/GOAL_CONFIGURATION.md");
             return -1L;
         }
     }

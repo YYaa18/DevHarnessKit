@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.bdd.BddBinding;
 import com.devharnesskit.dhk.model.goal.GoalRun;
@@ -39,13 +40,17 @@ public final class BddBindGoalCommand implements Command {
         String goalKey = args.option("goal").trim();
         String relation = defaultIfBlank(args.option("relation", "supports"), "supports");
         if (scenarioKey.length() == 0 || goalKey.length() == 0) {
-            context.err().println("Missing required parameters: --scenario, --goal");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "BDD_BIND_GOAL_ARGUMENTS_MISSING",
+                    new String[]{"--scenario", "--goal"},
+                    "dhk bdd bind-goal --scenario <scenario> --goal <goal>",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (!BddService.isKeyAllowed(scenarioKey) || !BddService.isKeyAllowed(goalKey)
                 || !BddService.isKeyAllowed(relation)) {
-            context.err().println("Invalid BDD/goal key. Use letters, numbers, dot, underscore, or dash.");
-            return ExitCodes.VALIDATION_ERROR;
+            return CommandErrorGuidance.invalidKey(context, args, "BDD_BIND_GOAL_INVALID_KEY",
+                    "BDD/goal key", scenarioKey + "/" + goalKey + "/" + relation,
+                    "dhk bdd bind-goal --scenario <scenario> --goal <goal>",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (BddCommandSupport.rejectSensitive(context, sensitiveDataGuard, "bdd bind-goal",
                 scenarioKey, goalKey, relation)) {
@@ -57,13 +62,15 @@ public final class BddBindGoalCommand implements Command {
             final Project project = BddCommandSupport.ensureProject(context, projectRoot, connection,
                     projectService, projectRepository, migrationRunner);
             if (bddService.findScenario(connection, project, scenarioKey) == null) {
-                context.err().println("BDD scenario not found: " + scenarioKey);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "BDD_SCENARIO_NOT_FOUND",
+                        "BDD scenario", scenarioKey, "dhk bdd show --scenario <scenario>",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             GoalRun goal = goalRunRepository.findByKey(connection, goalKey);
             if (goal == null || !project.projectKey().equals(goal.projectKey())) {
-                context.err().println("Goal run not found: " + goalKey);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "GOAL_RUN_NOT_FOUND",
+                        "goal run", goalKey, "dhk goal status --goal <goal>",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             final String selectedScenarioKey = scenarioKey;
             final String selectedGoalKey = goalKey;

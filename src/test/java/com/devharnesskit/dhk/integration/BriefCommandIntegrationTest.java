@@ -55,6 +55,15 @@ final class BriefCommandIntegrationTest {
 
     @Test
     void adviseEnumErrorsIncludeValidValues() {
+        Harness missingTask = new Harness(tempDir);
+        int missingTaskExit = new CommandRouter().run(new String[]{
+                "advise", "--project-root", "brief-missing-task"
+        }, missingTask.context());
+        assertEquals(ExitCodes.USAGE_ERROR, missingTaskExit);
+        assertTrue(missingTask.stderr().contains("error_code: ADVISE_TASK_MISSING"));
+        assertTrue(missingTask.stderr().contains("missing:"));
+        assertTrue(missingTask.stderr().contains("--task"));
+
         Harness invalidMode = new Harness(tempDir);
         int invalidModeExit = new CommandRouter().run(new String[]{
                 "advise",

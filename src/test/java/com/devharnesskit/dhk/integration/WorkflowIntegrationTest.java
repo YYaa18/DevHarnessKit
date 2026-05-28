@@ -67,6 +67,37 @@ final class WorkflowIntegrationTest {
     }
 
     @Test
+    void workflowUsageAndNotFoundErrorsAreActionable() {
+        seed();
+
+        Harness missingStartArgs = new Harness(tempDir);
+        int missingStartArgsExit = new CommandRouter().run(new String[]{
+                "workflow", "start", "--project-root", "demo", "--workflow", "api-change"
+        }, missingStartArgs.context());
+        assertEquals(ExitCodes.USAGE_ERROR, missingStartArgsExit);
+        assertTrue(missingStartArgs.stderr().contains("error_code: WORKFLOW_START_ARGUMENTS_MISSING"));
+        assertTrue(missingStartArgs.stderr().contains("missing:"));
+        assertTrue(missingStartArgs.stderr().contains("--task"));
+
+        Harness missingRun = new Harness(tempDir);
+        int missingRunExit = new CommandRouter().run(new String[]{
+                "workflow", "status", "--project-root", "demo", "--run", "missing-run"
+        }, missingRun.context());
+        assertEquals(ExitCodes.NOT_FOUND, missingRunExit);
+        assertTrue(missingRun.stderr().contains("error_code: WORKFLOW_RUN_NOT_FOUND"));
+        assertTrue(missingRun.stderr().contains("next_action:"));
+
+        Harness missingPhaseSummary = new Harness(tempDir);
+        int missingPhaseSummaryExit = new CommandRouter().run(new String[]{
+                "workflow", "phase", "pass", "--project-root", "demo", "--run", "missing-run",
+                "--phase", "export_context"
+        }, missingPhaseSummary.context());
+        assertEquals(ExitCodes.USAGE_ERROR, missingPhaseSummaryExit);
+        assertTrue(missingPhaseSummary.stderr().contains("error_code: WORKFLOW_PHASE_SUMMARY_MISSING"));
+        assertTrue(missingPhaseSummary.stderr().contains("--summary"));
+    }
+
+    @Test
     void workflowRunStatusPhaseGateExportAndMemoryExportIntegration() throws Exception {
         seed();
 

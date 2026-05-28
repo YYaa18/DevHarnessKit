@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.spec.SpecChange;
@@ -41,8 +42,10 @@ public final class SpecBindWorkflowCommand implements Command {
         String runKey = args.option("run").trim();
         String type = args.option("type", "implements").trim();
         if (changeKey.length() == 0 || runKey.length() == 0) {
-            context.err().println("Missing required parameters: --change, --run");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "SPEC_BIND_WORKFLOW_ARGUMENTS_MISSING",
+                    new String[]{"--change", "--run"},
+                    "dhk spec bind-workflow --change <change> --run <run> --type implements",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (!SpecService.isWorkflowBindingType(type)) {
             return EnumGuidance.printInvalid(context, args, "INVALID_WORKFLOW_SPEC_BINDING_TYPE",
@@ -60,13 +63,15 @@ public final class SpecBindWorkflowCommand implements Command {
                     projectService, projectRepository, migrationRunner);
             SpecChange change = changeRepository.findByKey(connection, changeKey);
             if (!SpecCommandSupport.belongsToProject(change, project)) {
-                context.err().println("Spec change not found: " + changeKey);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "SPEC_CHANGE_NOT_FOUND",
+                        "spec change", changeKey, "dhk spec status --change <change>",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             WorkflowRun run = runRepository.findByKey(connection, runKey);
             if (run == null || !project.projectKey().equals(run.projectKey())) {
-                context.err().println("Workflow run not found: " + runKey);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "WORKFLOW_RUN_NOT_FOUND",
+                        "workflow run", runKey, "dhk workflow status --run <run>",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             final SpecChange selectedChange = change;
             final WorkflowRun selectedRun = run;

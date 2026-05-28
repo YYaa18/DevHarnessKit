@@ -4,6 +4,7 @@ import com.devharnesskit.dhk.cli.Args;
 import com.devharnesskit.dhk.cli.Command;
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.model.goal.GoalEvidenceContract;
 import com.devharnesskit.dhk.model.goal.GoalPlan;
 import com.devharnesskit.dhk.model.goal.GoalRun;
@@ -19,9 +20,9 @@ public final class GoalEvidenceTemplateCommand implements Command {
         Path projectRoot = GoalCommandSupport.projectRoot(args, context);
         String goalKey = args.option("goal", "").trim();
         if (goalKey.length() == 0) {
-            context.err().println("Missing required parameter: --goal");
-            context.err().println("next_command: dhk goal evidence-template --goal <goal-key>");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "GOAL_EVIDENCE_TEMPLATE_ARGUMENTS_MISSING",
+                    new String[]{"--goal"}, "dhk goal evidence-template --goal <goal-key>",
+                    "README.md#core-path");
         }
         try {
             GoalRun goal = orchestrator.find(context, projectRoot, goalKey);

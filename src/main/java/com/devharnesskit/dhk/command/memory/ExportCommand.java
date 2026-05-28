@@ -9,6 +9,7 @@ import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.export.CurrentContextRenderer;
 import com.devharnesskit.dhk.export.SpecContextRenderer;
 import com.devharnesskit.dhk.export.WorkflowContextRenderer;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.model.Checkpoint;
 import com.devharnesskit.dhk.model.MemoryItem;
 import com.devharnesskit.dhk.model.Project;
@@ -103,14 +104,15 @@ public final class ExportCommand implements Command {
     public int run(CommandContext context, Args args) {
         String task = args.option("task").trim();
         if (task.length() == 0) {
-            context.err().println("Missing required parameter: --task");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "MEMORY_EXPORT_TASK_MISSING",
+                    new String[]{"--task"}, "dhk memory export --task \"<task>\"",
+                    "README.md#core-path");
         }
         String module = args.option("module", "global").trim();
         if (module.length() == 0) {
             module = "global";
         }
-        int limit = parseLimit(context, args.option("limit", "30"));
+        int limit = parseLimit(context, args, args.option("limit", "30"));
         if (limit <= 0) {
             return ExitCodes.VALIDATION_ERROR;
         }
@@ -240,16 +242,20 @@ public final class ExportCommand implements Command {
         return change;
     }
 
-    private int parseLimit(CommandContext context, String rawValue) {
+    private int parseLimit(CommandContext context, Args args, String rawValue) {
         try {
             int value = Integer.parseInt(rawValue);
             if (value < 1) {
-                context.err().println("Invalid limit, expected positive integer: " + rawValue);
+                CommandErrorGuidance.invalidNumber(context, args, "MEMORY_EXPORT_INVALID_LIMIT",
+                        "memory export limit", rawValue, "limit must be a positive integer.",
+                        "dhk memory export --task \"<task>\" --limit 30", "README.md#core-path");
                 return -1;
             }
             return Math.min(value, 100);
         } catch (NumberFormatException ex) {
-            context.err().println("Invalid limit, expected positive integer: " + rawValue);
+            CommandErrorGuidance.invalidNumber(context, args, "MEMORY_EXPORT_INVALID_LIMIT",
+                    "memory export limit", rawValue, "limit must be a positive integer.",
+                    "dhk memory export --task \"<task>\" --limit 30", "README.md#core-path");
             return -1;
         }
     }

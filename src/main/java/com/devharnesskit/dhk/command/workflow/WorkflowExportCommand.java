@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.export.WorkflowContextRenderer;
+import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.model.workflow.WorkflowRun;
 import com.devharnesskit.dhk.repository.workflow.WorkflowGateRunRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowArtifactRepository;
@@ -40,8 +41,9 @@ public final class WorkflowExportCommand implements Command {
     public int run(CommandContext context, Args args) {
         String runKey = args.option("run").trim();
         if (runKey.length() == 0) {
-            context.err().println("Missing required parameter: --run");
-            return ExitCodes.USAGE_ERROR;
+            return CommandErrorGuidance.missing(context, args, "WORKFLOW_EXPORT_RUN_MISSING",
+                    new String[]{"--run"}, "dhk workflow export --run <run>",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         Path projectRoot = WorkflowCommandSupport.projectRoot(args, context);
         Path out = args.hasOption("out")
@@ -51,8 +53,9 @@ public final class WorkflowExportCommand implements Command {
             migrationRunner.migrate(connection, context.clock());
             WorkflowRun run = runRepository.findByKey(connection, runKey);
             if (run == null) {
-                context.err().println("Workflow run not found: " + runKey);
-                return ExitCodes.NOT_FOUND;
+                return CommandErrorGuidance.notFound(context, args, "WORKFLOW_RUN_NOT_FOUND",
+                        "workflow run", runKey, "dhk workflow status --run <run>",
+                        "docs/GOAL_CONFIGURATION.md");
             }
             String markdown = exportService.render(connection, run, context.clock().now().toString());
             markdown = sensitiveDataGuard.redact(markdown);

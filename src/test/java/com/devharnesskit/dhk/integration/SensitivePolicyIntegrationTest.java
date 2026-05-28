@@ -106,7 +106,7 @@ final class SensitivePolicyIntegrationTest {
                 "--module", "risk",
                 "--mode", "api"));
         assertValidationError(run("goal", "start", "--project-root", "demo",
-                "--profile", "bugfix",
+                "--profile", "java-api-patch",
                 "--task", "jdbc:mysql://127.0.0.1/demo",
                 "--module", "risk"));
     }

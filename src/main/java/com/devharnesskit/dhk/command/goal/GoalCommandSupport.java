@@ -5,6 +5,7 @@ import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.model.goal.GoalPlan;
 import com.devharnesskit.dhk.model.goal.GoalProfile;
 import com.devharnesskit.dhk.model.goal.GoalRun;
+import com.devharnesskit.dhk.model.goal.GoalEvidenceContract;
 import com.devharnesskit.dhk.service.goal.GoalCheckPolicyService;
 import com.devharnesskit.dhk.service.goal.GoalGraphStateService;
 import com.devharnesskit.dhk.service.goal.GoalOrchestrator;
@@ -26,14 +27,6 @@ final class GoalCommandSupport {
             "perform_current_action_only",
             "record_goal_step_after_work",
             "run_goal_next_before_continuing"
-    };
-    private static final String[] STRUCTURED_EVIDENCE_FIELDS = new String[]{
-            "--read-files",
-            "--changed-files",
-            "--tests-run",
-            "--compile-result",
-            "--risks",
-            "--pending"
     };
 
     private GoalCommandSupport() {
@@ -67,11 +60,12 @@ final class GoalCommandSupport {
             context.out().println("  - " + action);
         }
         context.out().println("required_evidence:");
-        for (String evidence : plan.requiredEvidence()) {
+        GoalEvidenceContract evidenceContract = GoalEvidenceContract.from(goal, plan);
+        for (String evidence : evidenceContract.requiredEvidence()) {
             context.out().println("  - " + evidence);
         }
         context.out().println("structured_evidence_fields:");
-        for (String field : structuredEvidenceFields(plan)) {
+        for (String field : evidenceContract.structuredEvidenceFields()) {
             context.out().println("  - " + field);
         }
         context.out().println("forbidden_actions:");
@@ -101,6 +95,7 @@ final class GoalCommandSupport {
             }
         }
         context.out().println("next_command: " + nextCommand(plan, graph, profile, projectRoot));
+        context.out().println("evidence_template_command: dhk goal evidence-template --goal " + goal.goalKey());
         context.out().println("context_path: " + PathUtil.goalContext(projectRoot));
     }
 
@@ -109,6 +104,7 @@ final class GoalCommandSupport {
         GoalProfile profile = PROFILE_SERVICE.find(projectRoot, goal.profileKey());
         String[] requiredChecks = CHECK_POLICY_SERVICE.load(projectRoot).requiredChecks(profile);
         GoalGraphState graph = GRAPH_STATE_SERVICE.inspect(projectRoot, profile, plan);
+        GoalEvidenceContract evidenceContract = GoalEvidenceContract.from(goal, plan);
         String[] contextFiles = contextFiles(goal);
         String nextCommand = nextCommand(plan, graph, profile, projectRoot);
         context.out().print(JsonOutput.object(
@@ -118,17 +114,19 @@ final class GoalCommandSupport {
                 JsonOutput.stringField("current_action", plan.currentAction()),
                 JsonOutput.stringField("instruction", plan.instruction()),
                 JsonOutput.rawField("allowed_actions", JsonOutput.stringArray(ALLOWED_ACTIONS)),
-                JsonOutput.rawField("required_evidence", JsonOutput.stringArray(plan.requiredEvidence())),
-                JsonOutput.rawField("structured_evidence_fields", JsonOutput.stringArray(structuredEvidenceFields(plan))),
+                JsonOutput.rawField("required_evidence", JsonOutput.stringArray(evidenceContract.requiredEvidence())),
+                JsonOutput.rawField("structured_evidence_fields", JsonOutput.stringArray(evidenceContract.structuredEvidenceFields())),
                 JsonOutput.rawField("forbidden_actions", JsonOutput.stringArray(plan.forbiddenActions())),
                 JsonOutput.rawField("required_checks", JsonOutput.stringArray(requiredChecks)),
                 JsonOutput.rawField("context_files", JsonOutput.stringArray(contextFiles)),
                 JsonOutput.rawField("completion_blockers", JsonOutput.stringArray(
                         completionBlockers == null ? new String[0] : completionBlockers)),
-                JsonOutput.rawField("evidence_contract", evidenceContractJson(plan)),
+                JsonOutput.rawField("evidence_contract", evidenceContractJson(evidenceContract)),
                 JsonOutput.rawField("graph", graphJson(graph)),
                 JsonOutput.rawField("scenario_impact", scenarioImpactJson(projectRoot, profile)),
                 JsonOutput.stringField("next_command", nextCommand),
+                JsonOutput.stringField("evidence_template_command",
+                        "dhk goal evidence-template --goal " + goal.goalKey()),
                 JsonOutput.stringField("context_path", PathUtil.goalContext(projectRoot).toString())
         ));
     }
@@ -143,29 +141,15 @@ final class GoalCommandSupport {
         return files.toArray(new String[files.size()]);
     }
 
-    private static String evidenceContractJson(GoalPlan plan) {
+    private static String evidenceContractJson(GoalEvidenceContract contract) {
         return JsonOutput.object(
-                JsonOutput.stringField("current_action", plan.currentAction()),
-                JsonOutput.rawField("required_evidence", JsonOutput.stringArray(plan.requiredEvidence())),
-                JsonOutput.rawField("structured_evidence_fields", JsonOutput.stringArray(structuredEvidenceFields(plan))),
+                JsonOutput.stringField("current_action", contract.currentAction()),
+                JsonOutput.rawField("required_evidence", JsonOutput.stringArray(contract.requiredEvidence())),
+                JsonOutput.rawField("structured_evidence_fields", JsonOutput.stringArray(contract.structuredEvidenceFields())),
+                JsonOutput.stringField("example_evidence", contract.exampleEvidence()),
+                JsonOutput.stringField("example_command", contract.exampleCommand()),
                 JsonOutput.stringField("rule", "include every required_evidence key in goal step evidence")
         );
-    }
-
-    private static String[] structuredEvidenceFields(GoalPlan plan) {
-        List<String> fields = new ArrayList<String>();
-        for (String field : STRUCTURED_EVIDENCE_FIELDS) {
-            fields.add(field);
-        }
-        if (plan != null) {
-            for (String evidence : plan.requiredEvidence()) {
-                String key = evidence == null ? "" : evidence.trim();
-                if (key.length() > 0) {
-                    fields.add("--field " + key + "=<value>");
-                }
-            }
-        }
-        return fields.toArray(new String[fields.size()]);
     }
 
     private static String graphJson(GoalGraphState graph) {

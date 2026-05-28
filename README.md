@@ -192,7 +192,10 @@ scripts/devharness-control-panel.sh configure \
 `.agents/devharness/config.json`. Presets describe verification capability, not
 only project type: `manual-ide-test` is an alias for manual compile/test
 evidence, while `graph-advisory` enables graph context without making graph
-checks completion gates.
+checks completion gates. For demos and mock projects without a build file,
+`demo-no-build` disables compile/test checks and writes a clear warning into
+`GOAL_CONTEXT.md`; it is for quick evaluation only and does not prove code
+correctness.
 
 Inspect local readiness:
 

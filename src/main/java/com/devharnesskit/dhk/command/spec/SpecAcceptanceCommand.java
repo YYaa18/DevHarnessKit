@@ -4,6 +4,8 @@ import com.devharnesskit.dhk.cli.Args;
 import com.devharnesskit.dhk.cli.Command;
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
+import com.devharnesskit.dhk.guidance.ActionableError;
+import com.devharnesskit.dhk.guidance.ActionableErrorRenderer;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.db.TransactionTemplate;
@@ -17,6 +19,7 @@ import com.devharnesskit.dhk.repository.spec.SpecEventRepository;
 import com.devharnesskit.dhk.service.ProjectService;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
 import com.devharnesskit.dhk.service.spec.SpecAcceptanceService;
+import com.devharnesskit.dhk.util.JsonOutput;
 
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -32,6 +35,7 @@ public final class SpecAcceptanceCommand implements Command {
     private final TransactionTemplate transactionTemplate = new TransactionTemplate();
     private final SpecAcceptanceService acceptanceService =
             new SpecAcceptanceService(acceptanceRepository, new SpecEventRepository());
+    private final ActionableErrorRenderer actionableErrorRenderer = new ActionableErrorRenderer();
 
     public int run(CommandContext context, Args args) {
         String action = args.positional(2);
@@ -106,9 +110,21 @@ public final class SpecAcceptanceCommand implements Command {
         }
         String normalizedStatus = SpecAcceptanceService.normalizeAcceptanceStatus(status);
         if (normalizedStatus.length() == 0) {
-            context.err().println("Invalid acceptance status: " + status
-                    + ". Allowed statuses: " + SpecAcceptanceService.ALLOWED_STATUS_TEXT
-                    + ". Aliases: " + SpecAcceptanceService.STATUS_ALIAS_TEXT);
+            ActionableError error = ActionableError.builder("INVALID_SPEC_ACCEPTANCE_STATUS",
+                            "Invalid acceptance status: " + status)
+                    .reason("Spec acceptance status must be one of the supported lifecycle values.")
+                    .validValues(SpecAcceptanceService.ALLOWED_STATUSES)
+                    .aliases(SpecAcceptanceService.STATUS_ALIASES)
+                    .nextCommand("dhk spec acceptance statuses")
+                    .docs("docs/GOAL_CONFIGURATION.md#spec-acceptance")
+                    .detail("example", "dhk spec acceptance update --change " + changeKey
+                            + " --acceptance " + acceptanceKey + " --status passed")
+                    .build();
+            if (JsonOutput.enabled(args)) {
+                context.out().print(actionableErrorRenderer.renderJson(error));
+            } else {
+                context.err().print(actionableErrorRenderer.renderText(error));
+            }
             return ExitCodes.VALIDATION_ERROR;
         }
         String evidence = args.option("evidence", args.option("reason", "")).trim();

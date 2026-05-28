@@ -98,6 +98,15 @@ public final class DevHarnessConfig {
         return booleanValue("verification.graph.allow_stale_requires_approval", true);
     }
 
+    public boolean demoMode() {
+        return booleanValue("verification.demo.enabled", false)
+                || "demo-no-build".equals(preset());
+    }
+
+    public String demoWarning() {
+        return value("verification.demo.warning", "demo mode does not prove code correctness");
+    }
+
     public String value(String key, String defaultValue) {
         String value = values.get(key);
         return value == null || value.trim().length() == 0 ? defaultValue : value.trim();

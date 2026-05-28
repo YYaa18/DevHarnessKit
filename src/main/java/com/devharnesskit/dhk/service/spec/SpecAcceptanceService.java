@@ -10,6 +10,18 @@ import java.sql.Connection;
 import java.sql.SQLException;
 
 public final class SpecAcceptanceService {
+    public static final String[] ALLOWED_STATUSES = new String[]{"pending", "passed", "failed", "waived"};
+    public static final String[] STATUS_ALIASES = new String[]{
+            "done -> passed",
+            "closed -> passed",
+            "accepted -> passed",
+            "resolved -> passed",
+            "approved -> passed",
+            "open -> pending",
+            "in_progress -> pending",
+            "rejected -> failed",
+            "waive -> waived"
+    };
     public static final String ALLOWED_STATUS_TEXT = "pending, passed, failed, waived";
     public static final String STATUS_ALIAS_TEXT = "done/closed/accepted/resolved/approved -> passed; "
             + "open/in_progress -> pending; rejected -> failed; waive -> waived";

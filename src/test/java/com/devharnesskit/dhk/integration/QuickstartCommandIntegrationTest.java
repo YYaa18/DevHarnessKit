@@ -99,7 +99,7 @@ final class QuickstartCommandIntegrationTest {
     }
 
     @Test
-    void quickstartReusesExistingConfigAndOpenGoalWithoutOverwrite() throws Exception {
+    void quickstartCreatesNewGoalByDefaultAndResumeExistingIsExplicit() throws Exception {
         Harness configure = new Harness(tempDir);
         int configureExit = new CommandRouter().run(new String[]{
                 "configure", "init",
@@ -130,9 +130,24 @@ final class QuickstartCommandIntegrationTest {
                 "--module", "order"
         }, second.context());
         assertEquals(ExitCodes.SUCCESS, secondExit);
-        assertTrue(second.stdout().contains("quickstart: existing_goal"));
+        assertTrue(second.stdout().contains("quickstart: ready"));
         assertTrue(second.stdout().contains("config: existing"));
-        assertEquals(firstGoal, firstValue(second.stdout(), "goal_key: "));
+        String secondGoal = firstValue(second.stdout(), "goal_key: ");
+        assertTrue(secondGoal.length() > 0);
+        assertFalse(firstGoal.equals(secondGoal));
+
+        Harness resumed = new Harness(tempDir);
+        int resumedExit = new CommandRouter().run(new String[]{
+                "quickstart",
+                "--project-root", "reuse-project",
+                "--preset", "springboot-manual-ide-test",
+                "--task", "First goal",
+                "--module", "order",
+                "--resume-existing"
+        }, resumed.context());
+        assertEquals(ExitCodes.SUCCESS, resumedExit);
+        assertTrue(resumed.stdout().contains("quickstart: existing_goal"));
+        assertEquals(secondGoal, firstValue(resumed.stdout(), "goal_key: "));
 
         Harness forced = new Harness(tempDir);
         int forcedExit = new CommandRouter().run(new String[]{
@@ -146,7 +161,7 @@ final class QuickstartCommandIntegrationTest {
         assertEquals(ExitCodes.SUCCESS, forcedExit);
         String forcedConfigText = read(PathUtil.devharnessConfig(tempDir.resolve("reuse-project")));
         assertTrue(forcedConfigText.contains("\"preset\": \"springboot-manual-ide-test\""));
-        assertEquals(firstGoal, firstValue(forced.stdout(), "goal_key: "));
+        assertFalse(secondGoal.equals(firstValue(forced.stdout(), "goal_key: ")));
     }
 
     @Test
@@ -180,6 +195,33 @@ final class QuickstartCommandIntegrationTest {
         assertTrue(patch.stdout().contains("module: user"));
         assertTrue(patchGoal.length() > 0);
         assertFalse(priorGoal.equals(patchGoal));
+    }
+
+    @Test
+    void demoNoBuildPresetStartsPatchGoalAndWritesDemoWarning() throws Exception {
+        Harness quickstart = new Harness(tempDir);
+        int exit = new CommandRouter().run(new String[]{
+                "quickstart",
+                "--project-root", "demo-no-build-project",
+                "--preset", "demo-no-build",
+                "--task", "Fix small demo bug",
+                "--module", "demo"
+        }, quickstart.context());
+
+        Path root = tempDir.resolve("demo-no-build-project");
+        assertEquals(ExitCodes.SUCCESS, exit);
+        assertTrue(quickstart.stdout().contains("quickstart: ready"));
+        assertTrue(quickstart.stdout().contains("preset: demo-no-build"));
+        assertTrue(quickstart.stdout().contains("profile: java-api-patch"));
+
+        String configText = read(PathUtil.devharnessConfig(root));
+        assertTrue(configText.contains("\"verification.compile.mode\": \"disabled\""));
+        assertTrue(configText.contains("\"verification.test.mode\": \"disabled\""));
+        assertTrue(configText.contains("\"verification.demo.enabled\": \"true\""));
+
+        String goalContext = read(PathUtil.goalContext(root));
+        assertTrue(goalContext.contains("<demo-warning>"));
+        assertTrue(goalContext.contains("demo mode does not prove code correctness"));
     }
 
     @Test

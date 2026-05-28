@@ -80,8 +80,7 @@ public final class BriefLifecycleService {
                 if ("manual_evidence".equals(request.type()) && "verify".equals(currentAction)) {
                     continue;
                 }
-                throw new IllegalArgumentException("blocking interaction requires user answer: "
-                        + request.requestId() + " - " + request.question());
+                throw new BlockingInteractionException(request.requestId(), request.question(), request.choices());
             }
         }
     }
@@ -105,6 +104,15 @@ public final class BriefLifecycleService {
         writeInteractionsBrief(projectRoot);
         updateAgentBriefAfterAnswer(projectRoot);
         return answered;
+    }
+
+    public InteractionRequest findInteraction(Path projectRoot, String requestId) {
+        for (InteractionRequest request : loadInteractions(projectRoot)) {
+            if (request.requestId().equals(requestId)) {
+                return request;
+            }
+        }
+        return null;
     }
 
     public Path writeProgressBrief(Path projectRoot, GoalRun goal, long stepId, String summary) throws Exception {

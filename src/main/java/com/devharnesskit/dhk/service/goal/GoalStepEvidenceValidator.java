@@ -47,7 +47,7 @@ final class GoalStepEvidenceValidator {
             }
         }
         if (!missing.isEmpty()) {
-            throw new IllegalArgumentException("Goal step evidence missing required items: " + missing);
+            throw new GoalStepEvidenceException(missing.toArray(new String[missing.size()]), plan);
         }
     }
 

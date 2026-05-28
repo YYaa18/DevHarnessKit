@@ -22,6 +22,9 @@ public final class GoalCommand implements Command {
         commands.put("step", new Supplier<Command>() {
             public Command get() { return new GoalStepCommand(); }
         });
+        commands.put("evidence-template", new Supplier<Command>() {
+            public Command get() { return new GoalEvidenceTemplateCommand(); }
+        });
         commands.put("status", new Supplier<Command>() {
             public Command get() { return new GoalStatusCommand(); }
         });

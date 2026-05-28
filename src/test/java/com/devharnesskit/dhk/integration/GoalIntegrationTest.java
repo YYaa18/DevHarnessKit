@@ -531,7 +531,31 @@ final class GoalIntegrationTest {
         assertTrue(template.stdout().contains("current_action: inspect_existing_code"));
         assertTrue(template.stdout().contains("--field existing_controller=<value>"));
         assertTrue(template.stdout().contains("--field existing_service=<value>"));
+        assertTrue(template.stdout().contains("example_command: dhk goal step --goal " + goalKey));
         assertTrue(template.stdout().contains("dry_run_command: dhk goal step --goal " + goalKey));
+
+        Harness evidenceTemplate = new Harness(tempDir);
+        int evidenceTemplateExit = new CommandRouter().run(new String[]{
+                "goal", "evidence-template",
+                "--project-root", "demo",
+                "--goal", goalKey
+        }, evidenceTemplate.context());
+        assertEquals(ExitCodes.SUCCESS, evidenceTemplateExit);
+        assertTrue(evidenceTemplate.stdout().contains("goal evidence template"));
+        assertTrue(evidenceTemplate.stdout().contains("current_action: inspect_existing_code"));
+        assertTrue(evidenceTemplate.stdout().contains("existing_controller=<value>"));
+
+        Harness missing = new Harness(tempDir);
+        int missingExit = new CommandRouter().run(new String[]{
+                "goal", "step",
+                "--project-root", "demo",
+                "--goal", goalKey,
+                "--summary", "Missing evidence"
+        }, missing.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, missingExit);
+        assertTrue(missing.stderr().contains("error_code: GOAL_STEP_EVIDENCE_MISSING"));
+        assertTrue(missing.stderr().contains("missing:"));
+        assertTrue(missing.stderr().contains("next_command: dhk goal evidence-template --goal " + goalKey));
 
         Harness dryRun = new Harness(tempDir);
         int dryRunExit = new CommandRouter().run(new String[]{

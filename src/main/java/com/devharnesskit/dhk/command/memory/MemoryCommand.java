@@ -9,6 +9,7 @@ public final class MemoryCommand implements Command {
     private final InitCommand initCommand;
     private final AddCommand addCommand;
     private final ConfirmCommand confirmCommand;
+    private final ListCommand listCommand;
     private final SearchCommand searchCommand;
     private final ExportCommand exportCommand;
     private final CheckpointCommand checkpointCommand;
@@ -16,17 +17,18 @@ public final class MemoryCommand implements Command {
     private final BackupCommand backupCommand;
 
     public MemoryCommand() {
-        this(new InitCommand(), new AddCommand(), new ConfirmCommand(), new SearchCommand(),
+        this(new InitCommand(), new AddCommand(), new ConfirmCommand(), new ListCommand(), new SearchCommand(),
                 new ExportCommand(), new CheckpointCommand(), new RecoverCommand(), new BackupCommand());
     }
 
     MemoryCommand(InitCommand initCommand, AddCommand addCommand, ConfirmCommand confirmCommand,
-                  SearchCommand searchCommand, ExportCommand exportCommand,
+                  ListCommand listCommand, SearchCommand searchCommand, ExportCommand exportCommand,
                   CheckpointCommand checkpointCommand, RecoverCommand recoverCommand,
                   BackupCommand backupCommand) {
         this.initCommand = initCommand;
         this.addCommand = addCommand;
         this.confirmCommand = confirmCommand;
+        this.listCommand = listCommand;
         this.searchCommand = searchCommand;
         this.exportCommand = exportCommand;
         this.checkpointCommand = checkpointCommand;
@@ -44,6 +46,9 @@ public final class MemoryCommand implements Command {
         }
         if ("confirm".equals(subCommand)) {
             return confirmCommand.run(context, args);
+        }
+        if ("list".equals(subCommand)) {
+            return listCommand.run(context, args);
         }
         if ("search".equals(subCommand)) {
             return searchCommand.run(context, args);

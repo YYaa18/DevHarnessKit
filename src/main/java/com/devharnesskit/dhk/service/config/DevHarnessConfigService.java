@@ -28,6 +28,7 @@ public final class DevHarnessConfigService {
             "verification.test.expected_duration", "verification.test.required_evidence",
             "verification.graph.mode", "verification.graph.required", "verification.graph.fresh_snapshot_required",
             "verification.graph.impact_map_required", "verification.graph.allow_stale_requires_approval",
+            "verification.demo.enabled", "verification.demo.warning",
             "verification.architecture.mode", "verification.rollback.required_when_auto_tests_unavailable",
             "adapter.target");
 
@@ -179,6 +180,23 @@ public final class DevHarnessConfigService {
             values.put("verification.graph.required", "true");
             values.put("verification.graph.fresh_snapshot_required", "true");
             values.put("verification.graph.impact_map_required", "true");
+            return values;
+        }
+        if ("demo-no-build".equals(normalized)) {
+            Map<String, String> values = defaultValues(normalized);
+            values.put("project.type", "demo");
+            values.put("project.runtime", "mock-project");
+            values.put("verification.compile.mode", "disabled");
+            values.put("verification.compile.command", "");
+            values.put("verification.test.mode", "disabled");
+            values.put("verification.test.command", "");
+            values.put("verification.graph.mode", "off");
+            values.put("verification.graph.required", "false");
+            values.put("verification.graph.fresh_snapshot_required", "false");
+            values.put("verification.graph.impact_map_required", "false");
+            values.put("verification.rollback.required_when_auto_tests_unavailable", "false");
+            values.put("verification.demo.enabled", "true");
+            values.put("verification.demo.warning", "demo mode does not prove code correctness");
             return values;
         }
         if ("springboot-ci-only-test".equals(normalized)) {

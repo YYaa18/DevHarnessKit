@@ -89,6 +89,24 @@ final class MemoryAddConfirmSearchIntegrationTest {
         assertTrue(searchJson.stdout().contains("\"command\": \"memory search\""));
         assertTrue(searchJson.stdout().contains("\"count\": 1"));
         assertTrue(searchJson.stdout().contains("\"title\": \"User identity from gateway\""));
+
+        Harness listConfirmed = new Harness(tempDir);
+        int listConfirmedExit = new CommandRouter().run(new String[]{
+                "memory", "list", "--project-root", "demo", "--status", "confirmed", "--limit", "5"
+        }, listConfirmed.context());
+        assertEquals(ExitCodes.SUCCESS, listConfirmedExit);
+        assertTrue(listConfirmed.stdout().contains("memory list"));
+        assertTrue(listConfirmed.stdout().contains("status: confirmed"));
+        assertTrue(listConfirmed.stdout().contains("memory_id: 1"));
+
+        Harness listJson = new Harness(tempDir);
+        int listJsonExit = new CommandRouter().run(new String[]{
+                "memory", "list", "--project-root", "demo", "--status", "confirmed", "--tag", "gateway", "--json"
+        }, listJson.context());
+        assertEquals(ExitCodes.SUCCESS, listJsonExit);
+        assertTrue(listJson.stdout().contains("\"command\": \"memory list\""));
+        assertTrue(listJson.stdout().contains("\"count\": 1"));
+        assertTrue(listJson.stdout().contains("\"memory_id\": 1"));
     }
 
     @Test

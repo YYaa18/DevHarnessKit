@@ -285,7 +285,9 @@ final class SpecIntegrationTest {
                 "--status", "complete"
         }, invalid.context());
         assertEquals(ExitCodes.VALIDATION_ERROR, invalidExit);
-        assertTrue(invalid.stderr().contains("Allowed statuses: pending, passed, failed, waived"));
+        assertTrue(invalid.stderr().contains("error_code: INVALID_SPEC_ACCEPTANCE_STATUS"));
+        assertTrue(invalid.stderr().contains("valid_values:"));
+        assertTrue(invalid.stderr().contains("done -> passed"));
 
         Harness waiveAlias = new Harness(tempDir);
         int waiveAliasExit = new CommandRouter().run(new String[]{

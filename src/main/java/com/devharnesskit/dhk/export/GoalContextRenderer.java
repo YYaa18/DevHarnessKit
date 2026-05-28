@@ -2,20 +2,13 @@ package com.devharnesskit.dhk.export;
 
 import com.devharnesskit.dhk.model.goal.GoalPlan;
 import com.devharnesskit.dhk.model.goal.GoalBddState;
+import com.devharnesskit.dhk.model.goal.GoalEvidenceContract;
 import com.devharnesskit.dhk.model.goal.GoalGraphState;
 import com.devharnesskit.dhk.model.goal.GoalRun;
 import com.devharnesskit.dhk.model.config.DevHarnessConfig;
 
 public final class GoalContextRenderer {
     private static final int MAX_CHARS = 16 * 1024;
-    private static final String[] STRUCTURED_EVIDENCE_FIELDS = new String[]{
-            "--read-files",
-            "--changed-files",
-            "--tests-run",
-            "--compile-result",
-            "--risks",
-            "--pending"
-    };
 
     public String render(GoalRun goal, GoalPlan plan, String generatedAt) {
         return render(goal, plan, new String[0], new String[0], generatedAt);
@@ -74,6 +67,7 @@ public final class GoalContextRenderer {
         GoalGraphState graph = graphState == null ? GoalGraphState.disabled() : graphState;
         GoalBddState bdd = bddState == null ? GoalBddState.disabled() : bddState;
         DevHarnessConfig config = verificationConfig == null ? new DevHarnessConfig(null) : verificationConfig;
+        GoalEvidenceContract evidenceContract = GoalEvidenceContract.from(goal, plan);
         StringBuilder builder = new StringBuilder();
         builder.append("# GOAL_CONTEXT\n\n");
         builder.append("<generated-at>").append(generatedAt).append("</generated-at>\n\n");
@@ -131,10 +125,10 @@ public final class GoalContextRenderer {
         builder.append("</forbidden-actions>\n\n");
 
         builder.append("<required-evidence>\n");
-        for (String evidence : plan.requiredEvidence()) {
+        for (String evidence : evidenceContract.requiredEvidence()) {
             builder.append("- ").append(evidence).append('\n');
         }
-        if (plan.requiredEvidence().length == 0) {
+        if (evidenceContract.requiredEvidence().length == 0) {
             builder.append("- concise_summary\n");
         }
         builder.append("</required-evidence>\n\n");
@@ -144,16 +138,20 @@ public final class GoalContextRenderer {
         builder.append("- include every required-evidence key in goal step evidence\n");
         builder.append("- put modified paths in --changed-files when files changed\n");
         builder.append("- use --field key=value for required evidence that has no dedicated option\n");
+        builder.append("- evidence_template_command: dhk goal evidence-template --goal ")
+                .append(goal.goalKey()).append('\n');
+        builder.append("- example_evidence: ").append(valueOrNone(evidenceContract.exampleEvidence())).append('\n');
         builder.append("</evidence-contract>\n\n");
 
         builder.append("<structured-evidence-fields>\n");
-        appendList(builder, structuredEvidenceFields(plan), "none");
+        appendList(builder, evidenceContract.structuredEvidenceFields(), "none");
         builder.append("</structured-evidence-fields>\n\n");
 
         builder.append("<required-checks>\n");
         appendList(builder, requiredChecks, "none");
         builder.append("</required-checks>\n\n");
 
+        appendDemoWarning(builder, config);
         appendVerificationPolicySection(builder, config);
         appendDisciplineGateSection(builder, disciplineGateStatus);
         appendRequiredCheckpointSection(builder, requiredCheckpointStatus);
@@ -371,20 +369,16 @@ public final class GoalContextRenderer {
         }
     }
 
-    private String[] structuredEvidenceFields(GoalPlan plan) {
-        java.util.List<String> fields = new java.util.ArrayList<String>();
-        for (String field : STRUCTURED_EVIDENCE_FIELDS) {
-            fields.add(field);
+    private void appendDemoWarning(StringBuilder builder, DevHarnessConfig config) {
+        if (!config.demoMode()) {
+            return;
         }
-        if (plan != null) {
-            for (String evidence : plan.requiredEvidence()) {
-                String key = evidence == null ? "" : evidence.trim();
-                if (key.length() > 0) {
-                    fields.add("--field " + key + "=<value>");
-                }
-            }
-        }
-        return fields.toArray(new String[fields.size()]);
+        builder.append("<demo-warning>\n");
+        builder.append("- verification_mode: demo\n");
+        builder.append("- warning: demo mode does not prove code correctness\n");
+        builder.append("- allowed_for: quickstart, examples, mock projects\n");
+        builder.append("- not_allowed_for: production development\n");
+        builder.append("</demo-warning>\n\n");
     }
 
     private String limit(String text) {

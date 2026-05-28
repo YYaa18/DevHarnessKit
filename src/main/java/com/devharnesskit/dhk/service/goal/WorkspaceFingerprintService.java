@@ -73,19 +73,16 @@ public final class WorkspaceFingerprintService {
             return "";
         }
         StringBuilder builder = new StringBuilder();
-        builder.append(run(root, new String[]{"git", "-C", root.toString(),
-                "status", "--porcelain=v1", "--untracked-files=all"}).output()).append('\n');
-        builder.append(run(root, new String[]{"git", "-C", root.toString(),
-                "diff", "--binary", "--no-ext-diff"}).output()).append('\n');
-        builder.append(run(root, new String[]{"git", "-C", root.toString(),
-                "diff", "--cached", "--binary", "--no-ext-diff"}).output()).append('\n');
+        builder.append(run(root, gitCommand(root, "status", "--porcelain=v1",
+                "--untracked-files=all")).output()).append('\n');
+        builder.append(run(root, gitCommand(root, "diff", "--binary", "--no-ext-diff")).output()).append('\n');
+        builder.append(run(root, gitCommand(root, "diff", "--cached", "--binary", "--no-ext-diff")).output()).append('\n');
         appendUntrackedContent(root, builder);
         return "git:" + sha256(builder.toString());
     }
 
     private void appendUntrackedContent(Path root, StringBuilder builder) {
-        CommandResult result = run(root, new String[]{"git", "-C", root.toString(),
-                "ls-files", "--others", "--exclude-standard", "-z"});
+        CommandResult result = run(root, gitCommand(root, "ls-files", "--others", "--exclude-standard", "-z"));
         if (!result.success() || result.output().length() == 0) {
             return;
         }
@@ -159,7 +156,7 @@ public final class WorkspaceFingerprintService {
         }
         if (".agents".equals(first) && relative.getNameCount() > 1) {
             String second = relative.getName(1).toString();
-            if ("memory".equals(second) || "tools".equals(second)) {
+            if ("devharness".equals(second) || "memory".equals(second) || "tools".equals(second)) {
                 return true;
             }
             if ("graph".equals(second) && relative.getNameCount() > 2) {
@@ -172,6 +169,18 @@ public final class WorkspaceFingerprintService {
             }
         }
         return false;
+    }
+
+    private String[] gitCommand(Path root, String... args) {
+        String[] command = new String[args.length + 6];
+        command[0] = "git";
+        command[1] = "-C";
+        command[2] = root.toString();
+        System.arraycopy(args, 0, command, 3, args.length);
+        command[args.length + 3] = "--";
+        command[args.length + 4] = ".";
+        command[args.length + 5] = ":(exclude).agents/devharness/**";
+        return command;
     }
 
     private CommandResult run(Path root, String[] command) {

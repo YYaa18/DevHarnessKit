@@ -9,10 +9,12 @@ import com.devharnesskit.dhk.command.StatusCommand;
 import com.devharnesskit.dhk.command.VersionCommand;
 import com.devharnesskit.dhk.command.artifact.ArtifactCommand;
 import com.devharnesskit.dhk.command.bdd.BddCommand;
+import com.devharnesskit.dhk.command.brief.BriefCommand;
 import com.devharnesskit.dhk.command.checkpoint.CheckpointCommand;
 import com.devharnesskit.dhk.command.configure.ConfigureCommand;
 import com.devharnesskit.dhk.command.projectdb.DbCommand;
 import com.devharnesskit.dhk.command.graph.GraphCommand;
+import com.devharnesskit.dhk.command.growth.GrowthCommand;
 import com.devharnesskit.dhk.command.memory.MemoryCommand;
 import com.devharnesskit.dhk.command.goal.GoalCommand;
 import com.devharnesskit.dhk.command.skill.SkillCommand;
@@ -67,6 +69,16 @@ public final class CommandRouter {
         this.commands.put("advise", new Supplier<Command>() {
             public Command get() {
                 return new AdviseCommand();
+            }
+        });
+        this.commands.put("brief", new Supplier<Command>() {
+            public Command get() {
+                return new BriefCommand();
+            }
+        });
+        this.commands.put("growth", new Supplier<Command>() {
+            public Command get() {
+                return new GrowthCommand();
             }
         });
         this.commands.put("completion", new Supplier<Command>() {

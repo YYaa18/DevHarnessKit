@@ -6,6 +6,7 @@ import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.service.goal.GoalStepAutoEvidenceCollector;
 import com.devharnesskit.dhk.service.goal.GoalOrchestrator;
+import com.devharnesskit.dhk.service.brief.BriefLifecycleService;
 import com.devharnesskit.dhk.service.policy.PolicyHookService;
 import com.devharnesskit.dhk.service.policy.PolicyViolationException;
 
@@ -16,6 +17,7 @@ public final class GoalStepCommand implements Command {
     private final GoalOrchestrator orchestrator = new GoalOrchestrator();
     private final PolicyHookService policyHookService = new PolicyHookService();
     private final GoalStepAutoEvidenceCollector autoEvidenceCollector = new GoalStepAutoEvidenceCollector();
+    private final BriefLifecycleService briefLifecycleService = new BriefLifecycleService();
 
     public int run(CommandContext context, Args args) {
         String goalKey = args.option("goal").trim();
@@ -44,6 +46,8 @@ public final class GoalStepCommand implements Command {
             String combinedEvidence = combineEvidence(evidence, structuredEvidence, fieldEvidence, autoEvidence);
             policyHookService.requireGoalStepAllowed(projectRoot, changedFiles);
             if (args.hasFlag("dry-run")) {
+                String currentAction = orchestrator.find(context, projectRoot, goalKey).currentAction();
+                briefLifecycleService.requireNoBlockingInteraction(projectRoot, goalKey, currentAction);
                 GoalOrchestrator.GoalStepValidationResult result = orchestrator.validateStep(context,
                         projectRoot, goalKey, summary, changedFiles, combinedEvidence);
                 context.out().println("goal step dry-run complete");
@@ -56,14 +60,20 @@ public final class GoalStepCommand implements Command {
                         + " --summary \"<summary>\" --evidence \"<evidence>\"");
                 return ExitCodes.SUCCESS;
             }
+            String currentAction = orchestrator.find(context, projectRoot, goalKey).currentAction();
+            briefLifecycleService.requireNoBlockingInteraction(projectRoot, goalKey, currentAction);
             GoalOrchestrator.GoalStepResult result = orchestrator.step(context, projectRoot, goalKey,
                     summary, changedFiles, combinedEvidence);
+            Path progressPath = briefLifecycleService.writeProgressBrief(projectRoot, result.goal(),
+                    result.stepId(), summary);
             context.out().println("step_id: " + result.stepId());
+            context.out().println("step_number: " + result.goal().stepCount());
             context.out().println("goal_key: " + result.goal().goalKey());
             context.out().println("status: " + result.goal().status());
             context.out().println("current_action: " + result.goal().currentAction());
             context.out().println("next_command: dhk goal next --goal " + result.goal().goalKey());
             context.out().println("context_path: " + result.contextPath());
+            context.out().println("progress_brief_path: " + progressPath);
             return ExitCodes.SUCCESS;
         } catch (IllegalArgumentException ex) {
             context.err().println(ex.getMessage());

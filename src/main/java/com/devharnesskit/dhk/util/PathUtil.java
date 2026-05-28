@@ -49,6 +49,14 @@ public final class PathUtil {
     public static final String CONTRACT_JSON = "contract.json";
     public static final String WORK_BRIEF = "WORK_BRIEF.md";
     public static final String AGENT_BRIEF_JSON = "AGENT_BRIEF.json";
+    public static final String PROGRESS_BRIEF = "PROGRESS_BRIEF.md";
+    public static final String VERIFY_BRIEF = "VERIFY_BRIEF.md";
+    public static final String COMPLETION_BRIEF = "COMPLETION_BRIEF.md";
+    public static final String KNOWLEDGE_CANDIDATES = "KNOWLEDGE_CANDIDATES.md";
+    public static final String INTERACTION_REQUESTS = "INTERACTION_REQUESTS.tsv";
+    public static final String KNOWLEDGE_CANDIDATES_TSV = "KNOWLEDGE_CANDIDATES.tsv";
+    public static final String GROWTH_LESSONS_TSV = "GROWTH_LESSONS.tsv";
+    public static final String GROWTH_CONTEXT = "GROWTH_CONTEXT.md";
 
     private PathUtil() {
     }
@@ -183,6 +191,38 @@ public final class PathUtil {
 
     public static Path agentBrief(Path projectRoot) {
         return devharnessBriefsDirectory(projectRoot).resolve(AGENT_BRIEF_JSON);
+    }
+
+    public static Path progressBrief(Path projectRoot) {
+        return devharnessBriefsDirectory(projectRoot).resolve(PROGRESS_BRIEF);
+    }
+
+    public static Path verifyBrief(Path projectRoot) {
+        return devharnessBriefsDirectory(projectRoot).resolve(VERIFY_BRIEF);
+    }
+
+    public static Path completionBrief(Path projectRoot) {
+        return devharnessBriefsDirectory(projectRoot).resolve(COMPLETION_BRIEF);
+    }
+
+    public static Path knowledgeCandidatesBrief(Path projectRoot) {
+        return devharnessBriefsDirectory(projectRoot).resolve(KNOWLEDGE_CANDIDATES);
+    }
+
+    public static Path interactionRequests(Path projectRoot) {
+        return devharnessBriefsDirectory(projectRoot).resolve(INTERACTION_REQUESTS);
+    }
+
+    public static Path knowledgeCandidatesStore(Path projectRoot) {
+        return devharnessBriefsDirectory(projectRoot).resolve(KNOWLEDGE_CANDIDATES_TSV);
+    }
+
+    public static Path growthLessonsStore(Path projectRoot) {
+        return devharnessBriefsDirectory(projectRoot).resolve(GROWTH_LESSONS_TSV);
+    }
+
+    public static Path growthContext(Path projectRoot) {
+        return devharnessBriefsDirectory(projectRoot).resolve(GROWTH_CONTEXT);
     }
 
     public static Path goalProfilesDirectory(Path projectRoot) {

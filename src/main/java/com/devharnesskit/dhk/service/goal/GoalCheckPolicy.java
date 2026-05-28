@@ -234,6 +234,9 @@ public final class GoalCheckPolicy {
         if (configured.length > 0) {
             return configured;
         }
+        if (isPatchProfile(profile) && ("compile".equals(checkKey) || "test".equals(checkKey))) {
+            return DEFAULT_ACCEPTED_STATUSES;
+        }
         if (profile != null && !profile.completionAllowSkippedChecks()) {
             return PASSED_ONLY;
         }
@@ -303,6 +306,14 @@ public final class GoalCheckPolicy {
                 || "java-mvc-change-with-graph".equals(profile.profileKey())
                 || "safe-refactor-with-graph".equals(profile.profileKey())
                 || profile.legacyGraphProfile();
+    }
+
+    private boolean isPatchProfile(GoalProfile profile) {
+        if (profile == null) {
+            return false;
+        }
+        return "java-api-patch".equals(profile.profileKey())
+                || "safe-patch".equals(profile.profileKey());
     }
 
     private String[] withGraphChecks(String[] checks, GoalProfile profile) {

@@ -79,7 +79,7 @@ Interaction request fields:
 request_id
 goal_key
 phase
-type: clarification | confirmation | risk_escalation | manual_evidence | knowledge_candidate
+type: clarification | confirmation | risk_escalation | manual_evidence | manual_verification | knowledge_candidate
 priority: blocking | important | optional
 question
 why
@@ -91,6 +91,22 @@ status: open | answered | rejected
 
 Blocking requests prevent goal step execution until answered. This keeps the
 user in control without exposing low-level Harness commands.
+
+### Manual Verification Choices
+
+When `goal verify` reaches a manual compile/test check without evidence, it
+creates a `manual_verification` interaction instead of leaving the user with a
+dead-end failure. The choices are:
+
+```text
+manual_passed       user has verified in IDE/local tooling and provides evidence_path
+try_auto            Harness attempts the configured compile/test command once
+waive_verification  user records an explicit verification-risk waiver
+```
+
+`try_auto` is scoped to the current check; it does not rewrite project
+configuration. `waive_verification` requires reason, approver, risk scope, and
+rollback plan evidence before the manual check can be accepted as waived.
 
 ## Agent Execution Brief
 

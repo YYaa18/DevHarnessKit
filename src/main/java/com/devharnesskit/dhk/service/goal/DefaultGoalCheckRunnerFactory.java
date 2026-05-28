@@ -6,6 +6,7 @@ import com.devharnesskit.dhk.repository.bdd.BddScenarioRepository;
 import com.devharnesskit.dhk.repository.bdd.BddStepRepository;
 import com.devharnesskit.dhk.repository.goal.GoalCheckRepository;
 import com.devharnesskit.dhk.repository.goal.GoalStepRepository;
+import com.devharnesskit.dhk.repository.brief.InteractionRequestRepository;
 import com.devharnesskit.dhk.repository.spec.SpecAcceptanceRepository;
 import com.devharnesskit.dhk.repository.spec.SpecTaskRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowGateRunRepository;
@@ -54,8 +55,10 @@ final class DefaultGoalCheckRunnerFactory {
         return GoalCheckRunnerRegistry.of(
                 new MavenGoalCheckRunner("compile", recorder, commandExecutor),
                 new MavenGoalCheckRunner("test", recorder, commandExecutor),
-                new ManualVerificationGoalCheckRunner("manual-compile", recorder, stepRepository, "compile_scope"),
-                new ManualVerificationGoalCheckRunner("manual-test", recorder, stepRepository, "test_scope"),
+                new ManualVerificationGoalCheckRunner("manual-compile", recorder, stepRepository,
+                        new InteractionRequestRepository(), commandExecutor, "compile_scope"),
+                new ManualVerificationGoalCheckRunner("manual-test", recorder, stepRepository,
+                        new InteractionRequestRepository(), commandExecutor, "test_scope"),
                 new VerificationRiskGoalCheckRunner(recorder, stepRepository),
                 new SensitiveGoalCheckRunner(recorder, sensitiveDataGuard),
                 new SpecGoalCheckRunner(recorder, taskRepository, acceptanceRepository),

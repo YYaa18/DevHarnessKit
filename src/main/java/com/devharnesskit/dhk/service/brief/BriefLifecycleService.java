@@ -43,6 +43,7 @@ public final class BriefLifecycleService {
     private final InteractionRequestRepository interactionRepository;
     private final GrowthLessonRepository growthLessonRepository;
     private final BriefLifecycleCompatibilityStoreWriter compatibilityStoreWriter;
+    private final ManualVerificationInteractionSupport manualVerificationInteractionSupport;
     private final TransactionTemplate transactionTemplate;
     private final SensitiveDataGuard sensitiveDataGuard;
     private final Clock systemClock = new SystemClock();
@@ -50,17 +51,16 @@ public final class BriefLifecycleService {
     public BriefLifecycleService() {
         this(new DbConnectionFactory(), new MigrationRunner(), new ProjectService(), new ProjectRepository(),
                 new MemoryRepository(), new FtsRepository(), new KnowledgeCandidateRepository(),
-                new InteractionRequestRepository(), new GrowthLessonRepository(),
-                new BriefLifecycleCompatibilityStoreWriter(), new TransactionTemplate(), new SensitiveDataGuard());
+                new InteractionRequestRepository(), new GrowthLessonRepository(), new BriefLifecycleCompatibilityStoreWriter(),
+                new ManualVerificationInteractionSupport(), new TransactionTemplate(), new SensitiveDataGuard());
     }
 
     BriefLifecycleService(DbConnectionFactory connectionFactory, MigrationRunner migrationRunner,
-                          ProjectService projectService, ProjectRepository projectRepository,
-                          MemoryRepository memoryRepository, FtsRepository ftsRepository,
-                          KnowledgeCandidateRepository candidateRepository,
-                          InteractionRequestRepository interactionRepository,
-                          GrowthLessonRepository growthLessonRepository,
+                          ProjectService projectService, ProjectRepository projectRepository, MemoryRepository memoryRepository,
+                          FtsRepository ftsRepository, KnowledgeCandidateRepository candidateRepository,
+                          InteractionRequestRepository interactionRepository, GrowthLessonRepository growthLessonRepository,
                           BriefLifecycleCompatibilityStoreWriter compatibilityStoreWriter,
+                          ManualVerificationInteractionSupport manualVerificationInteractionSupport,
                           TransactionTemplate transactionTemplate, SensitiveDataGuard sensitiveDataGuard) {
         this.connectionFactory = connectionFactory;
         this.migrationRunner = migrationRunner;
@@ -72,6 +72,7 @@ public final class BriefLifecycleService {
         this.interactionRepository = interactionRepository;
         this.growthLessonRepository = growthLessonRepository;
         this.compatibilityStoreWriter = compatibilityStoreWriter;
+        this.manualVerificationInteractionSupport = manualVerificationInteractionSupport;
         this.transactionTemplate = transactionTemplate;
         this.sensitiveDataGuard = sensitiveDataGuard;
     }
@@ -104,7 +105,8 @@ public final class BriefLifecycleService {
     public void requireNoBlockingInteraction(Path projectRoot, String goalKey, String currentAction) {
         for (InteractionRequest request : loadInteractions(projectRoot)) {
             if (request.openBlockingFor(goalKey)) {
-                if ("manual_evidence".equals(request.type()) && "verify".equals(currentAction)) {
+                if (("manual_evidence".equals(request.type()) || "manual_verification".equals(request.type()))
+                        && "verify".equals(currentAction)) {
                     continue;
                 }
                 throw new BlockingInteractionException(request.requestId(), request.question(), request.choices());
@@ -131,6 +133,18 @@ public final class BriefLifecycleService {
         writeInteractionsBrief(projectRoot);
         updateAgentBriefAfterAnswer(projectRoot);
         return answered;
+    }
+
+    public InteractionRequest answerInteraction(Path projectRoot, String requestId, String answer,
+                                                String evidencePath, String scope, String tester,
+                                                String reason, String approver, String riskScope,
+                                                String rollbackPlan) throws Exception {
+        InteractionRequest request = findInteraction(projectRoot, requestId);
+        if (request != null && "manual_verification".equals(request.type())) {
+            return answerInteraction(projectRoot, requestId, manualVerificationInteractionSupport.answer(request, answer,
+                    evidencePath, scope, tester, reason, approver, riskScope, rollbackPlan));
+        }
+        return answerInteraction(projectRoot, requestId, answer);
     }
 
     public InteractionRequest findInteraction(Path projectRoot, String requestId) {
@@ -188,7 +202,7 @@ public final class BriefLifecycleService {
         }
         builder.append("\n## 下一步\n\n");
         builder.append("- ").append(evaluation.nextCommand()).append('\n');
-        recordVerifyInteraction(projectRoot, goal, evaluation);
+        recordVerifyInteractions(projectRoot, goal, checks, evaluation);
         Path path = PathUtil.verifyBrief(projectRoot);
         Files.write(path, builder.toString().getBytes("UTF-8"));
         return path;
@@ -459,7 +473,19 @@ public final class BriefLifecycleService {
         return "confirmation";
     }
 
-    private void recordVerifyInteraction(Path projectRoot, GoalRun goal, GoalEvaluation evaluation) throws Exception {
+    private void recordVerifyInteractions(Path projectRoot, GoalRun goal, List<GoalCheck> checks,
+                                          GoalEvaluation evaluation) throws Exception {
+        boolean manualVerificationCreated = false;
+        for (GoalCheck check : checks) {
+            if (manualVerificationInteractionSupport.isFailedManualVerification(check)) {
+                upsertInteraction(projectRoot, manualVerificationInteractionSupport.request(goal, check));
+                manualVerificationCreated = true;
+            }
+        }
+        if (manualVerificationCreated) {
+            writeInteractionsBrief(projectRoot);
+            return;
+        }
         for (String missing : evaluation.missing()) {
             String lower = missing.toLowerCase(Locale.ROOT);
             if (lower.contains("manual") || lower.contains("evidence")) {
@@ -544,7 +570,6 @@ public final class BriefLifecycleService {
     private interface LifecycleStoreWork<T> {
         T execute(Connection connection, Project project, String now) throws Exception;
     }
-
     private void writeInteractionsBrief(Path projectRoot) throws Exception {
         Files.createDirectories(PathUtil.devharnessBriefsDirectory(projectRoot));
         StringBuilder builder = new StringBuilder();
@@ -561,7 +586,6 @@ public final class BriefLifecycleService {
         Files.write(PathUtil.devharnessBriefsDirectory(projectRoot).resolve("INTERACTION_REQUESTS.md"),
                 builder.toString().getBytes("UTF-8"));
     }
-
     private void appendOpenInteractions(StringBuilder builder, Path projectRoot, String goalKey) {
         List<InteractionRequest> requests = loadInteractions(projectRoot);
         boolean any = false;
@@ -579,7 +603,6 @@ public final class BriefLifecycleService {
             builder.append("## 需要用户处理\n\n- 当前没有 blocking interaction。\n");
         }
     }
-
     private void updateAgentBriefAfterAnswer(Path projectRoot) throws Exception {
         Path path = PathUtil.agentBrief(projectRoot);
         if (!Files.isRegularFile(path)) {
@@ -590,7 +613,6 @@ public final class BriefLifecycleService {
                 "\"current_action\": \"answered_continue\"");
         Files.write(path, text.getBytes("UTF-8"));
     }
-
     private String userFriendlyBlocker(String missing) {
         String lower = missing.toLowerCase(Locale.ROOT);
         if (lower.contains("manual") || lower.contains("evidence")) {
@@ -604,7 +626,6 @@ public final class BriefLifecycleService {
         }
         return missing;
     }
-
     private KnowledgeCandidate findCandidate(List<KnowledgeCandidate> candidates, String id) {
         for (KnowledgeCandidate candidate : candidates) {
             if (candidate.candidateId().equals(id)) {
@@ -613,7 +634,6 @@ public final class BriefLifecycleService {
         }
         return null;
     }
-
     private String join(String[] values, String delimiter) {
         StringBuilder builder = new StringBuilder();
         for (String value : values) {
@@ -624,5 +644,4 @@ public final class BriefLifecycleService {
         }
         return builder.toString();
     }
-
 }

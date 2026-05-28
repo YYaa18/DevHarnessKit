@@ -8,6 +8,7 @@ public final class GoalCheckPolicy {
     private static final String[] DEFAULT_ACCEPTED_STATUSES =
             new String[]{"passed", "skipped", "waived"};
     private static final String[] PASSED_ONLY = new String[]{"passed"};
+    private static final String[] MANUAL_ACCEPTED_STATUSES = new String[]{"passed", "waived"};
 
     private final String[] requiredChecks;
     private final boolean requiredChecksConfigured;
@@ -270,8 +271,10 @@ public final class GoalCheckPolicy {
         if ("bdd".equals(checkKey)) {
             return PASSED_ONLY;
         }
-        if ("manual-compile".equals(checkKey) || "manual-test".equals(checkKey)
-                || "verification-risk".equals(checkKey)) {
+        if ("manual-compile".equals(checkKey) || "manual-test".equals(checkKey)) {
+            return MANUAL_ACCEPTED_STATUSES;
+        }
+        if ("verification-risk".equals(checkKey)) {
             return PASSED_ONLY;
         }
         if (isBuiltInJavaProfile(profile)) {

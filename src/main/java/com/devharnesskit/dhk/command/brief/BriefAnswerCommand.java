@@ -48,11 +48,21 @@ public final class BriefAnswerCommand implements Command {
             return ExitCodes.USAGE_ERROR;
         }
         try {
-            InteractionRequest request = lifecycleService.answerInteraction(projectRoot, requestId, choice);
+            InteractionRequest request = lifecycleService.answerInteraction(projectRoot, requestId, choice,
+                    args.option("evidence-path", args.option("manual-evidence-path", "")).trim(),
+                    args.option("scope", "").trim(),
+                    args.option("tester", "").trim(),
+                    args.option("reason", args.option("waive-reason", "")).trim(),
+                    args.option("approver", "").trim(),
+                    args.option("risk-scope", args.option("risk", "")).trim(),
+                    args.option("rollback-plan", "").trim());
             context.out().println("request_id: " + request.requestId());
             context.out().println("status: " + request.status());
             context.out().println("answer: " + request.answer());
             context.out().println("agent_brief_path: " + PathUtil.agentBrief(projectRoot));
+            if ("manual_verification".equals(request.type())) {
+                context.out().println("next_action: rerun goal verify");
+            }
             return ExitCodes.SUCCESS;
         } catch (IllegalArgumentException ex) {
             context.err().println(ex.getMessage());

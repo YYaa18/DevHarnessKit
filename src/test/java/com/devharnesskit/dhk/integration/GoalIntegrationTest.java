@@ -2618,6 +2618,119 @@ final class GoalIntegrationTest {
     }
 
     @Test
+    void manualCompileVerifyCreatesChoiceInteractionAndManualAnswerPassesCheck() throws Exception {
+        Path root = tempDir.resolve("demo-manual-choice");
+        writeManualCompilePolicy(root, "java -version");
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo-manual-choice",
+                "--profile", "java-api-patch",
+                "--task", "Fix small mapping bug",
+                "--module", "order"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "demo-manual-choice", "--goal", goalKey
+        }, verify.context());
+        assertEquals(ExitCodes.SUCCESS, verifyExit);
+        assertTrue(verify.stdout().contains("manual-compile: failed"));
+
+        String requestId = "interaction-" + goalKey + "-manual-compile";
+        Harness show = new Harness(tempDir);
+        int showExit = new CommandRouter().run(new String[]{
+                "brief", "show", "--project-root", "demo-manual-choice", "--request", requestId
+        }, show.context());
+        assertEquals(ExitCodes.SUCCESS, showExit);
+        assertTrue(show.stdout().contains("type: manual_verification"));
+        assertTrue(show.stdout().contains("manual_passed:"));
+        assertTrue(show.stdout().contains("try_auto:"));
+        assertTrue(show.stdout().contains("waive_verification:"));
+
+        Path evidence = root.resolve(".agents/verification/manual-compile.md");
+        Files.createDirectories(evidence.getParent());
+        Files.write(evidence, "IDE compile passed".getBytes("UTF-8"));
+        Harness answer = new Harness(tempDir);
+        int answerExit = new CommandRouter().run(new String[]{
+                "brief", "answer",
+                "--project-root", "demo-manual-choice",
+                "--request", requestId,
+                "--choice", "manual_passed",
+                "--scope", "IDE full compile",
+                "--evidence-path", ".agents/verification/manual-compile.md",
+                "--tester", "yangyang"
+        }, answer.context());
+        assertEquals(ExitCodes.SUCCESS, answerExit);
+        assertTrue(answer.stdout().contains("next_action: rerun goal verify"));
+
+        Harness verifyAgain = new Harness(tempDir);
+        int verifyAgainExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "demo-manual-choice", "--goal", goalKey
+        }, verifyAgain.context());
+        assertEquals(ExitCodes.SUCCESS, verifyAgainExit);
+        assertTrue(verifyAgain.stdout().contains("manual-compile: passed"));
+        assertTrue(verifyAgain.stdout().contains("user-confirmed manual evidence passed"));
+    }
+
+    @Test
+    void manualCompileInteractionCanRunAutoFallbackOrRecordWaiver() throws Exception {
+        Path autoRoot = tempDir.resolve("demo-manual-auto");
+        writeManualCompilePolicy(autoRoot, "java -version");
+        String autoGoal = startPatchGoal("demo-manual-auto", "Auto fallback manual compile");
+        String autoRequest = createManualCompileInteraction("demo-manual-auto", autoGoal);
+
+        Harness autoAnswer = new Harness(tempDir);
+        int autoAnswerExit = new CommandRouter().run(new String[]{
+                "brief", "answer",
+                "--project-root", "demo-manual-auto",
+                "--request", autoRequest,
+                "--choice", "try_auto"
+        }, autoAnswer.context());
+        assertEquals(ExitCodes.SUCCESS, autoAnswerExit);
+
+        Harness autoVerify = new Harness(tempDir);
+        int autoVerifyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "demo-manual-auto", "--goal", autoGoal
+        }, autoVerify.context());
+        assertEquals(ExitCodes.SUCCESS, autoVerifyExit);
+        assertTrue(autoVerify.stdout().contains("manual-compile: passed"));
+        assertTrue(autoVerify.stdout().contains("user-selected auto fallback exit_code=0"));
+
+        Path waiverRoot = tempDir.resolve("demo-manual-waiver");
+        writeManualCompilePolicy(waiverRoot, "java -version");
+        String waiverGoal = startPatchGoal("demo-manual-waiver", "Waiver manual compile");
+        String waiverRequest = createManualCompileInteraction("demo-manual-waiver", waiverGoal);
+        Path rollback = waiverRoot.resolve(".agents/verification/rollback.md");
+        Files.createDirectories(rollback.getParent());
+        Files.write(rollback, "Rollback by reverting the patch".getBytes("UTF-8"));
+
+        Harness waiverAnswer = new Harness(tempDir);
+        int waiverAnswerExit = new CommandRouter().run(new String[]{
+                "brief", "answer",
+                "--project-root", "demo-manual-waiver",
+                "--request", waiverRequest,
+                "--choice", "waive_verification",
+                "--reason", "No build tool available in this environment",
+                "--approver", "yangyang",
+                "--risk-scope", "manual compile skipped for local harness test",
+                "--rollback-plan", ".agents/verification/rollback.md"
+        }, waiverAnswer.context());
+        assertEquals(ExitCodes.SUCCESS, waiverAnswerExit);
+
+        Harness waiverVerify = new Harness(tempDir);
+        int waiverVerifyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "demo-manual-waiver", "--goal", waiverGoal
+        }, waiverVerify.context());
+        assertEquals(ExitCodes.SUCCESS, waiverVerifyExit);
+        assertTrue(waiverVerify.stdout().contains("manual-compile: waived"));
+        assertTrue(waiverVerify.stdout().contains("verification waived with approval"));
+    }
+
+    @Test
     void legacyGraphProfileSurfacesProtectedImpactRiskAndCompletesWithEvidence() throws Exception {
         Path root = tempDir.resolve("demo-legacy-protected");
         writeSource(root, "src/main/java/com/example/App.java",
@@ -3161,6 +3274,42 @@ final class GoalIntegrationTest {
                 + "  <artifactId>demo</artifactId>\n"
                 + "  <version>1.0.0</version>\n"
                 + "</project>\n").getBytes("UTF-8"));
+    }
+
+    private void writeManualCompilePolicy(Path root, String compileCommand) throws Exception {
+        Files.createDirectories(PathUtil.devharnessDirectory(root));
+        Files.write(PathUtil.devharnessConfig(root), ("{\n"
+                + "  \"schema_version\": \"devharness-config/v1-alpha\",\n"
+                + "  \"verification.compile.mode\": \"manual\",\n"
+                + "  \"verification.test.mode\": \"disabled\"\n"
+                + "}\n").getBytes("UTF-8"));
+        Files.write(PathUtil.goalCheckPolicy(root), ("{\n"
+                + "  \"required_checks\": \"compile\",\n"
+                + "  \"compile_command\": \"" + compileCommand + "\"\n"
+                + "}\n").getBytes("UTF-8"));
+    }
+
+    private String startPatchGoal(String projectRoot, String task) {
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", projectRoot,
+                "--profile", "java-api-patch",
+                "--task", task,
+                "--module", "order"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        return firstValue(start.stdout(), "goal_key: ");
+    }
+
+    private String createManualCompileInteraction(String projectRoot, String goalKey) {
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", projectRoot, "--goal", goalKey
+        }, verify.context());
+        assertEquals(ExitCodes.SUCCESS, verifyExit);
+        assertTrue(verify.stdout().contains("manual-compile: failed"));
+        return "interaction-" + goalKey + "-manual-compile";
     }
 
     private void closeSpec(Path root, String specChange) {

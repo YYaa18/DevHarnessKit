@@ -34,6 +34,7 @@ import com.devharnesskit.dhk.model.policy.DevHarnessPolicy;
 import com.devharnesskit.dhk.service.policy.DevHarnessPolicyService;
 import com.devharnesskit.dhk.service.policy.PolicyHookService;
 import com.devharnesskit.dhk.service.config.DevHarnessConfigService;
+import com.devharnesskit.dhk.service.knowledge.ProfessionalKnowledgeService;
 import com.devharnesskit.dhk.service.spec.SpecExportService;
 import com.devharnesskit.dhk.service.workflow.WorkflowExportService;
 import com.devharnesskit.dhk.util.PathUtil;
@@ -65,6 +66,7 @@ public final class GoalContextService {
     private final DevHarnessPolicyService devHarnessPolicyService;
     private final HumanCheckpointService humanCheckpointService;
     private final DevHarnessConfigService devHarnessConfigService = new DevHarnessConfigService();
+    private final ProfessionalKnowledgeService professionalKnowledgeService = new ProfessionalKnowledgeService();
 
     public GoalContextService() {
         this(new ExportSelectionService(new MemoryRepository()), new CheckpointRepository(),
@@ -168,7 +170,8 @@ public final class GoalContextService {
                 bddStateService.inspect(connection, projectRoot, project, goal, profile),
                 disciplineGateStatus(requiredChecks, checks),
                 humanCheckpointStatus(connection, goal, devPolicy),
-                verificationConfig);
+                verificationConfig,
+                professionalKnowledgeService.forGoal(projectRoot, goal, plan));
         return writePath(projectRoot, PathUtil.goalContext(projectRoot), goalContext);
     }
 

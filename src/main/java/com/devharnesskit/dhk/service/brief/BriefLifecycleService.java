@@ -44,6 +44,8 @@ public final class BriefLifecycleService {
     private final GrowthLessonRepository growthLessonRepository;
     private final BriefLifecycleCompatibilityStoreWriter compatibilityStoreWriter;
     private final ManualVerificationInteractionSupport manualVerificationInteractionSupport;
+    private final ProfessionalKnowledgeCandidateFactory knowledgeCandidateFactory;
+    private final KnowledgeCandidatesBriefRenderer knowledgeBriefRenderer;
     private final TransactionTemplate transactionTemplate;
     private final SensitiveDataGuard sensitiveDataGuard;
     private final Clock systemClock = new SystemClock();
@@ -52,7 +54,8 @@ public final class BriefLifecycleService {
         this(new DbConnectionFactory(), new MigrationRunner(), new ProjectService(), new ProjectRepository(),
                 new MemoryRepository(), new FtsRepository(), new KnowledgeCandidateRepository(),
                 new InteractionRequestRepository(), new GrowthLessonRepository(), new BriefLifecycleCompatibilityStoreWriter(),
-                new ManualVerificationInteractionSupport(), new TransactionTemplate(), new SensitiveDataGuard());
+                new ManualVerificationInteractionSupport(), new ProfessionalKnowledgeCandidateFactory(),
+                new KnowledgeCandidatesBriefRenderer(), new TransactionTemplate(), new SensitiveDataGuard());
     }
 
     BriefLifecycleService(DbConnectionFactory connectionFactory, MigrationRunner migrationRunner,
@@ -61,6 +64,8 @@ public final class BriefLifecycleService {
                           InteractionRequestRepository interactionRepository, GrowthLessonRepository growthLessonRepository,
                           BriefLifecycleCompatibilityStoreWriter compatibilityStoreWriter,
                           ManualVerificationInteractionSupport manualVerificationInteractionSupport,
+                          ProfessionalKnowledgeCandidateFactory knowledgeCandidateFactory,
+                          KnowledgeCandidatesBriefRenderer knowledgeBriefRenderer,
                           TransactionTemplate transactionTemplate, SensitiveDataGuard sensitiveDataGuard) {
         this.connectionFactory = connectionFactory;
         this.migrationRunner = migrationRunner;
@@ -73,6 +78,8 @@ public final class BriefLifecycleService {
         this.growthLessonRepository = growthLessonRepository;
         this.compatibilityStoreWriter = compatibilityStoreWriter;
         this.manualVerificationInteractionSupport = manualVerificationInteractionSupport;
+        this.knowledgeCandidateFactory = knowledgeCandidateFactory;
+        this.knowledgeBriefRenderer = knowledgeBriefRenderer;
         this.transactionTemplate = transactionTemplate;
         this.sensitiveDataGuard = sensitiveDataGuard;
     }
@@ -245,6 +252,11 @@ public final class BriefLifecycleService {
                     "保留本次任务的风险识别、轻重流程选择和验证经验，供未来 Work Brief advisory 使用。",
                     "goal:" + goal.goalKey(), "growth", "medium", true, "passed", "draft"));
         }
+        for (KnowledgeCandidate candidate : knowledgeCandidateFactory.candidates(projectRoot, goal)) {
+            if (findCandidate(candidates, candidate.candidateId()) == null) {
+                candidates.add(candidate);
+            }
+        }
         saveCandidates(projectRoot, candidates);
         return candidates;
     }
@@ -367,26 +379,8 @@ public final class BriefLifecycleService {
 
     public Path writeKnowledgeBrief(Path projectRoot) throws Exception {
         Files.createDirectories(PathUtil.devharnessBriefsDirectory(projectRoot));
-        StringBuilder builder = new StringBuilder();
-        builder.append("# Knowledge Candidates\n\n");
-        builder.append("用户确认前，候选知识不会进入 confirmed memory。\n\n");
-        for (KnowledgeCandidate candidate : loadCandidates(projectRoot)) {
-            if ("rejected".equals(candidate.status())) {
-                continue;
-            }
-            builder.append("## ").append(candidate.title()).append("\n\n");
-            builder.append("- candidate_id: ").append(candidate.candidateId()).append('\n');
-            builder.append("- goal_key: ").append(candidate.goalKey()).append('\n');
-            builder.append("- type: ").append(candidate.type()).append('\n');
-            builder.append("- suggested_destination: ").append(candidate.suggestedDestination()).append('\n');
-            builder.append("- confidence: ").append(candidate.confidence()).append('\n');
-            builder.append("- requires_confirmation: ").append(candidate.requiresConfirmation()).append('\n');
-            builder.append("- sensitive_scan_status: ").append(candidate.sensitiveScanStatus()).append('\n');
-            builder.append("- status: ").append(candidate.status()).append("\n\n");
-            builder.append(candidate.summary()).append("\n\n");
-        }
         Path path = PathUtil.knowledgeCandidatesBrief(projectRoot);
-        Files.write(path, builder.toString().getBytes("UTF-8"));
+        Files.write(path, knowledgeBriefRenderer.render(loadCandidates(projectRoot)).getBytes("UTF-8"));
         return path;
     }
 

@@ -6,6 +6,8 @@ import com.devharnesskit.dhk.model.goal.GoalEvidenceContract;
 import com.devharnesskit.dhk.model.goal.GoalGraphState;
 import com.devharnesskit.dhk.model.goal.GoalRun;
 import com.devharnesskit.dhk.model.config.DevHarnessConfig;
+import com.devharnesskit.dhk.model.knowledge.KnowledgeSnippet;
+import com.devharnesskit.dhk.model.knowledge.ProfessionalKnowledgeContext;
 
 public final class GoalContextRenderer {
     private static final int MAX_CHARS = 16 * 1024;
@@ -64,9 +66,22 @@ public final class GoalContextRenderer {
                          String freshnessStatus, String generatedAt, GoalGraphState graphState,
                          GoalBddState bddState, String[] disciplineGateStatus,
                          String[] requiredCheckpointStatus, DevHarnessConfig verificationConfig) {
+        return render(goal, plan, requiredChecks, completionBlockers, staleChecks, freshnessStatus,
+                generatedAt, graphState, bddState, disciplineGateStatus, requiredCheckpointStatus,
+                verificationConfig, ProfessionalKnowledgeContext.disabled());
+    }
+
+    public String render(GoalRun goal, GoalPlan plan, String[] requiredChecks,
+                         String[] completionBlockers, String[] staleChecks,
+                         String freshnessStatus, String generatedAt, GoalGraphState graphState,
+                         GoalBddState bddState, String[] disciplineGateStatus,
+                         String[] requiredCheckpointStatus, DevHarnessConfig verificationConfig,
+                         ProfessionalKnowledgeContext knowledgeContext) {
         GoalGraphState graph = graphState == null ? GoalGraphState.disabled() : graphState;
         GoalBddState bdd = bddState == null ? GoalBddState.disabled() : bddState;
         DevHarnessConfig config = verificationConfig == null ? new DevHarnessConfig(null) : verificationConfig;
+        ProfessionalKnowledgeContext knowledge = knowledgeContext == null
+                ? ProfessionalKnowledgeContext.disabled() : knowledgeContext;
         GoalEvidenceContract evidenceContract = GoalEvidenceContract.from(goal, plan);
         StringBuilder builder = new StringBuilder();
         builder.append("# GOAL_CONTEXT\n\n");
@@ -157,6 +172,7 @@ public final class GoalContextRenderer {
         appendRequiredCheckpointSection(builder, requiredCheckpointStatus);
         appendGraphSections(builder, graph);
         appendBddSections(builder, bdd);
+        appendProfessionalKnowledgeSection(builder, knowledge);
 
         builder.append("<context-files>\n");
         builder.append("- .agents/memory/exports/CURRENT_CONTEXT.md\n");
@@ -343,6 +359,31 @@ public final class GoalContextRenderer {
             builder.append("- rule: legacy graph profiles require manual confirmation before completion\n");
             builder.append("</protected-impact-risk>\n\n");
         }
+    }
+
+    private void appendProfessionalKnowledgeSection(StringBuilder builder, ProfessionalKnowledgeContext knowledge) {
+        if (!knowledge.enabled()) {
+            return;
+        }
+        builder.append("<professional-knowledge>\n");
+        builder.append("- status: enabled\n");
+        builder.append("- advisory: true\n");
+        builder.append("- rule: ").append(knowledge.advisory()).append('\n');
+        builder.append("- pack_refs:\n");
+        appendList(builder, knowledge.packRefs(), "none");
+        for (KnowledgeSnippet snippet : knowledge.snippets()) {
+            builder.append("\n<knowledge-snippet>\n");
+            builder.append("- rule_id: ").append(snippet.ruleId()).append('\n');
+            builder.append("- domain: ").append(snippet.domain()).append('\n');
+            builder.append("- severity: ").append(snippet.severity()).append('\n');
+            builder.append("- full_ref: ").append(snippet.fullRef()).append('\n');
+            builder.append("- summary:\n");
+            appendList(builder, snippet.summaryLines(), "none");
+            builder.append("- evidence_checklist:\n");
+            appendList(builder, snippet.evidenceChecklist(), "none");
+            builder.append("</knowledge-snippet>\n");
+        }
+        builder.append("</professional-knowledge>\n\n");
     }
 
     private String valueOrNone(String value) {

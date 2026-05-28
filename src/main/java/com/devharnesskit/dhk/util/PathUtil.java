@@ -10,6 +10,8 @@ public final class PathUtil {
     public static final String AGENTS_DIRECTORY = ".agents";
     public static final String DEVHARNESS_DIRECTORY = "devharness";
     public static final String SKILLS_DIRECTORY = "skills";
+    public static final String KNOWLEDGE_DIRECTORY = "knowledge";
+    public static final String KNOWLEDGE_PACKS_DIRECTORY = "packs";
     public static final String MEMORY_DIRECTORY = "memory";
     public static final String GRAPH_DIRECTORY = "graph";
     public static final String BDD_DIRECTORY = "bdd";
@@ -95,6 +97,14 @@ public final class PathUtil {
 
     public static Path skillsDirectory(Path projectRoot) {
         return projectRoot.resolve(AGENTS_DIRECTORY).resolve(SKILLS_DIRECTORY);
+    }
+
+    public static Path knowledgeDirectory(Path projectRoot) {
+        return projectRoot.resolve(AGENTS_DIRECTORY).resolve(KNOWLEDGE_DIRECTORY);
+    }
+
+    public static Path knowledgePacksDirectory(Path projectRoot) {
+        return knowledgeDirectory(projectRoot).resolve(KNOWLEDGE_PACKS_DIRECTORY);
     }
 
     public static Path skillDirectory(Path projectRoot, String skillKey) {

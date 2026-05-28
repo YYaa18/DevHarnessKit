@@ -17,6 +17,8 @@ public final class WorkBriefRenderer {
         appendList(builder, brief.why(), "暂无额外原因。");
         builder.append("\n## 风险提示\n\n");
         appendList(builder, brief.riskFlags(), "未发现明显高风险信号。");
+        builder.append("\n## 专业注意事项\n\n");
+        appendList(builder, brief.professionalNotes(), "暂无额外专业知识提示。");
         builder.append("\n## 预计会做\n\n");
         appendList(builder, brief.expectedWork(), "先确认任务边界。");
         builder.append("\n## 不会做\n\n");

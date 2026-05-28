@@ -2,6 +2,8 @@ package com.devharnesskit.dhk.service.brief;
 
 import com.devharnesskit.dhk.model.brief.AgentBrief;
 import com.devharnesskit.dhk.model.brief.HarnessCommand;
+import com.devharnesskit.dhk.model.knowledge.KnowledgeSnippet;
+import com.devharnesskit.dhk.model.knowledge.ProfessionalKnowledgeContext;
 import com.devharnesskit.dhk.util.JsonOutput;
 
 import java.util.ArrayList;
@@ -26,6 +28,7 @@ public final class AgentBriefRenderer {
                 JsonOutput.stringField("user_brief_path", brief.userBriefPath()),
                 JsonOutput.stringField("user_visible_summary_ref", brief.userBriefPath()),
                 JsonOutput.rawField("growth_context", growthContext(brief)),
+                JsonOutput.rawField("knowledge_context", knowledgeContext(brief.knowledgeContext())),
                 JsonOutput.rawField("execution_policy", executionPolicy(brief)),
                 JsonOutput.rawField("harness_commands", commands(brief.harnessCommands()))
         );
@@ -59,6 +62,28 @@ public final class AgentBriefRenderer {
         return JsonOutput.object(
                 JsonOutput.stringField("path", path),
                 JsonOutput.booleanField("advisory_only", true)
+        );
+    }
+
+    private String knowledgeContext(ProfessionalKnowledgeContext context) {
+        List<String> snippets = new ArrayList<String>();
+        for (KnowledgeSnippet snippet : context.snippets()) {
+            snippets.add(JsonOutput.object(
+                    JsonOutput.stringField("pack_ref", snippet.packRef()),
+                    JsonOutput.stringField("rule_id", snippet.ruleId()),
+                    JsonOutput.stringField("domain", snippet.domain()),
+                    JsonOutput.stringField("severity", snippet.severity()),
+                    JsonOutput.booleanField("advisory", true),
+                    JsonOutput.stringField("full_ref", snippet.fullRef()),
+                    JsonOutput.rawField("summary", JsonOutput.stringArray(snippet.summaryLines())),
+                    JsonOutput.rawField("evidence_checklist", JsonOutput.stringArray(snippet.evidenceChecklist()))
+            ).trim());
+        }
+        return JsonOutput.object(
+                JsonOutput.booleanField("enabled", context.enabled()),
+                JsonOutput.rawField("pack_refs", JsonOutput.stringArray(context.packRefs())),
+                JsonOutput.stringField("agent_instruction", context.advisory()),
+                JsonOutput.rawField("snippets", JsonOutput.array(snippets))
         );
     }
 

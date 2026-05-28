@@ -1,5 +1,7 @@
 package com.devharnesskit.dhk.model.brief;
 
+import com.devharnesskit.dhk.model.knowledge.ProfessionalKnowledgeContext;
+
 public final class AgentBrief {
     public static final String SCHEMA_VERSION = "devharness-agent-brief/v1-alpha";
 
@@ -22,6 +24,7 @@ public final class AgentBrief {
     private final String userBriefPath;
     private final boolean requireUserConfirmation;
     private final HarnessCommand[] harnessCommands;
+    private final ProfessionalKnowledgeContext knowledgeContext;
 
     public AgentBrief(String briefId, String recommendationId, String taskKey, String goalKey,
                       String mode, String profileKey, String currentAction,
@@ -30,6 +33,21 @@ public final class AgentBrief {
                       String compileMode, String testMode, String graphMode,
                       boolean manualEvidenceRequired, String userBriefPath,
                       boolean requireUserConfirmation, HarnessCommand[] harnessCommands) {
+        this(briefId, recommendationId, taskKey, goalKey, mode, profileKey, currentAction,
+                allowedActions, forbiddenActions, requiredEvidence, softEscalationRules,
+                hardEscalationRules, compileMode, testMode, graphMode, manualEvidenceRequired,
+                userBriefPath, requireUserConfirmation, harnessCommands,
+                ProfessionalKnowledgeContext.disabled());
+    }
+
+    public AgentBrief(String briefId, String recommendationId, String taskKey, String goalKey,
+                      String mode, String profileKey, String currentAction,
+                      String[] allowedActions, String[] forbiddenActions, String[] requiredEvidence,
+                      String[] softEscalationRules, String[] hardEscalationRules,
+                      String compileMode, String testMode, String graphMode,
+                      boolean manualEvidenceRequired, String userBriefPath,
+                      boolean requireUserConfirmation, HarnessCommand[] harnessCommands,
+                      ProfessionalKnowledgeContext knowledgeContext) {
         this.briefId = value(briefId);
         this.recommendationId = value(recommendationId);
         this.taskKey = value(taskKey);
@@ -49,6 +67,8 @@ public final class AgentBrief {
         this.userBriefPath = value(userBriefPath);
         this.requireUserConfirmation = requireUserConfirmation;
         this.harnessCommands = harnessCommands == null ? new HarnessCommand[0] : harnessCommands;
+        this.knowledgeContext = knowledgeContext == null
+                ? ProfessionalKnowledgeContext.disabled() : knowledgeContext;
     }
 
     public String briefId() { return briefId; }
@@ -70,6 +90,7 @@ public final class AgentBrief {
     public String userBriefPath() { return userBriefPath; }
     public boolean requireUserConfirmation() { return requireUserConfirmation; }
     public HarnessCommand[] harnessCommands() { return harnessCommands; }
+    public ProfessionalKnowledgeContext knowledgeContext() { return knowledgeContext; }
 
     private static String value(String value) {
         return value == null ? "" : value.trim();

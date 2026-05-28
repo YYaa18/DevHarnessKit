@@ -56,6 +56,13 @@
             <fileMode>0755</fileMode>
         </fileSet>
         <fileSet>
+            <directory>${project.basedir}/.agents/knowledge</directory>
+            <outputDirectory>.agents/knowledge</outputDirectory>
+            <includes>
+                <include>**/*</include>
+            </includes>
+        </fileSet>
+        <fileSet>
             <directory>${project.basedir}/.comate/rules</directory>
             <outputDirectory>.comate/rules</outputDirectory>
             <includes>

@@ -1,0 +1,56 @@
+{
+  "schema_version": "devharness-knowledge-pack/v1-alpha",
+  "pack_key": "devharness-methodology-core",
+  "title": "DevHarness Methodology Core",
+  "version": "0.1.0",
+  "language": "neutral",
+  "status": "alpha",
+  "source_policy": "original-devharness-guidance",
+  "license_notes": [
+    "Original DevHarnessKit guidance.",
+    "Do not copy external prompt packs or copyrighted process text verbatim."
+  ],
+  "reviewed_at": "2026-05-28",
+  "entries": [
+    {
+      "file": "methodology/how-to-inspect.md",
+      "rule_id": "method-inspect-current-evidence",
+      "domain": "methodology",
+      "severity": "must",
+      "applies_to_profiles": ["*"],
+      "applies_to_actions": ["graph_index_or_refresh", "graph_impact_analysis", "inspect_existing_code"],
+      "risk_flags": ["inspect", "impact", "read"],
+      "budget_lines": 6
+    },
+    {
+      "file": "methodology/how-to-plan.md",
+      "rule_id": "method-plan-minimal-safe-change",
+      "domain": "methodology",
+      "severity": "should",
+      "applies_to_profiles": ["*"],
+      "applies_to_actions": ["create_change_plan"],
+      "risk_flags": ["plan", "design", "risk"],
+      "budget_lines": 6
+    },
+    {
+      "file": "methodology/how-to-implement.md",
+      "rule_id": "method-implement-minimal-change",
+      "domain": "methodology",
+      "severity": "must",
+      "applies_to_profiles": ["*"],
+      "applies_to_actions": ["implement_minimal_change"],
+      "risk_flags": ["implement", "patch", "change"],
+      "budget_lines": 6
+    },
+    {
+      "file": "methodology/how-to-verify.md",
+      "rule_id": "method-verify-evidence-first",
+      "domain": "methodology",
+      "severity": "must",
+      "applies_to_profiles": ["*"],
+      "applies_to_actions": ["verify", "graph_reimpact"],
+      "risk_flags": ["verify", "test", "manual"],
+      "budget_lines": 6
+    }
+  ]
+}

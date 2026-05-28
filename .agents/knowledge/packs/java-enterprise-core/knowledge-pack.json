@@ -1,0 +1,87 @@
+{
+  "schema_version": "devharness-knowledge-pack/v1-alpha",
+  "pack_key": "java-enterprise-core",
+  "title": "Java Enterprise Core Knowledge",
+  "version": "0.1.0",
+  "language": "java",
+  "status": "alpha",
+  "source_policy": "paraphrased-and-attributed",
+  "license_notes": [
+    "Rules are summarized from public documentation and common engineering practice.",
+    "Do not copy copyrighted source text, commercial books, or third-party skill prompts verbatim."
+  ],
+  "domains": ["api", "mvc", "database", "testing", "security", "logging", "exception", "code-pattern"],
+  "reviewed_at": "2026-05-28",
+  "entries": [
+    {
+      "file": "domain/java/database-convention.md",
+      "rule_id": "java-db-safe-binding",
+      "domain": "database",
+      "severity": "must",
+      "applies_to_profiles": ["java", "safe-patch", "patch"],
+      "applies_to_actions": ["inspect_existing_code", "create_change_plan", "implement_minimal_change", "verify"],
+      "risk_flags": ["sql", "db", "database", "mapper", "mybatis", "transaction"],
+      "budget_lines": 7
+    },
+    {
+      "file": "domain/java/security-convention.md",
+      "rule_id": "java-security-sensitive-change",
+      "domain": "security",
+      "severity": "must",
+      "applies_to_profiles": ["java", "strict", "safe-patch"],
+      "applies_to_actions": ["inspect_existing_code", "create_change_plan", "implement_minimal_change", "verify"],
+      "risk_flags": ["security", "permission", "auth", "token", "payment", "risk"],
+      "budget_lines": 7
+    },
+    {
+      "file": "domain/java/testing-convention.md",
+      "rule_id": "java-testing-evidence",
+      "domain": "testing",
+      "severity": "should",
+      "applies_to_profiles": ["java", "patch", "safe-patch"],
+      "applies_to_actions": ["create_change_plan", "implement_minimal_change", "verify"],
+      "risk_flags": ["test", "verify", "manual", "compile"],
+      "budget_lines": 7
+    },
+    {
+      "file": "domain/java/api-convention.md",
+      "rule_id": "java-api-contract",
+      "domain": "api",
+      "severity": "should",
+      "applies_to_profiles": ["java", "api", "mvc"],
+      "applies_to_actions": ["inspect_existing_code", "create_change_plan", "implement_minimal_change"],
+      "risk_flags": ["api", "controller", "endpoint", "request", "response"],
+      "budget_lines": 6
+    },
+    {
+      "file": "domain/java/code-pattern.md",
+      "rule_id": "java-code-local-pattern",
+      "domain": "code-pattern",
+      "severity": "should",
+      "applies_to_profiles": ["java", "patch", "safe-patch"],
+      "applies_to_actions": ["inspect_existing_code", "implement_minimal_change"],
+      "risk_flags": ["service", "dto", "mapper", "controller", "java"],
+      "budget_lines": 6
+    },
+    {
+      "file": "domain/java/exception-convention.md",
+      "rule_id": "java-exception-boundary",
+      "domain": "exception",
+      "severity": "should",
+      "applies_to_profiles": ["java", "api", "mvc"],
+      "applies_to_actions": ["create_change_plan", "implement_minimal_change", "verify"],
+      "risk_flags": ["exception", "error", "fallback", "npe"],
+      "budget_lines": 6
+    },
+    {
+      "file": "domain/java/logging-convention.md",
+      "rule_id": "java-logging-no-sensitive-data",
+      "domain": "logging",
+      "severity": "must",
+      "applies_to_profiles": ["java", "strict", "safe-patch"],
+      "applies_to_actions": ["implement_minimal_change", "verify"],
+      "risk_flags": ["log", "audit", "sensitive", "security"],
+      "budget_lines": 6
+    }
+  ]
+}

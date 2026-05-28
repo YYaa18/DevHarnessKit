@@ -16,12 +16,24 @@ public final class WorkBrief {
     private final String confirmationReason;
     private final boolean safeToStart;
     private final int riskScore;
+    private final String[] professionalNotes;
 
     public WorkBrief(String briefId, String recommendationId, String modeId,
                      String taskSummary, String recommendation, String confidence,
                      String[] why, String[] riskFlags, String[] expectedWork,
                      String[] willNotDo, String[] userChoices, boolean confirmationRequired,
                      String confirmationReason, boolean safeToStart, int riskScore) {
+        this(briefId, recommendationId, modeId, taskSummary, recommendation, confidence, why, riskFlags,
+                expectedWork, willNotDo, userChoices, confirmationRequired, confirmationReason,
+                safeToStart, riskScore, new String[0]);
+    }
+
+    public WorkBrief(String briefId, String recommendationId, String modeId,
+                     String taskSummary, String recommendation, String confidence,
+                     String[] why, String[] riskFlags, String[] expectedWork,
+                     String[] willNotDo, String[] userChoices, boolean confirmationRequired,
+                     String confirmationReason, boolean safeToStart, int riskScore,
+                     String[] professionalNotes) {
         this.briefId = value(briefId);
         this.recommendationId = value(recommendationId);
         this.modeId = value(modeId);
@@ -37,6 +49,7 @@ public final class WorkBrief {
         this.confirmationReason = value(confirmationReason);
         this.safeToStart = safeToStart;
         this.riskScore = riskScore;
+        this.professionalNotes = array(professionalNotes);
     }
 
     public String briefId() { return briefId; }
@@ -54,6 +67,7 @@ public final class WorkBrief {
     public String confirmationReason() { return confirmationReason; }
     public boolean safeToStart() { return safeToStart; }
     public int riskScore() { return riskScore; }
+    public String[] professionalNotes() { return professionalNotes; }
 
     private static String value(String value) {
         return value == null ? "" : value.trim();

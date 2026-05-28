@@ -146,6 +146,9 @@ for entry in \
   "LICENSE" \
   "THIRD_PARTY_NOTICES.md" \
   ".agents/skills/devharness-goal-development/SKILL.md" \
+  ".agents/skills/devharness-goal-development/references/knowledge-injection.md" \
+  ".agents/knowledge/packs/devharness-methodology-core/knowledge-pack.json" \
+  ".agents/knowledge/packs/java-enterprise-core/knowledge-pack.json" \
   ".agents/skills/devharness-goal-development/scripts/dhk.sh" \
   ".agents/skills/devharness-goal-development/scripts/dhk.bat" \
   ".agents/skills/devharness-goal-development/scripts/goal-start.sh" \

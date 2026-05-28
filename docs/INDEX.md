@@ -17,6 +17,8 @@ contracts, experimental surfaces, release material, and historical design notes.
   blocker-category contract for testing.
 - [BRIEF_PROTOCOL](BRIEF_PROTOCOL.md): Work Brief, Agent Execution Brief, and
   GOAL_CONTEXT layering for agent-mounted usage.
+- [PROFESSIONAL_KNOWLEDGE](PROFESSIONAL_KNOWLEDGE.md): advisory methodology
+  and Java domain knowledge injected into goal and brief context.
 - [SECURITY](../SECURITY.md): security model, limitations, and reporting.
 
 ## Daily Usage

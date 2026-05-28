@@ -48,6 +48,7 @@ final class BriefCommandIntegrationTest {
         String agentBrief = read(PathUtil.agentBrief(root));
         assertTrue(workBrief.contains("recommendation: patch"));
         assertFalse(workBrief.contains("dhk goal"));
+        assertTrue(workBrief.contains("## 专业注意事项"));
         assertTrue(agentBrief.contains("\"schema_version\": \"devharness-agent-brief/v1-alpha\""));
         assertTrue(agentBrief.contains("\"agent_internal_only\": true"));
         assertTrue(agentBrief.contains("\"show_commands_to_user\": false"));
@@ -55,6 +56,8 @@ final class BriefCommandIntegrationTest {
         assertTrue(agentBrief.contains("\"user_visible_summary_ref\""));
         assertTrue(agentBrief.contains("\"growth_context\""));
         assertTrue(agentBrief.contains("\"advisory_only\": true"));
+        assertTrue(agentBrief.contains("\"knowledge_context\""));
+        assertTrue(agentBrief.contains("\"pack_ref\""));
     }
 
     @Test
@@ -317,7 +320,7 @@ final class BriefCommandIntegrationTest {
         Files.createDirectories(root);
         com.devharnesskit.dhk.model.goal.GoalRun goal = new com.devharnesskit.dhk.model.goal.GoalRun(
                 "goal-knowledge", "project", "", "", "java-api-patch",
-                "Fix order bug", "order", "api", "", "completed", "verify",
+                "Fix mapper SQL binding bug", "order", "api", "", "completed", "verify",
                 3, 3, "", "", "");
         service.writeCompletionBrief(root, goal, 42L, root.resolve("GOAL_SUMMARY.md"));
 
@@ -326,7 +329,10 @@ final class BriefCommandIntegrationTest {
         String candidates = read(PathUtil.knowledgeCandidatesBrief(root));
         assertTrue(candidates.contains("status: draft"));
         assertTrue(candidates.contains("suggested_destination: growth"));
-        assertEquals(2, countRows(root, "knowledge_candidate"));
+        assertTrue(candidates.contains("source_rule_id: java-db-safe-binding"));
+        assertEquals(3, countRows(root, "knowledge_candidate"));
+        assertEquals(1, countRowsWhere(root, "knowledge_candidate",
+                "source_rule_id = 'java-db-safe-binding' AND domain = 'database'"));
 
         Harness initMemory = new Harness(tempDir);
         int initExit = new CommandRouter().run(new String[]{

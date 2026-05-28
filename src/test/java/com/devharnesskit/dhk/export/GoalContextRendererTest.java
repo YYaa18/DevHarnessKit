@@ -2,6 +2,8 @@ package com.devharnesskit.dhk.export;
 
 import com.devharnesskit.dhk.model.goal.GoalPlan;
 import com.devharnesskit.dhk.model.goal.GoalRun;
+import com.devharnesskit.dhk.model.knowledge.KnowledgeSnippet;
+import com.devharnesskit.dhk.model.knowledge.ProfessionalKnowledgeContext;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -46,6 +48,35 @@ final class GoalContextRendererTest {
         assertTrue(markdown.contains("<completion-condition>"));
         assertTrue(markdown.contains("<next-command>"));
         assertTrue(markdown.contains("<!-- truncated: goal context exceeded budget -->"));
+    }
+
+    @Test
+    void rendersProfessionalKnowledgeSectionWhenProvided() {
+        GoalRun goal = new GoalRun("goal-knowledge", "project-1", "workflow-1", "",
+                "java-api-patch", "Fix mapper SQL binding", "order", "api",
+                "", "context_ready", "verify", 30, 1, "now", "now", "");
+        GoalPlan plan = new GoalPlan("verify", "Run verification.",
+                new String[]{"compile_result"}, new String[0],
+                "dhk goal verify --goal goal-knowledge");
+        ProfessionalKnowledgeContext knowledge = new ProfessionalKnowledgeContext(true,
+                new String[]{"java-enterprise-core@0.1.0"},
+                new KnowledgeSnippet[]{
+                        new KnowledgeSnippet("java-enterprise-core@0.1.0",
+                                "java-db-safe-binding", "database", "must",
+                                ".agents/knowledge/packs/java-enterprise-core/domain/java/database-convention.md",
+                                new String[]{"Do not concatenate untrusted input into SQL."},
+                                new String[]{"Check changed SQL/XML for unsafe interpolation."})
+                },
+                "Professional knowledge is advisory.");
+
+        String markdown = new GoalContextRenderer().render(goal, plan, new String[]{"compile"},
+                new String[0], new String[0], "fresh", "now",
+                null, null, new String[0], new String[0], null, knowledge);
+
+        assertTrue(markdown.contains("<professional-knowledge>"));
+        assertTrue(markdown.contains("rule_id: java-db-safe-binding"));
+        assertTrue(markdown.contains("full_ref: .agents/knowledge/packs/java-enterprise-core/domain/java/database-convention.md"));
+        assertTrue(markdown.contains("Do not concatenate untrusted input into SQL."));
     }
 
     private void assertSectionOrder(String text, String... markers) {

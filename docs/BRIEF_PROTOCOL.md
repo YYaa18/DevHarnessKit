@@ -63,6 +63,11 @@ These files are export artifacts. SQLite and explicit command state remain the
 audit source. Brief files can be regenerated and must not be treated as the only
 source of truth.
 
+`WORK_BRIEF.md` may include short professional notes for the user.
+`AGENT_BRIEF.json` may include a machine-readable `knowledge_context` with
+advisory rule references and `full_ref` paths. Knowledge refs guide the Agent;
+they are not project facts.
+
 ## Interaction Requests
 
 When task boundaries, risk escalation, protected files, or manual evidence need

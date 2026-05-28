@@ -29,3 +29,10 @@ The repository license is MIT, but the shaded jar is a combined binary distribut
 - users who do not need MySQL inspection should still review the dependency notice before redistributing the shaded jar.
 
 Future releases may split the project into `dhk-core` and optional DB artifacts so memory-only users can avoid bundling MySQL Connector/J. The current decision is documented in [docs/decisions/0001-module-split-and-installer-strategy.md](docs/decisions/0001-module-split-and-installer-strategy.md): keep one shaded alpha jar for `0.1.x`, then revisit the split before DB readonly or installer distribution is promoted.
+
+## Professional Knowledge Packs
+
+Knowledge packs under `.agents/knowledge/packs/` are original DevHarnessKit
+summaries or paraphrased engineering guidance with source notes. They must not
+copy commercial books, third-party skill prompts, or long verbatim passages from
+external documentation. Pack manifests record source and license notes.

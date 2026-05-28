@@ -56,7 +56,8 @@ final class GoalIntegrationTest {
         String workflowRun = firstValue(start.stdout(), "workflow_run: ");
         String specChange = firstValue(start.stdout(), "spec_change: ");
 
-        assertEquals(ExitCodes.SUCCESS, startExit);
+        assertEquals(ExitCodes.SUCCESS, startExit,
+                "stdout=" + start.stdout() + "\nstderr=" + start.stderr());
         assertTrue(goalKey.length() > 0);
         assertTrue(start.stdout().contains("workflow_run:"));
         assertTrue(start.stdout().contains("spec_change:"));

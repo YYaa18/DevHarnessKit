@@ -30,6 +30,7 @@ public final class DefaultMigrationStepCatalog {
         result.add(new V12HumanCheckpointMigration());
         result.add(new V13SkillTrustHardeningMigration());
         result.add(new V14BriefLifecycleSQLiteMigration());
+        result.add(new V15KnowledgeCandidateMetadataMigration());
         return Collections.unmodifiableList(result);
     }
 }

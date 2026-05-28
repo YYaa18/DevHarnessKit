@@ -267,6 +267,9 @@ Work Brief / Agent Brief protocol details are documented in
 [docs/BRIEF_PROTOCOL.md](docs/BRIEF_PROTOCOL.md). The short version:
 users see intent, risk, recommended mode, and confirmation needs; agents consume
 structured execution policy; SQLite and goal artifacts remain the audit source.
+Professional knowledge injection is documented in
+[docs/PROFESSIONAL_KNOWLEDGE.md](docs/PROFESSIONAL_KNOWLEDGE.md); it is
+advisory guidance and never overrides current code or confirmed memory.
 
 To preview the plan without writing files:
 

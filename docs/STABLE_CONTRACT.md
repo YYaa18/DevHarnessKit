@@ -134,6 +134,7 @@ part of the stable-beta contract:
 - Graph Lite and Graph-aware Goal
 - BDD acceptance harness
 - Skill Contract, Skill Evaluation, and Skill Trust
+- Professional Knowledge Layer and knowledge pack injection
 - Policy/Hook governance
 - ECC Control Panel scripts
 - Routine, metrics, and replay

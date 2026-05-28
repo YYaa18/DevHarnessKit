@@ -106,5 +106,6 @@ DevHarness self-check:
 
 - `references/goal-protocol.md`
 - `references/evidence-format.md`
+- `references/knowledge-injection.md`
 - `references/self-check-format.md`
 - `references/forbidden-actions.md`

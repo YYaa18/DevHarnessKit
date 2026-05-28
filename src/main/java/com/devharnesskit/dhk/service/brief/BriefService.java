@@ -9,7 +9,10 @@ import com.devharnesskit.dhk.model.brief.WorkBrief;
 import com.devharnesskit.dhk.model.config.DevHarnessConfig;
 import com.devharnesskit.dhk.model.goal.GoalPlan;
 import com.devharnesskit.dhk.model.goal.GoalRun;
+import com.devharnesskit.dhk.model.knowledge.KnowledgeSnippet;
+import com.devharnesskit.dhk.model.knowledge.ProfessionalKnowledgeContext;
 import com.devharnesskit.dhk.service.config.DevHarnessConfigService;
+import com.devharnesskit.dhk.service.knowledge.ProfessionalKnowledgeService;
 import com.devharnesskit.dhk.util.PathUtil;
 
 import java.nio.file.Files;
@@ -22,20 +25,24 @@ public final class BriefService {
     private final WorkBriefRenderer workRenderer;
     private final AgentBriefRenderer agentRenderer;
     private final BriefLifecycleService lifecycleService;
+    private final ProfessionalKnowledgeService knowledgeService;
 
     public BriefService() {
         this(new DevHarnessConfigService(), new ModeAdvisor(),
-                new WorkBriefRenderer(), new AgentBriefRenderer(), new BriefLifecycleService());
+                new WorkBriefRenderer(), new AgentBriefRenderer(), new BriefLifecycleService(),
+                new ProfessionalKnowledgeService());
     }
 
     BriefService(DevHarnessConfigService configService, ModeAdvisor advisor,
                  WorkBriefRenderer workRenderer, AgentBriefRenderer agentRenderer,
-                 BriefLifecycleService lifecycleService) {
+                 BriefLifecycleService lifecycleService,
+                 ProfessionalKnowledgeService knowledgeService) {
         this.configService = configService;
         this.advisor = advisor;
         this.workRenderer = workRenderer;
         this.agentRenderer = agentRenderer;
         this.lifecycleService = lifecycleService;
+        this.knowledgeService = knowledgeService;
     }
 
     public BriefResult prepare(BriefRequest request, boolean writeFiles) throws Exception {
@@ -48,8 +55,9 @@ public final class BriefService {
         ModeAdvice advice = advisor.advise(request, config);
         String briefId = "brief-" + stableKey(request.task(), request.module(), advice.modeId());
         String recommendationId = "rec-" + stableKey(request.task(), advice.modeId(), advice.profileKey());
-        WorkBrief workBrief = workBrief(request, advice, briefId, recommendationId);
-        AgentBrief agentBrief = agentBrief(request, advice, config, workBrief, goal, plan);
+        ProfessionalKnowledgeContext knowledge = knowledgeService.forBrief(request, advice);
+        WorkBrief workBrief = workBrief(request, advice, briefId, recommendationId, knowledge);
+        AgentBrief agentBrief = agentBrief(request, advice, config, workBrief, goal, plan, knowledge);
         Path workPath = PathUtil.workBrief(request.projectRoot());
         Path agentPath = PathUtil.agentBrief(request.projectRoot());
         if (writeFiles) {
@@ -85,16 +93,18 @@ public final class BriefService {
     }
 
     private WorkBrief workBrief(BriefRequest request, ModeAdvice advice,
-                                String briefId, String recommendationId) {
+                                String briefId, String recommendationId,
+                                ProfessionalKnowledgeContext knowledge) {
         return new WorkBrief(briefId, recommendationId, advice.modeId(), taskSummary(request),
                 advice.recommendation(), advice.confidence(), advice.why(), advice.riskFlags(),
                 expectedWork(advice), willNotDo(advice), userChoices(),
                 advice.confirmationRequired(), advice.confirmationReason(), advice.safeToStart(),
-                advice.riskScore());
+                advice.riskScore(), professionalNotes(knowledge));
     }
 
     private AgentBrief agentBrief(BriefRequest request, ModeAdvice advice, DevHarnessConfig config,
-                                  WorkBrief workBrief, GoalRun goal, GoalPlan plan) {
+                                  WorkBrief workBrief, GoalRun goal, GoalPlan plan,
+                                  ProfessionalKnowledgeContext knowledge) {
         String goalKey = goal == null ? "" : goal.goalKey();
         String currentAction = plan == null
                 ? (workBrief.confirmationRequired() || !workBrief.safeToStart() ? "wait_for_user_answer" : "")
@@ -108,7 +118,18 @@ public final class BriefService {
                 config.compileMode(), config.testMode(), config.graphMode(),
                 "manual".equals(config.compileMode()) || "manual".equals(config.testMode()),
                 PathUtil.workBrief(request.projectRoot()).toString(),
-                advice.confirmationRequired(), harnessCommands(request, advice, goalKey));
+                advice.confirmationRequired(), harnessCommands(request, advice, goalKey), knowledge);
+    }
+
+    private String[] professionalNotes(ProfessionalKnowledgeContext knowledge) {
+        java.util.List<String> notes = new java.util.ArrayList<String>();
+        for (KnowledgeSnippet snippet : knowledge.snippets()) {
+            String[] lines = snippet.summaryLines();
+            if (lines.length > 0) {
+                notes.add(snippet.domain() + ": " + lines[0]);
+            }
+        }
+        return notes.toArray(new String[notes.size()]);
     }
 
     private String[] allowedActions(ModeAdvice advice) {

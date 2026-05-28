@@ -599,6 +599,20 @@ final class GoalIntegrationTest {
     }
 
     @Test
+    void goalVerifyInvalidLevelShowsValidValues() {
+        Harness invalid = new Harness(tempDir);
+        int exit = new CommandRouter().run(new String[]{
+                "goal", "verify",
+                "--project-root", "demo",
+                "--level", "deep"
+        }, invalid.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, exit);
+        assertTrue(invalid.stderr().contains("error_code: INVALID_GOAL_VERIFY_LEVEL"));
+        assertTrue(invalid.stderr().contains("valid_values:"));
+        assertTrue(invalid.stderr().contains("release"));
+    }
+
+    @Test
     void goalStepStructuredEvidenceStillReportsMissingRequiredItems() throws Exception {
         Harness start = new Harness(tempDir);
         int startExit = new CommandRouter().run(new String[]{

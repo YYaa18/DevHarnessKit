@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.bdd.BddScenarioView;
 import com.devharnesskit.dhk.model.bdd.BddStep;
@@ -60,16 +61,22 @@ public final class BddAddCommand implements Command {
         String then = args.option("then", "").trim();
         String andStep = args.option("and", "").trim();
         if (!BddService.isScenarioTypeAllowed(type)) {
-            context.err().println("Invalid BDD scenario type: " + type);
-            return ExitCodes.VALIDATION_ERROR;
+            return EnumGuidance.printInvalid(context, args, "INVALID_BDD_SCENARIO_TYPE",
+                    "BDD scenario type", type, EnumGuidance.BDD_SCENARIO_TYPES, new String[0],
+                    "dhk bdd add --feature <feature> --title \"<title>\" --scenario <scenario> --scenario-title \"<title>\" --type acceptance",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (!BddService.isPriorityAllowed(priority)) {
-            context.err().println("Invalid BDD priority: " + priority);
-            return ExitCodes.VALIDATION_ERROR;
+            return EnumGuidance.printInvalid(context, args, "INVALID_BDD_PRIORITY", "BDD priority", priority,
+                    EnumGuidance.SPEC_PRIORITIES, new String[0],
+                    "dhk bdd add --feature <feature> --title \"<title>\" --scenario <scenario> --scenario-title \"<title>\" --priority normal",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (status.length() > 0 && !BddService.isScenarioStatusAllowed(status)) {
-            context.err().println("Invalid BDD scenario status: " + status);
-            return ExitCodes.VALIDATION_ERROR;
+            return EnumGuidance.printInvalid(context, args, "INVALID_BDD_SCENARIO_STATUS",
+                    "BDD scenario status", status, EnumGuidance.BDD_SCENARIO_STATUSES, new String[0],
+                    "dhk bdd add --feature <feature> --title \"<title>\" --scenario <scenario> --scenario-title \"<title>\" --status active",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (BddCommandSupport.rejectSensitive(context, sensitiveDataGuard, "bdd add",
                 feature, title, scenario, scenarioTitle, module, description,

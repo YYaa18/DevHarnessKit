@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.spec.SpecChange;
 import com.devharnesskit.dhk.model.spec.SpecDocument;
@@ -48,13 +49,17 @@ public final class SpecDocumentCommand implements Command {
             return ExitCodes.USAGE_ERROR;
         }
         if (!SpecDocumentService.isDocumentTypeAllowed(type)) {
-            context.err().println("Invalid document type: " + type);
-            return ExitCodes.VALIDATION_ERROR;
+            return EnumGuidance.printInvalid(context, args, "INVALID_SPEC_DOCUMENT_TYPE",
+                    "spec document type", type, EnumGuidance.SPEC_DOCUMENT_TYPES, new String[0],
+                    "dhk spec document set --change <change> --type proposal --content \"<content>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         String status = args.option("status", "draft").trim();
         if (!SpecDocumentService.isDocumentStatusAllowed(status)) {
-            context.err().println("Invalid document status: " + status);
-            return ExitCodes.VALIDATION_ERROR;
+            return EnumGuidance.printInvalid(context, args, "INVALID_SPEC_DOCUMENT_STATUS",
+                    "spec document status", status, EnumGuidance.SPEC_DOCUMENT_STATUSES, new String[0],
+                    "dhk spec document set --change <change> --type proposal --status draft --content \"<content>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         String title = args.option("title", type).trim();
         if (title.length() == 0) {

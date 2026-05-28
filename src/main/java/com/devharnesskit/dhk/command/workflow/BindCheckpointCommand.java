@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.Checkpoint;
 import com.devharnesskit.dhk.model.workflow.WorkflowRun;
 import com.devharnesskit.dhk.repository.CheckpointRepository;
@@ -43,8 +44,10 @@ public final class BindCheckpointCommand implements Command {
         }
         String type = args.option("type", "created").trim();
         if (!isCheckpointBindingType(type)) {
-            context.err().println("Invalid checkpoint binding type: " + type);
-            return ExitCodes.VALIDATION_ERROR;
+            return EnumGuidance.printInvalid(context, args, "INVALID_WORKFLOW_CHECKPOINT_BINDING_TYPE",
+                    "workflow checkpoint binding type", type, EnumGuidance.WORKFLOW_CHECKPOINT_BINDING_TYPES,
+                    new String[0], "dhk workflow bind-checkpoint --run <run> --checkpoint <id> --type created",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         Path projectRoot = WorkflowCommandSupport.projectRoot(args, context);
         try (Connection connection = connectionFactory.open(projectRoot)) {

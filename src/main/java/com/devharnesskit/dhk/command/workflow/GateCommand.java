@@ -6,6 +6,7 @@ import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.workflow.WorkflowRun;
 import com.devharnesskit.dhk.repository.workflow.WorkflowEventRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowGateRunRepository;
@@ -29,8 +30,10 @@ public final class GateCommand implements Command {
     public int run(CommandContext context, Args args) {
         String action = args.positional(2);
         if (!"pass".equals(action) && !"fail".equals(action) && !"waive".equals(action)) {
-            context.err().println("Unknown workflow gate action: " + action);
-            return ExitCodes.USAGE_ERROR;
+            return EnumGuidance.printInvalid(context, args, "INVALID_WORKFLOW_GATE_ACTION",
+                    "workflow gate action", action, EnumGuidance.WORKFLOW_GATE_ACTIONS, new String[0],
+                    "dhk workflow gate pass --run <run> --gate <gate> --summary \"<summary>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         String runKey = args.option("run").trim();
         String gateKey = args.option("gate").trim();

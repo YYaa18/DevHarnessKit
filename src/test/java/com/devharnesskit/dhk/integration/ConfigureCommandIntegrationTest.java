@@ -190,6 +190,42 @@ final class ConfigureCommandIntegrationTest {
     }
 
     @Test
+    void configureInitEnumErrorsIncludeValidValues() {
+        Harness invalidCompile = new Harness(tempDir);
+        int invalidCompileExit = new CommandRouter().run(new String[]{
+                "configure", "init",
+                "--project-root", "bad-compile",
+                "--compile", "robot"
+        }, invalidCompile.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, invalidCompileExit);
+        assertTrue(invalidCompile.stderr().contains("error_code: INVALID_VERIFICATION_MODE"));
+        assertTrue(invalidCompile.stderr().contains("valid_values:"));
+        assertTrue(invalidCompile.stderr().contains("manual"));
+
+        Harness invalidGraph = new Harness(tempDir);
+        int invalidGraphExit = new CommandRouter().run(new String[]{
+                "configure", "init",
+                "--project-root", "bad-graph",
+                "--graph", "maybe"
+        }, invalidGraph.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, invalidGraphExit);
+        assertTrue(invalidGraph.stderr().contains("error_code: INVALID_GRAPH_MODE"));
+        assertTrue(invalidGraph.stderr().contains("valid_values:"));
+        assertTrue(invalidGraph.stderr().contains("optional -> advisory"));
+
+        Harness invalidPreset = new Harness(tempDir);
+        int invalidPresetExit = new CommandRouter().run(new String[]{
+                "configure", "init",
+                "--project-root", "bad-preset",
+                "--preset", "unknown"
+        }, invalidPreset.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, invalidPresetExit);
+        assertTrue(invalidPreset.stderr().contains("error_code: INVALID_CONFIGURE_PRESET"));
+        assertTrue(invalidPreset.stderr().contains("valid_values:"));
+        assertTrue(invalidPreset.stderr().contains("demo-no-build"));
+    }
+
+    @Test
     void configureInitRejectsOverwriteWithoutForce() {
         Harness first = new Harness(tempDir);
         int firstExit = new CommandRouter().run(new String[]{

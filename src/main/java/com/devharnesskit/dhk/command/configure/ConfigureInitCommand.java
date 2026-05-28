@@ -4,6 +4,7 @@ import com.devharnesskit.dhk.cli.Args;
 import com.devharnesskit.dhk.cli.Command;
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
+import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.config.ConfigureInitResult;
 import com.devharnesskit.dhk.service.config.DevHarnessConfigService;
 import com.devharnesskit.dhk.util.JsonOutput;
@@ -24,13 +25,37 @@ public final class ConfigureInitCommand implements Command {
 
     public int run(CommandContext context, Args args) {
         Path projectRoot = PathUtil.resolveProjectRoot(args, context.workingDirectory());
+        String preset = args.option("preset", "springboot-manual-ide-test");
+        String compile = args.option("compile", "");
+        String test = args.option("test", "");
+        String graph = args.option("graph", "");
+        if (!EnumGuidance.isConfigurePresetAllowed(preset)) {
+            return EnumGuidance.printInvalid(context, args, "INVALID_CONFIGURE_PRESET",
+                    "configure preset", preset, EnumGuidance.CONFIGURE_PRESETS, new String[]{"auto -> springboot-manual-ide-test"},
+                    "dhk configure init --preset springboot-manual-ide-test", "docs/GOAL_CONFIGURATION.md");
+        }
+        if (!EnumGuidance.isVerificationModeAllowed(compile)) {
+            return EnumGuidance.printInvalid(context, args, "INVALID_VERIFICATION_MODE",
+                    "verification compile mode", compile, EnumGuidance.VERIFICATION_MODES, new String[0],
+                    "dhk configure init --compile manual", "docs/GOAL_CONFIGURATION.md");
+        }
+        if (!EnumGuidance.isVerificationModeAllowed(test)) {
+            return EnumGuidance.printInvalid(context, args, "INVALID_VERIFICATION_MODE",
+                    "verification test mode", test, EnumGuidance.VERIFICATION_MODES, new String[0],
+                    "dhk configure init --test manual", "docs/GOAL_CONFIGURATION.md");
+        }
+        if (!EnumGuidance.isGraphModeAllowed(graph)) {
+            return EnumGuidance.printInvalid(context, args, "INVALID_GRAPH_MODE", "graph mode", graph,
+                    EnumGuidance.GRAPH_MODES, new String[]{"optional -> advisory", "disabled -> off"},
+                    "dhk configure init --graph advisory", "docs/GOAL_CONFIGURATION.md");
+        }
         try {
             ConfigureInitResult result = service.init(projectRoot,
-                    args.option("preset", "springboot-manual-ide-test"),
+                    preset,
                     args.hasFlag("force"),
-                    args.option("compile", ""),
-                    args.option("test", ""),
-                    args.option("graph", ""),
+                    compile,
+                    test,
+                    graph,
                     args.option("target", ""),
                     args.hasFlag("dry-run"));
             if (JsonOutput.enabled(args)) {

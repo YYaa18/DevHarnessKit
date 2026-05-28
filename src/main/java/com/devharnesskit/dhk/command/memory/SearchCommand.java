@@ -5,6 +5,7 @@ import com.devharnesskit.dhk.cli.Command;
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
+import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.SearchResult;
 import com.devharnesskit.dhk.repository.FtsRepository;
@@ -45,9 +46,9 @@ public final class SearchCommand implements Command {
         }
         String status = args.option("status", "").trim();
         if (status.length() > 0 && !MemoryStatus.isAllowed(status)) {
-            context.err().println("Invalid status: " + status);
-            context.err().println("valid_values: draft, confirmed, deprecated, archived");
-            return ExitCodes.VALIDATION_ERROR;
+            return EnumGuidance.printInvalid(context, args, "INVALID_MEMORY_STATUS", "memory status", status,
+                    EnumGuidance.MEMORY_STATUSES, new String[0],
+                    "dhk memory list --status confirmed", "README.md#core-path");
         }
         String module = args.option("module", "").trim();
         int limit = parseLimit(context, args.option("limit", "20"));

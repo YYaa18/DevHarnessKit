@@ -6,6 +6,7 @@ import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
+import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.MemoryItem;
 import com.devharnesskit.dhk.model.workflow.WorkflowRun;
 import com.devharnesskit.dhk.repository.MemoryRepository;
@@ -43,8 +44,10 @@ public final class BindMemoryCommand implements Command {
         }
         String type = args.option("type", "read").trim();
         if (!isMemoryBindingType(type)) {
-            context.err().println("Invalid memory binding type: " + type);
-            return ExitCodes.VALIDATION_ERROR;
+            return EnumGuidance.printInvalid(context, args, "INVALID_WORKFLOW_MEMORY_BINDING_TYPE",
+                    "workflow memory binding type", type, EnumGuidance.WORKFLOW_MEMORY_BINDING_TYPES,
+                    new String[0], "dhk workflow bind-memory --run <run> --memory-id <id> --type read",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         String phase = args.option("phase", "").trim();
         String reason = args.option("reason", "").trim();

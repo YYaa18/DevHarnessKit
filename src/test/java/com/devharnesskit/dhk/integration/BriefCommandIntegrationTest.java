@@ -54,6 +54,33 @@ final class BriefCommandIntegrationTest {
     }
 
     @Test
+    void adviseEnumErrorsIncludeValidValues() {
+        Harness invalidMode = new Harness(tempDir);
+        int invalidModeExit = new CommandRouter().run(new String[]{
+                "advise",
+                "--project-root", "brief-invalid-mode",
+                "--task", "Fix order query response mapping",
+                "--mode", "robot"
+        }, invalidMode.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, invalidModeExit);
+        assertTrue(invalidMode.stderr().contains("error_code: INVALID_RECOMMENDATION_MODE"));
+        assertTrue(invalidMode.stderr().contains("valid_values:"));
+        assertTrue(invalidMode.stderr().contains("patch"));
+
+        Harness invalidGraph = new Harness(tempDir);
+        int invalidGraphExit = new CommandRouter().run(new String[]{
+                "advise",
+                "--project-root", "brief-invalid-graph",
+                "--task", "Fix order query response mapping",
+                "--graph", "maybe"
+        }, invalidGraph.context());
+        assertEquals(ExitCodes.VALIDATION_ERROR, invalidGraphExit);
+        assertTrue(invalidGraph.stderr().contains("error_code: INVALID_GRAPH_MODE"));
+        assertTrue(invalidGraph.stderr().contains("valid_values:"));
+        assertTrue(invalidGraph.stderr().contains("optional -> advisory"));
+    }
+
+    @Test
     void adviseAskCreatesBlockingInteractionAndAnswerUpdatesAgentBrief() throws Exception {
         Harness harness = new Harness(tempDir);
         int exit = new CommandRouter().run(new String[]{

@@ -7,6 +7,7 @@ import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.spec.SpecChange;
 import com.devharnesskit.dhk.model.workflow.WorkflowRun;
@@ -44,8 +45,10 @@ public final class SpecBindWorkflowCommand implements Command {
             return ExitCodes.USAGE_ERROR;
         }
         if (!SpecService.isWorkflowBindingType(type)) {
-            context.err().println("Invalid workflow spec binding type: " + type);
-            return ExitCodes.VALIDATION_ERROR;
+            return EnumGuidance.printInvalid(context, args, "INVALID_WORKFLOW_SPEC_BINDING_TYPE",
+                    "workflow spec binding type", type, EnumGuidance.SPEC_WORKFLOW_BINDING_TYPES,
+                    new String[0], "dhk spec bind-workflow --change <change> --run <run> --type implements",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         if (SpecCommandSupport.rejectSensitive(context, sensitiveDataGuard, "spec bind-workflow",
                 changeKey, runKey, type)) {

@@ -6,6 +6,7 @@ import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
 import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.TransactionTemplate;
+import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.workflow.WorkflowRun;
 import com.devharnesskit.dhk.repository.workflow.WorkflowEventRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowGateRunRepository;
@@ -29,8 +30,10 @@ public final class PhaseCommand implements Command {
     public int run(CommandContext context, Args args) {
         String action = args.positional(2);
         if (!"pass".equals(action) && !"fail".equals(action)) {
-            context.err().println("Unknown workflow phase action: " + action);
-            return ExitCodes.USAGE_ERROR;
+            return EnumGuidance.printInvalid(context, args, "INVALID_WORKFLOW_PHASE_ACTION",
+                    "workflow phase action", action, EnumGuidance.WORKFLOW_PHASE_ACTIONS, new String[0],
+                    "dhk workflow phase pass --run <run> --phase <phase> --summary \"<summary>\"",
+                    "docs/GOAL_CONFIGURATION.md");
         }
         String runKey = args.option("run").trim();
         String phaseKey = args.option("phase").trim();

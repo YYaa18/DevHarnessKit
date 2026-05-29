@@ -1,9 +1,11 @@
 @echo off
 setlocal enabledelayedexpansion
 
+rem Developer validation helper. Requires sqlite3 to bulk-load sample memory rows.
+
 set "JAR=%~1"
 if "%JAR%"=="" (
-  for %%F in (target\dhk-cli-*-all.jar) do if "%JAR%"=="" set "JAR=%%F"
+  for /f "delims=" %%F in ('powershell -NoProfile -Command "if (Test-Path 'target') { Get-ChildItem -Path 'target' -Filter 'dhk-cli-*-all.jar' -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty FullName }"') do set "JAR=%%F"
 )
 if not exist "%JAR%" (
   echo Jar not found: %JAR% 1>&2
@@ -17,17 +19,48 @@ if errorlevel 1 (
   exit /b 4
 )
 
-set "ROOT=%TEMP%\dhk-perf-smoke-%RANDOM%"
-mkdir "%ROOT%" >nul
+where powershell >nul 2>nul
+if errorlevel 1 (
+  echo powershell is required for millisecond perf timing. 1>&2
+  exit /b 4
+)
 
-call :timed "help" java -jar "%JAR%" help
-call :timed "memory init" java -jar "%JAR%" memory init --project-root "%ROOT%"
+set "ROOT=%TEMP%\dhk-perf-smoke-%RANDOM%-%RANDOM%"
+mkdir "%ROOT%" >nul || exit /b 4
 
-for /f "tokens=2 delims=:" %%A in ('findstr /c:"project_key" "%ROOT%\.agents\memory\project.json"') do set "PROJECT_KEY=%%~A"
-set "PROJECT_KEY=%PROJECT_KEY:"=%"
-set "PROJECT_KEY=%PROJECT_KEY:,=%"
-set "PROJECT_KEY=%PROJECT_KEY: =%"
-set "NOW=2026-01-01T00:00:00Z"
+if "%DHK_PERF_MAX_HELP_MS%"=="" set "DHK_PERF_MAX_HELP_MS=1500"
+if "%DHK_PERF_MAX_DOCTOR_MS%"=="" set "DHK_PERF_MAX_DOCTOR_MS=2000"
+if "%DHK_PERF_MAX_MEMORY_SEARCH_MS%"=="" set "DHK_PERF_MAX_MEMORY_SEARCH_MS=1000"
+if "%DHK_PERF_MAX_MEMORY_EXPORT_MS%"=="" set "DHK_PERF_MAX_MEMORY_EXPORT_MS=2000"
+if "%DHK_PERF_JAR_WARN_BYTES%"=="" set "DHK_PERF_JAR_WARN_BYTES=26214400"
+if "%DHK_PERF_JAR_MAX_BYTES%"=="" set "DHK_PERF_JAR_MAX_BYTES=36700160"
+
+for %%I in ("%JAR%") do set "JAR_SIZE=%%~zI"
+echo jar size: %JAR_SIZE% bytes
+if %JAR_SIZE% GTR %DHK_PERF_JAR_MAX_BYTES% (
+  echo ERROR: jar size exceeds maximum budget: %JAR_SIZE% bytes ^> %DHK_PERF_JAR_MAX_BYTES% bytes 1>&2
+  call :cleanup
+  exit /b 1
+)
+if %JAR_SIZE% GTR %DHK_PERF_JAR_WARN_BYTES% (
+  echo WARNING: jar size exceeds target budget: %JAR_SIZE% bytes ^> %DHK_PERF_JAR_WARN_BYTES% bytes 1>&2
+)
+
+set "DHK_TIMED_ARGS=help"
+call :run_timed "help" "%DHK_PERF_MAX_HELP_MS%"
+if errorlevel 1 goto fail
+
+set "DHK_TIMED_ARGS=memory|init|--project-root|%ROOT%"
+call :run_timed "memory init" "%DHK_PERF_MAX_DOCTOR_MS%"
+if errorlevel 1 goto fail
+
+set "DHK_TIMED_ARGS=doctor|--project-root|%ROOT%"
+call :run_timed "doctor" "%DHK_PERF_MAX_DOCTOR_MS%"
+if errorlevel 1 goto fail
+
+set "PROJECT_JSON=%ROOT%\.agents\memory\project.json"
+for /f "delims=" %%A in ('powershell -NoProfile -Command "(Get-Content -Raw $env:PROJECT_JSON | ConvertFrom-Json).project_key"') do set "PROJECT_KEY=%%A"
+for /f "delims=" %%A in ('powershell -NoProfile -Command "(Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')"') do set "NOW=%%A"
 set "DB=%ROOT%\.agents\memory\memory.db"
 set "SQL_FILE=%ROOT%\perf-load.sql"
 
@@ -51,17 +84,38 @@ set "SQL_FILE=%ROOT%\perf-load.sql"
 ) > "%SQL_FILE%"
 
 sqlite3 "%DB%" < "%SQL_FILE%"
-if errorlevel 1 exit /b %ERRORLEVEL%
+if errorlevel 1 goto fail
 
-call :timed "memory search 1000" java -jar "%JAR%" memory search --project-root "%ROOT%" --q gateway-special --status confirmed
-call :timed "memory export 1000" java -jar "%JAR%" memory export --project-root "%ROOT%" --task "perf smoke" --keywords gateway-special
+set "DHK_TIMED_ARGS=memory|search|--project-root|%ROOT%|--q|gateway-special|--status|confirmed"
+call :run_timed "memory search 1000" "%DHK_PERF_MAX_MEMORY_SEARCH_MS%"
+if errorlevel 1 goto fail
 
-rmdir /s /q "%ROOT%" >nul 2>nul
+set "DHK_TIMED_ARGS=memory|export|--project-root|%ROOT%|--task|perf smoke|--keywords|gateway-special"
+call :run_timed "memory export 1000" "%DHK_PERF_MAX_MEMORY_EXPORT_MS%"
+if errorlevel 1 goto fail
+
+call :check_lingering_processes
+if errorlevel 1 goto fail
+
+call :cleanup
 dir "%JAR%"
 exit /b 0
 
-:timed
-set "LABEL=%~1"
-shift
-powershell -NoProfile -Command "$s=Get-Date; & %* *> $null; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; $e=Get-Date; Write-Host '%LABEL%:' (($e-$s).TotalSeconds.ToString('0.000')) 's'"
+:run_timed
+set "DHK_TIMED_LABEL=%~1"
+set "DHK_TIMED_MAX_MS=%~2"
+powershell -NoProfile -Command "$label=$env:DHK_TIMED_LABEL; $max=[int]$env:DHK_TIMED_MAX_MS; $args=$env:DHK_TIMED_ARGS -split '\|'; $sw=[Diagnostics.Stopwatch]::StartNew(); & java -jar $env:JAR @args *> $null; $code=$LASTEXITCODE; $sw.Stop(); $elapsed=[int]$sw.Elapsed.TotalMilliseconds; Write-Host ($label + ': ' + $elapsed + 'ms (max ' + $max + 'ms)'); if ($code -ne 0) { exit $code }; if ($elapsed -gt $max) { Write-Error ('ERROR: ' + $label + ' exceeded performance budget: ' + $elapsed + 'ms > ' + $max + 'ms'); exit 1 }"
 exit /b %ERRORLEVEL%
+
+:check_lingering_processes
+powershell -NoProfile -Command "$self=$PID; $matches=Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $self -and $_.CommandLine -and $_.CommandLine -match 'dhk-cli|devharnesskit|dhk\.jar|java -jar' }; if ($matches) { Write-Error 'Possible lingering dhk Java process detected.'; $matches | Select-Object -First 5 -ExpandProperty CommandLine | Write-Error; exit 1 }"
+exit /b %ERRORLEVEL%
+
+:cleanup
+if exist "%ROOT%" rmdir /s /q "%ROOT%" >nul 2>nul
+exit /b 0
+
+:fail
+set "EXIT_CODE=%ERRORLEVEL%"
+call :cleanup
+exit /b %EXIT_CODE%

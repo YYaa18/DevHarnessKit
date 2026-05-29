@@ -95,6 +95,29 @@ final class GoalSkillPackagingTest {
     }
 
     @Test
+    void perfSmokeBatchKeepsParityWithShellBudgets() throws Exception {
+        String shell = read(Paths.get("scripts/perf-smoke.sh"));
+        String batch = read(Paths.get("scripts/perf-smoke.bat"));
+
+        assertTrue(shell.contains("MAX_HELP_MS"));
+        assertTrue(shell.contains("MAX_DOCTOR_MS"));
+        assertTrue(shell.contains("JAR_WARN_BYTES"));
+        assertTrue(shell.contains("Possible lingering dhk Java process detected."));
+
+        assertTrue(batch.contains("DHK_PERF_MAX_HELP_MS"));
+        assertTrue(batch.contains("DHK_PERF_MAX_DOCTOR_MS"));
+        assertTrue(batch.contains("DHK_PERF_MAX_MEMORY_SEARCH_MS"));
+        assertTrue(batch.contains("DHK_PERF_MAX_MEMORY_EXPORT_MS"));
+        assertTrue(batch.contains("DHK_PERF_JAR_WARN_BYTES"));
+        assertTrue(batch.contains("DHK_PERF_JAR_MAX_BYTES"));
+        assertTrue(batch.contains("doctor|--project-root"));
+        assertTrue(batch.contains("jar size:"));
+        assertTrue(batch.contains(":check_lingering_processes"));
+        assertTrue(batch.contains(":cleanup"));
+        assertTrue(batch.contains("Sort-Object LastWriteTime -Descending"));
+    }
+
+    @Test
     void comateReleaseRulesUseGoalFirstProtocol() throws Exception {
         Path rulesRoot = Paths.get(".comate/rules");
 

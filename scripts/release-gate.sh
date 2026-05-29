@@ -128,8 +128,8 @@ grep -ni "Stable candidate surface" docs/STABLE_CANDIDATE.md >/dev/null \
   || fail "stable candidate contract missing"
 grep -ni "Experimental surface" docs/STABLE_CANDIDATE.md >/dev/null \
   || fail "experimental surface contract missing"
-grep -ni "Stable-Beta Surface" docs/STABLE_CONTRACT.md >/dev/null \
-  || fail "stable-beta surface contract missing"
+grep -ni "Stable Surface Candidate" docs/STABLE_CONTRACT.md >/dev/null \
+  || fail "stable surface contract missing"
 grep -ni "Stable JSON Fields" docs/STABLE_CONTRACT.md >/dev/null \
   || fail "stable JSON contract missing"
 grep -ni "Stable Markdown Export Anchors" docs/STABLE_CONTRACT.md >/dev/null \

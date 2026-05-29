@@ -49,6 +49,25 @@ grep -F 'dhk-cli-<version>-all.jar' THIRD_PARTY_NOTICES.md >/dev/null || {
   exit 1
 }
 
+SCHEMA_VERSION="$(sed -n 's/.*CURRENT_SCHEMA_VERSION = MigrationRunner\.V\([0-9][0-9]*\).*/\1/p' \
+  src/main/java/com/devharnesskit/dhk/cli/VersionInfo.java | head -n 1)"
+[ -n "$SCHEMA_VERSION" ] || {
+  echo "ERROR: could not resolve current schema version from VersionInfo.java" >&2
+  exit 1
+}
+
+grep -F "Current schema version is v$SCHEMA_VERSION" README.md >/dev/null || {
+  echo "ERROR: README.md is missing current schema version v$SCHEMA_VERSION" >&2
+  exit 1
+}
+
+for schema_doc in docs/COMPATIBILITY.md docs/MIGRATIONS.md; do
+  grep -F "Current schema version: \`$SCHEMA_VERSION\`" "$schema_doc" >/dev/null || {
+    echo "ERROR: $schema_doc is missing current schema version $SCHEMA_VERSION" >&2
+    exit 1
+  }
+done
+
 if grep -E 'v0\.4\.4-beta\.1|dhk-cli-0\.1\.0-alpha-all\.jar' \
   SECURITY.md CONTRIBUTING.md THIRD_PARTY_NOTICES.md >/dev/null; then
   echo "ERROR: stale hard-coded version reference found in release governance docs" >&2

@@ -113,8 +113,8 @@ checksums.
    ```
 
    Windows `.bat` wrappers are verified by archive presence and dynamic jar
-   fallback checks in this local gate. Run them on Windows before a release
-   promoted beyond beta.
+   fallback checks in this local gate. Run the packaged `.bat` wrappers on
+   Windows and attach the manual evidence before a stable tag.
 
 8. Run packaged CLI smoke:
 
@@ -204,6 +204,13 @@ The release workflow runs on `workflow_dispatch` and tags matching `v*`.
 Tag-triggered releases are created as drafts. The workflow resolves
 `project.version` from Maven and uploads the matching jar, zip, tarball, and
 `SHA256SUMS`.
+
+For beta tags, keep the GitHub release as a prerelease or draft until release
+notes are reviewed. For the first stable tag, publish a non-draft,
+non-prerelease release only after remote CI is green, checksums are attached,
+manual Windows archive smoke evidence is recorded, and the stable contract docs
+name the exact promoted surface. GitHub only allows a non-prerelease release to
+be marked as Latest.
 
 Release notes must state:
 

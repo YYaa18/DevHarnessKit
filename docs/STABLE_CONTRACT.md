@@ -1,12 +1,13 @@
-# Stable-Beta Contract
+# Stable Contract
 
-DevHarness Kit is still a beta developer preview. This document defines the
-smallest contract that may be tested as a stable-beta surface before any 1.0
-claim. Anything not listed here is either beta-only, experimental, or internal.
+DevHarness Kit is still a beta developer preview until a stable release tag
+explicitly promotes it. This document defines the smallest surface intended to
+become the 1.0 stable contract. Anything not listed here is beta-only,
+experimental, or internal.
 
-## Stable-Beta Surface
+## Stable Surface Candidate
 
-The stable-beta surface is intentionally narrow:
+The 1.0 stable surface is intentionally narrow:
 
 - `dhk help`
 - `dhk version`
@@ -21,9 +22,12 @@ The stable-beta surface is intentionally narrow:
 - goal core: `start`, `resume`, `next`, `step`, `status`, `export`, `verify`,
   `complete`, `audit`, and `recheck`
 
-Stable-beta means command names, required option names, exit code meanings, and
-the minimum machine-readable fields below should change only with release notes
-and migration guidance.
+For 1.0 and later, command names, required option names, exit code meanings,
+and the minimum machine-readable fields below should change only under semantic
+versioning and documented deprecation windows.
+
+The current artifact remains `0.4.6-beta.1`; this contract is the freeze target,
+not a current stable claim.
 
 ## Exit Codes
 
@@ -37,7 +41,7 @@ The stable-beta exit code contract is:
 
 ## Stable JSON Fields
 
-Stable-beta JSON consumers should ignore unknown fields. Additive fields are not
+Stable JSON consumers should ignore unknown fields. Additive fields are not
 breaking changes.
 
 The following fields are the minimum stable JSON fields:
@@ -125,6 +129,18 @@ Kit does not force database read-only credentials because the intended target is
 a trusted personal development environment. SQL guardrails and JDBC read-only
 hints reduce accidental risk, but do not replace database permissions or local
 developer responsibility.
+
+## 1.0 Boundary Decisions
+
+The first 1.0 stable tag keeps one shaded CLI jar and one release archive for
+install simplicity. Experimental surfaces stay bundled for dogfooding and
+adapter compatibility, but they remain outside the stable contract unless a
+future release note explicitly promotes them.
+
+The artifact-boundary decision for Graph, BDD, Skill/Governance, Policy, Routine,
+and ECC Control Panel is recorded in [MODULE_BOUNDARIES.md](MODULE_BOUNDARIES.md).
+Splitting those surfaces into optional artifacts is deferred until the split
+reduces user risk more than it increases install and adapter complexity.
 
 ## Experimental Outside The Contract
 

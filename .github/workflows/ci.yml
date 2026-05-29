@@ -39,7 +39,7 @@ jobs:
         run: mvn -B clean test
 
       - name: Package
-        run: mvn -B -DskipTests package
+        run: mvn -B -DskipTests package -P release-archive
 
       - name: Resolve artifact version
         shell: bash
@@ -62,6 +62,10 @@ jobs:
       - name: Module boundary gate
         shell: bash
         run: scripts/check-module-boundaries.sh
+
+      - name: Class size gate
+        shell: bash
+        run: scripts/check-class-size.sh
 
       - name: Version smoke
         shell: bash

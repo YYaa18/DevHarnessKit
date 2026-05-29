@@ -105,7 +105,8 @@ Focus: stable CLI and schema compatibility.
 - Document supported schema migration paths.
 - Provide release checksums and reproducible packaging instructions.
 - Promote the beta compatibility contract into a stricter stable command/output/schema contract.
-- Define post-1.0 semantic versioning and deprecation windows before claiming stability.
+- Maintain the documented semantic versioning and deprecation windows before
+  claiming or changing stable behavior.
 - Revisit coverage threshold enforcement using [decisions/0002-coverage-threshold-and-sql-safety-fuzz.md](decisions/0002-coverage-threshold-and-sql-safety-fuzz.md) after the CLI surface and DB safety tests stabilize.
 - Before any stable tag, produce an artifact-boundary decision for each
   experimental module: keep bundled, mark optional dependency, or split into an

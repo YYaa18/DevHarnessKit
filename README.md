@@ -32,7 +32,7 @@ command surface.
 | Workflow | Alpha | Records process state for audit and context export. It is not a workflow engine. |
 | Spec | Alpha | Records change documents, tasks, acceptance, and status. Markdown is export only. |
 | Agent packaging | Alpha | Ships `.agents/skills` and `.comate/rules` helpers for agent workflows. Work Brief is user-facing; Agent Brief is machine-facing and command details stay internal to adapters. |
-| SQLite schema | Alpha | Current schema version is v13. Compatibility policy is documented, but not yet guaranteed as stable. |
+| SQLite schema | Alpha | Current schema version is v15. Compatibility policy is documented, but not yet guaranteed as stable. |
 
 Stable-candidate work is now being narrowed around memory core, doctor, goal
 core, migration recovery, and release packaging. DB inspection remains beta.

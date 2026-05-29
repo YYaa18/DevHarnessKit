@@ -45,8 +45,14 @@ jobs:
       - name: Module boundary gate
         run: scripts/check-module-boundaries.sh
 
+      - name: Class size gate
+        run: scripts/check-class-size.sh
+
       - name: Verify version
         run: java -jar "$DHK_JAR" version
+
+      - name: Release gate
+        run: scripts/release-gate.sh --skip-package
 
       - name: Generate checksums
         run: |

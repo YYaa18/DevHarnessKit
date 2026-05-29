@@ -103,6 +103,9 @@ final class GoalSkillPackagingTest {
         assertTrue(shell.contains("MAX_DOCTOR_MS"));
         assertTrue(shell.contains("JAR_WARN_BYTES"));
         assertTrue(shell.contains("Possible lingering dhk Java process detected."));
+        assertFalse(shell.contains("pgrep -fl \"dhk-cli|devharnesskit|dhk.jar"));
+        assertTrue(shell.contains("grep -F \"java -jar $JAR\""));
+        assertTrue(shell.contains("grep -v -F \"grep -F\""));
 
         assertTrue(batch.contains("DHK_PERF_MAX_HELP_MS"));
         assertTrue(batch.contains("DHK_PERF_MAX_DOCTOR_MS"));
@@ -113,8 +116,45 @@ final class GoalSkillPackagingTest {
         assertTrue(batch.contains("doctor|--project-root"));
         assertTrue(batch.contains("jar size:"));
         assertTrue(batch.contains(":check_lingering_processes"));
+        assertTrue(batch.contains("java(\\.exe)?\\s+-jar"));
+        assertTrue(batch.contains("[IO.Path]::GetFileName($env:JAR)"));
         assertTrue(batch.contains(":cleanup"));
         assertTrue(batch.contains("Sort-Object LastWriteTime -Descending"));
+    }
+
+    @Test
+    void ciAndReleaseWorkflowsUseReleaseArchiveAndStableGates() throws Exception {
+        String ci = read(Paths.get(".github/workflows/ci.yml"));
+        String release = read(Paths.get(".github/workflows/release.yml"));
+
+        assertTrue(ci.contains("mvn -B -DskipTests package -P release-archive"));
+        assertTrue(ci.contains("scripts/check-class-size.sh"));
+        assertTrue(ci.contains("scripts/perf-smoke.sh \"$DHK_JAR\""));
+        assertTrue(ci.contains("ls -lh \"$DHK_JAR\" \"$DHK_ARCHIVE_PREFIX\".*"));
+
+        assertTrue(release.contains("mvn -B clean package -P release-archive"));
+        assertTrue(release.contains("scripts/check-class-size.sh"));
+        assertTrue(release.contains("scripts/release-gate.sh --skip-package"));
+        assertTrue(release.contains("target/SHA256SUMS"));
+    }
+
+    @Test
+    void versionMetadataGateChecksSchemaVersionDrift() throws Exception {
+        String gate = read(Paths.get("scripts/check-version-metadata.sh"));
+        String readme = read(Paths.get("README.md"));
+        String compatibility = read(Paths.get("docs/COMPATIBILITY.md"));
+        String migrations = read(Paths.get("docs/MIGRATIONS.md"));
+        String stableContract = read(Paths.get("docs/STABLE_CONTRACT.md"));
+
+        assertTrue(gate.contains("CURRENT_SCHEMA_VERSION = MigrationRunner"));
+        assertTrue(gate.contains("Current schema version is v$SCHEMA_VERSION"));
+        assertTrue(gate.contains("Current schema version: \\`$SCHEMA_VERSION\\`"));
+        assertTrue(readme.contains("Current schema version is v15"));
+        assertTrue(compatibility.contains("Current schema version: `15`"));
+        assertTrue(migrations.contains("Current schema version: `15`"));
+        assertTrue(stableContract.contains("For 1.0 and later"));
+        assertTrue(stableContract.contains("under semantic"));
+        assertTrue(stableContract.contains("1.0 Boundary Decisions"));
     }
 
     @Test

@@ -98,8 +98,12 @@ SQL
 run_timed "memory search 1000" "$MAX_MEMORY_SEARCH_MS" java -jar "$JAR" memory search --project-root "$ROOT" --q gateway-special --status confirmed
 run_timed "memory export 1000" "$MAX_MEMORY_EXPORT_MS" java -jar "$JAR" memory export --project-root "$ROOT" --task "perf smoke" --keywords gateway-special
 
-if pgrep -fl "dhk-cli|devharnesskit|dhk.jar|java -jar $JAR" >/dev/null 2>&1; then
+LINGERING_JAVA="$(pgrep -fl java 2>/dev/null \
+  | grep -F "java -jar $JAR" \
+  | grep -v -F "grep -F" || true)"
+if [ -n "$LINGERING_JAVA" ]; then
   echo "Possible lingering dhk Java process detected." >&2
+  printf '%s\n' "$LINGERING_JAVA" >&2
   exit 1
 fi
 

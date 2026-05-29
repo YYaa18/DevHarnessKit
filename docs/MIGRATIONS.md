@@ -6,7 +6,7 @@ DevHarness Kit stores project state in:
 .agents/memory/memory.db
 ```
 
-Current schema version: `14`.
+Current schema version: `15`.
 
 ## Current Schema Versions
 

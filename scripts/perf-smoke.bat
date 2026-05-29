@@ -108,7 +108,7 @@ powershell -NoProfile -Command "$label=$env:DHK_TIMED_LABEL; $max=[int]$env:DHK_
 exit /b %ERRORLEVEL%
 
 :check_lingering_processes
-powershell -NoProfile -Command "$self=$PID; $matches=Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $self -and $_.CommandLine -and $_.CommandLine -match 'dhk-cli|devharnesskit|dhk\.jar|java -jar' }; if ($matches) { Write-Error 'Possible lingering dhk Java process detected.'; $matches | Select-Object -First 5 -ExpandProperty CommandLine | Write-Error; exit 1 }"
+powershell -NoProfile -Command "$self=$PID; $jarName=[IO.Path]::GetFileName($env:JAR); $matches=Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $self -and $_.CommandLine -and $_.CommandLine -match 'java(\.exe)?\s+-jar' -and $_.CommandLine -like ('*' + $jarName + '*') }; if ($matches) { Write-Error 'Possible lingering dhk Java process detected.'; $matches | Select-Object -First 5 -ExpandProperty CommandLine | Write-Error; exit 1 }"
 exit /b %ERRORLEVEL%
 
 :cleanup

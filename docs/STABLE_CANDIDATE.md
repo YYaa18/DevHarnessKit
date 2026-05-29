@@ -82,6 +82,13 @@ Before a stable-candidate tag:
    not accidentally import CLI command implementations. Known goal-to-graph,
    goal-to-BDD, and goal-to-governance debt is reported as boundary debt until
    the next physical runner split.
+8. Remote CI on `main` must be green across the configured Linux, macOS,
+   Windows, Java 8, and Java 17 matrix. For the first stable tag, the Windows
+   release-archive wrapper smoke may be recorded as separate manual evidence
+   when it cannot run in local release-gate automation.
+9. README, compatibility docs, migration docs, and `dhk version` must agree on
+   the current schema version. `scripts/check-version-metadata.sh` enforces
+   this before packaging.
 
 ## Non-Goals Before 1.0
 

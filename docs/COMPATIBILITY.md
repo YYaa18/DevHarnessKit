@@ -179,7 +179,7 @@ with the matching CLI version.
 
 ## SQLite Schema Contract
 
-Current schema version: `14`.
+Current schema version: `15`.
 
 Before 1.0, the schema is not a stable public API. Users may rely on these
 operational guarantees:
@@ -239,8 +239,14 @@ Before 1.0:
 - removals should include replacement guidance;
 - docs must be updated in the same change as the behavior change.
 
-After 1.0, deprecation windows and semantic versioning rules should be tightened
-before any stable claim is made.
+For 1.0 and later stable releases:
+
+- public stable command/output/schema changes follow semantic versioning;
+- removals require at least one minor release of deprecation notice when
+  practical;
+- stable JSON fields and Markdown anchors should remain additive within a major
+  version;
+- schema migrations must document supported upgrade paths before release.
 
 ## Release Notes Checklist
 

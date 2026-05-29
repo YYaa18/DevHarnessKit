@@ -2091,7 +2091,8 @@ final class GoalIntegrationTest {
                 "--task", "Graph impact API change",
                 "--module", "order"
         }, start.context());
-        assertEquals(ExitCodes.SUCCESS, startExit);
+        assertEquals(ExitCodes.SUCCESS, startExit,
+                "stdout=" + start.stdout() + "\nstderr=" + start.stderr());
         String goalKey = firstValue(start.stdout(), "goal_key: ");
 
         Harness index = new Harness(tempDir);

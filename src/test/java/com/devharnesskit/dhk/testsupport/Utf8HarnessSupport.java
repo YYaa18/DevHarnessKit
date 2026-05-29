@@ -18,7 +18,7 @@ public final class Utf8HarnessSupport {
 
     public static String text(ByteArrayOutputStream output) {
         try {
-            return output.toString("UTF-8");
+            return output.toString("UTF-8").replace("\r\n", "\n");
         } catch (UnsupportedEncodingException ex) {
             throw new IllegalStateException("UTF-8 is not available", ex);
         }

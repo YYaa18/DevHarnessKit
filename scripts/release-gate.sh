@@ -65,6 +65,18 @@ require_tgz_entry() {
   tar -tzf "$TGZ" | grep -F "$1" >/dev/null || fail "tar.gz missing $1"
 }
 
+require_no_zip_entry() {
+  if unzip -l "$ZIP" | grep -F "$1" >/dev/null; then
+    fail "zip should not contain $1"
+  fi
+}
+
+require_no_tgz_entry() {
+  if tar -tzf "$TGZ" | grep -F "$1" >/dev/null; then
+    fail "tar.gz should not contain $1"
+  fi
+}
+
 check_no_hardcoded_wrapper_version() {
   if grep -E 'target[\\/]+dhk-cli-[0-9][^ "$%]*-all\.jar' \
       .agents/skills/devharness-goal-development/scripts/dhk.sh \
@@ -144,8 +156,11 @@ log "checking archive contents"
 for entry in \
   "install.sh" \
   "lib/dhk.jar" \
+  "README.md" \
   "LICENSE" \
   "THIRD_PARTY_NOTICES.md" \
+  "SECURITY.md" \
+  "CHANGELOG.md" \
   ".agents/skills/devharness-goal-development/SKILL.md" \
   ".agents/skills/devharness-goal-development/references/knowledge-injection.md" \
   ".agents/knowledge/packs/devharness-methodology-core/knowledge-pack.json" \
@@ -161,18 +176,30 @@ for entry in \
   ".agents/skills/devharness-graph-aware-development/scripts/graph-impact.bat" \
   ".comate/rules/devharness-goal-protocol.mdr" \
   ".comate/rules/devharness-graph-aware-protocol.mdr" \
-  "docs/INDEX.md" \
-  "docs/STABLE_CONTRACT.md" \
-  "scripts/check-version-metadata.sh" \
-  "scripts/check-coverage-threshold.sh" \
-  "scripts/check-module-boundaries.sh" \
-  "scripts/check-class-size.sh" \
-  "scripts/release-thresholds.env" \
   "scripts/devharness-control-panel.sh" \
   "scripts/install-agent-adapters.sh"
 do
   require_zip_entry "$entry"
   require_tgz_entry "$entry"
+done
+for entry in \
+  "docs/" \
+  "RELEASE.md" \
+  "CONTRIBUTING.md" \
+  "CODE_OF_CONDUCT.md" \
+  "scripts/check-version-metadata.sh" \
+  "scripts/check-coverage-threshold.sh" \
+  "scripts/check-module-boundaries.sh" \
+  "scripts/check-class-size.sh" \
+  "scripts/release-thresholds.env" \
+  "scripts/release-gate.sh" \
+  "scripts/perf-smoke.sh" \
+  "scripts/perf-smoke.bat" \
+  "scripts/dev-build.sh" \
+  "scripts/lark-codex-bridge.sh"
+do
+  require_no_zip_entry "$entry"
+  require_no_tgz_entry "$entry"
 done
 if unzip -l "$ZIP" | grep 'devharness-java-development' >/dev/null; then
   fail "zip still contains legacy devharness-java-development skill"

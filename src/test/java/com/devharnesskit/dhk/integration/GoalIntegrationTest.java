@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -2330,10 +2329,9 @@ final class GoalIntegrationTest {
         writeArchitectureProfile(root, "custom-architecture");
         Path controller = root.resolve("src/main/java/com/acme/modern/account/controller/AccountController.java");
         String controllerText = new String(Files.readAllBytes(controller), "UTF-8");
-        controllerText = controllerText.replace(
-                "import com.acme.modern.account.service.AccountService;\n",
-                "import com.acme.modern.account.service.AccountService;\n"
-                        + "import com.acme.modern.account.repository.AccountRepository;\n");
+        controllerText = insertLineAfter(controllerText,
+                "import com.acme.modern.account.service.AccountService;",
+                "import com.acme.modern.account.repository.AccountRepository;");
         Files.write(controller, controllerText.getBytes("UTF-8"));
 
         Harness start = new Harness(tempDir);
@@ -3461,6 +3459,16 @@ final class GoalIntegrationTest {
         }
     }
 
+    private String insertLineAfter(String text, String existingLine, String insertedLine) {
+        String unixNeedle = existingLine + "\n";
+        String windowsNeedle = existingLine + "\r\n";
+        if (text.contains(windowsNeedle)) {
+            return text.replace(windowsNeedle, windowsNeedle + insertedLine + "\r\n");
+        }
+        assertTrue(text.contains(unixNeedle), "Expected fixture line: " + existingLine);
+        return text.replace(unixNeedle, unixNeedle + insertedLine + "\n");
+    }
+
     private static final class Harness {
         private final Path workingDirectory;
         private final ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -3473,18 +3481,18 @@ final class GoalIntegrationTest {
         private CommandContext context() {
             return new CommandContext(
                     workingDirectory.toAbsolutePath().normalize(),
-                    new PrintStream(out),
-                    new PrintStream(err),
+                    com.devharnesskit.dhk.testsupport.Utf8HarnessSupport.printStream(out),
+                    com.devharnesskit.dhk.testsupport.Utf8HarnessSupport.printStream(err),
                     new FixedClock()
             );
         }
 
         private String stdout() {
-            return out.toString();
+            return com.devharnesskit.dhk.testsupport.Utf8HarnessSupport.text(out);
         }
 
         private String stderr() {
-            return err.toString();
+            return com.devharnesskit.dhk.testsupport.Utf8HarnessSupport.text(err);
         }
     }
 

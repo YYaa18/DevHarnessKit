@@ -95,7 +95,7 @@ public final class SkillContractService {
                 listValue(json, "allowed_commands"),
                 listValue(json, "forbidden_commands"),
                 json == null ? "" : json,
-                sourcePath == null ? "" : sourcePath.toAbsolutePath().normalize().toString(),
+                PathUtil.displayPath(sourcePath),
                 sourceHash,
                 "",
                 "unknown",

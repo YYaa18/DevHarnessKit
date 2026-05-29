@@ -429,6 +429,10 @@ Start with [docs/INDEX.md](docs/INDEX.md). It separates onboarding, daily usage,
 experimental surfaces, release operations, and historical design notes so new
 users do not have to scan every Markdown file.
 
+Downloadable release archives intentionally omit the repository `docs/`
+directory and release-process notes. Use the GitHub source tree for the full
+documentation set; the archive keeps only install/runtime essentials.
+
 Most users need these first:
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): current architecture and module boundaries.

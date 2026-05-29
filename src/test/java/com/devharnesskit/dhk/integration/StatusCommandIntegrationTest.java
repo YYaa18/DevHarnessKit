@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -169,14 +168,14 @@ final class StatusCommandIntegrationTest {
         CommandContext context() {
             return new CommandContext(
                     workingDirectory,
-                    new PrintStream(out),
-                    new PrintStream(err),
+                    com.devharnesskit.dhk.testsupport.Utf8HarnessSupport.printStream(out),
+                    com.devharnesskit.dhk.testsupport.Utf8HarnessSupport.printStream(err),
                     new FixedClock()
             );
         }
 
         String stdout() {
-            return out.toString();
+            return com.devharnesskit.dhk.testsupport.Utf8HarnessSupport.text(out);
         }
     }
 

@@ -29,27 +29,15 @@
                 <include>LICENSE</include>
                 <include>THIRD_PARTY_NOTICES.md</include>
                 <include>SECURITY.md</include>
-                <include>CONTRIBUTING.md</include>
                 <include>CHANGELOG.md</include>
-                <include>RELEASE.md</include>
-                <include>CODE_OF_CONDUCT.md</include>
             </includes>
-        </fileSet>
-        <fileSet>
-            <directory>${project.basedir}/docs</directory>
-            <outputDirectory>docs</outputDirectory>
-            <includes>
-                <include>**/*.md</include>
-            </includes>
-            <excludes>
-                <exclude>features/**</exclude>
-            </excludes>
         </fileSet>
         <fileSet>
             <directory>${project.basedir}/scripts</directory>
             <outputDirectory>scripts</outputDirectory>
             <includes>
-                <include>**/*</include>
+                <include>devharness-control-panel.sh</include>
+                <include>install-agent-adapters.sh</include>
             </includes>
             <fileMode>0755</fileMode>
         </fileSet>

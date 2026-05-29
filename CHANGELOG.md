@@ -35,6 +35,15 @@ Release-readiness, control-panel, and onboarding hardening beta.
 - Release archive smoke now verifies dynamic wrapper jar fallback for Unix and
   Windows wrappers and blocks legacy memory-first Comate rules from packaged
   archives.
+- Release archives now use a user-facing whitelist: runtime jar, installer,
+  adapter assets, README/license/security/changelog notices, and runtime
+  control-panel scripts are packaged, while repository docs, release-process
+  docs, CI gates, smoke scripts, and local development helper scripts are left
+  out of the downloadable distribution.
+- Windows Java 17 CI hardening now fixes UTF-8 CLI test harness output,
+  resolves Maven process calls through `mvn.cmd`/`mvnw.cmd` on Windows, uses
+  platform-specific `.sh`/`.cmd` CGC test substitutes, and normalizes displayed
+  source paths to `/`.
 
 ## 0.4.5-beta.1
 

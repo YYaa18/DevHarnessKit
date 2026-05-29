@@ -1,5 +1,6 @@
 package com.devharnesskit.dhk.service.goal;
 
+import com.devharnesskit.dhk.util.PathUtil;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -49,7 +50,7 @@ class GoalCheckServiceTest {
         assertTrue(result.truncated());
         assertTrue(result.output().contains("command: "));
         assertTrue(result.output().contains("working_directory: "
-                + tempDir.toAbsolutePath().normalize()));
+                + PathUtil.displayPath(tempDir)));
         assertTrue(result.output().contains("duration_ms:"));
         assertTrue(result.output().contains("timeout: false"));
         assertTrue(result.output().contains("output_truncated: true"));

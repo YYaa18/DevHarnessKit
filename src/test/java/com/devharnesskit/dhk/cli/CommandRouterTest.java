@@ -4,7 +4,6 @@ import com.devharnesskit.dhk.util.Clock;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
 import java.nio.file.Paths;
 import java.time.Instant;
 
@@ -72,18 +71,18 @@ final class CommandRouterTest {
         CommandContext context() {
             return new CommandContext(
                     Paths.get(".").toAbsolutePath().normalize(),
-                    new PrintStream(out),
-                    new PrintStream(err),
+                    com.devharnesskit.dhk.testsupport.Utf8HarnessSupport.printStream(out),
+                    com.devharnesskit.dhk.testsupport.Utf8HarnessSupport.printStream(err),
                     new FixedClock()
             );
         }
 
         String stdout() {
-            return out.toString();
+            return com.devharnesskit.dhk.testsupport.Utf8HarnessSupport.text(out);
         }
 
         String stderr() {
-            return err.toString();
+            return com.devharnesskit.dhk.testsupport.Utf8HarnessSupport.text(err);
         }
     }
 

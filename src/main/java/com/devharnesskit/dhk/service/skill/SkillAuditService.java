@@ -6,6 +6,7 @@ import com.devharnesskit.dhk.model.skill.SkillContract;
 import com.devharnesskit.dhk.model.skill.SkillContractLintIssue;
 import com.devharnesskit.dhk.model.skill.SkillContractLintResult;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
+import com.devharnesskit.dhk.util.PathUtil;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -80,7 +81,7 @@ public final class SkillAuditService {
         auditFiles(skillDirectory, issues);
 
         String skillKey = lint.skillKey();
-        String sourcePath = skillDirectory.toAbsolutePath().normalize().toString();
+        String sourcePath = PathUtil.displayPath(skillDirectory);
         String sourceHash = contract == null ? contractService.sourceHash(skillDirectory) : contract.sourceHash();
         return new SkillAuditResult(skillKey, sourcePath, sourceHash, issues);
     }

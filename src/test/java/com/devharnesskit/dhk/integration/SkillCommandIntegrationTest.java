@@ -10,7 +10,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
-import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -457,7 +456,7 @@ final class SkillCommandIntegrationTest {
         }
 
         private CommandContext context() {
-            return new CommandContext(workingDirectory, new PrintStream(stdout), new PrintStream(stderr),
+            return new CommandContext(workingDirectory, com.devharnesskit.dhk.testsupport.Utf8HarnessSupport.printStream(stdout), com.devharnesskit.dhk.testsupport.Utf8HarnessSupport.printStream(stderr),
                     new Clock() {
                         public Instant now() {
                             return Instant.parse("2026-01-01T00:00:00Z");

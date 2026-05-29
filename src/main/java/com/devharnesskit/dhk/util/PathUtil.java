@@ -79,6 +79,10 @@ public final class PathUtil {
         return path.toAbsolutePath().normalize();
     }
 
+    public static String displayPath(Path path) {
+        return path == null ? "" : path.toAbsolutePath().normalize().toString().replace('\\', '/');
+    }
+
     public static Path memoryDirectory(Path projectRoot) {
         return projectRoot.resolve(AGENTS_DIRECTORY).resolve(MEMORY_DIRECTORY);
     }

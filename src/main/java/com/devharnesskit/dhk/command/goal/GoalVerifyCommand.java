@@ -12,6 +12,7 @@ import com.devharnesskit.dhk.service.brief.BriefLifecycleService;
 import com.devharnesskit.dhk.service.goal.GoalOrchestrator;
 import com.devharnesskit.dhk.util.JsonOutput;
 import com.devharnesskit.dhk.util.PathUtil;
+import com.devharnesskit.dhk.util.ProcessCommandUtil;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
@@ -245,7 +246,8 @@ public final class GoalVerifyCommand implements Command {
 
     private String runPackage(Path projectRoot) {
         try {
-            Process process = new ProcessBuilder("mvn", "-q", "-DskipTests", "package")
+            Process process = new ProcessBuilder(ProcessCommandUtil.resolveExecutable(
+                    new String[]{"mvn", "-q", "-DskipTests", "package"}))
                     .directory(projectRoot.toFile())
                     .redirectErrorStream(true)
                     .start();

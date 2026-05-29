@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -148,16 +147,12 @@ final class GraphCommandIntegrationTest {
     @Test
     void graphImpactUsesCgcProviderPrototypeOutput() throws Exception {
         Path root = tempDir.resolve("demo-cgc-impact");
-        Path command = root.resolve("fake-cgc.sh");
+        Path command = root.resolve(isWindows() ? "fake-cgc.cmd" : "fake-cgc.sh");
         Files.createDirectories(root);
-        Files.write(command, ("#!/bin/sh\n"
-                + "printf 'start_node\\tnode:com.acme.AccountService\\tclass\\tAccountService\\tcom.acme.AccountService\\tsrc/main/java/com/acme/AccountService.java\\t10\\t20\\tjava\\t93\\tCGC tree root\\n'\n"
-                + "printf 'node\\tnode:com.acme.AccountController.freeze\\tmethod\\tfreeze\\tcom.acme.AccountController.freeze\\tsrc/main/java/com/acme/AccountController.java\\t31\\t36\\tjava\\t88\\tCGC caller\\n'\n"
-                + "printf 'caller\\tcalls\\tnode:com.acme.AccountController.freeze\\tnode:com.acme.AccountService\\tsrc/main/java/com/acme/AccountController.java\\t82\\tCGC callers\\n'\n"
-                + "printf 'risk_node\\tnode:route:POST:/accounts/freeze\\troute\\tPOST:/accounts/freeze\\tPOST:/accounts/freeze\\tsrc/main/java/com/acme/AccountController.java\\t31\\t31\\tjava\\t86\\tpublic route\\n'\n"
-                + "printf 'related_file\\tsrc/main/java/com/acme/AccountService.java\\n'\n"
-                + "printf 'related_test\\tsrc/test/java/com/acme/AccountServiceTest.java\\n'\n").getBytes("UTF-8"));
-        assertTrue(command.toFile().setExecutable(true));
+        Files.write(command, fakeCgcCommand().getBytes("UTF-8"));
+        if (!isWindows()) {
+            assertTrue(command.toFile().setExecutable(true));
+        }
         write(root, ".agents/graph/config.json",
                 "{\n"
                         + "  \"schema_version\": \"devharness-graph-config/v1-alpha\",\n"
@@ -182,6 +177,29 @@ final class GraphCommandIntegrationTest {
         assertTrue(impactMap.contains("src/main/java/com/acme/AccountController.java"));
         assertTrue(impactMap.contains("src/test/java/com/acme/AccountServiceTest.java"));
         assertTrue(impactMap.contains("POST:/accounts/freeze"));
+    }
+
+    private static String fakeCgcCommand() {
+        if (isWindows()) {
+            return "@echo off\r\n"
+                    + "echo start_node\tnode:com.acme.AccountService\tclass\tAccountService\tcom.acme.AccountService\tsrc/main/java/com/acme/AccountService.java\t10\t20\tjava\t93\tCGC tree root\r\n"
+                    + "echo node\tnode:com.acme.AccountController.freeze\tmethod\tfreeze\tcom.acme.AccountController.freeze\tsrc/main/java/com/acme/AccountController.java\t31\t36\tjava\t88\tCGC caller\r\n"
+                    + "echo caller\tcalls\tnode:com.acme.AccountController.freeze\tnode:com.acme.AccountService\tsrc/main/java/com/acme/AccountController.java\t82\tCGC callers\r\n"
+                    + "echo risk_node\tnode:route:POST:/accounts/freeze\troute\tPOST:/accounts/freeze\tPOST:/accounts/freeze\tsrc/main/java/com/acme/AccountController.java\t31\t31\tjava\t86\tpublic route\r\n"
+                    + "echo related_file\tsrc/main/java/com/acme/AccountService.java\r\n"
+                    + "echo related_test\tsrc/test/java/com/acme/AccountServiceTest.java\r\n";
+        }
+        return "#!/bin/sh\n"
+                + "printf 'start_node\\tnode:com.acme.AccountService\\tclass\\tAccountService\\tcom.acme.AccountService\\tsrc/main/java/com/acme/AccountService.java\\t10\\t20\\tjava\\t93\\tCGC tree root\\n'\n"
+                + "printf 'node\\tnode:com.acme.AccountController.freeze\\tmethod\\tfreeze\\tcom.acme.AccountController.freeze\\tsrc/main/java/com/acme/AccountController.java\\t31\\t36\\tjava\\t88\\tCGC caller\\n'\n"
+                + "printf 'caller\\tcalls\\tnode:com.acme.AccountController.freeze\\tnode:com.acme.AccountService\\tsrc/main/java/com/acme/AccountController.java\\t82\\tCGC callers\\n'\n"
+                + "printf 'risk_node\\tnode:route:POST:/accounts/freeze\\troute\\tPOST:/accounts/freeze\\tPOST:/accounts/freeze\\tsrc/main/java/com/acme/AccountController.java\\t31\\t31\\tjava\\t86\\tpublic route\\n'\n"
+                + "printf 'related_file\\tsrc/main/java/com/acme/AccountService.java\\n'\n"
+                + "printf 'related_test\\tsrc/test/java/com/acme/AccountServiceTest.java\\n'\n";
+    }
+
+    private static boolean isWindows() {
+        return System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
     }
 
     @Test
@@ -984,18 +1002,18 @@ final class GraphCommandIntegrationTest {
         CommandContext context() {
             return new CommandContext(
                     workingDirectory,
-                    new PrintStream(out),
-                    new PrintStream(err),
+                    com.devharnesskit.dhk.testsupport.Utf8HarnessSupport.printStream(out),
+                    com.devharnesskit.dhk.testsupport.Utf8HarnessSupport.printStream(err),
                     new FixedClock()
             );
         }
 
         String stdout() {
-            return out.toString();
+            return com.devharnesskit.dhk.testsupport.Utf8HarnessSupport.text(out);
         }
 
         String stderr() {
-            return err.toString();
+            return com.devharnesskit.dhk.testsupport.Utf8HarnessSupport.text(err);
         }
     }
 

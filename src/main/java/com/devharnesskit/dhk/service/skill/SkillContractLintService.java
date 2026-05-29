@@ -31,7 +31,7 @@ public final class SkillContractLintService {
             issues.add(issue("missing", "contract.json", "contract.json was not found",
                     "Create .agents/skills/<skill-key>/contract.json"));
             return new SkillContractLintResult(skillDirectory.getFileName().toString(),
-                    contractPath.toAbsolutePath().normalize().toString(), null, issues);
+                    PathUtil.displayPath(contractPath), null, issues);
         }
 
         String json;
@@ -41,7 +41,7 @@ public final class SkillContractLintService {
             issues.add(issue("invalid", "contract.json", "contract.json could not be read: " + ex.getMessage(),
                     "Check file permissions and encoding"));
             return new SkillContractLintResult(skillDirectory.getFileName().toString(),
-                    contractPath.toAbsolutePath().normalize().toString(), null, issues);
+                    PathUtil.displayPath(contractPath), null, issues);
         }
 
         addMissing(issues, json, "skill_key", "Add a stable skill_key");
@@ -88,7 +88,7 @@ public final class SkillContractLintService {
         if (skillKey.length() == 0) {
             skillKey = skillDirectory.getFileName().toString();
         }
-        return new SkillContractLintResult(skillKey, contractPath.toAbsolutePath().normalize().toString(),
+        return new SkillContractLintResult(skillKey, PathUtil.displayPath(contractPath),
                 contract, issues);
     }
 

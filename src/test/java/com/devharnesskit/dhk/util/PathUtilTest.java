@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class PathUtilTest {
@@ -30,6 +31,14 @@ final class PathUtilTest {
         Path root = PathUtil.resolveProjectRoot(args, tempDir);
 
         assertEquals(tempDir.resolve("path with spaces").toAbsolutePath().normalize(), root);
+    }
+
+    @Test
+    void displayPathUsesForwardSlashes() {
+        String display = PathUtil.displayPath(tempDir.resolve("C:\\demo\\contract.json"));
+
+        assertFalse(display.contains("\\"));
+        assertTrue(display.endsWith("C:/demo/contract.json"));
     }
 
     @Test

@@ -139,6 +139,34 @@ final class GoalSkillPackagingTest {
     }
 
     @Test
+    void releaseArchiveUsesUserFacingWhitelist() throws Exception {
+        String assembly = read(Paths.get("src/assembly/release.xml"));
+        String releaseGate = read(Paths.get("scripts/release-gate.sh"));
+        int scriptsStart = assembly.indexOf("<directory>${project.basedir}/scripts</directory>");
+        assertTrue(scriptsStart >= 0);
+        String scriptsFileSet = assembly.substring(scriptsStart, assembly.indexOf("</fileSet>", scriptsStart));
+
+        assertTrue(assembly.contains("<include>README.md</include>"));
+        assertTrue(assembly.contains("<include>LICENSE</include>"));
+        assertTrue(assembly.contains("<include>THIRD_PARTY_NOTICES.md</include>"));
+        assertTrue(assembly.contains("<include>SECURITY.md</include>"));
+        assertTrue(assembly.contains("<include>CHANGELOG.md</include>"));
+        assertFalse(assembly.contains("<directory>${project.basedir}/docs</directory>"));
+        assertFalse(assembly.contains("<include>RELEASE.md</include>"));
+        assertFalse(assembly.contains("<include>CONTRIBUTING.md</include>"));
+        assertFalse(assembly.contains("<include>CODE_OF_CONDUCT.md</include>"));
+        assertTrue(scriptsFileSet.contains("<include>devharness-control-panel.sh</include>"));
+        assertTrue(scriptsFileSet.contains("<include>install-agent-adapters.sh</include>"));
+        assertFalse(scriptsFileSet.contains("<include>**/*</include>"));
+        assertFalse(scriptsFileSet.contains("lark-codex-bridge"));
+
+        assertTrue(releaseGate.contains("require_no_zip_entry \"$entry\""));
+        assertTrue(releaseGate.contains("\"docs/\""));
+        assertTrue(releaseGate.contains("\"RELEASE.md\""));
+        assertTrue(releaseGate.contains("\"scripts/lark-codex-bridge.sh\""));
+    }
+
+    @Test
     void versionMetadataGateChecksSchemaVersionDrift() throws Exception {
         String gate = read(Paths.get("scripts/check-version-metadata.sh"));
         String readme = read(Paths.get("README.md"));

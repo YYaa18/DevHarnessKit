@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -491,18 +490,18 @@ final class MemoryAddConfirmSearchIntegrationTest {
         private CommandContext context() {
             return new CommandContext(
                     workingDirectory.toAbsolutePath().normalize(),
-                    new PrintStream(out),
-                    new PrintStream(err),
+                    com.devharnesskit.dhk.testsupport.Utf8HarnessSupport.printStream(out),
+                    com.devharnesskit.dhk.testsupport.Utf8HarnessSupport.printStream(err),
                     new FixedClock()
             );
         }
 
         private String stdout() {
-            return out.toString();
+            return com.devharnesskit.dhk.testsupport.Utf8HarnessSupport.text(out);
         }
 
         private String stderr() {
-            return err.toString();
+            return com.devharnesskit.dhk.testsupport.Utf8HarnessSupport.text(err);
         }
     }
 

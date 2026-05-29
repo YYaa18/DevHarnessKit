@@ -29,13 +29,12 @@ final class GoalCheckSupport {
         if (steps == null || key == null || key.length() == 0) {
             return "";
         }
-        Pattern pattern = Pattern.compile("(?i)(?:^|[;\\n\\r])\\s*" + Pattern.quote(key)
-                + "\\s*=\\s*([^;\\n\\r]+)");
+        Pattern pattern = evidencePattern(key);
         for (GoalStep step : steps) {
             Matcher matcher = pattern.matcher(step.evidence() == null ? "" : step.evidence());
             String value = "";
             while (matcher.find()) {
-                value = matcher.group(1).trim();
+                value = cleanEvidenceValue(matcher.group(1));
             }
             if (value.length() > 0) {
                 return value;
@@ -48,16 +47,31 @@ final class GoalCheckSupport {
         if (steps == null || key == null || key.length() == 0) {
             return "";
         }
-        Pattern pattern = Pattern.compile("(?i)(?:^|[;\\n\\r])\\s*" + Pattern.quote(key)
-                + "\\s*=\\s*([^;\\n\\r]+)");
+        Pattern pattern = evidencePattern(key);
         String latest = "";
         for (GoalStep step : steps) {
             Matcher matcher = pattern.matcher(step.evidence() == null ? "" : step.evidence());
             while (matcher.find()) {
-                latest = matcher.group(1).trim();
+                latest = cleanEvidenceValue(matcher.group(1));
             }
         }
         return latest;
+    }
+
+    private static Pattern evidencePattern(String key) {
+        return Pattern.compile("(?i)(?:^|[;\\n\\r]|\\s+--field\\s+)\\s*(?:--field\\s+)?"
+                + Pattern.quote(key)
+                + "\\s*=\\s*(.*?)(?=(?:\\s+--field\\s+[A-Za-z0-9_.-]+\\s*=)|[;\\n\\r]|$)");
+    }
+
+    private static String cleanEvidenceValue(String value) {
+        String text = value == null ? "" : value.trim();
+        if (text.length() >= 2
+                && (text.charAt(0) == '"' && text.charAt(text.length() - 1) == '"'
+                || text.charAt(0) == '\'' && text.charAt(text.length() - 1) == '\'')) {
+            return text.substring(1, text.length() - 1).trim();
+        }
+        return text;
     }
 
     static boolean containsEvidenceFlag(List<GoalStep> steps, String key) {

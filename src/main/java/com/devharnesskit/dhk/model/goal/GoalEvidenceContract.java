@@ -49,7 +49,12 @@ public final class GoalEvidenceContract {
         String exampleCommand = "dhk goal step --goal " + (goalKey.length() == 0 ? "<goal-key>" : goalKey)
                 + " --summary \"<summary>\"";
         if (exampleEvidence.length() > 0) {
-            exampleCommand += " --evidence \"" + exampleEvidence + "\"";
+            for (String evidence : required) {
+                String key = value(evidence);
+                if (key.length() > 0) {
+                    exampleCommand += " --field \"" + key + "=<value>\"";
+                }
+            }
         } else {
             exampleCommand += " --evidence \"<evidence>\"";
         }

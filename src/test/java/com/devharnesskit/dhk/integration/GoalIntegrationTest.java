@@ -533,6 +533,7 @@ final class GoalIntegrationTest {
         assertTrue(template.stdout().contains("--field existing_controller=<value>"));
         assertTrue(template.stdout().contains("--field existing_service=<value>"));
         assertTrue(template.stdout().contains("example_command: dhk goal step --goal " + goalKey));
+        assertTrue(template.stdout().contains("--field \"existing_controller=<value>\""));
         assertTrue(template.stdout().contains("dry_run_command: .agents/skills/devharness-goal-development/scripts/goal-step.sh --goal " + goalKey));
 
         Harness evidenceTemplate = new Harness(tempDir);

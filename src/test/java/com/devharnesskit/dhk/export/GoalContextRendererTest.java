@@ -33,6 +33,7 @@ final class GoalContextRendererTest {
                 "<structured-evidence-fields>", "<required-checks>", "<context-files>",
                 "<completion-blockers>", "<freshness-status>", "<completion-condition>", "<next-command>");
         assertTrue(markdown.contains("<allowed-commands>"));
+        assertTrue(markdown.contains("--field \"compile_result=<value>\""));
         assertTrue(markdown.contains(".agents/skills/devharness-goal-development/scripts/goal-verify.sh --goal goal-1"));
         assertTrue(markdown.contains("<evidence-contract>"));
         assertTrue(markdown.contains("<structured-evidence-fields>"));

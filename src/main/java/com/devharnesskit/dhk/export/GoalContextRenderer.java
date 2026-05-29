@@ -116,8 +116,7 @@ public final class GoalContextRenderer {
         builder.append("<allowed-commands>\n");
         builder.append("- ").append(GOAL_SCRIPT_DIR).append("goal-next.sh --goal ")
                 .append(goal.goalKey()).append('\n');
-        builder.append("- ").append(GOAL_SCRIPT_DIR).append("goal-step.sh --goal ").append(goal.goalKey())
-                .append(" --summary \"<summary>\" --evidence \"<evidence>\"\n");
+        builder.append("- ").append(goalStepCommand(goal, evidenceContract)).append('\n');
         if (graph.enabled()) {
             builder.append("- internal graph helper: ").append(GRAPH_SCRIPT_DIR).append("graph-index-export.sh\n");
             builder.append("- ").append(GRAPH_SCRIPT_DIR)
@@ -397,6 +396,25 @@ public final class GoalContextRenderer {
 
     private String valueOrNone(String value) {
         return value == null || value.length() == 0 ? "none" : value;
+    }
+
+    private String goalStepCommand(GoalRun goal, GoalEvidenceContract evidenceContract) {
+        StringBuilder command = new StringBuilder();
+        command.append(GOAL_SCRIPT_DIR).append("goal-step.sh --goal ")
+                .append(goal.goalKey()).append(" --summary \"<summary>\"");
+        boolean hasEvidence = false;
+        for (String evidence : evidenceContract.requiredEvidence()) {
+            String key = evidence == null ? "" : evidence.trim();
+            if (key.length() == 0) {
+                continue;
+            }
+            hasEvidence = true;
+            command.append(" --field \"").append(key).append("=<value>\"");
+        }
+        if (!hasEvidence) {
+            command.append(" --evidence \"<evidence>\"");
+        }
+        return command.toString();
     }
 
     private String nextCommand(GoalPlan plan, GoalGraphState graph, GoalBddState bdd) {

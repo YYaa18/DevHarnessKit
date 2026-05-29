@@ -24,9 +24,9 @@ public final class GoalPlanner {
         if (action.length() == 0 && profile.actions().length > 0) {
             action = profile.actions()[0];
         }
-        return new GoalPlan(action, instruction(action), requiredEvidence(profile, action), FORBIDDEN,
-                "dhk goal step --goal " + goal.goalKey()
-                        + " --summary \"<summary>\" --evidence \"<evidence>\"");
+        String[] evidence = requiredEvidence(profile, action);
+        return new GoalPlan(action, instruction(action), evidence, FORBIDDEN,
+                goalStepCommand(goal.goalKey(), evidence));
     }
 
     public String nextAction(GoalProfile profile, String currentAction) {
@@ -181,5 +181,23 @@ public final class GoalPlanner {
             return new String[]{"diff_or_file_list"};
         }
         return new String[]{"summary", "evidence"};
+    }
+
+    private String goalStepCommand(String goalKey, String[] requiredEvidence) {
+        StringBuilder command = new StringBuilder("dhk goal step --goal ");
+        command.append(goalKey).append(" --summary \"<summary>\"");
+        boolean hasEvidence = false;
+        for (String evidence : requiredEvidence == null ? new String[0] : requiredEvidence) {
+            String key = evidence == null ? "" : evidence.trim();
+            if (key.length() == 0) {
+                continue;
+            }
+            hasEvidence = true;
+            command.append(" --field \"").append(key).append("=<value>\"");
+        }
+        if (!hasEvidence) {
+            command.append(" --evidence \"<evidence>\"");
+        }
+        return command.toString();
     }
 }

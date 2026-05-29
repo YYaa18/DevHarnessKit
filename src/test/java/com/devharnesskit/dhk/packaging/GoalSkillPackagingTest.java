@@ -116,6 +116,8 @@ final class GoalSkillPackagingTest {
         assertTrue(goalRule.contains("goal_task_matches_user_request"));
         assertTrue(goalRule.contains("Even typo or documentation-only edits must have a lightweight patch goal"));
         assertTrue(goalRule.contains("After any file edit, immediately run `.agents/skills/devharness-goal-development/scripts/goal-step.sh`"));
+        assertTrue(goalRule.contains("Do not put `--field ...` inside `--evidence`"));
+        assertTrue(goalRule.contains("--field \"manual_evidence_status=passed\""));
         assertTrue(goalRule.contains("self-repair by recording the missing goal step"));
         assertTrue(goalRule.contains("Harness self-check"));
         assertTrue(goalRule.contains("step_recorded_after_edit"));
@@ -210,6 +212,8 @@ final class GoalSkillPackagingTest {
         assertTrue(comateRule.contains("goal_task_matches_user_request"));
         assertTrue(comateRule.contains("Even typo or documentation-only edits must have a lightweight patch goal"));
         assertTrue(comateRule.contains("After any file edit, immediately run `.agents/skills/devharness-goal-development/scripts/goal-step.sh`"));
+        assertTrue(comateRule.contains("Do not put `--field ...` inside `--evidence`"));
+        assertTrue(comateRule.contains("--field \"manual_evidence_status=passed\""));
         assertTrue(comateRule.contains("self-repair by recording the missing goal step"));
         assertTrue(comateRule.contains("Harness self-check"));
         assertTrue(read(project.resolve(".comate/rules/devharness-graph-aware-protocol.mdr"))

@@ -449,9 +449,11 @@ final class ConfigureCommandIntegrationTest {
         Files.createDirectories(manualEvidence.getParent());
         Files.write(manualEvidence, "IDE build and focused test passed\n".getBytes("UTF-8"));
         recordStep("manual-check-goal", goalKey, "Recorded manual verification evidence", "",
-                "manual_evidence_status=passed; compile_scope=order module; test_scope=OrderServiceTest; "
-                        + "manual_evidence_path=.agents/memory/artifacts/manual-evidence.md; tester=developer; "
-                        + "compile_result=manual passed; test_result=manual passed; sensitive_result=ok");
+                "compile_result=manual passed; test_result=manual passed; sensitive_result=ok; "
+                        + "--field manual_evidence_status=\"passed\" "
+                        + "--field compile_scope=\"order module\" --field test_scope=OrderServiceTest "
+                        + "--field manual_evidence_path=.agents/memory/artifacts/manual-evidence.md "
+                        + "--field tester=developer");
 
         Harness verifyReady = new Harness(tempDir);
         int verifyReadyExit = new CommandRouter().run(new String[]{

@@ -470,6 +470,8 @@ For any code change:
 13. Even typo or documentation-only edits must have a lightweight patch goal; do not edit README, comments, or docs directly without a current goal.
 14. If GOAL_CONTEXT contains graph_required=true or graph-assist, treat graph as evidence inside the current main action. Run graph helpers internally and record graph_snapshot, graph_context, impact_map, or graph_result evidence in the current goal step. Do not create a separate graph step.
 15. After any file edit, immediately run `.agents/skills/devharness-goal-development/scripts/goal-step.sh` with the required evidence from GOAL_CONTEXT.
+   For verify/manual evidence, keep each `--field key=value` as its own CLI argument. Do not put `--field ...` inside `--evidence`. Use this command shape:
+   `.agents/skills/devharness-goal-development/scripts/goal-step.sh --goal "<goal-key>" --summary "Record verification evidence" --field "compile_result=manual passed" --field "test_result=manual passed" --field "sensitive_result=passed" --field "manual_evidence_status=passed" --field "compile_scope=<module or changed classes>" --field "test_scope=<class or method>" --field "manual_evidence_path=<path>" --field "tester=<human or role>"`
 16. If files changed but goal audit/next still shows step_count unchanged or "goal steps incomplete", self-repair by recording the missing goal step before replying.
 17. If files were edited before a current goal existed, or under a goal whose task does not match the latest request, self-repair by creating a quickstart patch goal for the user request and recording the edit as a goal step before claiming completion.
 18. Run `.agents/skills/devharness-goal-development/scripts/goal-verify.sh` before claiming completion.

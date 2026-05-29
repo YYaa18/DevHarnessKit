@@ -147,6 +147,7 @@ final class GoalSkillPackagingTest {
         String scriptsFileSet = assembly.substring(scriptsStart, assembly.indexOf("</fileSet>", scriptsStart));
 
         assertTrue(assembly.contains("<include>README.md</include>"));
+        assertTrue(assembly.contains("<include>README.zh-CN.md</include>"));
         assertTrue(assembly.contains("<include>LICENSE</include>"));
         assertTrue(assembly.contains("<include>THIRD_PARTY_NOTICES.md</include>"));
         assertTrue(assembly.contains("<include>SECURITY.md</include>"));

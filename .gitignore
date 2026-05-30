@@ -6,7 +6,13 @@ testbeds/runs/*
 !testbeds/runs/README.md
 
 .agents/memory/
+.agents/devharness/briefs/
+.agents/devharness/config.json
+.agents/devharness/install-state.json
 .agents/graph/exports/
 .agents/graph/snapshots/
 .agents/graph/cache/
 .agents/tools/
+.agents/verification/
+
+.vscode/

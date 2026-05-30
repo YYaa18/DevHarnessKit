@@ -92,6 +92,31 @@ final class GraphLiteParserTest {
     }
 
     @Test
+    void parsesSamePackageStaticMethodCallsAsMethodReferences() throws Exception {
+        write("src/main/java/com/example/GoalContextService.java",
+                "package com.example;\n"
+                        + "final class GoalContextService {\n"
+                        + "  void write(String output) {\n"
+                        + "    GeneratedHashMasker.mask(output);\n"
+                        + "  }\n"
+                        + "}\n");
+        write("src/main/java/com/example/GeneratedHashMasker.java",
+                "package com.example;\n"
+                        + "final class GeneratedHashMasker {\n"
+                        + "  static String mask(String text) {\n"
+                        + "    return text;\n"
+                        + "  }\n"
+                        + "}\n");
+
+        GraphConfig config = GraphConfig.defaults();
+        GraphScanReport scan = new GraphFileScanner().scan(tempDir, config);
+        GraphParseResult result = new GraphLiteParser().parse(tempDir, scan.entries());
+
+        assertNode(result, "method", "com.example.GeneratedHashMasker#mask");
+        assertEdge(result, "calls", "java_method:com.example.GeneratedHashMasker#mask");
+    }
+
+    @Test
     void propertiesParserAndReportDoNotExportSensitiveValues() throws Exception {
         write("src/main/resources/application.properties",
                 "db.password=super-secret-value\napp.route=/legacy/orders\n");

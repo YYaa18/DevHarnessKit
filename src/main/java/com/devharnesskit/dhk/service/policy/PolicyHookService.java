@@ -26,10 +26,10 @@ public final class PolicyHookService {
         DevHarnessPolicy policy = policyService.load(projectRoot);
         PolicyDecision command = commandDecision(policy, "goal complete");
         if (!command.allowed()) {
-            throw new PolicyViolationException("Policy blocked goal complete: " + command.reason());
+            block(projectRoot, "goal complete", command.reason());
         }
         for (GoalStep step : steps) {
-            requireChangedFilesAllowed(policy, "goal complete", step.changedFiles(), false);
+            requireChangedFilesAllowed(projectRoot, policy, "goal complete", step.changedFiles(), false);
         }
     }
 
@@ -40,9 +40,9 @@ public final class PolicyHookService {
         DevHarnessPolicy policy = policyService.load(projectRoot);
         PolicyDecision command = commandDecision(policy, "goal step");
         if (!command.allowed()) {
-            throw new PolicyViolationException("Policy blocked goal step: " + command.reason());
+            block(projectRoot, "goal step", command.reason());
         }
-        requireChangedFilesAllowed(policy, "goal step", changedFiles, true);
+        requireChangedFilesAllowed(projectRoot, policy, "goal step", changedFiles, true);
     }
 
     public void requireGoalCheckAllowed(Path projectRoot) {
@@ -52,7 +52,7 @@ public final class PolicyHookService {
         DevHarnessPolicy policy = policyService.load(projectRoot);
         PolicyDecision command = commandDecision(policy, "goal check");
         if (!command.allowed()) {
-            throw new PolicyViolationException("Policy blocked goal check: " + command.reason());
+            block(projectRoot, "goal check", command.reason());
         }
     }
 
@@ -63,12 +63,14 @@ public final class PolicyHookService {
         DevHarnessPolicy policy = policyService.load(projectRoot);
         PolicyDecision command = commandDecision(policy, "db sql");
         if (!command.allowed()) {
-            throw new PolicyViolationException("Policy blocked db sql: " + command.reason());
+            block(projectRoot, "db sql", command.reason());
         }
         if (!dryRun && policy.dbSqlRequiresExplicitRequest()
                 && !args.hasFlag("i-understand-db-readonly-risk")) {
-            throw new PolicyViolationException("Policy blocked db sql: "
-                    + "db_sql_requires_explicit_request requires --i-understand-db-readonly-risk");
+            block(projectRoot, "db sql",
+                    "db_sql_requires_explicit_request requires --i-understand-db-readonly-risk",
+                    "dhk db sql --project-root " + quote(projectRoot)
+                            + " --i-understand-db-readonly-risk --sql \"select 1\"");
         }
     }
 
@@ -78,13 +80,15 @@ public final class PolicyHookService {
         if (hasPolicy) {
             PolicyDecision command = commandDecision(policy, "graph impact");
             if (!command.allowed()) {
-                throw new PolicyViolationException("Policy blocked graph impact: " + command.reason());
+                block(projectRoot, "graph impact", command.reason());
             }
         }
         if (args.hasFlag("allow-stale") && policy.graphAllowStaleRequiresApproval()
                 && args.option("allow-stale-evidence", "").trim().length() == 0) {
-            throw new PolicyViolationException("Policy blocked graph impact: "
-                    + "graph_allow_stale_requires_approval requires --allow-stale-evidence");
+            block(projectRoot, "graph impact",
+                    "graph_allow_stale_requires_approval requires --allow-stale-evidence",
+                    "dhk graph impact --project-root " + quote(projectRoot)
+                            + " --allow-stale --allow-stale-evidence \"<approval evidence>\" ...");
         }
     }
 
@@ -97,16 +101,15 @@ public final class PolicyHookService {
         String relative = relative(projectRoot, out);
         if (policy.contextExportAllowedFiles().length > 0
                 && !matchesAny(relative, policy.contextExportAllowedFiles())) {
-            throw new PolicyViolationException("Policy blocked context export: output path is not allowed: "
-                    + relative);
+            block(projectRoot, "context export", "output path is not allowed: " + relative);
         }
         if (matchesAny(relative, policy.contextExportForbiddenFiles())) {
-            throw new PolicyViolationException("Policy blocked context export: output path is forbidden: "
-                    + relative);
+            block(projectRoot, "context export", "output path is forbidden: " + relative);
         }
         if (policy.contextExportBlockOnSensitive() && sensitiveMatches != null && !sensitiveMatches.isEmpty()) {
-            throw new PolicyViolationException("Policy blocked context export: sensitive matches "
-                    + sensitiveMatches);
+            block(projectRoot, "context export", "sensitive matches " + sensitiveMatches,
+                    "dhk doctor --project-root " + quote(projectRoot)
+                            + " --json");
         }
     }
 
@@ -139,20 +142,34 @@ public final class PolicyHookService {
         return false;
     }
 
-    private void requireChangedFilesAllowed(DevHarnessPolicy policy, String hook, String changedFiles,
-                                            boolean enforceAllowedWritePaths) {
+    private void requireChangedFilesAllowed(Path projectRoot, DevHarnessPolicy policy, String hook,
+                                            String changedFiles, boolean enforceAllowedWritePaths) {
         String[] files = splitChangedFiles(changedFiles);
         for (String file : files) {
             if (matchesAny(file, policy.protectedFiles())) {
-                throw new PolicyViolationException("Policy blocked " + hook + ": protected file changed: "
-                        + file);
+                block(projectRoot, hook, "protected file changed: " + file);
             }
             if (enforceAllowedWritePaths && policy.allowedWritePaths().length > 0
                     && !matchesAny(file, policy.allowedWritePaths())) {
-                throw new PolicyViolationException("Policy blocked " + hook
-                        + ": changed file is outside allowed_write_paths: " + file);
+                block(projectRoot, hook, "changed file is outside allowed_write_paths: " + file);
             }
         }
+    }
+
+    private void block(Path projectRoot, String hook, String reason) {
+        block(projectRoot, hook, reason, "dhk doctor --project-root " + quote(projectRoot));
+    }
+
+    private void block(Path projectRoot, String hook, String reason, String nextCommand) {
+        throw new PolicyViolationException("Policy blocked " + hook + ": " + reason
+                + "\nnext_command: " + nextCommand);
+    }
+
+    private String quote(Path projectRoot) {
+        if (projectRoot == null) {
+            return "\".\"";
+        }
+        return "\"" + projectRoot.toAbsolutePath().normalize().toString().replace("\"", "\\\"") + "\"";
     }
 
     private String[] splitChangedFiles(String changedFiles) {

@@ -213,6 +213,15 @@ final class JavaLiteParser implements GraphSourceParser {
                         "typed method call expression"));
                 builder.addEdge(new GraphEdge("calls", methodKey, targetKey, entry.relativePath(), 75,
                         "lite", "call " + qualified + "()"));
+            } else if (isTypeReceiver(receiver)) {
+                String qualifiedType = resolveType(receiver, imports, packageName);
+                String qualified = qualifiedType + "#" + method;
+                String targetKey = javaMethodKey(qualified);
+                builder.addNode(new GraphNode(targetKey, "method_reference", method, qualified,
+                        entry.relativePath(), lineNumber, lineNumber, "java", "", "", 70, "lite",
+                        "static method call expression"));
+                builder.addEdge(new GraphEdge("calls", methodKey, targetKey, entry.relativePath(), 75,
+                        "lite", "call " + qualified + "()"));
             } else {
                 String qualified = receiver + "." + method;
                 String targetKey = "java_call:" + qualified;
@@ -392,6 +401,10 @@ final class JavaLiteParser implements GraphSourceParser {
 
     private boolean isIgnoredReceiver(String receiver) {
         return "this".equals(receiver) || "super".equals(receiver);
+    }
+
+    private boolean isTypeReceiver(String receiver) {
+        return receiver != null && receiver.length() > 0 && Character.isUpperCase(receiver.charAt(0));
     }
 
     private String simpleName(String qualified) {

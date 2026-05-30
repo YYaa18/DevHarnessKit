@@ -48,32 +48,37 @@ public final class SqlCommand implements Command {
     }
 
     public int run(CommandContext context, Args args) {
-        boolean json = args.hasFlag("json");
+        boolean json = JsonOutput.enabled(args);
+        boolean jsonFlag = args.hasFlag("json");
+        boolean explain = args.hasFlag("explain");
+        boolean dryRun = args.hasFlag("dry-run");
         String sql;
         try {
             sql = InputUtil.readExclusiveText(context, args, "sql", "sql-file", "sql-stdin", false).trim();
         } catch (InputUtil.InputException ex) {
+            if (json) {
+                writeJsonError(context, ex.getMessage(), dryRun);
+                return ExitCodes.USAGE_ERROR;
+            }
             return CommandErrorGuidance.invalidUsage(context, args, "DB_SQL_INPUT_CONFLICT",
                     ex.getMessage(), "Provide SQL through only one input source.",
                     "dhk db sql --sql \"select 1\"", "docs/DB_READONLY_THREAT_MODEL.md");
         }
         if (sql.length() == 0) {
+            String message = "Missing SQL text: use --sql, --sql-file, or --sql-stdin";
+            if (json) {
+                writeJsonError(context, message, dryRun);
+                return ExitCodes.USAGE_ERROR;
+            }
             return CommandErrorGuidance.missing(context, args, "DB_SQL_TEXT_MISSING",
                     new String[]{"--sql|--sql-file|--sql-stdin"},
                     "dhk db sql --sql \"select 1\"", "docs/DB_READONLY_THREAT_MODEL.md");
         }
-        boolean explain = args.hasFlag("explain");
-        boolean dryRun = args.hasFlag("dry-run");
         Path projectRoot = PathUtil.resolveProjectRoot(args, context.workingDirectory());
         SqlSafetyResult safety = safetyGuard.validate(sql, explain);
         if (!safety.allowed()) {
             if (json) {
-                context.out().print(JsonOutput.object(
-                        JsonOutput.stringField("command", "db sql"),
-                        JsonOutput.stringField("status", "rejected"),
-                        JsonOutput.booleanField("dry_run", dryRun),
-                        JsonOutput.stringField("reason", safety.reason())
-                ));
+                writeJsonRejection(context, dryRun, safety.reason());
             } else {
                 context.err().println("SQL rejected: " + safety.reason());
             }
@@ -82,6 +87,10 @@ public final class SqlCommand implements Command {
         try {
             policyHookService.requireDbSqlAllowed(projectRoot, args, dryRun);
         } catch (PolicyViolationException ex) {
+            if (json) {
+                writeJsonRejection(context, dryRun, message(ex));
+                return ExitCodes.VALIDATION_ERROR;
+            }
             context.err().println(ex.getMessage());
             return ExitCodes.VALIDATION_ERROR;
         }
@@ -103,6 +112,10 @@ public final class SqlCommand implements Command {
 
         DbConnectionRequest connectionRequest = connectionService.fromArgs(args, false);
         if (!connectionRequest.valid()) {
+            if (json) {
+                writeJsonError(context, connectionRequest.error(), false);
+                return ExitCodes.USAGE_ERROR;
+            }
             context.err().println(connectionRequest.error());
             return ExitCodes.USAGE_ERROR;
         }
@@ -110,10 +123,14 @@ public final class SqlCommand implements Command {
         SqlExecutionRequest executionRequest = SqlExecutionRequest.fromArgs(safety.executableSql(), args);
         try {
             SqlExecutionResult result = executionService.execute(connectionService, connectionRequest, executionRequest);
-            String format = args.hasFlag("json") && !args.hasOption("format") ? "json" : args.option("format", "table");
+            String format = jsonFlag && !args.hasOption("format") ? "json" : args.option("format", "table");
             String output = renderer.render(result, format, executionRequest.maxOutputBytes());
             output = sensitiveDataGuard.redact(output);
             if (sensitiveDataGuard.containsSensitiveData(output)) {
+                if (json) {
+                    writeJsonRejection(context, false, "Sensitive SQL result rejected; output was not written.");
+                    return ExitCodes.VALIDATION_ERROR;
+                }
                 context.err().println("Sensitive SQL result rejected; output was not written.");
                 return ExitCodes.VALIDATION_ERROR;
             }
@@ -149,6 +166,27 @@ public final class SqlCommand implements Command {
             }
             return ExitCodes.RUNTIME_ERROR;
         }
+    }
+
+    private void writeJsonError(CommandContext context, String error, boolean dryRun) {
+        context.out().print(JsonOutput.object(
+                JsonOutput.stringField("command", "db sql"),
+                JsonOutput.stringField("status", "error"),
+                JsonOutput.booleanField("dry_run", dryRun),
+                JsonOutput.stringField("error", error),
+                JsonOutput.stringField("compatibility_hint", ""),
+                JsonOutput.stringField("risk_warning", DbRiskNotice.text())
+        ));
+    }
+
+    private void writeJsonRejection(CommandContext context, boolean dryRun, String reason) {
+        context.out().print(JsonOutput.object(
+                JsonOutput.stringField("command", "db sql"),
+                JsonOutput.stringField("status", "rejected"),
+                JsonOutput.booleanField("dry_run", dryRun),
+                JsonOutput.stringField("reason", reason),
+                JsonOutput.stringField("risk_warning", DbRiskNotice.text())
+        ));
     }
 
     private String message(Exception ex) {

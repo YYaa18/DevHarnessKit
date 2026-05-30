@@ -18,16 +18,22 @@ Focus: beta release readiness without expanding major feature scope.
 
 Focus: freeze the smallest dependable public surface before any stable claim.
 
-- Promote only memory core, doctor, goal core, migration recovery, and release
-  packaging into the first stable-candidate surface.
+- BDD acceptance harness is stable in 1.0 for documented commands, evidence,
+  generated export anchors, and traceability bindings. Scenarios remain
+  acceptance intent, not implementation proof by themselves.
+- Graph Lite stable-advisory output is included for `status`, `index`,
+  `impact`, and `export`; Graph-aware Goal orchestration and graph internals
+  remain outside the stable contract.
+- Skill, Policy, Routine, and ECC Control Panel user-facing subsets are
+  stable-candidate where their compatibility docs and release gates name a
+  schema, command, or local report contract. Full governance enforcement,
+  generated adapter layouts, public routine automation, and private helper
+  internals remain non-stable.
 - Keep DB inspection beta until SQL safety fuzz/property tests and real-version
   compatibility checks are stronger.
-- Keep Graph, BDD, Skill Contract, Policy/Governance, Routine, and ECC Control
-  Panel experimental until each has its own compatibility contract and release
-  gate.
-- Before 1.0, classify Graph, BDD, Skill, Policy/Governance, Routine, and ECC
-  as optional-dependency or independent-artifact candidates against
-  [STABLE_CONTRACT.md](STABLE_CONTRACT.md); do not let experimental
+- Before optional splits, classify Graph, Skill, Policy/Governance, Routine, and
+  ECC as optional-dependency or independent-artifact candidates against
+  [STABLE_CONTRACT.md](STABLE_CONTRACT.md); do not let non-stable
   dependencies leak into the stable core promise.
 - Use Maven `project.version` as the artifact version source for CI, release,
   and local release-gate scripts.
@@ -90,11 +96,12 @@ Focus: Policy / hook alpha.
 
 ## 0.7.x
 
-Focus: Routine / metrics alpha.
+Focus: Routine / metrics stable-candidate local reports.
 
 - Use [GOAL_METRICS_REPLAY.md](GOAL_METRICS_REPLAY.md) as the per-goal derived model.
 - Use [ROUTINE_LOCAL_CI_EXPORT.md](ROUTINE_LOCAL_CI_EXPORT.md) as the local and CI export plan.
-- Start with local/offline report generation only.
+- Start with local/offline report generation only; public routine commands are
+  still outside the stable surface.
 - Keep CI exports free of raw task text, evidence, SQL results, and context Markdown by default.
 - Defer dashboards, schedulers, and model scoring until routine export contracts are stable.
 
@@ -105,8 +112,13 @@ Focus: stable CLI and schema compatibility.
 - Document supported schema migration paths.
 - Provide release checksums and reproducible packaging instructions.
 - Promote the beta compatibility contract into a stricter stable command/output/schema contract.
+- Promote Workflow/Spec first as a stable audit/traceability subset because
+  Goal and BDD already depend on their exports and bindings.
 - Maintain the documented semantic versioning and deprecation windows before
   claiming or changing stable behavior.
+- Track remaining stable-expansion work in
+  [STABLE_EXPANSION_PLAN.md](STABLE_EXPANSION_PLAN.md), backed by Linear roadmap
+  `AI-319` and feature issues `AI-320` through `AI-325`.
 - Revisit coverage threshold enforcement using [decisions/0002-coverage-threshold-and-sql-safety-fuzz.md](decisions/0002-coverage-threshold-and-sql-safety-fuzz.md) after the CLI surface and DB safety tests stabilize.
 - Before any stable tag, produce an artifact-boundary decision for each
   experimental module: keep bundled, mark optional dependency, or split into an

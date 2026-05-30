@@ -8,6 +8,8 @@ import com.devharnesskit.dhk.db.DbConnectionFactory;
 import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.export.WorkflowContextRenderer;
 import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
+import com.devharnesskit.dhk.model.workflow.WorkflowGateRun;
+import com.devharnesskit.dhk.model.workflow.WorkflowPhaseRun;
 import com.devharnesskit.dhk.model.workflow.WorkflowRun;
 import com.devharnesskit.dhk.repository.workflow.WorkflowGateRunRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowArtifactRepository;
@@ -20,11 +22,13 @@ import com.devharnesskit.dhk.repository.workflow.WorkflowRunRepository;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
 import com.devharnesskit.dhk.service.workflow.WorkflowArtifactService;
 import com.devharnesskit.dhk.service.workflow.WorkflowExportService;
+import com.devharnesskit.dhk.util.JsonOutput;
 import com.devharnesskit.dhk.util.PathUtil;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
+import java.util.List;
 
 public final class WorkflowExportCommand implements Command {
     private final DbConnectionFactory connectionFactory = new DbConnectionFactory();
@@ -68,6 +72,12 @@ public final class WorkflowExportCommand implements Command {
             runRepository.updateContextExportPath(connection, run.runKey(), out.toString(), context.clock().now().toString());
             artifactService.recordArtifact(connection, run, "workflow_context", "WORKFLOW_CONTEXT.md",
                     out.toString(), markdown, "Workflow context exported", context.clock().now().toString());
+            if (JsonOutput.enabled(args)) {
+                List<WorkflowPhaseRun> phases = new WorkflowPhaseRunRepository().listByRun(connection, run.runKey());
+                List<WorkflowGateRun> gates = new WorkflowGateRunRepository().listByRun(connection, run.runKey());
+                context.out().print(WorkflowJsonSupport.export(run, phases, gates, out));
+                return ExitCodes.SUCCESS;
+            }
             context.out().println("workflow_context_path: " + out);
             context.out().println("run_key: " + run.runKey());
             return ExitCodes.SUCCESS;

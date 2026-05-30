@@ -246,7 +246,7 @@ public final class GoalContextService {
 
     private Path writePath(Path projectRoot, Path path, String text) throws Exception {
         String output = sensitiveDataGuard.redact(text);
-        List<String> matches = sensitiveDataGuard.findMatches(output);
+        List<String> matches = sensitiveDataGuard.findMatches(GeneratedHashMasker.mask(output));
         policyHookService.requireContextExportAllowed(projectRoot, path, output, matches);
         if (!matches.isEmpty()) {
             throw new IllegalStateException("Sensitive data rejected during goal context export: "

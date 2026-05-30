@@ -301,6 +301,7 @@ write_config() {
 }'
 
   policy='{
+  "schema_version": "devharness-policy/v1",
   "mode": "guided",
   "allowed_dhk_commands": "goal start,goal resume,goal next,goal step,goal verify,goal complete,graph status,graph index,graph export,graph impact,configure show,configure doctor",
   "forbidden_dhk_commands": "workflow gate waive,spec archive,memory confirm,db sql",
@@ -510,9 +511,14 @@ If GOAL_CONTEXT contains graph_required=true:
 }
 
 install_adapters() {
+  validate_modes
+  if [ "$DRY_RUN" = "true" ]; then
+    run "install adapters target=$TARGET mode=$MODE"
+    [ -n "$JAR_PATH" ] && run "install jar $JAR_PATH"
+    return 0
+  fi
   [ -d "$PROJECT_ROOT/.agents/skills/devharness-goal-development" ] || fail "missing .agents/skills/devharness-goal-development under $PROJECT_ROOT"
   [ -d "$PROJECT_ROOT/.agents/skills/devharness-graph-aware-development" ] || fail "missing .agents/skills/devharness-graph-aware-development under $PROJECT_ROOT"
-  validate_modes
   remove_legacy
   install_jar
   case "$TARGET" in

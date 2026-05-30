@@ -19,6 +19,7 @@ import com.devharnesskit.dhk.repository.spec.WorkflowSpecBindingRepository;
 import com.devharnesskit.dhk.service.ProjectService;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
 import com.devharnesskit.dhk.service.spec.SpecService;
+import com.devharnesskit.dhk.util.JsonOutput;
 
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -88,6 +89,10 @@ public final class SpecCreateCommand implements Command {
                             context.clock().now().toString());
                 }
             });
+            if (JsonOutput.enabled(args)) {
+                context.out().print(SpecJsonSupport.create(created));
+                return ExitCodes.SUCCESS;
+            }
             context.out().println("change_key: " + created.changeKey());
             context.out().println("status: " + created.status());
             context.out().println("proposal_document: proposal");

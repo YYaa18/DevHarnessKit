@@ -1,8 +1,13 @@
 # Routine Local and CI Export Plan
 
-Routine is a planned alpha layer for summarizing repeated goal runs. It should help a team compare profile, model, and task outcomes over time without reading chat history or uploading project memory.
+Status: stable-candidate local and CI-safe report helper schema for 1.0;
+public routine commands remain experimental/planned.
 
-Implementation is intentionally deferred. This document defines scope, export shape, and privacy boundaries before a public `routine` CLI exists.
+Routine summarizes repeated goal runs. It helps a team compare profile, task,
+and check outcomes over time without reading chat history or uploading project
+memory. The current implementation provides internal report models, renderers,
+and local export services; a public `routine` CLI remains outside the 1.0
+stable contract.
 
 ## Goals
 
@@ -14,7 +19,7 @@ Implementation is intentionally deferred. This document defines scope, export sh
 
 ## Non-Goals
 
-Routine alpha must not add:
+Routine stable-candidate reporting must not add:
 
 - a daemon, scheduler, background watcher, or HTTP service;
 - cloud upload, telemetry, or hosted dashboards;
@@ -47,7 +52,7 @@ dhk routine export --format markdown --out .agents/memory/exports/ROUTINE_SUMMAR
 dhk routine export --ci --out target/devharness-routine
 ```
 
-Planned command boundaries:
+Planned command boundaries remain non-contract until the commands exist:
 
 | Command | Scope |
 | --- | --- |
@@ -128,7 +133,7 @@ Default paths:
 
 ```json
 {
-  "schema_version": "routine-summary/v1-alpha",
+  "schema_version": "routine-summary/v1",
   "generated_at": "2026-05-25T00:00:00Z",
   "window": {
     "since": "2026-04-25T00:00:00Z",
@@ -160,7 +165,7 @@ Default path:
 target/devharness-routine/
 ```
 
-Recommended files:
+Implemented helper files:
 
 ```text
 target/devharness-routine/routine-summary.json
@@ -168,6 +173,11 @@ target/devharness-routine/routine-checks.ndjson
 target/devharness-routine/routine-profiles.ndjson
 target/devharness-routine/README.md
 ```
+
+The internal `RoutineLocalExportService.exportCi(...)` helper writes this
+artifact set directly. It intentionally does not accept replay entries, raw goal
+snapshots, task text, evidence text, context Markdown, chat transcripts, SQL
+text, or SQL result paths.
 
 CI export may include:
 
@@ -256,17 +266,31 @@ Recommended follow-up issues:
 1. Add `RoutineSummary` and `RoutineProfileSummary` model classes.
 2. Add a `RoutineReportService` that aggregates `GoalMetricsSnapshot` values.
 3. Add local Markdown and JSON renderers.
-4. Add `routine export --ci` with strict field filtering.
+4. Add CI-safe export helper with strict field filtering.
 5. Add sensitive/policy hook checks before routine writes files.
 6. Add fixture tests for CI-safe exports.
 7. Add documentation examples for a small Java API change profile.
 
+Current 1.0 state:
+
+- model classes and aggregation service exist for local reports;
+- Markdown, JSON, goal NDJSON, and replay NDJSON renderers exist;
+- `RoutineLocalExportService` writes local artifacts to a caller-provided export
+  directory;
+- `RoutineLocalExportService.exportCi(...)` writes the CI-safe summary, checks,
+  profiles, and README artifacts without replay or raw goal text;
+- public CI command packaging remains follow-up work.
+
 ## Acceptance Boundary
 
-For the current alpha milestone, this issue is complete when:
+For the current stable-candidate report milestone, this issue is complete when:
 
 - routine local scope and non-goals are documented;
 - CI export files and field rules are documented;
 - success, failure, and intervention metrics are named;
 - privacy boundaries are explicit;
-- implementation remains deferred to follow-up issues.
+- internal models/renderers/export helpers produce `routine-summary/v1`,
+  `goal-metrics/v1`, and `goal-replay/v1` artifacts;
+- CI-safe export helper tests prove raw task text, SQL result references,
+  context Markdown, and chat transcript content are excluded;
+- deterministic replay is covered by tests.

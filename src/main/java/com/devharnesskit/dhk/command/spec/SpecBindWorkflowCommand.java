@@ -11,6 +11,7 @@ import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.spec.SpecChange;
+import com.devharnesskit.dhk.model.spec.WorkflowSpecBinding;
 import com.devharnesskit.dhk.model.workflow.WorkflowRun;
 import com.devharnesskit.dhk.repository.ProjectRepository;
 import com.devharnesskit.dhk.repository.spec.SpecChangeRepository;
@@ -21,6 +22,7 @@ import com.devharnesskit.dhk.repository.workflow.WorkflowRunRepository;
 import com.devharnesskit.dhk.service.ProjectService;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
 import com.devharnesskit.dhk.service.spec.SpecService;
+import com.devharnesskit.dhk.util.JsonOutput;
 
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -32,10 +34,11 @@ public final class SpecBindWorkflowCommand implements Command {
     private final ProjectRepository projectRepository = new ProjectRepository();
     private final SpecChangeRepository changeRepository = new SpecChangeRepository();
     private final WorkflowRunRepository runRepository = new WorkflowRunRepository();
+    private final WorkflowSpecBindingRepository bindingRepository = new WorkflowSpecBindingRepository();
     private final SensitiveDataGuard sensitiveDataGuard = new SensitiveDataGuard();
     private final TransactionTemplate transactionTemplate = new TransactionTemplate();
     private final SpecService specService = new SpecService(changeRepository, new SpecDocumentRepository(),
-            new SpecEventRepository(), new WorkflowSpecBindingRepository());
+            new SpecEventRepository(), bindingRepository);
 
     public int run(CommandContext context, Args args) {
         String changeKey = args.option("change").trim();
@@ -76,12 +79,19 @@ public final class SpecBindWorkflowCommand implements Command {
             final SpecChange selectedChange = change;
             final WorkflowRun selectedRun = run;
             final String selectedType = type;
+            final String now = context.clock().now().toString();
             Long id = transactionTemplate.execute(connection, new TransactionTemplate.Work<Long>() {
                 public Long execute() throws Exception {
                     return Long.valueOf(specService.bindWorkflow(connection, selectedChange, selectedRun,
-                            selectedType, context.clock().now().toString()));
+                            selectedType, now));
                 }
             });
+            if (JsonOutput.enabled(args)) {
+                WorkflowSpecBinding binding = new WorkflowSpecBinding(id.longValue(), run.runKey(),
+                        change.changeKey(), type, now);
+                context.out().print(SpecJsonSupport.bindWorkflow(id.longValue(), change, binding));
+                return ExitCodes.SUCCESS;
+            }
             context.out().println("workflow_spec_binding_id: " + id.longValue());
             context.out().println("change_key: " + change.changeKey());
             context.out().println("run_key: " + run.runKey());

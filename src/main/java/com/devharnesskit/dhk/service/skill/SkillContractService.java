@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
 
 public final class SkillContractService {
     private static final String[] REQUIRED_FIELDS = new String[]{
-            "skill_key", "version", "task_type", "data_access_level"
+            "schema_version", "skill_key", "version", "task_type", "data_access_level"
     };
 
     private final SkillContractRepository repository;
@@ -79,6 +79,10 @@ public final class SkillContractService {
     public SkillContract parse(String json, Path sourcePath, String sourceHash) {
         for (String field : REQUIRED_FIELDS) {
             require(field, stringValue(json, field));
+        }
+        String schemaVersion = stringValue(json, "schema_version");
+        if (!isSupportedSchemaVersion(schemaVersion)) {
+            throw new IllegalArgumentException("Invalid schema_version: " + schemaVersion);
         }
         String dataAccessLevel = stringValue(json, "data_access_level");
         if (!isAllowedDataAccessLevel(dataAccessLevel)) {
@@ -213,6 +217,11 @@ public final class SkillContractService {
                 || "metadata".equals(value)
                 || "context".equals(value)
                 || "raw".equals(value);
+    }
+
+    private boolean isSupportedSchemaVersion(String value) {
+        return SkillContract.SCHEMA_VERSION.equals(value)
+                || "skill-contract/v1-alpha".equals(value);
     }
 
     private String value(String raw, String defaultValue) {

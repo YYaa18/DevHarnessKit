@@ -12,6 +12,11 @@ public final class WorkflowContextRenderer {
 
     public String render(WorkflowRun run, List<WorkflowPhaseRun> phases, List<WorkflowGateRun> gates,
                          WorkflowPhaseTemplate currentTemplate, String generatedAt) {
+        return render(run, phases, gates, currentTemplate, java.util.Collections.<String>emptyList(), generatedAt);
+    }
+
+    public String render(WorkflowRun run, List<WorkflowPhaseRun> phases, List<WorkflowGateRun> gates,
+                         WorkflowPhaseTemplate currentTemplate, List<String> bddTrace, String generatedAt) {
         StringBuilder builder = new StringBuilder();
         builder.append("# WORKFLOW_CONTEXT\n\n");
         builder.append("<generated-at>").append(generatedAt).append("</generated-at>\n\n");
@@ -56,6 +61,15 @@ public final class WorkflowContextRenderer {
             builder.append("none\n");
         }
         builder.append("</pending-hard-gates>\n\n");
+        builder.append("<bdd-trace>\n");
+        if (bddTrace == null || bddTrace.isEmpty()) {
+            builder.append("none\n");
+        } else {
+            for (String trace : bddTrace) {
+                builder.append("- ").append(trace).append('\n');
+            }
+        }
+        builder.append("</bdd-trace>\n\n");
         builder.append("<agent-instructions>\n");
         builder.append("1. Continue from current_phase; do not skip pending hard gates.\n");
         builder.append("2. Record phase/gate outcomes with dhk workflow phase/gate commands.\n");

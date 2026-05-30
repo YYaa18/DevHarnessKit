@@ -1,9 +1,14 @@
 # Graph Lite Schema And Config
 
-Status: alpha design contract for V0.5.0 Graph Lite Core.
+Status: stable-advisory output contract for DevHarness Kit 1.0.0.
 
 Graph Lite stores snapshot-bound machine facts about the local workspace. It is
-not confirmed project memory and is not a stable public database API before 1.0.
+not confirmed project memory and is not a stable public database API.
+
+Stable-advisory consumers may depend on the CLI command shape, generated export
+anchors, snapshot freshness semantics, and JSON fields documented here and in
+`STABLE_CONTRACT.md`. They must not depend on SQLite table names, row layouts,
+raw node/edge scoring internals, or exact impact ranking.
 
 ## Paths
 
@@ -20,15 +25,21 @@ not confirmed project memory and is not a stable public database API before 1.0.
 Only `config.json` is intended to be committed. Generated exports, snapshots,
 and cache files are ignored.
 
-## Current Commands
+## Stable-Advisory Commands
 
 ```bash
-dhk graph init --project-root <path>
-dhk graph doctor --project-root <path>
 dhk graph status --project-root <path>
 dhk graph index --project-root <path>
 dhk graph impact --file <path>|--symbol <name>|--sql-table <table> --project-root <path>
 dhk graph export --project-root <path>
+```
+
+`graph init`, `graph doctor`, and `graph prune` are useful local operations, but
+they are not part of the stable-advisory command contract:
+
+```bash
+dhk graph init --project-root <path>
+dhk graph doctor --project-root <path>
 dhk graph prune --keep 10 --project-root <path>
 dhk graph prune --keep 10 --dry-run --project-root <path>
 ```
@@ -184,6 +195,10 @@ Graph Lite schema is v9. Earlier design notes that mention v6 are historical
 and should not be used for implementation.
 
 ## Tables
+
+The tables below document the current internal storage model for maintainers.
+They are not a public read or write API. Scripts should consume `dhk graph ...`
+commands and generated files instead of querying these tables directly.
 
 `code_graph_snapshot`
 

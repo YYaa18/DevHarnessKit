@@ -1,8 +1,11 @@
 # JSON Output
 
-DevHarness Kit supports alpha JSON output for scripts and agents.
+DevHarness Kit supports JSON output for scripts and agents.
 
-JSON output is an alpha contract in beta patch releases: supported commands and existing field names should change conservatively, but fields may be added before 1.0.
+Stable commands have conservative minimum fields documented here and in
+`STABLE_CONTRACT.md`. Experimental command JSON remains alpha. Supported
+commands and existing field names should change conservatively, and consumers
+should tolerate additive fields.
 See [COMPATIBILITY.md](COMPATIBILITY.md) for the broader command and output stability policy.
 
 Use `--json` for command status output. Use `--format json` only where a command explicitly documents JSON data output, such as `dhk db sql` query results.
@@ -29,19 +32,37 @@ dhk goal verify --goal <goal-key> [--level fast|standard|release] --json
 dhk goal audit --goal <goal-key> --json
 dhk goal recheck --goal <goal-key> --json
 dhk goal complete --goal <goal-key> --json
+dhk workflow start --workflow <workflow> --task <task> --json
+dhk workflow status --run <run-key> --json
+dhk workflow export --run <run-key> --json
+dhk workflow summary --run <run-key> --json
+dhk spec create --change <key> --title <title> --json
+dhk spec status --change <key> --json
+dhk spec export --change <key> --json
+dhk spec bind-workflow --change <key> --run <run-key> --json
 dhk bdd init --json
 dhk bdd add --feature <key> --title <title> --scenario <key> --scenario-title <title> --json
+dhk bdd scenario create --scenario <key> --title <title> --json
+dhk bdd scenario list --json
+dhk bdd scenario show --scenario <key> --json
 dhk bdd list --json
 dhk bdd show --scenario <key> --json
 dhk bdd export --json
 dhk bdd lint --json
 dhk bdd evidence add --scenario <key> --summary <text> --json
+dhk bdd evidence junit --reports <dir[,dir]> --json
+dhk bdd evidence report --adapter cucumber|postman|playwright --report <json> --scenario <key> --json
 dhk bdd verify --json
 dhk bdd coverage --json
 dhk bdd bind-spec --scenario <key> --change <key> --acceptance <key> --json
 dhk bdd bind-goal --scenario <key> --goal <goal-key> --json
+dhk bdd bind-workflow --scenario <key> --run <workflow-run> --json
 dhk bdd bind-graph --scenario <key> --file <path>|--symbol <symbol>|--sql-table <table> --json
+dhk bdd bind-test --scenario <key> --class <name> [--method <name>] --json
+dhk graph status --json
+dhk graph impact --file <path>|--symbol <symbol>|--sql-table <table> --json
 dhk graph impact --scenario <key> --json
+dhk graph export --json
 dhk skill lint --skill <key>|--path <skill-dir> --json
 dhk skill verify --skill <key>|--path <skill-dir> --json
 dhk skill trust --skill <key>|--path <skill-dir> --json
@@ -135,6 +156,16 @@ probes
 risk_warning
 ```
 
+`db test --json` error:
+
+```text
+command
+status
+error
+compatibility_hint
+risk_warning
+```
+
 `db sql --dry-run --json` success:
 
 ```text
@@ -154,6 +185,9 @@ dry_run
 reason
 ```
 
+`db sql --dry-run --format json` uses the same success and rejected fields as
+`db sql --dry-run --json`.
+
 `db sql --format json` query result:
 
 ```text
@@ -166,6 +200,51 @@ columns
 data
 risk_warning
 ```
+
+`db sql --format json` error:
+
+```text
+command
+status
+dry_run
+error
+compatibility_hint
+risk_warning
+```
+
+`db sql --format json` rejected:
+
+```text
+command
+status
+dry_run
+reason
+risk_warning
+```
+
+## DB Readonly JSON Contract
+
+Status: beta readonly DB inspection contract. The JSON shape is documented so
+scripts can consume diagnostics consistently, but `dhk db test` and
+`dhk db sql` remain outside the 1.0 stable command surface.
+
+Machine-readable DB diagnostics are written to stdout when `--json` is used,
+and `dhk db sql` also writes machine-readable diagnostics to stdout when
+`--format json` is used. Expected validation failures still return non-zero
+exit codes.
+
+Exit semantics:
+
+```text
+0 success
+1 runtime, connection, probe, or query execution failure
+2 usage, input, or connection-argument validation failure before DB execution
+3 SQL safety, policy, or sensitive-output rejection
+```
+
+`risk_warning` is part of DB JSON output. The SQL guard and JDBC read-only hint
+are not database permission boundaries. Use a database account with read-only
+privileges when the target environment requires that boundary.
 
 `configure show`:
 
@@ -393,6 +472,118 @@ Profiles with `bdd_required=true` include a `bdd` check in `checks`; failed BDD
 checks appear in `failed_checks` and `completion_blockers` like other required
 checks.
 
+`workflow start`, `workflow status`, and `workflow export`:
+
+```text
+command
+run_key
+workflow
+task
+module
+mode
+status
+current_phase
+phases
+pending_hard_gates
+workflow_context_path
+```
+
+`workflow_context_path` is present for `workflow export`.
+
+Each `phases` item includes:
+
+```text
+phase_key
+name
+status
+phase_order
+```
+
+Each `pending_hard_gates` item includes:
+
+```text
+gate_key
+phase_key
+status
+```
+
+`workflow summary`:
+
+```text
+command
+run_key
+workflow
+task
+module
+mode
+status
+current_phase
+exported_memory_count
+artifact_count
+checkpoint_count
+bound_spec_count
+pending_hard_gate_count
+blocking_hard_gate_count
+```
+
+`spec create`, `spec status`, and `spec export`:
+
+```text
+command
+change_key
+title
+status
+module
+mode
+priority
+tasks
+acceptance
+bound_workflows
+export_path
+```
+
+`export_path` is present for `spec export`.
+
+Each `tasks` item includes:
+
+```text
+task_key
+title
+status
+phase
+```
+
+Each `acceptance` item includes:
+
+```text
+acceptance_key
+description
+expected
+status
+```
+
+`spec bind-workflow`:
+
+```text
+command
+workflow_spec_binding_id
+change_key
+title
+status
+module
+mode
+run_key
+binding_type
+bound_workflows
+```
+
+Each `bound_workflows` item includes:
+
+```text
+run_key
+binding_type
+```
+
 `bdd init`:
 
 ```text
@@ -403,7 +594,7 @@ evidence_dir
 exports_dir
 ```
 
-`bdd add`:
+`bdd add` and `bdd scenario create`:
 
 ```text
 command
@@ -424,7 +615,10 @@ features
 scenarios
 ```
 
-`bdd show`:
+`bdd scenario list` returns the same scenario fields as `bdd list` scoped to
+the requested feature when `--feature` is provided.
+
+`bdd show` and `bdd scenario show`:
 
 ```text
 command
@@ -516,6 +710,60 @@ adapter_key
 adapter_normalized_status
 ```
 
+## Routine Report JSON
+
+Routine local report JSON is stable-candidate and generated by local report
+helpers, not by a stable public `dhk routine` CLI command in 1.0.
+
+`routine-summary.json`:
+
+```text
+schema_version
+generated_at
+window.since
+window.until
+source_schema
+metrics_schema
+replay_schema
+outcomes.total_goals
+outcomes.completed_goals
+outcomes.failed_goals
+outcomes.abandoned_goals
+outcomes.in_progress_goals
+outcomes.completion_rate
+profiles
+checks
+interventions
+```
+
+Stable-candidate schema versions:
+
+```text
+routine-summary/v1
+goal-metrics/v1
+goal-replay/v1
+```
+
+`routine-goals.ndjson` contains one `goal-metrics/v1` object per line.
+`routine-replay/<goal-key>.ndjson` contains deterministic `goal-replay/v1`
+entries sorted by timestamp, source, kind, status, summary, and data.
+
+CI-safe routine exports use the same `routine-summary/v1` aggregate schema and
+add two filtered NDJSON files:
+
+```text
+routine-checks.ndjson
+routine-profiles.ndjson
+```
+
+Each line includes `schema_version`, `record_type`, and aggregate count fields.
+CI-safe exports intentionally exclude replay entries, task text, step evidence,
+SQL text or result paths, context Markdown, chat transcript content, and paths
+outside the export directory.
+
+Routine JSON is derived reporting. It is not a completion decision, scheduler,
+dashboard, model score, telemetry stream, or direct SQLite API.
+
 `bdd bind-spec`:
 
 ```text
@@ -539,6 +787,17 @@ relation
 goal_key
 ```
 
+`bdd bind-workflow`:
+
+```text
+command
+scenario_key
+binding_type
+binding_key
+relation
+run_key
+```
+
 `bdd bind-graph`:
 
 ```text
@@ -547,6 +806,68 @@ scenario_key
 binding_type
 binding_key
 relation
+```
+
+`bdd bind-test`:
+
+```text
+command
+scenario_key
+binding_type
+binding_key
+relation
+test_class
+test_method
+```
+
+`graph status`:
+
+```text
+command
+config_source
+report_path
+files_considered
+indexed_files
+skipped_files
+max_file_bytes
+max_indexed_files
+max_impact_depth
+max_export_nodes
+graph_nodes
+graph_edges
+parse_errors
+latest_snapshot_key
+latest_snapshot_status
+current_workspace_fingerprint
+latest_snapshot_workspace_fingerprint
+latest_snapshot_stale
+latest_snapshot_nodes
+latest_snapshot_edges
+```
+
+`graph impact --file|--symbol|--sql-table`:
+
+```text
+command
+found
+query_type
+query
+depth
+requested_depth
+max_impact_depth
+depth_limited
+snapshot_key
+snapshot_stale
+allow_stale
+allow_stale_evidence
+current_workspace_fingerprint
+snapshot_workspace_fingerprint
+related_files
+related_sql
+related_tests
+risk_nodes
+recommended_read_files
+impact_map
 ```
 
 `graph impact --scenario`:
@@ -567,6 +888,96 @@ risk_nodes
 recommended_read_files
 scenario_impact_map
 ```
+
+Graph Lite JSON output is stable-advisory: field names and freshness semantics
+are stable, but the reported impact is heuristic context, not proof that the
+impact set is complete or that an implementation is correct.
+
+`graph export`:
+
+```text
+command
+snapshot_key
+files
+nodes
+edges
+context_path
+snapshot_path
+```
+
+`skill lint`, `skill verify`, and `skill trust`:
+
+```text
+command
+skill_key
+status
+source_path
+source_hash
+trusted_source_hash
+trust_status
+trusted
+missing
+invalid
+forbidden
+issues
+```
+
+Each `issues` item includes:
+
+```text
+category
+field
+message
+suggestion
+```
+
+`skill audit`:
+
+```text
+command
+skill_key
+decision
+source_path
+source_hash
+issue_count
+critical
+high
+medium
+issues
+```
+
+Each `issues` item includes:
+
+```text
+severity
+category
+path
+message
+suggestion
+```
+
+`skill score` and `skill report`:
+
+```text
+command
+goal_key
+group
+skill_key
+skill_contract_present
+skill_trusted
+trust_status
+skill_quality_score
+dqi_score
+baseline_score
+dqi_delta
+gate_pass_rate
+evidence_completeness
+rollback_quality
+```
+
+Skill governance JSON output is stable-candidate: field names are intended to
+remain stable after the release gate is added, but trust status and scores are
+local governance signals, not sandboxing or correctness proof.
 
 `goal complete` success:
 

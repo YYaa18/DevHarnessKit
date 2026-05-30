@@ -98,6 +98,44 @@ class GoalMetricsServiceTest {
         assertEquals(GoalReplayEntry.SCHEMA_VERSION, replay.get(0).schemaVersion());
     }
 
+    @Test
+    void replayUsesFullTieBreakersForDeterministicOrdering() {
+        GoalStep inspect = stepAt(1, "inspect", "recorded", "2026-01-01T00:02:00Z");
+        GoalStep verify = stepAt(2, "verify", "recorded", "2026-01-01T00:02:00Z");
+        GoalCheck compile = checkAt("compile", "passed", true, 4, "compile summary",
+                "2026-01-01T00:03:00Z");
+        GoalCheck test = checkAt("test", "failed", true, 4, "test summary",
+                "2026-01-01T00:03:00Z");
+
+        String first = replaySignature(service.replay(goal(),
+                Arrays.asList(verify, inspect),
+                Arrays.asList(test, compile),
+                Arrays.asList(event("z_event", "2026-01-01T00:01:00Z"),
+                        event("a_event", "2026-01-01T00:01:00Z")),
+                Arrays.asList(artifact("z_artifact", "2026-01-01T00:04:00Z"),
+                        artifact("a_artifact", "2026-01-01T00:04:00Z"))));
+        String second = replaySignature(service.replay(goal(),
+                Arrays.asList(inspect, verify),
+                Arrays.asList(compile, test),
+                Arrays.asList(event("a_event", "2026-01-01T00:01:00Z"),
+                        event("z_event", "2026-01-01T00:01:00Z")),
+                Arrays.asList(artifact("a_artifact", "2026-01-01T00:04:00Z"),
+                        artifact("z_artifact", "2026-01-01T00:04:00Z"))));
+
+        assertEquals(first, second);
+        assertEquals("1:goal_run:goal_created\n"
+                        + "2:goal_event:a_event\n"
+                        + "3:goal_event:z_event\n"
+                        + "4:goal_step:inspect\n"
+                        + "5:goal_step:verify\n"
+                        + "6:goal_check:compile\n"
+                        + "7:goal_check:test\n"
+                        + "8:goal_artifact:a_artifact\n"
+                        + "9:goal_artifact:z_artifact\n"
+                        + "10:goal_run:goal_completed\n",
+                first);
+    }
+
     private static void assertEntry(GoalReplayEntry entry, int sequence, String source, String kind) {
         assertEquals(sequence, entry.sequence());
         assertEquals(source, entry.source());
@@ -111,8 +149,12 @@ class GoalMetricsServiceTest {
     }
 
     private static GoalStep step(int index, String action, String status) {
+        return stepAt(index, action, status, "2026-01-01T00:0" + index + ":00Z");
+    }
+
+    private static GoalStep stepAt(int index, String action, String status, String createdAt) {
         return new GoalStep(index, "goal-1", index, action, action + " summary",
-                "", "evidence", status, "2026-01-01T00:0" + index + ":00Z");
+                "", "evidence", status, createdAt);
     }
 
     private static GoalCheck check(String key, String status, boolean required, int stepCount) {
@@ -120,9 +162,14 @@ class GoalMetricsServiceTest {
     }
 
     private static GoalCheck check(String key, String status, boolean required, int stepCount, String summary) {
+        return checkAt(key, status, required, stepCount, summary, "2026-01-01T00:03:00Z");
+    }
+
+    private static GoalCheck checkAt(String key, String status, boolean required, int stepCount,
+                                     String summary, String checkedAt) {
         return new GoalCheck(1L, "goal-1", key, "command", required, stepCount,
                 key + " command", status, summary, key + ".log",
-                "2026-01-01T00:03:00Z", "2026-01-01T00:03:00Z", "2026-01-01T00:03:00Z");
+                checkedAt, checkedAt, checkedAt);
     }
 
     private static GoalEvent event(String type, String createdAt) {
@@ -131,5 +178,15 @@ class GoalMetricsServiceTest {
 
     private static GoalArtifact artifact(String type, String createdAt) {
         return new GoalArtifact(1L, "goal-1", type, type, "artifact.md", "", "summary", createdAt);
+    }
+
+    private static String replaySignature(List<GoalReplayEntry> replay) {
+        StringBuilder builder = new StringBuilder();
+        for (GoalReplayEntry entry : replay) {
+            builder.append(entry.sequence()).append(':')
+                    .append(entry.source()).append(':')
+                    .append(entry.kind()).append('\n');
+        }
+        return builder.toString();
     }
 }

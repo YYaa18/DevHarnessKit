@@ -12,6 +12,7 @@ import com.devharnesskit.dhk.model.workflow.WorkflowRun;
 import com.devharnesskit.dhk.repository.workflow.WorkflowGateRunRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowPhaseRunRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowRunRepository;
+import com.devharnesskit.dhk.util.JsonOutput;
 
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -38,6 +39,12 @@ public final class StatusCommand implements Command {
                         "workflow run", runKey, "dhk workflow summary --run <run>",
                         "docs/GOAL_CONFIGURATION.md");
             }
+            List<WorkflowPhaseRun> phases = phaseRunRepository.listByRun(connection, runKey);
+            List<WorkflowGateRun> gates = gateRunRepository.listByRun(connection, runKey);
+            if (JsonOutput.enabled(args)) {
+                context.out().print(WorkflowJsonSupport.run("workflow status", run, phases, gates));
+                return ExitCodes.SUCCESS;
+            }
             context.out().println("run: " + run.runKey());
             context.out().println("workflow: " + run.workflowKey());
             context.out().println("task: " + run.taskName());
@@ -45,13 +52,11 @@ public final class StatusCommand implements Command {
             context.out().println("current_phase: " + run.currentPhaseKey());
             context.out().println();
             context.out().println("phases:");
-            List<WorkflowPhaseRun> phases = phaseRunRepository.listByRun(connection, runKey);
             for (WorkflowPhaseRun phase : phases) {
                 context.out().println("[" + phase.status() + "] " + phase.phaseKey());
             }
             context.out().println();
             context.out().println("hard gates:");
-            List<WorkflowGateRun> gates = gateRunRepository.listByRun(connection, runKey);
             for (WorkflowGateRun gate : gates) {
                 if ("hard".equals(gate.severity())) {
                     context.out().println("[" + gate.status() + "] " + gate.gateKey());

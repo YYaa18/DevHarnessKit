@@ -123,7 +123,19 @@ public final class GoalMetricsService {
                 if (source != 0) {
                     return source;
                 }
-                return left.kind().compareTo(right.kind());
+                int kind = left.kind().compareTo(right.kind());
+                if (kind != 0) {
+                    return kind;
+                }
+                int status = left.status().compareTo(right.status());
+                if (status != 0) {
+                    return status;
+                }
+                int summary = left.summary().compareTo(right.summary());
+                if (summary != 0) {
+                    return summary;
+                }
+                return left.data().compareTo(right.data());
             }
         });
 

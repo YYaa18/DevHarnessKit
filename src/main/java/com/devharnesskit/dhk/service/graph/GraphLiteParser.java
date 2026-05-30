@@ -16,6 +16,7 @@ public final class GraphLiteParser {
                 new JavaLiteParser(),
                 new JspLiteParser(),
                 new MyBatisXmlLiteParser(),
+                new SqlLiteParser(),
                 new PropertiesLiteParser()));
     }
 

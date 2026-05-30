@@ -15,6 +15,8 @@ contracts, experimental surfaces, release material, and historical design notes.
   stable-candidate work.
 - [STABLE_CONTRACT](STABLE_CONTRACT.md): stable-beta CLI, JSON, export, and
   blocker-category contract for testing.
+- [STABLE_EXPANSION_PLAN](STABLE_EXPANSION_PLAN.md): Linear-backed roadmap for
+  promoting remaining beta/alpha surfaces toward stable contracts.
 - [BRIEF_PROTOCOL](BRIEF_PROTOCOL.md): Work Brief, Agent Execution Brief, and
   GOAL_CONTEXT layering for agent-mounted usage.
 - [PROFESSIONAL_KNOWLEDGE](PROFESSIONAL_KNOWLEDGE.md): advisory methodology
@@ -27,6 +29,10 @@ contracts, experimental surfaces, release material, and historical design notes.
   command usage.
 - [GOAL_CONFIGURATION](GOAL_CONFIGURATION.md): goal profiles, check policy,
   manual evidence, and graph-aware options.
+- [BDD](BDD.md): stable BDD acceptance harness, evidence, and traceability
+  bindings.
+- [BDD_ACCEPTANCE_TEST_PLAN](BDD_ACCEPTANCE_TEST_PLAN.md): L0-L9 BDD acceptance
+  checks from simple command smoke to goal-gated business validation.
 - [GOAL_SYNC_STRICTNESS](GOAL_SYNC_STRICTNESS.md): how goal drives workflow/spec
   audit state.
 - [DB_COMPATIBILITY](DB_COMPATIBILITY.md): MySQL 5.1 production floor, MySQL 8
@@ -40,7 +46,8 @@ contracts, experimental surfaces, release material, and historical design notes.
 - [GRAPH_SCHEMA](GRAPH_SCHEMA.md): Graph Lite schema and snapshot contracts.
 - [GRAPH_LIMITS](GRAPH_LIMITS.md): graph scan limits, skipped files, and
   truncation behavior.
-- [BDD](BDD.md): internal-alpha BDD acceptance harness.
+- [GRAPH_LITE_PRECISION_TEST_PLAN](GRAPH_LITE_PRECISION_TEST_PLAN.md): staged
+  precision, recall, false-positive, and ranking test plan for Graph Lite.
 - [POLICY](POLICY.md): local project policy hooks and governance boundaries.
 - [SKILL_CONTRACT](SKILL_CONTRACT.md): alpha skill contract metadata.
 - [SKILL_EVALUATION](SKILL_EVALUATION.md): governed skill scoring and reports.

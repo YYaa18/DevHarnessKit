@@ -25,7 +25,9 @@ import com.devharnesskit.dhk.service.bdd.JsonReportBddEvidenceService.ReportEvid
 import com.devharnesskit.dhk.service.bdd.JunitBddEvidenceService;
 import com.devharnesskit.dhk.service.bdd.JunitBddEvidenceService.JunitEvidenceImportResult;
 import com.devharnesskit.dhk.util.JsonOutput;
+import com.devharnesskit.dhk.util.PathUtil;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Connection;
@@ -67,7 +69,7 @@ public final class BddEvidenceCommand implements Command {
         String goalKey = args.option("goal", "").trim();
         String type = defaultIfBlank(args.option("type", "manual"), "manual");
         String status = defaultIfBlank(args.option("status", "passed"), "passed");
-        String path = args.option("path", "").trim();
+        String path = value(args.option("evidence-path", ""), args.option("path", ""));
         String summary = args.option("summary", "").trim();
         String command = args.option("command", "").trim();
         if (scenarioKey.length() == 0 || summary.length() == 0) {
@@ -100,6 +102,17 @@ public final class BddEvidenceCommand implements Command {
         }
 
         Path projectRoot = BddCommandSupport.projectRoot(args, context);
+        Path resolvedEvidencePath = null;
+        if (path.length() > 0) {
+            resolvedEvidencePath = PathUtil.resolvePath(path, projectRoot);
+            if (!Files.isRegularFile(resolvedEvidencePath)) {
+                return CommandErrorGuidance.notFound(context, args, "BDD_EVIDENCE_PATH_NOT_FOUND",
+                        "BDD evidence path", path,
+                        "dhk bdd evidence add --scenario " + scenarioKey
+                                + " --evidence-path <existing-file> --summary \"<summary>\"",
+                        "docs/GOAL_CONFIGURATION.md");
+            }
+        }
         try (Connection connection = connectionFactory.open(projectRoot)) {
             final Project project = BddCommandSupport.ensureProject(context, projectRoot, connection,
                     projectService, projectRepository, migrationRunner);
@@ -115,12 +128,20 @@ public final class BddEvidenceCommand implements Command {
                             "goal run", goalKey, "dhk goal status --goal <goal>",
                             "docs/GOAL_CONFIGURATION.md");
                 }
+                if ("completed".equals(goal.status())) {
+                    return CommandErrorGuidance.invalidUsage(context, args, "BDD_EVIDENCE_GOAL_COMPLETED",
+                            "Goal is already completed: " + goalKey,
+                            "Completed goals are immutable for BDD goal-scoped evidence.",
+                            "dhk bdd evidence add --scenario " + scenarioKey
+                                    + " --status passed --summary \"<evidence>\"",
+                            "docs/GOAL_CONFIGURATION.md");
+                }
             }
             final String selectedScenarioKey = scenarioKey;
             final String selectedGoalKey = goalKey;
             final String selectedType = type;
             final String selectedStatus = status;
-            final String selectedPath = path;
+            final String selectedPath = resolvedEvidencePath == null ? "" : path;
             final String selectedSummary = summary;
             final String selectedCommand = command;
             BddEvidence evidence = transactionTemplate.execute(connection,
@@ -190,6 +211,13 @@ public final class BddEvidenceCommand implements Command {
                             "goal run", goalKey, "dhk goal status --goal <goal>",
                             "docs/GOAL_CONFIGURATION.md");
                 }
+                if ("completed".equals(goal.status())) {
+                    return CommandErrorGuidance.invalidUsage(context, args, "BDD_EVIDENCE_GOAL_COMPLETED",
+                            "Goal is already completed: " + goalKey,
+                            "Completed goals are immutable for BDD goal-scoped evidence.",
+                            "dhk bdd evidence junit --scenario <scenario>",
+                            "docs/GOAL_CONFIGURATION.md");
+                }
             }
             final String selectedScenarioKey = scenarioKey;
             final String selectedGoalKey = goalKey;
@@ -255,6 +283,13 @@ public final class BddEvidenceCommand implements Command {
                 if (goal == null || !project.projectKey().equals(goal.projectKey())) {
                     return CommandErrorGuidance.notFound(context, args, "GOAL_RUN_NOT_FOUND",
                             "goal run", goalKey, "dhk goal status --goal <goal>",
+                            "docs/GOAL_CONFIGURATION.md");
+                }
+                if ("completed".equals(goal.status())) {
+                    return CommandErrorGuidance.invalidUsage(context, args, "BDD_EVIDENCE_GOAL_COMPLETED",
+                            "Goal is already completed: " + goalKey,
+                            "Completed goals are immutable for BDD goal-scoped evidence.",
+                            "dhk bdd evidence report --scenario <scenario> --adapter <adapter> --report <path>",
                             "docs/GOAL_CONFIGURATION.md");
                 }
             }
@@ -352,5 +387,13 @@ public final class BddEvidenceCommand implements Command {
     private String defaultIfBlank(String value, String fallback) {
         String text = value == null ? "" : value.trim();
         return text.length() == 0 ? fallback : text;
+    }
+
+    private String value(String preferred, String fallback) {
+        String text = preferred == null ? "" : preferred.trim();
+        if (text.length() > 0) {
+            return text;
+        }
+        return fallback == null ? "" : fallback.trim();
     }
 }

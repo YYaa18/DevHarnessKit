@@ -12,8 +12,8 @@ DevHarness Kit 是一个本地优先的 AI 编程协作工具。它不是让模�
 ## 当前状态
 
 DevHarness Kit `1.0.0` 是第一个正式稳定版本。稳定承诺范围刻意收窄：
-核心 CLI、memory、goal、status、readiness、configure、brief、发布包，以及文档中
-列出的导出文件锚点。
+核心 CLI、memory、goal、status、readiness、configure、brief、BDD 验收证据、
+发布包，以及文档中列出的导出文件锚点。
 
 当前稳定版本：`1.0.0`。
 
@@ -96,6 +96,19 @@ Goal 验证会记录编译、测试、敏感信息检查、流程状态和需求
 - 后续又改了文件时，旧检查会被识别为可能过期；
 - 完成摘要能告诉你验证了什么，还剩什么风险。
 
+### 把验收意图变成可检查证据
+
+BDD 层可以记录 feature、scenario、Given/When/Then 步骤、证据和追踪关系。它能读取
+手工说明、JUnit XML、Cucumber、Postman、Playwright 等已有报告文件，但不会替你运行
+这些外部工具。
+
+效果是：
+
+- 产品验收意图对 Agent 可见；
+- scenario 可以绑定到 spec、goal、workflow、graph 输入和测试；
+- BDD-required goal 会被缺失或失败的 BDD 证据阻塞；
+- 通过的 BDD 证据可以支持验收，但不会把 scenario 本身伪装成实现正确性的证明。
+
 ### 辅助影响面分析
 
 Graph Lite 可以在本地扫描代码关系，生成影响面建议。它不是正确性证明，而是帮助
@@ -164,6 +177,18 @@ lib/dhk.jar
 java -jar lib/dhk.jar version
 ```
 
+面向本地安装自动化，1.0 将以下发布包入口列为 stable-candidate：
+
+- `install.sh`
+- `scripts/install-agent-adapters.sh`
+- `scripts/devharness-control-panel.sh` 的 `configure`、`plan`、`install`、
+  `status`、`doctor`、`repair`、`uninstall` 命令
+
+这个承诺覆盖文档中的命令名、参数名、`plan` 和 `--dry-run` 的不改写语义、
+`status --status-format text|json|markdown`，以及 `doctor`/`repair` 流程。
+它不把生成出来的 `.agents/`、`.claude/`、`.comate/` 目录结构、规则文件内容、
+alpha install-state/manifest schema 当作稳定 API。
+
 ## 典型使用流程
 
 1. 把 DevHarness Kit 安装到目标项目。
@@ -174,7 +199,7 @@ java -jar lib/dhk.jar version
 6. 完成前运行 Goal 验证。
 7. 用总结和 artifact passport 做复查或发布证据。
 
-目前稳定候选的主要入口是：
+目前稳定的主要入口是：
 
 - `dhk doctor`
 - `dhk configure`
@@ -184,9 +209,14 @@ java -jar lib/dhk.jar version
 - `dhk quickstart`
 - `dhk memory`
 - `dhk goal`
+- `dhk graph` stable-advisory 子集：status、index、impact、export
+- `dhk bdd`
 
-Graph Lite、BDD、skill governance、policy hook 等能力仍属于实验性范围，不属于
-1.0 稳定合同，除非后续 release note 明确提升它们的稳定级别。
+Graph Lite 属于 stable-advisory：文档列出的输出形状稳定，但影响面分析仍是启发式建议，
+必须结合测试、人工审查和 Goal 检查使用。Skill governance 现在有 stable-candidate
+的 contract/report 子集，但完整治理 enforcement 仍不属于 stable contract。Policy hook
+现在有 stable-candidate 的本地 schema 与 hook 行为子集，但它不是沙箱，也不是权限边界。
+Routine metrics/replay 现在有 stable-candidate 的本地报告 schema；公开 routine 自动化仍是实验面。
 
 ## 从源码构建
 
@@ -216,6 +246,8 @@ mvn -DskipTests package -P release-archive
 发布包会包含运行时 jar、安装器、Agent 规则、许可证、安全说明、更新记录和面向用户的
 README 文件。仓库中的 `docs/` 目录不会打进用户下载包，开发和设计细节请在 GitHub
 源码树中查看。
+`scripts/release-gate.sh` 会生成 `target/ARTIFACT_MANIFEST.json` 和
+`target/SHA256SUMS`，发布时需要和 jar、zip、tar.gz 一起上传。
 
 ## 更多文档
 

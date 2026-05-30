@@ -1,8 +1,12 @@
 # Skill Evaluation
 
-Skill Evaluation is an alpha local reporting layer for comparing governed skill
-runs against a simple baseline. It is not a statistical benchmark and does not
-replace tests, review, BDD evidence, or artifact passport verification.
+Status: stable-candidate local report schema for governed skill runs.
+
+Skill Evaluation compares governed skill runs against a simple local baseline.
+For the 1.0 promotion track, the stable-candidate subset is the report field
+contract documented below. It is not a statistical benchmark, release approval,
+model evaluation, or replacement for tests, review, BDD evidence, goal checks,
+or artifact passport verification.
 
 ## Commands
 
@@ -13,6 +17,8 @@ dhk skill report --goal <goal-key> --baseline-score <score> --group F
 
 `skill score` reads local `goal_step` and `goal_check` rows. `skill report`
 adds skill contract and trust metadata from `policy.json` and `skill_contract`.
+Those storage details are internal; consumers should rely on CLI output fields,
+not direct SQLite reads.
 
 ## Metrics
 
@@ -91,3 +97,19 @@ gate_pass_rate
 evidence_completeness
 rollback_quality
 ```
+
+Stable-candidate consumers may rely on these field names, numeric score ranges
+from `0` to `100`, and `dqi_delta = dqi_score - baseline_score`. They should
+ignore unknown additive fields and must not compare scores across unrelated
+fixtures, skill versions, or policy configurations.
+
+## Outside The Contract
+
+The following remain experimental:
+
+- scoring weights beyond the documented local formula;
+- DQI interpretation across real projects;
+- benchmark group names beyond the fixture-backed `F` group;
+- direct reads from `goal_step`, `goal_check`, `policy`, or `skill_contract`
+  SQLite rows;
+- using a score or positive delta as proof that code behavior is correct.

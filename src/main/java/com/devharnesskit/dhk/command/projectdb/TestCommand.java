@@ -27,10 +27,20 @@ public final class TestCommand implements Command {
     }
 
     public int run(CommandContext context, Args args) {
-        boolean json = args.hasFlag("json");
+        boolean json = JsonOutput.enabled(args);
         DbConnectionRequest request = connectionService.fromArgs(args, false);
         if (!request.valid()) {
-            context.err().println(request.error());
+            if (json) {
+                context.out().print(JsonOutput.object(
+                        JsonOutput.stringField("command", "db test"),
+                        JsonOutput.stringField("status", "error"),
+                        JsonOutput.stringField("error", request.error()),
+                        JsonOutput.stringField("compatibility_hint", ""),
+                        JsonOutput.stringField("risk_warning", DbRiskNotice.text())
+                ));
+            } else {
+                context.err().println(request.error());
+            }
             return ExitCodes.USAGE_ERROR;
         }
         DbRiskNotice.print(context, args);

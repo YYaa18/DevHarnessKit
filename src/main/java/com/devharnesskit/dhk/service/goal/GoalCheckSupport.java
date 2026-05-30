@@ -248,6 +248,9 @@ final class GoalCheckSupport {
     }
 
     static boolean requiresImpactCoverage(String file) {
+        if (file.startsWith("src/test/")) {
+            return false;
+        }
         return file.startsWith("src/")
                 && (file.endsWith(".java") || file.endsWith(".xml") || file.endsWith(".jsp")
                 || file.endsWith(".jspx") || file.endsWith(".sql") || file.endsWith(".properties")
@@ -357,6 +360,22 @@ final class GoalCheckSupport {
         String normalized = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
         return "yes".equals(normalized) || "true".equals(normalized) || "covered".equals(normalized)
                 || "passed".equals(normalized) || normalized.indexOf("covered") >= 0;
+    }
+
+    static boolean multiImpactEvidenceCovers(Path projectRoot, List<GoalStep> steps, String file) {
+        if (!acceptedCoverageEvidence(latestEvidenceValue(steps, "multi_impact_evidence_status"))) {
+            return false;
+        }
+        if (!artifactExists(projectRoot, latestEvidenceValue(steps, "multi_impact_evidence_path"))) {
+            return false;
+        }
+        String covered = latestEvidenceValue(steps, "impact_covered_files");
+        for (String part : covered.split("[,\\n\\r]+")) {
+            if (normalizePath(part).equals(normalizePath(file))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     static boolean impactExpanded(String value) {

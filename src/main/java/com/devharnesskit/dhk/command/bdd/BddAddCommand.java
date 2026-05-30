@@ -123,6 +123,13 @@ public final class BddAddCommand implements Command {
             }
             return ExitCodes.SUCCESS;
         } catch (Exception ex) {
+            if (ex.getMessage() != null && ex.getMessage().startsWith("BDD scenario already exists:")) {
+                return CommandErrorGuidance.invalidUsage(context, args, "BDD_SCENARIO_ALREADY_EXISTS",
+                        ex.getMessage(),
+                        "Scenario keys are immutable; use a new key or inspect the existing scenario.",
+                        "dhk bdd scenario show --scenario " + scenario,
+                        "docs/GOAL_CONFIGURATION.md");
+            }
             context.err().println("ERROR bdd add failed: " + ex.getMessage());
             return ExitCodes.RUNTIME_ERROR;
         }

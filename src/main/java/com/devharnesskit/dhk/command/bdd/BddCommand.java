@@ -19,6 +19,9 @@ public final class BddCommand implements Command {
         commands.put("add", new Supplier<Command>() {
             public Command get() { return new BddAddCommand(); }
         });
+        commands.put("scenario", new Supplier<Command>() {
+            public Command get() { return new BddScenarioCommand(); }
+        });
         commands.put("list", new Supplier<Command>() {
             public Command get() { return new BddListCommand(); }
         });
@@ -45,6 +48,9 @@ public final class BddCommand implements Command {
         });
         commands.put("bind-goal", new Supplier<Command>() {
             public Command get() { return new BddBindGoalCommand(); }
+        });
+        commands.put("bind-workflow", new Supplier<Command>() {
+            public Command get() { return new BddBindWorkflowCommand(); }
         });
         commands.put("bind-graph", new Supplier<Command>() {
             public Command get() { return new BddBindGraphCommand(); }

@@ -1,6 +1,10 @@
 # Goal Metrics and Replay
 
-Goal metrics and replay are alpha design contracts for routine reporting. They are derived from existing goal tables; they are not a new source of truth.
+Status: stable-candidate local report schema for 1.0.
+
+Goal metrics and replay are derived models for routine reporting. They are
+computed from existing goal facts; they are not a new source of truth and they
+do not decide completion readiness.
 
 ## Source of Truth
 
@@ -14,14 +18,16 @@ goal_event
 goal_artifact
 ```
 
-The generated artifacts that may appear later, such as `GOAL_METRICS.md` or routine reports, must be treated like other Markdown exports. SQLite remains authoritative.
+Generated artifacts such as routine reports must be treated like other local
+exports. SQLite remains authoritative, and users should consume generated
+Markdown/JSON/NDJSON rather than reading SQLite tables directly.
 
 ## Metrics Snapshot
 
 The code-level schema version is:
 
 ```text
-goal-metrics/v1.1-alpha
+goal-metrics/v1
 ```
 
 A metrics snapshot summarizes one goal run:
@@ -65,7 +71,7 @@ the source of truth.
 The code-level schema version is:
 
 ```text
-goal-replay/v1-alpha
+goal-replay/v1
 ```
 
 Replay is a deterministic ordered timeline. Each entry has:
@@ -90,16 +96,19 @@ goal_check
 goal_artifact
 ```
 
-This makes replay stable even when multiple facts share the same timestamp.
+When timestamp, source, and kind are equal, replay also sorts by status, summary,
+and data. This makes replay deterministic even when equivalent input lists
+arrive in different orders.
 
 ## Non-Goals
 
-This design does not add:
+This stable-candidate report layer does not add:
 
 - a new SQLite schema;
 - a public `goal metrics` or `goal replay` CLI command;
 - cross-project aggregation;
-- model scoring or automatic quality judgment.
+- model scoring or automatic quality judgment;
+- scheduler, daemon, dashboard, telemetry, or network upload.
 
 Those can be added after routine exports define their exact needs.
 
@@ -115,6 +124,9 @@ Future routine reporting can consume this model to answer questions such as:
 - how BDD scenario coverage, evidence freshness, and quality score trend across
   comparable tasks or model runs.
 
-The first routine implementation should export derived reports under `.agents/memory/exports/` and include the schema version in every artifact.
+The first routine implementation exports derived report artifacts under
+`.agents/memory/exports/` through internal report services and includes schema
+versions in every artifact. Public `dhk routine` commands remain outside the
+1.0 stable contract until a later issue explicitly promotes them.
 
 Routine local and CI export planning is documented in [ROUTINE_LOCAL_CI_EXPORT.md](ROUTINE_LOCAL_CI_EXPORT.md).

@@ -6,10 +6,11 @@ import java.util.Locale;
 
 public final class SqlSafetyGuard {
     public SqlSafetyResult validate(String sql, boolean explain) {
-        String normalized = stripCommentsAndValidateSemicolons(sql);
-        if (normalized == null) {
-            return SqlSafetyResult.rejected("multiple statements are not allowed");
+        SanitizedSql sanitized = stripCommentsAndValidateSemicolons(sql);
+        if (!sanitized.allowed()) {
+            return SqlSafetyResult.rejected(sanitized.reason());
         }
+        String normalized = sanitized.sql();
         normalized = trimTrailingSemicolon(normalized.trim());
         if (normalized.length() == 0) {
             return SqlSafetyResult.rejected("empty SQL");
@@ -49,10 +50,14 @@ public final class SqlSafetyGuard {
     }
 
     private boolean containsRiskyPattern(String lower) {
-        String riskText = maskQuotedContent(lower);
-        return riskText.matches(".*\\binto\\s+(outfile|dumpfile)\\b.*")
+        String riskText = maskQuotedContent(lower).replaceAll("\\s+", " ");
+        return riskText.matches(".*\\bwith\\b.*")
+                || riskText.matches(".*\\binto\\b.*")
                 || riskText.matches(".*\\bsleep\\s*\\(.*")
                 || riskText.matches(".*\\bload_file\\s*\\(.*")
+                || riskText.matches(".*\\b(get_lock|release_lock|benchmark)\\s*\\(.*")
+                || riskText.matches(".*\\bfor\\s+update\\b.*")
+                || riskText.matches(".*\\block\\s+in\\s+share\\s+mode\\b.*")
                 || riskText.matches(".*\\b(insert|update|delete|drop|alter|truncate|create|grant|revoke|call|set|replace|load)\\b.*");
     }
 
@@ -73,7 +78,10 @@ public final class SqlSafetyGuard {
         return trimmed;
     }
 
-    private String stripCommentsAndValidateSemicolons(String sql) {
+    private SanitizedSql stripCommentsAndValidateSemicolons(String sql) {
+        if (sql == null) {
+            return SanitizedSql.allowed("");
+        }
         StringBuilder out = new StringBuilder();
         int state = 0;
         int lastSemicolon = -1;
@@ -98,13 +106,16 @@ public final class SqlSafetyGuard {
                     state = 4;
                     out.append(' ');
                 } else if (ch == '/' && next == '*') {
+                    if (i + 2 < sql.length() && sql.charAt(i + 2) == '!') {
+                        return SanitizedSql.rejected("versioned comments are not allowed");
+                    }
                     state = 5;
                     i++;
                     out.append(' ');
                 } else {
                     if (ch == ';') {
                         if (lastSemicolon >= 0) {
-                            return null;
+                            return SanitizedSql.rejected("multiple statements are not allowed");
                         }
                         lastSemicolon = out.length();
                     }
@@ -147,11 +158,12 @@ public final class SqlSafetyGuard {
         if (lastSemicolon >= 0) {
             for (int i = lastSemicolon + 1; i < out.length(); i++) {
                 if (!Character.isWhitespace(out.charAt(i))) {
-                    return null;
+                    return SanitizedSql.rejected("multiple statements are not allowed");
                 }
             }
         }
-        return state == 0 ? out.toString() : null;
+        return state == 0 ? SanitizedSql.allowed(out.toString())
+                : SanitizedSql.rejected("unterminated string or comment");
     }
 
     private String maskQuotedContent(String sql) {
@@ -197,5 +209,37 @@ public final class SqlSafetyGuard {
             }
         }
         return out.toString();
+    }
+
+    private static final class SanitizedSql {
+        private final boolean allowed;
+        private final String sql;
+        private final String reason;
+
+        private SanitizedSql(boolean allowed, String sql, String reason) {
+            this.allowed = allowed;
+            this.sql = sql == null ? "" : sql;
+            this.reason = reason == null ? "" : reason;
+        }
+
+        private static SanitizedSql allowed(String sql) {
+            return new SanitizedSql(true, sql, "");
+        }
+
+        private static SanitizedSql rejected(String reason) {
+            return new SanitizedSql(false, "", reason);
+        }
+
+        private boolean allowed() {
+            return allowed;
+        }
+
+        private String sql() {
+            return sql;
+        }
+
+        private String reason() {
+            return reason;
+        }
     }
 }

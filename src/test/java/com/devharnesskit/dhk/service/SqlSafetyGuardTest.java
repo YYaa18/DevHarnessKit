@@ -3,6 +3,10 @@ package com.devharnesskit.dhk.service;
 import com.devharnesskit.dhk.sql.SqlSafetyResult;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -12,6 +16,8 @@ final class SqlSafetyGuardTest {
     @Test
     void allowsReadonlyStatements() {
         assertAllowed("SELECT 1");
+        assertAllowed("SELECT * FROM (SELECT id FROM t_order WHERE status = 'PAID') q");
+        assertAllowed("SELECT o.id FROM t_order o JOIN customer c ON c.id = o.customer_id");
         assertAllowed("SHOW TABLES");
         assertAllowed("DESC t_order");
         assertAllowed("DESCRIBE t_order");
@@ -25,8 +31,14 @@ final class SqlSafetyGuardTest {
         assertRejected("DROP TABLE t");
         assertRejected("ALTER TABLE t ADD COLUMN x INT");
         assertRejected("SELECT * FROM t INTO OUTFILE '/tmp/a'");
+        assertRejected("SELECT id INTO @order_id FROM t_order");
+        assertRejected("SELECT * FROM t_order FOR UPDATE");
+        assertRejected("SELECT * FROM t_order LOCK IN SHARE MODE");
+        assertRejected("SELECT GET_LOCK('dhk', 1)");
         assertRejected("WITH x AS (SELECT 1) SELECT * FROM x");
+        assertRejected("SELECT * FROM (WITH x AS (SELECT 1) SELECT * FROM x) q");
         assertRejected("SELECT SLEEP(1)");
+        assertRejected("SELECT BENCHMARK(1000, MD5('x'))");
         assertRejected("SELECT LOAD_FILE('/etc/passwd')");
     }
 
@@ -148,8 +160,14 @@ final class SqlSafetyGuardTest {
     void deterministicRiskPatternFuzzRejectsWhitespaceVariants() {
         assertRejected("SELECT * FROM t_order INTO   OUTFILE '/tmp/orders.txt'");
         assertRejected("SELECT * FROM t_order INTO\nDUMPFILE '/tmp/orders.bin'");
+        assertRejected("SELECT id INTO\n@order_id FROM t_order");
+        assertRejected("SELECT * FROM t_order FOR\nUPDATE");
+        assertRejected("SELECT * FROM t_order LOCK\nIN SHARE MODE");
         assertRejected("SELECT SLEEP (1)");
         assertRejected("SELECT LOAD_FILE ('/etc/passwd')");
+        assertRejected("SELECT GET_LOCK ('dhk', 1)");
+        assertRejected("SELECT RELEASE_LOCK ('dhk')");
+        assertRejected("SELECT BENCHMARK (1000, MD5('x'))");
         assertRejected("EXPLAIN SELECT SLEEP (1)");
     }
 
@@ -169,6 +187,62 @@ final class SqlSafetyGuardTest {
     }
 
     @Test
+    void mysqlVersionedCommentsFailClosedBecauseTheyCanExecuteHiddenSql() {
+        assertVersionedCommentRejected("/*!50000 SELECT 1 */");
+        assertVersionedCommentRejected("SELECT 1 /*!50000 INTO OUTFILE '/tmp/orders.txt' */");
+        assertVersionedCommentRejected("SELECT 1 /*!40101 SET @old_sql_mode=@@sql_mode */");
+        assertVersionedCommentRejected("SELECT 1 /*!80000 FOR UPDATE */");
+    }
+
+    @Test
+    void propertySuiteHasZeroFalseAllowsForDangerousSql() {
+        String[] dangerousSql = new String[]{
+                "INSERT INTO t_order(id) VALUES (1)",
+                "UPDATE t_order SET status = 'PAID'",
+                "DELETE FROM t_order WHERE id = 1",
+                "DROP TABLE t_order",
+                "ALTER TABLE t_order ADD COLUMN note VARCHAR(32)",
+                "TRUNCATE TABLE t_order",
+                "CREATE TABLE t_order_copy(id INT)",
+                "GRANT SELECT ON demo.* TO readonly_user",
+                "REVOKE SELECT ON demo.* FROM readonly_user",
+                "CALL refresh_order()",
+                "SET @x = 1",
+                "REPLACE INTO t_order(id) VALUES (1)",
+                "LOAD DATA INFILE '/tmp/orders.csv' INTO TABLE t_order",
+                "SELECT * FROM t_order INTO OUTFILE '/tmp/orders.txt'",
+                "SELECT id INTO @order_id FROM t_order",
+                "SELECT * FROM t_order FOR UPDATE",
+                "SELECT * FROM t_order LOCK IN SHARE MODE",
+                "SELECT GET_LOCK('dhk', 1)",
+                "SELECT RELEASE_LOCK('dhk')",
+                "SELECT BENCHMARK(1000, MD5('x'))",
+                "SELECT * FROM (WITH x AS (SELECT 1) SELECT * FROM x) q",
+                "SELECT 1 /*!50000 INTO OUTFILE '/tmp/orders.txt' */",
+                "SELECT 1; UPDATE t_order SET status = 'PAID'"
+        };
+        String[] wrappers = new String[]{
+                "%s",
+                "  %s  ",
+                "/* harmless comment */ %s",
+                "-- harmless comment\n%s",
+                "EXPLAIN %s"
+        };
+
+        List<String> falseAllowed = new ArrayList<String>();
+        for (int i = 0; i < dangerousSql.length; i++) {
+            for (int j = 0; j < wrappers.length; j++) {
+                String sql = String.format(wrappers[j], deterministicCase(dangerousSql[i], i + j));
+                if (guard.validate(sql, false).allowed()) {
+                    falseAllowed.add(sql);
+                }
+            }
+        }
+
+        assertTrue(falseAllowed.isEmpty(), "false allowed dangerous SQL: " + falseAllowed);
+    }
+
+    @Test
     void explainFlagFuzzOnlyWrapsPlainSelect() {
         assertTrue(guard.validate("  SELECT id FROM t_order ; ", true).allowed());
         assertFalse(guard.validate("SHOW TABLES", true).allowed());
@@ -183,6 +257,12 @@ final class SqlSafetyGuardTest {
 
     private void assertRejected(String sql) {
         assertFalse(guard.validate(sql, false).allowed(), sql);
+    }
+
+    private void assertVersionedCommentRejected(String sql) {
+        SqlSafetyResult result = guard.validate(sql, false);
+        assertFalse(result.allowed(), sql);
+        assertEquals("versioned comments are not allowed", result.reason());
     }
 
     private String deterministicCase(String sql, int seed) {

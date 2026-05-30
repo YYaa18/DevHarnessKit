@@ -15,6 +15,7 @@ import com.devharnesskit.dhk.repository.workflow.WorkflowGateRunRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowMemoryBindingRepository;
 import com.devharnesskit.dhk.repository.workflow.WorkflowRunRepository;
 import com.devharnesskit.dhk.repository.spec.WorkflowSpecBindingRepository;
+import com.devharnesskit.dhk.util.JsonOutput;
 
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -46,18 +47,28 @@ public final class SummaryCommand implements Command {
                         "workflow run", runKey, "dhk workflow status --run <run>",
                         "docs/GOAL_CONFIGURATION.md");
             }
+            int exportedMemoryCount = memoryBindingRepository.countByRunAndType(connection, run.runKey(), "exported");
+            int artifactCount = artifactRepository.countByRun(connection, run.runKey());
+            int checkpointCount = checkpointBindingRepository.countByRun(connection, run.runKey());
+            int boundSpecCount = specBindingRepository.countByRun(connection, run.runKey());
+            int pendingHardGateCount = pendingHardGateCount(connection, run.runKey());
+            int blockingHardGateCount = blockingHardGateCount(connection, run.runKey());
+            if (JsonOutput.enabled(args)) {
+                context.out().print(WorkflowJsonSupport.summary(run, exportedMemoryCount, artifactCount,
+                        checkpointCount, boundSpecCount, pendingHardGateCount, blockingHardGateCount));
+                return ExitCodes.SUCCESS;
+            }
             context.out().println("run: " + run.runKey());
             context.out().println("workflow: " + run.workflowKey());
             context.out().println("task: " + run.taskName());
             context.out().println("status: " + run.status());
             context.out().println("current_phase: " + run.currentPhaseKey());
-            context.out().println("exported_memory_count: "
-                    + memoryBindingRepository.countByRunAndType(connection, run.runKey(), "exported"));
-            context.out().println("artifact_count: " + artifactRepository.countByRun(connection, run.runKey()));
-            context.out().println("checkpoint_count: " + checkpointBindingRepository.countByRun(connection, run.runKey()));
-            context.out().println("bound_spec_count: " + specBindingRepository.countByRun(connection, run.runKey()));
-            context.out().println("pending_hard_gate_count: " + pendingHardGateCount(connection, run.runKey()));
-            context.out().println("blocking_hard_gate_count: " + blockingHardGateCount(connection, run.runKey()));
+            context.out().println("exported_memory_count: " + exportedMemoryCount);
+            context.out().println("artifact_count: " + artifactCount);
+            context.out().println("checkpoint_count: " + checkpointCount);
+            context.out().println("bound_spec_count: " + boundSpecCount);
+            context.out().println("pending_hard_gate_count: " + pendingHardGateCount);
+            context.out().println("blocking_hard_gate_count: " + blockingHardGateCount);
             return ExitCodes.SUCCESS;
         } catch (Exception ex) {
             context.err().println("ERROR workflow summary failed: " + ex.getMessage());

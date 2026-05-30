@@ -228,6 +228,62 @@ final class WorkflowIntegrationTest {
     }
 
     @Test
+    void workflowStableSubsetSupportsJsonOutput() throws Exception {
+        seed();
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "workflow", "start",
+                "--project-root", "demo",
+                "--workflow", "api-change",
+                "--task", "新增订单查询接口",
+                "--module", "order",
+                "--mode", "api",
+                "--json"
+        }, start.context());
+        String runKey = "20260521000000-api-change-order";
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        assertTrue(start.stdout().contains("\"command\": \"workflow start\""));
+        assertTrue(start.stdout().contains("\"run_key\": \"" + runKey + "\""));
+        assertTrue(start.stdout().contains("\"workflow\": \"api-change\""));
+        assertTrue(start.stdout().contains("\"task\": \"新增订单查询接口\""));
+        assertTrue(start.stdout().contains("\"module\": \"order\""));
+        assertTrue(start.stdout().contains("\"mode\": \"api\""));
+        assertTrue(start.stdout().contains("\"current_phase\": \"export_context\""));
+        assertTrue(start.stdout().contains("\"phases\": ["));
+        assertTrue(start.stdout().contains("\"pending_hard_gates\": ["));
+
+        Harness status = new Harness(tempDir);
+        int statusExit = new CommandRouter().run(new String[]{
+                "workflow", "status", "--project-root", "demo", "--run", runKey, "--json"
+        }, status.context());
+        assertEquals(ExitCodes.SUCCESS, statusExit);
+        assertTrue(status.stdout().contains("\"command\": \"workflow status\""));
+        assertTrue(status.stdout().contains("\"phase_key\": \"export_context\""));
+        assertTrue(status.stdout().contains("\"gate_key\": \"current_context_exists\""));
+
+        Harness export = new Harness(tempDir);
+        int exportExit = new CommandRouter().run(new String[]{
+                "workflow", "export", "--project-root", "demo", "--run", runKey, "--json"
+        }, export.context());
+        assertEquals(ExitCodes.SUCCESS, exportExit);
+        assertTrue(export.stdout().contains("\"command\": \"workflow export\""));
+        assertTrue(export.stdout().contains("\"workflow_context_path\":"));
+        assertTrue(export.stdout().contains("\"run_key\": \"" + runKey + "\""));
+        assertTrue(Files.isRegularFile(PathUtil.workflowContext(tempDir.resolve("demo"))));
+
+        Harness summary = new Harness(tempDir);
+        int summaryExit = new CommandRouter().run(new String[]{
+                "workflow", "summary", "--project-root", "demo", "--run", runKey, "--json"
+        }, summary.context());
+        assertEquals(ExitCodes.SUCCESS, summaryExit);
+        assertTrue(summary.stdout().contains("\"command\": \"workflow summary\""));
+        assertTrue(summary.stdout().contains("\"artifact_count\": 1"));
+        assertTrue(summary.stdout().contains("\"pending_hard_gate_count\":"));
+        assertTrue(summary.stdout().contains("\"blocking_hard_gate_count\":"));
+    }
+
+    @Test
     void workflowSensitiveDataIsRejectedAtWriteAndExportBoundaries() throws Exception {
         seed();
 

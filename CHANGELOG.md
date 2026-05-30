@@ -7,17 +7,23 @@ First stable release.
 - Promoted the documented core surface to the 1.0 stable contract: core CLI,
   memory, goal, configure, status, readiness, advise/quickstart, release
   packaging, checksums, and documented generated-export anchors.
-- Kept DB inspection as beta and Graph Lite, BDD, skill governance,
-  policy/hook governance, routine, and direct SQLite table details outside the
-  stable contract.
+- Promoted BDD acceptance harness, Graph Lite stable-advisory output, Workflow
+  and Spec audit/traceability subsets, and generated export anchors into the
+  documented 1.0 contract.
+- Kept DB inspection beta, and kept stable-candidate governance and
+  installer/reporting subsets outside the stable surface until a future
+  compatibility release promotes them.
 - Updated release metadata, README status, security policy, compatibility docs,
   and release gates so stable releases no longer require beta/developer-preview
   wording.
 - Hardened the installer wizard for user-facing 1.0 packages and removed fixed
   `0.4.6-beta.1` jar fallbacks from installer lookup.
+- Added default release-gate coverage for Graph Lite precision, BDD acceptance,
+  built-in skill governance, Workflow/Spec JSON smoke, Routine CI-safe exports,
+  and artifact manifest/checksum generation.
 - 1.0 artifacts are built from Maven `project.version` as
-  `dhk-cli-1.0.0-all.jar`, `devharnesskit-1.0.0.zip`, and
-  `devharnesskit-1.0.0.tar.gz`.
+  `dhk-cli-1.0.0-all.jar`, `devharnesskit-1.0.0.zip`,
+  `devharnesskit-1.0.0.tar.gz`, `ARTIFACT_MANIFEST.json`, and `SHA256SUMS`.
 
 ## 0.4.6-beta.1
 

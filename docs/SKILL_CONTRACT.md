@@ -1,8 +1,14 @@
 # Skill Contract
 
-Skill Contract is an alpha governance layer. It turns a local skill from prompt
-text into a small, auditable execution contract that later `dhk skill` commands
-can lint, verify, trust, and enforce.
+Status: stable-candidate contract subset for 1.0.
+
+Skill Contract turns a local skill from prompt text into a small, auditable
+execution contract that `dhk skill` commands can lint, verify, trust, and audit.
+For the 1.0 promotion track, the stable-candidate subset is the public shape of
+`contract.json` plus the command semantics documented here. The full governance
+runtime, scoring model, release enforcement, direct SQLite rows, and internal
+`.agents/skills/` layout remain outside the stable contract until a release gate
+explicitly promotes them.
 
 ## Local Layout
 
@@ -12,12 +18,12 @@ can lint, verify, trust, and enforce.
   contract.json
 ```
 
-The alpha `contract.json` loader accepts either JSON string arrays or
+The stable-candidate `contract.json` loader accepts either JSON string arrays or
 comma/newline-separated strings for command lists:
 
 ```json
 {
-  "schema_version": "skill-contract/v1-alpha",
+  "schema_version": "skill-contract/v1",
   "skill_key": "devharness-goal-development",
   "version": "0.7.1",
   "task_type": "coding",
@@ -47,10 +53,24 @@ comma/newline-separated strings for command lists:
 
 | Field | Meaning |
 | --- | --- |
+| `schema_version` | Contract schema identifier. Current stable-candidate value: `skill-contract/v1`. Older `skill-contract/v1-alpha` files are accepted as legacy input during the 1.0 transition. |
 | `skill_key` | Stable skill identifier and local directory name. |
 | `version` | Skill contract version. |
 | `task_type` | Primary task class such as `coding`, `review`, or `research`. |
 | `data_access_level` | One of `none`, `metadata`, `context`, or `raw`. |
+| `allowed_commands` | Command prefixes the skill may ask an agent to run. Required by lint. |
+| `forbidden_commands` | Command prefixes the skill must not run or request. Required by lint. |
+
+Stable-candidate optional fields:
+
+| Field | Meaning |
+| --- | --- |
+| `risk_level` | Human review signal. Current default is `medium`; `high` triggers audit review. |
+| `mode` | Governance mode label. Current default is `strict`. |
+| `declared_commands` | Commands declared by skill scripts or protocol text. Lint checks they fit inside `allowed_commands` and avoid `forbidden_commands`. |
+
+Non-contract fields may be added for internal governance experiments, but scripts
+must ignore unknown fields unless a later stable contract lists them.
 
 ## MVP Contract Fixtures
 
@@ -63,14 +83,15 @@ invalid-missing-fields.json
 invalid-command-boundary.json
 ```
 
-These fixtures are the minimum acceptance set for the alpha contract loader and
-CLI:
+These fixtures are the minimum acceptance set for the contract loader and CLI:
 
 ```text
 contract parsing        valid contract loads with command arrays
 missing fields          missing task_type/data_access_level/command lists fail lint
 command boundaries      declared commands cannot match forbidden_commands or fall outside allowed_commands
 verify persistence      invalid contracts are not written to SQLite
+trust/tamper hashing    trust pins source_hash, changed skill files require review_required
+non-execution           trust and verify do not execute script-like files inside the skill directory
 ```
 
 Adding fields to `contract.json` should preserve these fixtures or add a new
@@ -105,6 +126,11 @@ updated_at
 hash differs from the trusted hash, it marks `trust_status` as
 `review_required` and sets `trusted` to `0`.
 
+The table and column names above document current implementation behavior for
+operators and migrations. They are not a public read or write API. Consumers
+should use `dhk skill` commands and documented JSON/text output, not direct
+SQLite access.
+
 ## CLI
 
 ```bash
@@ -133,6 +159,15 @@ forbidden  allowed commands that conflict with forbidden command prefixes
 forbidden  declared commands outside allowed_commands or matching forbidden_commands
 ```
 
+Stable-candidate `lint` exit codes:
+
+```text
+0  contract passed lint
+2  command usage error, such as missing --skill/--path
+3  contract validation failed
+1  unexpected runtime error
+```
+
 `verify` runs the same lint contract and only persists the contract to
 `skill_contract` when lint passes. Persistence is not trust: a first-time
 verified skill is stored with `trust_status=unknown` and `trusted=0`. If a skill
@@ -141,6 +176,15 @@ was previously trusted and its source hash changes, verify stores
 
 `trust` lints the skill and records the current source hash as trusted. Use it
 only after reviewing the skill contract and local skill files.
+
+Stable-candidate trust statuses:
+
+| Status | Meaning |
+| --- | --- |
+| `unknown` | A valid contract was verified, but no trust pin exists. |
+| `trusted` | `trusted_source_hash` matches the current `source_hash`. |
+| `review_required` | A previously trusted skill changed and must be reviewed again. |
+| `untrusted` | Reserved for explicit distrust workflows; current CLI does not emit it by default. |
 
 `audit` scans local skill source for review risks before trust. It checks:
 
@@ -156,6 +200,12 @@ source            external or unreadable source paths
 
 Any finding returns `decision=review_required`. Audit output is advisory and
 does not persist trust; use `dhk skill trust` only after review.
+
+For the built-in goal-development skill, the default release gate runs
+`skill lint`, `skill verify`, and `skill audit`. Lint and verify must pass.
+Audit is expected to return `review_required` because the bundled skill contains
+wrapper scripts, but the release gate requires zero `critical` and zero `high`
+audit findings.
 
 `score` computes a deterministic skill quality score for a goal from local
 goal steps and checks:
@@ -211,7 +261,7 @@ The intended rollout order is:
    human checkpoints, and release integrity.
 ```
 
-For V0.7.5, `dhk skill lint`, `dhk skill verify`, `dhk skill audit`, and
-`dhk skill trust` only validate, review, persist, and explicitly pin local skill
-source trust. They do not replace BDD evidence and do not prove behavioral
-correctness.
+For 1.0, `dhk skill lint`, `dhk skill verify`, `dhk skill audit`, and
+`dhk skill trust` validate, review, persist, and explicitly pin local skill
+source trust. They do not execute skill scripts, replace BDD evidence, create a
+sandbox, or prove behavioral correctness.

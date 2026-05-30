@@ -1,6 +1,12 @@
 # DevHarness Policy
 
-`.agents/devharness/policy.json` is an alpha project safety policy. It is local-first, string-only JSON, and intended to be read by current doctor diagnostics and future hook points.
+Status: stable-candidate local schema and hook behavior for 1.0.
+
+`.agents/devharness/policy.json` is a local-first, string-only JSON policy
+used by DevHarnessKit diagnostics and command hooks. The stable-candidate
+schema identifier is `devharness-policy/v1`; legacy files without
+`schema_version` are still loaded, but `doctor` warns so projects can migrate
+without breaking existing workflows.
 
 It does not replace:
 
@@ -8,12 +14,15 @@ It does not replace:
 - `goal-profiles/*.json`, which defines goal process actions and evidence.
 - `goal-check-policy.json`, which configures goal check commands and accepted check statuses.
 
-In the current alpha, `policy.json` is enforced only at the hook points listed below. It is not a general sandbox.
+`policy.json` is enforced only at the hook points listed below. It is not a
+general sandbox, operating-system permission boundary, database permission
+boundary, or substitute for review.
 
 ## Example
 
 ```json
 {
+  "schema_version": "devharness-policy/v1",
   "mode": "strict",
   "allowed_dhk_commands": "goal start,goal resume,goal next,goal step,goal verify,goal complete",
   "forbidden_dhk_commands": "workflow gate waive,spec archive,memory confirm,db sql",
@@ -40,6 +49,7 @@ In the current alpha, `policy.json` is enforced only at the hook points listed b
 
 | Field | Values | Purpose |
 | --- | --- | --- |
+| `schema_version` | `devharness-policy/v1` | Stable-candidate schema identifier. Missing legacy values load but produce a doctor warning. |
 | `mode` | `strict`, `guided`, `expert` | Human-readable policy posture for skills and hooks. |
 | `allowed_dhk_commands` | comma-separated command prefixes | Commands that strict-mode agents are expected to prefer. |
 | `forbidden_dhk_commands` | comma-separated command prefixes | Commands hooks may block unless explicitly allowed. |
@@ -73,12 +83,15 @@ dhk doctor --project-root . --json
 
 Doctor warns about:
 
+- missing or unsupported `schema_version`;
 - invalid JSON;
 - unknown fields;
 - unsupported `mode`;
 - invalid command patterns;
+- command prefixes that appear in both `allowed_dhk_commands` and `forbidden_dhk_commands`;
 - duplicate or empty list items;
 - absolute paths, `~`, or `..` in file globs;
+- identical paths in `context_export_allowed_files` and `context_export_forbidden_files`;
 - invalid boolean values;
 - missing skill contract when `skill_contract_required` and `skill_key` are configured;
 - `skill_trust_required_for_high_risk` without a `skill_key`;
@@ -136,9 +149,25 @@ until the skill is trusted with `dhk skill trust` or an approved
 
 `doctor --json` returns policy warnings under `policy_warnings`.
 
+## Hook Semantics
+
+Hook decisions use three stable-candidate outcomes:
+
+| Outcome | Meaning |
+| --- | --- |
+| allow | The hook found no configured block and the command continues. |
+| warn | `doctor` reports a damaged, missing, legacy, or conflicting policy setting. Warnings do not mutate project state. |
+| block | The command exits with validation error before the protected mutation or export, prints `Policy blocked ...`, and includes `next_command:` guidance. |
+
+Missing `policy.json` means most hooks are permissive, but stale Graph Lite
+overrides still use the default `graph_allow_stale_requires_approval=true`.
+Damaged JSON is diagnosed by `doctor` and loaded as the default policy. When a
+command is both allowed and forbidden, the forbidden rule wins; `doctor` reports
+the conflict.
+
 ## Hook Points
 
-The first alpha hook points are:
+The stable-candidate hook points are:
 
 | Hook | Command path | What can block |
 | --- | --- | --- |
@@ -149,10 +178,19 @@ The first alpha hook points are:
 | `before-graph-impact` | `dhk graph impact` | `forbidden_dhk_commands`, missing `allowed_dhk_commands`, or `--allow-stale` without `--allow-stale-evidence` when `graph_allow_stale_requires_approval` is true. |
 | `before-context-export` | `dhk memory export` and goal context exports | `context_export_allowed_files`, `context_export_forbidden_files`, and sensitive matches when `context_export_block_on_sensitive` is true. |
 
-No policy file means most hooks are permissive, but stale graph overrides still
-use the default `graph_allow_stale_requires_approval=true`. A configured policy
-file can block commands with validation errors; hooks never call a network
-service or daemon.
+Blocked hooks print actionable guidance. Examples:
+
+```text
+Policy blocked db sql: db_sql_requires_explicit_request requires --i-understand-db-readonly-risk
+next_command: dhk db sql --project-root "<project>" --i-understand-db-readonly-risk --sql "select 1"
+```
+
+```text
+Policy blocked context export: output path is forbidden: .agents/memory/exports/CURRENT_CONTEXT.md
+next_command: dhk doctor --project-root "<project>"
+```
+
+Hooks never call a network service or daemon.
 
 ## Security Notes
 

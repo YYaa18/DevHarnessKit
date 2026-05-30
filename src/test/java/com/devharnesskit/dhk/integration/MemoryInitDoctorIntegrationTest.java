@@ -313,6 +313,7 @@ final class MemoryInitDoctorIntegrationTest {
         new CommandRouter().run(new String[]{"memory", "init", "--project-root", "demo"}, initHarness.context());
 
         Files.write(PathUtil.devharnessPolicy(root), ("{\n"
+                + "  \"schema_version\": \"devharness-policy/v1\",\n"
                 + "  \"mode\": \"strict\",\n"
                 + "  \"allowed_dhk_commands\": \"goal start,goal resume,goal next,goal step,goal verify,goal complete\",\n"
                 + "  \"forbidden_dhk_commands\": \"workflow gate waive,spec archive,memory confirm,db sql\",\n"

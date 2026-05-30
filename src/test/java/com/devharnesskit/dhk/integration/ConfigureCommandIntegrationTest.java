@@ -464,6 +464,7 @@ final class ConfigureCommandIntegrationTest {
         assertTrue(verifyReady.stdout().contains("manual-compile: passed"), verifyReady.stdout());
         assertTrue(verifyReady.stdout().contains("manual-test: passed"), verifyReady.stdout());
         assertTrue(verifyReady.stdout().contains("manual-test evidence passed"), verifyReady.stdout());
+        assertTrue(verifyReady.stdout().contains("spec: passed"), verifyReady.stdout());
     }
 
     @Test

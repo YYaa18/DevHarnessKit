@@ -392,6 +392,7 @@ final class GraphCommandIntegrationTest {
         assertTrue(rejectedImpactHarness.stderr().contains("dhk graph index"));
         assertEquals(ExitCodes.VALIDATION_ERROR, staleWithoutEvidenceExit);
         assertTrue(staleWithoutEvidenceHarness.stderr().contains("graph_allow_stale_requires_approval"));
+        assertTrue(staleWithoutEvidenceHarness.stderr().contains("next_command: dhk graph impact --project-root"));
         assertEquals(ExitCodes.SUCCESS, allowedImpactExit);
         assertTrue(allowedImpactHarness.stdout().contains("snapshot_stale: true"));
         assertTrue(allowedImpactHarness.stdout().contains("allow_stale: true"));
@@ -752,7 +753,7 @@ final class GraphCommandIntegrationTest {
         assertTrue(impactHarness.stdout().contains("graph impact"));
         String impactMap = new String(Files.readAllBytes(PathUtil.graphImpactMap(fixture)), "UTF-8");
         assertTrue(impactMap.contains("src/main/webapp/WEB-INF/jsp/shop/order-list.jsp"));
-        assertTrue(impactMap.contains("src/main/webapp/WEB-INF/jsp/common/header.jsp"));
+        assertFalse(impactMap.contains("src/main/webapp/WEB-INF/jsp/common/header.jsp"));
         assertTrue(impactMap.contains("src/main/webapp/WEB-INF/web.xml"));
         assertTrue(impactMap.contains("src/main/java/com/acme/legacy/shop/web/ShopOrderServlet.java"));
         assertTrue(impactMap.contains("src/main/java/com/acme/legacy/shop/service/ShopOrderService.java"));
@@ -789,6 +790,17 @@ final class GraphCommandIntegrationTest {
         assertTrue(impactMap.contains("src/test/java/com/acme/modern/account/service/AccountServiceTest.java"));
         assertFalse(impactMap.contains("src/test/java/com/acme/modern/account/repository/InMemoryAccountRepositoryTest.java"));
         assertTrue(impactMap.contains("- missing_related_test_count: 1"));
+        int recommendedSection = impactMap.indexOf("<recommended-read-files>");
+        int serviceIndex = impactMap.indexOf("- src/main/java/com/acme/modern/account/service/AccountService.java",
+                recommendedSection);
+        int controllerIndex = impactMap.indexOf("- src/main/java/com/acme/modern/account/controller/AccountController.java",
+                recommendedSection);
+        int serviceTestIndex = impactMap.indexOf("- src/test/java/com/acme/modern/account/service/AccountServiceTest.java",
+                recommendedSection);
+        assertTrue(recommendedSection >= 0);
+        assertTrue(serviceIndex > recommendedSection);
+        assertTrue(controllerIndex > serviceIndex);
+        assertTrue(serviceTestIndex > serviceIndex);
     }
 
     @Test

@@ -33,6 +33,7 @@ jobs:
           echo "DHK_JAR=target/dhk-cli-$VERSION-all.jar" >> "$GITHUB_ENV"
           echo "DHK_ZIP=target/devharnesskit-$VERSION.zip" >> "$GITHUB_ENV"
           echo "DHK_TGZ=target/devharnesskit-$VERSION.tar.gz" >> "$GITHUB_ENV"
+          echo "DHK_MANIFEST=target/ARTIFACT_MANIFEST.json" >> "$GITHUB_ENV"
 
       - name: Version metadata gate
         run: scripts/check-version-metadata.sh "$DHK_VERSION"
@@ -57,7 +58,7 @@ jobs:
       - name: Generate checksums
         run: |
           cd target
-          sha256sum "dhk-cli-$DHK_VERSION-all.jar" "devharnesskit-$DHK_VERSION.zip" "devharnesskit-$DHK_VERSION.tar.gz" > SHA256SUMS
+          sha256sum "dhk-cli-$DHK_VERSION-all.jar" "devharnesskit-$DHK_VERSION.zip" "devharnesskit-$DHK_VERSION.tar.gz" "ARTIFACT_MANIFEST.json" > SHA256SUMS
 
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
@@ -67,6 +68,7 @@ jobs:
             ${{ env.DHK_JAR }}
             ${{ env.DHK_ZIP }}
             ${{ env.DHK_TGZ }}
+            ${{ env.DHK_MANIFEST }}
             target/SHA256SUMS
 
       - name: Create draft GitHub release
@@ -78,6 +80,7 @@ jobs:
             "$DHK_JAR" \
             "$DHK_ZIP" \
             "$DHK_TGZ" \
+            "$DHK_MANIFEST" \
             target/SHA256SUMS \
             --draft \
             --title "$GITHUB_REF_NAME"

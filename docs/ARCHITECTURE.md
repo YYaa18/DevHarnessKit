@@ -91,7 +91,10 @@ Goal is not an autonomous workflow engine. It records state, renders the next de
 
 `GOAL_CONTEXT.md` and `GOAL_SUMMARY.md` are generated Markdown exports. They are stable enough for alpha agents and scripts to read, but SQLite goal/workflow/spec rows and the completion checkpoint remain the source of truth. Regenerate exports with the matching CLI instead of hand-editing them.
 
-Goal metrics and replay are alpha derived models documented in [GOAL_METRICS_REPLAY.md](GOAL_METRICS_REPLAY.md). They summarize existing goal rows for future routine reporting without adding a new source of truth or public CLI surface.
+Goal metrics and replay are stable-candidate derived report models documented
+in [GOAL_METRICS_REPLAY.md](GOAL_METRICS_REPLAY.md). They summarize existing
+goal rows for routine reporting without adding a new source of truth or public
+CLI surface.
 
 ## Graph Lite
 
@@ -122,9 +125,13 @@ directories are ignored by git.
 
 The schema and config contract are documented in [GRAPH_SCHEMA.md](GRAPH_SCHEMA.md).
 
-## Routine Reporting (Planned Alpha)
+## Routine Reporting
 
-Routine reporting is a planned local-only layer for summarizing repeated goal runs and CI-safe outcome artifacts. The scope and privacy boundary are documented in [ROUTINE_LOCAL_CI_EXPORT.md](ROUTINE_LOCAL_CI_EXPORT.md). There is no public `routine` command yet.
+Routine reporting is a local-only layer for summarizing repeated goal runs and
+CI-safe outcome artifacts. The stable-candidate local schema is implemented by
+internal report models, renderers, and export helpers. The scope and privacy
+boundary are documented in [ROUTINE_LOCAL_CI_EXPORT.md](ROUTINE_LOCAL_CI_EXPORT.md).
+There is no stable public `routine` command yet.
 
 ## Workflow
 

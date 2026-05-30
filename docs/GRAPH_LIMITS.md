@@ -1,7 +1,14 @@
 # Graph Lite Limits
 
-Graph Lite is intentionally bounded for alpha use. It should stay fast,
-local-first, and safe on old enterprise projects.
+Graph Lite is intentionally bounded. It should stay fast, local-first, and safe
+on old enterprise projects.
+
+Status: stable-advisory in DevHarness Kit 1.0.0.
+
+The limit names, skip reasons, freshness flags, and truncation reporting
+documented here are stable-advisory output semantics. The exact analysis result
+remains heuristic and must be verified with normal compile, tests, manual review,
+and goal checks.
 
 ## Default Limits
 
@@ -60,7 +67,8 @@ Graph reports should not silently omit data.
 
 ## Non-Goals
 
-Graph Lite is not a complete parser. In alpha it does not guarantee:
+Graph Lite is not a complete parser. The stable-advisory contract does not
+guarantee:
 
 - full Java type resolution;
 - reflection or runtime dispatch resolution;

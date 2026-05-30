@@ -2,7 +2,11 @@
 
 DevHarness Kit Markdown files under `.agents/memory/exports/` are generated context artifacts. SQLite remains the source of truth for memory, workflow, spec, and goal state. Work Brief files under `.agents/devharness/briefs/` are an agent-mounted entry layer, not a replacement source of truth.
 
-Alpha agents and scripts may depend on the required sections below. New fields may be added inside a section before 1.0, but existing section names and order should change only with a changelog note.
+Agents and scripts may depend on the required sections below for stable
+exports. New fields may be added inside a section, but existing stable section
+names and order should change only with a changelog note and the compatibility
+policy. Workflow and Spec exports are part of the stable audit/traceability
+subset. Alpha exports are called out in [COMPATIBILITY.md](COMPATIBILITY.md).
 See [COMPATIBILITY.md](COMPATIBILITY.md) for which exports are beta
 versus alpha in the broader release contract.
 

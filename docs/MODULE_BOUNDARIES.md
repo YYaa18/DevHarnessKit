@@ -67,24 +67,25 @@ ownership and CI boundary scripts instead of Maven module enforcement.
   monolithic. Do not split Maven modules before adapter installation and release
   archive contracts support it.
 
-## Experimental Artifact Boundary Matrix
+## Bundled Artifact Boundary Matrix
 
-This matrix records the 1.0-preparation decision for experimental surfaces. It
-does not change the current beta packaging: DevHarness Kit still ships one
-shaded CLI jar and one release archive. The stable promise is defined by
-`STABLE_CONTRACT.md`; the rows below are included for dogfooding and adapter
-compatibility, not as stable API commitments.
+This matrix records the 1.0-preparation decision for bundled surfaces. It does
+not change the current packaging: DevHarness Kit still ships one shaded CLI jar
+and one release archive. The stable promise is defined by
+`STABLE_CONTRACT.md`; rows marked experimental are included for dogfooding and
+adapter compatibility, not as stable API commitments.
 
 | Surface | Current 1.0-prep decision | Stable contract status | Future artifact path | Release packaging impact |
 | --- | --- | --- | --- | --- |
-| Graph Lite / Graph-aware Goal | Keep bundled in the default shaded CLI for beta and stable-candidate dogfooding. | Experimental; graph output is heuristic advisory context, not a correctness proof. | Candidate for `dhk-graph` only after graph checks and adapter paths can be isolated from goal core without changing check keys. | No current archive split. Future split requires README, release notes, wrappers, and `THIRD_PARTY_NOTICES.md` to describe core/full behavior. |
-| BDD acceptance harness | Keep bundled while BDD-required profiles are still internal alpha. | Experimental; scenario evidence and BDD quality gates may change before 1.0. | Candidate for `dhk-bdd` after executable adapter contracts and evidence schema stabilize. | No current archive split. Future split must keep existing goal verify behavior compatible when BDD is absent. |
+| Graph Lite / Graph-aware Goal | Keep bundled in the default shaded CLI for stable-advisory graph output and graph-aware dogfooding. | Graph Lite `status/index/impact/export` output is stable-advisory; Graph-aware Goal orchestration and provider internals remain experimental. Graph output is heuristic context, not a correctness proof. | Candidate for `dhk-graph` only after graph checks and adapter paths can be isolated from goal core without changing check keys. | No current archive split. Future split requires README, release notes, wrappers, and `THIRD_PARTY_NOTICES.md` to describe core/full behavior. |
+| BDD acceptance harness | Keep bundled in the default shaded CLI for the 1.0 stable contract. | Stable command/export/evidence surface; scenarios are acceptance intent and still require accepted evidence plus goal checks. | Candidate for `dhk-bdd` only after optional artifact installation can preserve current command and goal-check behavior. | No current archive split. Future split must keep existing goal verify behavior compatible when BDD is absent. |
 | Skill Contract / Evaluation / Trust | Keep bundled because agent adapters depend on these files and checks during dogfooding. | Experimental governance surface; not part of stable CLI core. | Candidate for `dhk-governance` once adapter install state, trust policy, and skill evaluation schemas are versioned. | Current adapters assume a single `dhk.jar`; split requires adapter installer and control panel updates. |
 | Policy / Hook governance | Keep bundled as local enforcement scaffolding, but outside the stable contract. | Experimental; policy/hook points can still change. | Candidate for `dhk-governance` or a small shared policy module after hook events are fixed. | Future split must preserve default safe behavior when optional governance modules are not installed. |
-| Routine / metrics / replay | Keep as planned alpha documentation and local report helpers; no public routine command is stable. | Experimental/planned alpha. | Candidate for a later reporting module, not a 1.0 core dependency. | No current release archive change. Do not add package-manager/install obligations until routine commands are public. |
-| ECC Control Panel scripts | Keep bundled as scripts and adapter setup helpers for beta UX. | Experimental script surface; not stable CLI API. | Candidate for installer/control-panel packaging, not core. | Future split must preserve script paths or provide migration wrappers because users and adapters may call them directly. |
+| Routine / metrics / replay | Keep stable-candidate local report helpers bundled; no public routine command is stable. | Stable-candidate local report schema; routine CLI remains experimental/planned. | Candidate for a later reporting module, not a 1.0 core dependency. | No current release archive change. Do not add package-manager/install obligations until routine commands are public. |
+| ECC Control Panel scripts | Keep bundled as scripts and adapter setup helpers for local installs. | Stable-candidate user-facing script entrypoints; internal `.agents/`, `.claude/`, `.comate/` generated layouts and alpha state files are not stable. | Candidate for installer/control-panel packaging, not core. | Future split must preserve `install.sh`, `scripts/install-agent-adapters.sh`, and `scripts/devharness-control-panel.sh` paths or provide migration wrappers because users and adapters may call them directly. |
 
-Default 1.0-prep answer: keep the shaded CLI bundled for compatibility, mark
-these surfaces outside the stable contract, and delay independent artifacts
-until licensing, startup, size, installer, and adapter costs justify the added
-release surface.
+Default 1.0-prep answer: keep the shaded CLI bundled for compatibility, promote
+BDD into the stable contract, promote Graph Lite output to stable-advisory,
+keep the remaining rows outside the stable contract, and delay independent
+artifacts until licensing, startup, size, installer, and adapter costs justify
+the added release surface.

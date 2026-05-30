@@ -75,7 +75,7 @@ final class ImpactGoalCheckRunner extends AbstractGoalCheckRunner {
             }
             GoalCheckSupport.addAgeFailure("impact map", generatedAt,
                     context.profile().graphMaxStalenessMinutes(), context.now(), command, failures);
-            List<String> uncovered = uncoveredChangedFiles(context, impactText);
+            List<String> uncovered = uncoveredChangedFiles(context, impactText, steps);
             if (!uncovered.isEmpty()) {
                 failures.add("changed files not covered by impact map: " + uncovered
                         + "; next_command=" + GoalCheckSupport.commandForChangedFile(
@@ -101,12 +101,14 @@ final class ImpactGoalCheckRunner extends AbstractGoalCheckRunner {
                 command, status, summary, log, context.now());
     }
 
-    private List<String> uncoveredChangedFiles(GoalCheckContext context, String impactText) throws Exception {
+    private List<String> uncoveredChangedFiles(GoalCheckContext context, String impactText,
+                                               List<GoalStep> steps) throws Exception {
         List<String> changed = GoalCheckSupport.changedFilesForCoverage(stepRepository, context.connection(),
                 context.projectRoot(), context.goal());
         List<String> uncovered = new ArrayList<String>();
         for (String file : changed) {
-            if (GoalCheckSupport.requiresImpactCoverage(file) && impactText.indexOf(file) < 0) {
+            if (GoalCheckSupport.requiresImpactCoverage(file) && impactText.indexOf(file) < 0
+                    && !GoalCheckSupport.multiImpactEvidenceCovers(context.projectRoot(), steps, file)) {
                 uncovered.add(file);
             }
         }

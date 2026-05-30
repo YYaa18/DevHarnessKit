@@ -65,6 +65,22 @@ final class DbSqlDryRunIntegrationTest {
     }
 
     @Test
+    void dryRunFormatJsonReturnsMachineReadableSuccess() {
+        Harness harness = new Harness(tempDir);
+
+        int exitCode = new CommandRouter().run(new String[]{
+                "db", "sql", "--dry-run", "--format", "json", "--sql", "SELECT 1"
+        }, harness.context());
+
+        assertEquals(ExitCodes.SUCCESS, exitCode);
+        assertTrue(harness.stdout().contains("\"command\": \"db sql\""));
+        assertTrue(harness.stdout().contains("\"status\": \"ok\""));
+        assertTrue(harness.stdout().contains("\"dry_run\": true"));
+        assertTrue(harness.stdout().contains("\"sql\": \"SELECT 1\""));
+        assertEquals("", harness.stderr());
+    }
+
+    @Test
     void policyCanBlockDbSqlEvenForDryRun() throws Exception {
         Path projectRoot = tempDir.resolve("demo");
         Files.createDirectories(PathUtil.devharnessDirectory(projectRoot));
@@ -84,6 +100,7 @@ final class DbSqlDryRunIntegrationTest {
         assertEquals(ExitCodes.VALIDATION_ERROR, exitCode);
         assertTrue(harness.stderr().contains("Policy blocked db sql"));
         assertTrue(harness.stderr().contains("command is forbidden by policy"));
+        assertTrue(harness.stderr().contains("next_command: dhk doctor --project-root"));
     }
 
     @Test
@@ -128,6 +145,7 @@ final class DbSqlDryRunIntegrationTest {
         assertEquals(ExitCodes.VALIDATION_ERROR, exitCode);
         assertTrue(harness.stderr().contains("Policy blocked db sql"));
         assertTrue(harness.stderr().contains("--i-understand-db-readonly-risk"));
+        assertTrue(harness.stderr().contains("next_command: dhk db sql --project-root"));
     }
 
     @Test
@@ -142,6 +160,61 @@ final class DbSqlDryRunIntegrationTest {
         assertTrue(harness.stdout().contains("\"command\": \"db sql\""));
         assertTrue(harness.stdout().contains("\"status\": \"rejected\""));
         assertTrue(harness.stdout().contains("\"reason\": \"high risk SQL pattern is not allowed\""));
+        assertEquals("", harness.stderr());
+    }
+
+    @Test
+    void dbSqlFormatJsonReportsSafetyRejection() {
+        Harness harness = new Harness(tempDir);
+
+        int exitCode = new CommandRouter().run(new String[]{
+                "db", "sql", "--dry-run", "--format", "json", "--sql", "DELETE FROM t_order"
+        }, harness.context());
+
+        assertEquals(ExitCodes.VALIDATION_ERROR, exitCode);
+        assertTrue(harness.stdout().contains("\"command\": \"db sql\""));
+        assertTrue(harness.stdout().contains("\"status\": \"rejected\""));
+        assertTrue(harness.stdout().contains("\"dry_run\": true"));
+        assertTrue(harness.stdout().contains("\"reason\": \"high risk SQL pattern is not allowed\""));
+        assertTrue(harness.stdout().contains("\"risk_warning\": \"SQL guard and JDBC read-only mode"));
+        assertEquals("", harness.stderr());
+    }
+
+    @Test
+    void dbSqlFormatJsonReportsConnectionUsageError() {
+        Harness harness = new Harness(tempDir);
+
+        int exitCode = new CommandRouter().run(new String[]{
+                "db", "sql",
+                "--format", "json",
+                "--jdbc-url", "jdbc:mysql://localhost/demo",
+                "--user", "readonly",
+                "--sql", "SELECT 1"
+        }, harness.context());
+
+        assertEquals(ExitCodes.USAGE_ERROR, exitCode);
+        assertTrue(harness.stdout().contains("\"command\": \"db sql\""));
+        assertTrue(harness.stdout().contains("\"status\": \"error\""));
+        assertTrue(harness.stdout().contains("\"dry_run\": false"));
+        assertTrue(harness.stdout().contains("\"error\": \"Missing password source: use --password-env or --password-stdin\""));
+        assertTrue(harness.stdout().contains("\"compatibility_hint\": \"\""));
+        assertTrue(harness.stdout().contains("\"risk_warning\": \"SQL guard and JDBC read-only mode"));
+        assertEquals("", harness.stderr());
+    }
+
+    @Test
+    void dryRunJsonReportsVersionedCommentRejection() {
+        Harness harness = new Harness(tempDir);
+
+        int exitCode = new CommandRouter().run(new String[]{
+                "db", "sql", "--dry-run", "--json",
+                "--sql", "SELECT 1 /*!50000 INTO OUTFILE '/tmp/orders.txt' */"
+        }, harness.context());
+
+        assertEquals(ExitCodes.VALIDATION_ERROR, exitCode);
+        assertTrue(harness.stdout().contains("\"command\": \"db sql\""));
+        assertTrue(harness.stdout().contains("\"status\": \"rejected\""));
+        assertTrue(harness.stdout().contains("\"reason\": \"versioned comments are not allowed\""));
         assertEquals("", harness.stderr());
     }
 
@@ -188,6 +261,23 @@ final class DbSqlDryRunIntegrationTest {
 
         assertEquals(ExitCodes.USAGE_ERROR, exitCode);
         assertTrue(harness.stderr().contains("Only jdbc:mysql:// URLs are allowed"));
+    }
+
+    @Test
+    void dbTestJsonReportsUsageError() {
+        Harness harness = new Harness(tempDir);
+
+        int exitCode = new CommandRouter().run(new String[]{
+                "db", "test", "--json", "--jdbc-url", "jdbc:sqlite:test.db", "--user", "readonly"
+        }, harness.context());
+
+        assertEquals(ExitCodes.USAGE_ERROR, exitCode);
+        assertTrue(harness.stdout().contains("\"command\": \"db test\""));
+        assertTrue(harness.stdout().contains("\"status\": \"error\""));
+        assertTrue(harness.stdout().contains("\"error\": \"Only jdbc:mysql:// URLs are allowed\""));
+        assertTrue(harness.stdout().contains("\"compatibility_hint\": \"\""));
+        assertTrue(harness.stdout().contains("\"risk_warning\": \"SQL guard and JDBC read-only mode"));
+        assertEquals("", harness.stderr());
     }
 
     @Test

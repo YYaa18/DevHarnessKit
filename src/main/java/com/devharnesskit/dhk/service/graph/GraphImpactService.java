@@ -154,7 +154,8 @@ public final class GraphImpactService {
         List<String> missingTests = missingRelatedTests(relatedFiles, data.files(), request, startNodes);
         List<GraphNode> sql = relatedSqlNodes(impactedNodes, request);
         List<GraphNode> risks = riskNodes(impactedNodes);
-        List<String> recommended = recommendedReadFiles(relatedFiles);
+        List<String> recommended = recommendedReadFiles(relatedFiles, startNodes, callers, callees,
+                nodesByKey, tests);
 
         return new GraphImpactResult(request, data.snapshot(), true, startNodes, impactedNodes, callers,
                 callees, relatedFiles, sql, tests, missingTests, risks, recommended, Collections.<GraphNode>emptyList(),
@@ -184,6 +185,7 @@ public final class GraphImpactService {
         if (!matches.isEmpty() || !"symbol".equals(request.queryType())) {
             if ("symbol".equals(request.queryType())) {
                 addPropertyAccessorMatches(matches, data.nodes(), query);
+                matches = orderSymbolStartNodes(matches);
             }
             return matches;
         }
@@ -193,7 +195,7 @@ public final class GraphImpactService {
             }
         }
         if (!matches.isEmpty()) {
-            return matches;
+            return orderSymbolStartNodes(matches);
         }
         List<GraphNode> productionMatches = new ArrayList<GraphNode>();
         for (GraphNode node : data.nodes()) {
@@ -206,7 +208,36 @@ public final class GraphImpactService {
                 }
             }
         }
-        return productionMatches.isEmpty() ? matches : productionMatches;
+        return productionMatches.isEmpty() ? orderSymbolStartNodes(matches) : orderSymbolStartNodes(productionMatches);
+    }
+
+    private List<GraphNode> orderSymbolStartNodes(List<GraphNode> nodes) {
+        List<GraphNode> ordered = new ArrayList<GraphNode>(nodes);
+        Collections.sort(ordered, new Comparator<GraphNode>() {
+            public int compare(GraphNode left, GraphNode right) {
+                return Integer.compare(symbolStartPriority(left), symbolStartPriority(right));
+            }
+        });
+        return ordered;
+    }
+
+    private int symbolStartPriority(GraphNode node) {
+        String kind = node.nodeKind();
+        if ("sql_parameter".equals(kind) || "sql_statement".equals(kind)
+                || "xml_mapper".equals(kind) || "db_table".equals(kind)) {
+            return 0;
+        }
+        if ("class".equals(kind) || "interface".equals(kind) || "enum".equals(kind)) {
+            return 0;
+        }
+        if ("method".equals(kind) || "test_case".equals(kind)) {
+            return 1;
+        }
+        if ("servlet".equals(kind) || "route".equals(kind) || "jsp_form".equals(kind)
+                || "jsp_page".equals(kind)) {
+            return 2;
+        }
+        return 3;
     }
 
     private Set<String> traverse(List<GraphNode> startNodes, Map<String, GraphNode> nodesByKey,
@@ -242,7 +273,7 @@ public final class GraphImpactService {
         for (GraphEdge edge : edges) {
             String neighbor = outgoing ? edge.targetNodeKey() : edge.sourceNodeKey();
             GraphNode neighborNode = nodesByKey.get(neighbor);
-            if (!shouldTraverseEdge(edge, current, neighborNode)) {
+            if (!shouldTraverseEdge(edge, current, neighborNode, outgoing)) {
                 continue;
             }
             if (visited.add(neighbor)) {
@@ -301,7 +332,7 @@ public final class GraphImpactService {
             if (edges != null) {
                 for (GraphEdge edge : edges) {
                     String neighbor = outgoing ? edge.targetNodeKey() : edge.sourceNodeKey();
-                    if (shouldTraverseEdge(edge, node, nodesByKey.get(neighbor))) {
+                    if (shouldTraverseEdge(edge, node, nodesByKey.get(neighbor), outgoing)) {
                         result.add(edge);
                     }
                 }
@@ -380,7 +411,8 @@ public final class GraphImpactService {
         if (file == null || !file.startsWith("src/main/java/") || !file.endsWith(".java")) {
             return "";
         }
-        if (!(file.contains("/controller/") || file.contains("/service/") || file.contains("/repository/"))) {
+        if (!(file.contains("/controller/") || file.contains("/service/") || file.contains("/repository/")
+                || file.contains("/web/"))) {
             return "";
         }
         String className = file.substring(file.lastIndexOf('/') + 1, file.length() - ".java".length());
@@ -414,6 +446,9 @@ public final class GraphImpactService {
         Set<String> expanded = new LinkedHashSet<String>(relatedFiles);
         for (GraphFileEntry file : files) {
             if (file.indexed() && file.relativePath().contains("/dto/")) {
+                expanded.add(file.relativePath());
+            } else if (file.indexed() && shouldIncludeLegacySqlResource(file.relativePath(),
+                    request, startNodes, relatedFiles)) {
                 expanded.add(file.relativePath());
             }
         }
@@ -469,11 +504,15 @@ public final class GraphImpactService {
                 || "method_reference".equals(kind) || "test_case".equals(kind));
     }
 
-    private boolean shouldTraverseEdge(GraphEdge edge, GraphNode current, GraphNode neighbor) {
+    private boolean shouldTraverseEdge(GraphEdge edge, GraphNode current, GraphNode neighbor, boolean outgoing) {
         if (edge == null) {
             return false;
         }
         if ("imports".equals(edge.edgeKind())) {
+            return false;
+        }
+        if ("includes".equals(edge.edgeKind()) && outgoing
+                && current != null && "jsp_page".equals(current.nodeKind())) {
             return false;
         }
         if (isExternalJavaKey(edge.sourceNodeKey()) || isExternalJavaKey(edge.targetNodeKey())) {
@@ -593,6 +632,41 @@ public final class GraphImpactService {
                     || "db_table".equals(node.nodeKind())) {
                 return true;
             }
+            if (startsFromLegacyWebEntry(startNodes) && node.relativePath().contains("/dao/")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean shouldIncludeLegacySqlResource(String file, GraphImpactRequest request,
+                                                   List<GraphNode> startNodes, List<String> relatedFiles) {
+        if (file == null || !file.startsWith("src/main/resources/sql/") || !file.endsWith(".sql")) {
+            return false;
+        }
+        if ("file".equals(request.queryType()) && request.query().endsWith("web.xml")) {
+            return false;
+        }
+        if (!startsFromLegacyWebEntry(startNodes)) {
+            return false;
+        }
+        for (String related : relatedFiles) {
+            if (related.contains("/dao/Jdbc") || related.contains("/dao/")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean startsFromLegacyWebEntry(List<GraphNode> startNodes) {
+        for (GraphNode node : startNodes) {
+            String kind = node.nodeKind();
+            String path = node.relativePath();
+            if ("servlet".equals(kind) || "jsp_page".equals(kind) || "jsp_form".equals(kind)
+                    || "route".equals(kind) || path.startsWith("src/main/webapp/")
+                    || path.contains("/web/")) {
+                return true;
+            }
         }
         return false;
     }
@@ -651,17 +725,99 @@ public final class GraphImpactService {
         return result;
     }
 
-    private List<String> recommendedReadFiles(List<String> relatedFiles) {
-        List<String> result = new ArrayList<String>();
-        for (String file : relatedFiles) {
-            if (!file.startsWith("target/") && !file.startsWith(".agents/")) {
+    private List<String> recommendedReadFiles(List<String> relatedFiles, List<GraphNode> startNodes,
+                                              List<GraphEdge> callers, List<GraphEdge> callees,
+                                              Map<String, GraphNode> nodesByKey, List<String> relatedTests) {
+        LinkedHashSet<String> result = new LinkedHashSet<String>();
+        List<String> startFiles = nodeFiles(startNodes);
+        List<String> directFiles = directEdgeFiles(callers, callees, nodesByKey);
+        List<String> seedFiles = new ArrayList<String>();
+        seedFiles.addAll(startFiles);
+        seedFiles.addAll(directFiles);
+
+        addRecommended(result, startFiles);
+        addRecommended(result, nonTestFiles(directFiles));
+        addRecommended(result, expectedTestsFor(seedFiles, relatedTests));
+        addRecommended(result, nonTestFiles(relatedFiles));
+        addRecommended(result, relatedTests);
+        addRecommended(result, relatedFiles);
+        return new ArrayList<String>(result);
+    }
+
+    private void addRecommended(LinkedHashSet<String> result, List<String> files) {
+        for (String file : files) {
+            if (result.size() >= 20) {
+                return;
+            }
+            if (isRecommendableFile(file)) {
                 result.add(file);
             }
-            if (result.size() >= 20) {
-                break;
+        }
+    }
+
+    private List<String> nodeFiles(List<GraphNode> nodes) {
+        Set<String> files = new LinkedHashSet<String>();
+        for (GraphNode node : nodes) {
+            addFile(files, node.relativePath());
+        }
+        return new ArrayList<String>(files);
+    }
+
+    private List<String> directEdgeFiles(List<GraphEdge> callers, List<GraphEdge> callees,
+                                         Map<String, GraphNode> nodesByKey) {
+        Set<String> files = new LinkedHashSet<String>();
+        addDirectEdgeFiles(files, callers, nodesByKey, false);
+        addDirectEdgeFiles(files, callees, nodesByKey, true);
+        return sortedFiles(files);
+    }
+
+    private void addDirectEdgeFiles(Set<String> files, List<GraphEdge> edges,
+                                    Map<String, GraphNode> nodesByKey, boolean outgoing) {
+        for (GraphEdge edge : edges) {
+            String nodeKey = outgoing ? edge.targetNodeKey() : edge.sourceNodeKey();
+            GraphNode node = nodesByKey.get(nodeKey);
+            if (node != null) {
+                addFile(files, node.relativePath());
             }
         }
-        return result;
+    }
+
+    private List<String> expectedTestsFor(List<String> files, List<String> relatedTests) {
+        Set<String> indexedTests = new LinkedHashSet<String>(relatedTests);
+        Set<String> matches = new LinkedHashSet<String>();
+        for (String file : files) {
+            String expected = expectedTestPath(file);
+            if (expected.length() > 0 && indexedTests.contains(expected)) {
+                matches.add(expected);
+            }
+        }
+        return sortedFiles(matches);
+    }
+
+    private List<String> nonTestFiles(List<String> files) {
+        Set<String> result = new LinkedHashSet<String>();
+        for (String file : files) {
+            if (!isTestFile(file)) {
+                result.add(file);
+            }
+        }
+        return sortedFiles(result);
+    }
+
+    private List<String> sortedFiles(Set<String> files) {
+        List<String> sorted = new ArrayList<String>(files);
+        Collections.sort(sorted);
+        return sorted;
+    }
+
+    private boolean isRecommendableFile(String file) {
+        return file != null && file.length() > 0
+                && !file.startsWith("target/")
+                && !file.startsWith(".agents/");
+    }
+
+    private boolean isTestFile(String file) {
+        return file != null && file.startsWith("src/test/");
     }
 
     private List<GraphNode> limitNodes(List<GraphNode> nodes, int limit) {

@@ -49,16 +49,25 @@ public final class SkillDisciplineGateService {
                 new String[]{"questions", "open_questions", "pending"});
         String tradeoff = firstEvidenceValue(steps, implementation,
                 new String[]{"tradeoff", "tradeoffs", "risk_points"});
+        String repair = evidenceValue(steps, "think_before_coding_repair");
+        String repairedGoalUnderstanding = evidenceValue(steps, "goal_understanding");
+        String repairedAssumptions = evidenceValue(steps, "assumptions");
+        String repairedQuestions = firstNonEmpty(evidenceValue(steps, "questions"),
+                firstNonEmpty(evidenceValue(steps, "open_questions"), evidenceValue(steps, "pending")));
+        boolean repairAccepted = isApproved(repair)
+                && repairedGoalUnderstanding.length() > 0
+                && (repairedAssumptions.length() > 0 || repairedQuestions.length() > 0);
 
         output.append("goal_understanding: ").append(empty(goalUnderstanding, "missing")).append('\n');
         output.append("assumptions: ").append(empty(assumptions, "missing")).append('\n');
         output.append("questions_or_pending: ").append(empty(questions, "missing")).append('\n');
         output.append("tradeoff_or_risk_points: ").append(empty(tradeoff, "missing")).append('\n');
+        output.append("repair_evidence: ").append(empty(repair, "none")).append('\n');
 
-        if (goalUnderstanding.length() == 0) {
+        if (goalUnderstanding.length() == 0 && !repairAccepted) {
             failures.add("goal understanding evidence missing; add goal_understanding=<summary> before implementation");
         }
-        if (assumptions.length() == 0 && questions.length() == 0) {
+        if (assumptions.length() == 0 && questions.length() == 0 && !repairAccepted) {
             failures.add("assumptions or pending/questions evidence missing before implementation");
         }
 
@@ -414,6 +423,8 @@ public final class SkillDisciplineGateService {
     private boolean isApproved(String value) {
         String normalized = value == null ? "" : value.trim().toLowerCase();
         return "approved".equals(normalized)
+                || "accepted".equals(normalized)
+                || "acknowledged".equals(normalized)
                 || "confirmed".equals(normalized)
                 || "passed".equals(normalized);
     }

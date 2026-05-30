@@ -181,8 +181,8 @@ public final class GoalActionSyncService {
             return;
         }
         Map<String, GoalCheck> checks = checksByKey(connection, goal.goalKey(), currentRunChecks);
-        GoalCheck compile = checks.get("compile");
-        if (isFreshAccepted(compile, goal, policy, profile)) {
+        GoalCheck compile = acceptedCheck("compile", checks, goal, policy, profile);
+        if (compile != null) {
             workflowSyncSupport.passPhase(connection, project, goal, "verify_compile", "Compile check passed",
                     checkEvidence(compile), now, profile);
         }
@@ -194,13 +194,13 @@ public final class GoalActionSyncService {
                 if (GoalActionMapping.MODE_CHECK.equals(mapping.gatePassMode())) {
                     for (String gateKey : mapping.requiredGates()) {
                         workflowSyncSupport.passGate(connection, project, goal, gateKey, "Goal checks accepted",
-                                checksEvidence(mapping, checks), now);
+                                checksEvidence(mapping, checks, goal, policy, profile), now);
                     }
                 }
                 if (mapping.workflowPhase().length() > 0
                         && GoalActionMapping.MODE_CHECK.equals(mapping.phasePassMode())) {
                     workflowSyncSupport.passPhase(connection, project, goal, mapping.workflowPhase(), "Goal checks accepted",
-                            checksEvidence(mapping, checks), now, profile);
+                            checksEvidence(mapping, checks, goal, policy, profile), now, profile);
                 }
             }
         }
@@ -253,17 +253,17 @@ public final class GoalActionSyncService {
         if (GoalAcceptanceMapping.SOURCE_EVIDENCE.equals(mapping.source())) {
             return evidenceKeyMatched(mapping, steps);
         }
-        String[] required = acceptanceRequiredChecks(mapping);
+        String[] required = acceptanceRequiredChecks(mapping, policy, profile);
         if (required.length == 0) {
             return "";
         }
         for (String checkKey : required) {
-            GoalCheck check = checks.get(checkKey);
-            if (!isFreshAccepted(check, goal, policy, profile)) {
+            GoalCheck check = acceptedCheck(checkKey, checks, goal, policy, profile);
+            if (check == null) {
                 return "";
             }
         }
-        return checksEvidence(required, checks);
+        return checksEvidence(required, checks, goal, policy, profile);
     }
 
     private String evidenceKeyMatched(GoalAcceptanceMapping mapping, List<GoalStep> steps) {
@@ -285,7 +285,12 @@ public final class GoalActionSyncService {
         return evidence.contains(key + "=") || evidence.contains(key + ":") || evidence.contains(key);
     }
 
-    private String[] acceptanceRequiredChecks(GoalAcceptanceMapping mapping) {
+    private String[] acceptanceRequiredChecks(GoalAcceptanceMapping mapping, GoalCheckPolicy policy,
+                                              GoalProfile profile) {
+        if (GOAL_ACCEPTANCE.equals(mapping.acceptanceKey())
+                && GoalAcceptanceMapping.SOURCE_CHECKS.equals(mapping.source())) {
+            return policyRequiredAcceptanceChecks(policy, profile);
+        }
         if (GoalAcceptanceMapping.SOURCE_TEST.equals(mapping.source()) && mapping.requiredChecks().length == 0) {
             return new String[]{"test"};
         }
@@ -294,6 +299,14 @@ public final class GoalActionSyncService {
             return mapping.requiredChecks();
         }
         return new String[0];
+    }
+
+    private String[] policyRequiredAcceptanceChecks(GoalCheckPolicy policy, GoalProfile profile) {
+        Set<String> checks = new LinkedHashSet<String>();
+        for (String checkKey : policy.requiredChecks(profile)) {
+            addAcceptanceCheck(checks, checkKey);
+        }
+        return checks.toArray(new String[checks.size()]);
     }
 
     private void syncLegacyAutoAcceptance(Connection connection, SpecChange change, GoalRun goal,
@@ -328,8 +341,8 @@ public final class GoalActionSyncService {
             return false;
         }
         for (String checkKey : required) {
-            GoalCheck check = checks.get(checkKey);
-            if (!isFreshAccepted(check, goal, policy, profile)) {
+            GoalCheck check = acceptedCheck(checkKey, checks, goal, policy, profile);
+            if (check == null) {
                 return false;
             }
         }
@@ -356,15 +369,17 @@ public final class GoalActionSyncService {
         return checks.toArray(new String[checks.size()]);
     }
 
-    private String checksEvidence(GoalActionMapping mapping, Map<String, GoalCheck> checks) {
+    private String checksEvidence(GoalActionMapping mapping, Map<String, GoalCheck> checks,
+                                  GoalRun goal, GoalCheckPolicy policy, GoalProfile profile) {
         String[] required = mappingRequiredChecks(mapping);
-        return checksEvidence(required, checks);
+        return checksEvidence(required, checks, goal, policy, profile);
     }
 
-    private String checksEvidence(String[] required, Map<String, GoalCheck> checks) {
+    private String checksEvidence(String[] required, Map<String, GoalCheck> checks,
+                                  GoalRun goal, GoalCheckPolicy policy, GoalProfile profile) {
         StringBuilder builder = new StringBuilder();
         for (String checkKey : required) {
-            GoalCheck check = checks.get(checkKey);
+            GoalCheck check = acceptedCheck(checkKey, checks, goal, policy, profile);
             if (check == null) {
                 continue;
             }
@@ -374,6 +389,42 @@ public final class GoalActionSyncService {
             builder.append(checkEvidence(check));
         }
         return builder.length() == 0 ? "goal_checks" : builder.toString();
+    }
+
+    private GoalCheck acceptedCheck(String checkKey, Map<String, GoalCheck> checks,
+                                    GoalRun goal, GoalCheckPolicy policy, GoalProfile profile) {
+        GoalCheck direct = checks.get(checkKey);
+        if (isFreshAccepted(direct, goal, policy, profile)) {
+            return direct;
+        }
+        String effective = effectiveCheckKey(checkKey, policy);
+        if (!effective.equals(checkKey)) {
+            GoalCheck mapped = checks.get(effective);
+            if (isFreshAccepted(mapped, goal, policy, profile)) {
+                return mapped;
+            }
+        }
+        return null;
+    }
+
+    private String effectiveCheckKey(String checkKey, GoalCheckPolicy policy) {
+        if ("compile".equals(checkKey)) {
+            return verificationModeCheck("compile", policy.compileMode());
+        }
+        if ("test".equals(checkKey)) {
+            return verificationModeCheck("test", policy.testMode());
+        }
+        return checkKey;
+    }
+
+    private String verificationModeCheck(String baseCheck, String mode) {
+        if ("manual".equals(mode)) {
+            return "manual-" + baseCheck;
+        }
+        if ("disabled".equals(mode)) {
+            return "verification-risk";
+        }
+        return baseCheck;
     }
 
     private String[] acceptanceChecks(GoalProfile profile, GoalCheckPolicy policy) {

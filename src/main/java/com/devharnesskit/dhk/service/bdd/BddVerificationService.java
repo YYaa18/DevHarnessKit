@@ -2,9 +2,11 @@ package com.devharnesskit.dhk.service.bdd;
 
 import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.bdd.BddAdapterResult;
+import com.devharnesskit.dhk.model.bdd.BddBinding;
 import com.devharnesskit.dhk.model.bdd.BddEvidence;
 import com.devharnesskit.dhk.model.bdd.BddScenario;
 import com.devharnesskit.dhk.model.bdd.BddScenarioView;
+import com.devharnesskit.dhk.repository.bdd.BddBindingRepository;
 import com.devharnesskit.dhk.service.bdd.adapter.BddEvidenceAdapter;
 import com.devharnesskit.dhk.service.bdd.adapter.BddEvidenceAdapterRegistry;
 
@@ -16,19 +18,27 @@ import java.util.List;
 
 public final class BddVerificationService {
     private final BddEvidenceAdapterRegistry adapterRegistry;
+    private final BddBindingRepository bindingRepository;
 
     public BddVerificationService() {
-        this(new BddEvidenceAdapterRegistry());
+        this(new BddEvidenceAdapterRegistry(), new BddBindingRepository());
     }
 
     public BddVerificationService(BddEvidenceAdapterRegistry adapterRegistry) {
+        this(adapterRegistry, new BddBindingRepository());
+    }
+
+    public BddVerificationService(BddEvidenceAdapterRegistry adapterRegistry,
+                                  BddBindingRepository bindingRepository) {
         this.adapterRegistry = adapterRegistry;
+        this.bindingRepository = bindingRepository;
     }
 
     public BddVerificationResult evaluate(Connection connection, Project project, BddService bddService,
                                           String featureKey, String scenarioKey, String goalKey)
             throws SQLException {
-        List<BddScenarioView> views = selectedScenarios(connection, project, bddService, featureKey, scenarioKey);
+        List<BddScenarioView> views = selectedScenarios(connection, project, bddService,
+                featureKey, scenarioKey, goalKey);
         List<BddScenarioEvidenceResult> scenarioResults = new ArrayList<BddScenarioEvidenceResult>();
         int coveredCount = 0;
         int missingCount = 0;
@@ -56,12 +66,25 @@ public final class BddVerificationService {
     }
 
     private List<BddScenarioView> selectedScenarios(Connection connection, Project project, BddService bddService,
-                                                    String featureKey, String scenarioKey) throws SQLException {
+                                                    String featureKey, String scenarioKey, String goalKey)
+            throws SQLException {
         List<BddScenarioView> views = new ArrayList<BddScenarioView>();
         if (scenarioKey != null && scenarioKey.length() > 0) {
             BddScenarioView view = bddService.findScenario(connection, project, scenarioKey);
             if (view != null) {
                 views.add(view);
+            }
+            return views;
+        }
+        if ((featureKey == null || featureKey.length() == 0)
+                && goalKey != null && goalKey.length() > 0) {
+            List<BddBinding> bindings = bindingRepository.listByBinding(connection, "goal", goalKey);
+            for (BddBinding binding : bindings) {
+                BddScenarioView view = bddService.findScenario(connection, project, binding.scenarioKey());
+                if (view != null && !"archived".equals(view.scenario().status())
+                        && !"deprecated".equals(view.scenario().status())) {
+                    views.add(view);
+                }
             }
             return views;
         }

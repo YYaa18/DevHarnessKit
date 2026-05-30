@@ -223,6 +223,7 @@ public final class CommandRouter {
         excluded.add("user");
         excluded.add("port");
         excluded.add("path");
+        excluded.add("evidence-path");
         excluded.add("write");
         return excluded;
     }

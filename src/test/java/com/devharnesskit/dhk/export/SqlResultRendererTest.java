@@ -29,6 +29,8 @@ final class SqlResultRendererTest {
         assertTrue(rendered.contains("\"columns\": [{"));
         assertTrue(rendered.contains("\"name\": \"ok\""));
         assertTrue(rendered.contains("\"data\": [[\"1\"]]"));
+        assertTrue(rendered.contains("\"risk_warning\": \"SQL guard and JDBC read-only mode"));
+        assertTrue(rendered.contains("not database permission boundaries"));
     }
 
     @Test

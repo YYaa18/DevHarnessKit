@@ -222,6 +222,98 @@ final class SpecIntegrationTest {
     }
 
     @Test
+    void specStableSubsetSupportsJsonOutput() throws Exception {
+        seedWorkflow();
+
+        Harness create = new Harness(tempDir);
+        int createExit = new CommandRouter().run(new String[]{
+                "spec", "create", "--project-root", "demo",
+                "--change", "order-query-api",
+                "--title", "新增订单查询接口",
+                "--summary", "为前端提供订单分页查询接口",
+                "--module", "order",
+                "--mode", "api",
+                "--json"
+        }, create.context());
+        assertEquals(ExitCodes.SUCCESS, createExit);
+        assertTrue(create.stdout().contains("\"command\": \"spec create\""));
+        assertTrue(create.stdout().contains("\"change_key\": \"order-query-api\""));
+        assertTrue(create.stdout().contains("\"title\": \"新增订单查询接口\""));
+        assertTrue(create.stdout().contains("\"module\": \"order\""));
+        assertTrue(create.stdout().contains("\"mode\": \"api\""));
+        assertTrue(create.stdout().contains("\"tasks\": []"));
+        assertTrue(create.stdout().contains("\"acceptance\": []"));
+
+        Harness task = new Harness(tempDir);
+        int taskExit = new CommandRouter().run(new String[]{
+                "spec", "task", "add", "--project-root", "demo",
+                "--change", "order-query-api",
+                "--task", "T001",
+                "--title", "新增请求 DTO",
+                "--phase", "implement_minimal_change"
+        }, task.context());
+        assertEquals(ExitCodes.SUCCESS, taskExit);
+
+        Harness acceptance = new Harness(tempDir);
+        int acceptanceExit = new CommandRouter().run(new String[]{
+                "spec", "acceptance", "add", "--project-root", "demo",
+                "--change", "order-query-api",
+                "--acceptance", "A001",
+                "--description", "分页查询返回统一结果",
+                "--expected", "接口返回 ApiResult<PageResult<OrderVO>>"
+        }, acceptance.context());
+        assertEquals(ExitCodes.SUCCESS, acceptanceExit);
+
+        Harness run = new Harness(tempDir);
+        int runExit = new CommandRouter().run(new String[]{
+                "workflow", "start", "--project-root", "demo",
+                "--workflow", "api-change",
+                "--task", "新增订单查询接口",
+                "--module", "order",
+                "--mode", "api"
+        }, run.context());
+        assertEquals(ExitCodes.SUCCESS, runExit);
+        String runKey = valueAfter(run.stdout(), "run_key: ");
+
+        Harness bind = new Harness(tempDir);
+        int bindExit = new CommandRouter().run(new String[]{
+                "spec", "bind-workflow", "--project-root", "demo",
+                "--change", "order-query-api",
+                "--run", runKey,
+                "--type", "implements",
+                "--json"
+        }, bind.context());
+        assertEquals(ExitCodes.SUCCESS, bindExit);
+        assertTrue(bind.stdout().contains("\"command\": \"spec bind-workflow\""));
+        assertTrue(bind.stdout().contains("\"workflow_spec_binding_id\": 1"));
+        assertTrue(bind.stdout().contains("\"change_key\": \"order-query-api\""));
+        assertTrue(bind.stdout().contains("\"run_key\": \"" + runKey + "\""));
+        assertTrue(bind.stdout().contains("\"bound_workflows\": ["));
+
+        Harness status = new Harness(tempDir);
+        int statusExit = new CommandRouter().run(new String[]{
+                "spec", "status", "--project-root", "demo", "--change", "order-query-api", "--json"
+        }, status.context());
+        assertEquals(ExitCodes.SUCCESS, statusExit);
+        assertTrue(status.stdout().contains("\"command\": \"spec status\""));
+        assertTrue(status.stdout().contains("\"tasks\": ["));
+        assertTrue(status.stdout().contains("\"task_key\": \"T001\""));
+        assertTrue(status.stdout().contains("\"acceptance\": ["));
+        assertTrue(status.stdout().contains("\"acceptance_key\": \"A001\""));
+        assertTrue(status.stdout().contains("\"bound_workflows\": ["));
+
+        Harness export = new Harness(tempDir);
+        int exportExit = new CommandRouter().run(new String[]{
+                "spec", "export", "--project-root", "demo", "--change", "order-query-api", "--json"
+        }, export.context());
+        assertEquals(ExitCodes.SUCCESS, exportExit);
+        assertTrue(export.stdout().contains("\"command\": \"spec export\""));
+        assertTrue(export.stdout().contains("\"export_path\":"));
+        assertTrue(export.stdout().contains("\"change_key\": \"order-query-api\""));
+        assertTrue(Files.isRegularFile(PathUtil.specContext(tempDir.resolve("demo"))));
+    }
+
+    @Test
     void waivedAcceptanceRequiresEvidence() {
         createSpec();
         Harness add = new Harness(tempDir);

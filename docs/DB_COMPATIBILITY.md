@@ -21,6 +21,62 @@ DevHarness Kit should not guess compatibility from version numbers alone. Prefer
 - lowest-common SQL features;
 - read-only database credentials enforced by the database server.
 
+## Compatibility Matrix
+
+| Target | 1.0 status | Evidence type | Current evidence | Required constraints |
+| --- | --- | --- | --- | --- |
+| MySQL Server 5.1 production floor | Beta target | Real environment smoke evidence required | No bundled live MySQL 5.1 evidence is claimed by this repository unless a release artifact links a dated smoke log. Fixture/unit tests cover URL construction and probe formatting only. | Connector/J 5.1-compatible URL, lowest-common SQL, readonly database credentials, no CTE/window/JSON function assumptions. |
+| MySQL Server 8 local target | Beta local target | Real environment smoke evidence required | Optional live smoke is available through `DHK_TEST_MYSQL_*`; when the variables are absent the test is skipped and does not prove MySQL 8 compatibility. | `mysql_native_password` account or explicit local-only compatibility flags, reviewed JDBC URL, readonly database credentials. |
+| Connector/J 5.1.49 default driver | Included dependency | Fixture/unit coverage plus driver load checks | `pom.xml` pins `mysql:mysql-connector-java:5.1.49`; `dhk doctor` checks `com.mysql.jdbc.Driver`; unit tests cover generated JDBC URL flags. | Do not upgrade by default while MySQL 5.1 is the production floor. |
+| `dhk db test` probes | Beta command | Fixture/unit and optional live smoke | SQLite fixture coverage proves probe output handles metadata and safe failures; live MySQL smoke must capture actual probe lines. | `probe_select_1: ok` is required before using `dhk db sql`; optional probes are diagnostic. |
+| `dhk db sql` readonly execution | Beta command | Unit/integration dry-run plus optional live smoke | Dry-run and SQL safety tests do not connect to MySQL; live smoke is opt-in and must use readonly credentials. | SQL guard and JDBC read-only hints are guardrails, not permission boundaries. |
+
+The matrix is intentionally evidence-bound. A fixture/unit test proves only the
+local Java behavior named in the test. A real environment smoke proves only the
+specific server, account, URL, driver, and probe output captured in that smoke
+log.
+
+## Automated And Manual Evidence Path
+
+Automated fixture/unit coverage:
+
+```bash
+mvn -q -Dtest=MysqlConnectionServiceTest,DbCompatibilityProbeServiceTest,DbSqlDryRunIntegrationTest#dbTestRejectsNonMysqlJdbcUrlsBeforeConnecting test
+```
+
+This coverage is useful for CLI behavior, but it is not real MySQL 5.1 or MySQL
+8 evidence.
+
+Optional live MySQL smoke:
+
+```bash
+export DHK_TEST_MYSQL_URL="jdbc:mysql://127.0.0.1:3306/your_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&zeroDateTimeBehavior=convertToNull"
+export DHK_TEST_MYSQL_USER="dhk_readonly"
+export DHK_TEST_MYSQL_PASSWORD="<redacted>"
+mvn -q -Dtest=DbSqlDryRunIntegrationTest#liveMysqlSmokeRunsWhenEnvironmentIsConfigured test
+```
+
+Manual smoke evidence can also be captured with:
+
+```bash
+dhk db test --json \
+  --jdbc-url "<redacted-reviewed-jdbc-url>" \
+  --user dhk_readonly \
+  --password-env DHK_DB_PASSWORD
+```
+
+Store release evidence outside public docs unless it is redacted. A useful
+smoke record includes:
+
+- date, tester, target label, and whether it is MySQL 5.1 or MySQL 8;
+- `database_product`, `database_version`, `driver_name`, and `driver_version`;
+- `readonly_requested`, `readonly_effective`, and `probe_select_1`;
+- `probe_explain_select_1`, `probe_show_tables`, and any compatibility hints;
+- a clear note when a result is fixture/unit coverage rather than real MySQL.
+
+Do not store passwords, full JDBC URLs, hostnames, tokens, or raw SQL result
+sets in evidence files.
+
 ## Recommended MySQL 5.1 Production URL
 
 Use a read-only account and keep the JDBC URL conservative:

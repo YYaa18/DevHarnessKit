@@ -6,10 +6,12 @@ import com.devharnesskit.dhk.model.spec.SpecChange;
 import com.devharnesskit.dhk.model.spec.SpecDocument;
 import com.devharnesskit.dhk.model.spec.SpecTask;
 import com.devharnesskit.dhk.model.spec.WorkflowSpecBinding;
+import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.repository.spec.SpecAcceptanceRepository;
 import com.devharnesskit.dhk.repository.spec.SpecDocumentRepository;
 import com.devharnesskit.dhk.repository.spec.SpecTaskRepository;
 import com.devharnesskit.dhk.repository.spec.WorkflowSpecBindingRepository;
+import com.devharnesskit.dhk.service.bdd.BddTraceService;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -21,6 +23,7 @@ public final class SpecExportService {
     private final SpecAcceptanceRepository acceptanceRepository;
     private final WorkflowSpecBindingRepository bindingRepository;
     private final SpecContextRenderer renderer;
+    private final BddTraceService bddTraceService = new BddTraceService();
 
     public SpecExportService(SpecDocumentRepository documentRepository,
                              SpecTaskRepository taskRepository,
@@ -39,7 +42,10 @@ public final class SpecExportService {
         List<SpecTask> tasks = taskRepository.listByChange(connection, change.changeKey());
         List<SpecAcceptance> acceptances = acceptanceRepository.listByChange(connection, change.changeKey());
         List<WorkflowSpecBinding> bindings = bindingRepository.listByChange(connection, change.changeKey());
-        return renderer.renderFull(change, documents, tasks, acceptances, bindings, generatedAt);
+        Project project = new Project(change.projectKey(), "", "", "", "", "", "", "", "");
+        return renderer.renderFull(change, documents, tasks, acceptances, bindings,
+                bddTraceService.specTrace(connection, project, change.changeKey(), acceptances),
+                generatedAt);
     }
 
     public String renderInline(Connection connection, SpecChange change) throws SQLException {

@@ -3,11 +3,15 @@
 Graph Lite exports are a short-context layer for agents. They are generated from
 the latest completed graph snapshot and are not long-term confirmed memory.
 
+Status: stable-advisory in DevHarness Kit 1.0.0.
+
+Stable-advisory means the command names, required options, freshness metadata,
+and generated export anchors documented here are stable for scripts and agents.
+It does not mean Graph Lite returns a complete impact set or proves correctness.
+
 ## Contract
 
 ```text
-.agents/graph/config.json
-.agents/graph/architecture.json
 .agents/graph/exports/GRAPH_INDEX_REPORT.md
 .agents/graph/exports/GRAPH_CONTEXT.md
 .agents/graph/exports/GRAPH_SNAPSHOT.json
@@ -18,6 +22,9 @@ Rules:
 
 - SQLite graph tables remain the source of truth for graph snapshots.
 - Markdown and JSON graph exports are derived artifacts.
+- `.agents/graph/config.json`, `.agents/graph/architecture.json`, provider
+  adapters, precision thresholds, and SQLite rows are configuration or internal
+  implementation details, not stable public APIs.
 - Agents should read `GRAPH_CONTEXT.md` and task-specific `IMPACT_MAP.md`, not
 `memory.db`.
 - Graph facts are snapshot-bound machine facts. They must not be promoted to
@@ -29,6 +36,35 @@ Rules:
 - `IMPACT_MAP.md` can include `related-tests` and `missing-related-tests`.
   Missing tests are inferred from Java path conventions and should be treated as
   review prompts.
+
+Stable-advisory commands:
+
+```text
+dhk graph status
+dhk graph index
+dhk graph impact --file <path>|--symbol <symbol>|--sql-table <table>|--scenario <key>
+dhk graph export
+```
+
+`graph init`, `graph doctor`, `graph prune`, CGC/provider adapter behavior, and
+Graph-aware Goal orchestration remain outside the stable-advisory contract.
+
+Stable export anchors:
+
+```text
+GRAPH_CONTEXT.md: boundary, graph-confidence, snapshot, limits, file-hashes,
+node-kinds, risk-nodes, truncation-report, agent-instructions
+
+IMPACT_MAP.md: summary, snapshot-freshness, graph-confidence, start-nodes,
+direct-callers, direct-callees, related-files, related-sql, related-tests,
+missing-related-tests, risk-nodes, recommended-read-files,
+candidate-suggestions, scoring-data
+
+GRAPH_SNAPSHOT.json: schema_version, generated_at, snapshot_id, snapshot_key,
+provider, status, workspace_fingerprint, config_hash, git_commit, git_dirty,
+file_count, node_count, edge_count, max_file_bytes, max_indexed_files,
+max_export_nodes, file_hashes_truncated, risk_nodes_truncated, file_hashes
+```
 
 ## Safety Boundary
 

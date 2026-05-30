@@ -1,5 +1,5 @@
 {
-  "schema_version": "skill-contract/v1-alpha",
+  "schema_version": "skill-contract/v1",
   "skill_key": "devharness-goal-development",
   "version": "0.7.1",
   "task_type": "coding",

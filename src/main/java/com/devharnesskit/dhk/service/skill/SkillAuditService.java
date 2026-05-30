@@ -171,12 +171,33 @@ public final class SkillAuditService {
     }
 
     private void auditCommandRules(String relativePath, String text, List<SkillAuditIssue> issues) {
+        String scanText = commandScanText(text);
         for (Rule rule : COMMAND_RULES) {
-            if (rule.pattern.matcher(text).find()) {
+            if (rule.pattern.matcher(scanText).find()) {
                 issues.add(new SkillAuditIssue(rule.severity, rule.category, relativePath,
                         rule.message, "Remove the command or require explicit human approval"));
             }
         }
+    }
+
+    private String commandScanText(String text) {
+        StringBuilder builder = new StringBuilder();
+        String[] lines = (text == null ? "" : text).split("\\r?\\n");
+        for (String line : lines) {
+            if (isForbiddenCommandDeclaration(line)) {
+                builder.append('\n');
+            } else {
+                builder.append(line).append('\n');
+            }
+        }
+        return builder.toString();
+    }
+
+    private boolean isForbiddenCommandDeclaration(String line) {
+        String lower = line == null ? "" : line.trim().toLowerCase(Locale.ROOT);
+        return lower.startsWith("- forbidden_commands:")
+                || lower.startsWith("forbidden_commands:")
+                || lower.startsWith("\"forbidden_commands\"");
     }
 
     private void auditScriptFile(String relativePath, String text, List<SkillAuditIssue> issues) {

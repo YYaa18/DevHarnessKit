@@ -285,7 +285,7 @@ final class HumanCheckpointIntegrationTest {
         Files.createDirectories(skill);
         Files.write(skill.resolve("LICENSE"), "MIT\n".getBytes("UTF-8"));
         Files.write(skill.resolve("contract.json"), ("{\n"
-                + "  \"schema_version\": \"skill-contract/v1-alpha\",\n"
+                + "  \"schema_version\": \"skill-contract/v1\",\n"
                 + "  \"skill_key\": \"" + skillKey + "\",\n"
                 + "  \"version\": \"0.7.5\",\n"
                 + "  \"task_type\": \"coding\",\n"

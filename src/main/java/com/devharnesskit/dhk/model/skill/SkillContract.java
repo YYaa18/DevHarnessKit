@@ -5,7 +5,7 @@ import java.util.Collections;
 import java.util.List;
 
 public final class SkillContract {
-    public static final String SCHEMA_VERSION = "skill-contract/v1-alpha";
+    public static final String SCHEMA_VERSION = "skill-contract/v1";
 
     private final String skillKey;
     private final String version;

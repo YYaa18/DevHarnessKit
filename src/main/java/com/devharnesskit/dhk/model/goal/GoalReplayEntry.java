@@ -1,7 +1,7 @@
 package com.devharnesskit.dhk.model.goal;
 
 public final class GoalReplayEntry {
-    public static final String SCHEMA_VERSION = "goal-replay/v1-alpha";
+    public static final String SCHEMA_VERSION = "goal-replay/v1";
 
     private final int sequence;
     private final String source;

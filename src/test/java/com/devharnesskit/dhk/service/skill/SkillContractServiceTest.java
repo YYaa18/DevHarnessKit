@@ -34,6 +34,7 @@ final class SkillContractServiceTest {
 
         SkillContract contract = service.load(skillDir);
 
+        assertEquals("skill-contract/v1", contract.schemaVersion());
         assertEquals("devharness-strict", contract.skillKey());
         assertEquals("0.7.1", contract.version());
         assertEquals("coding", contract.taskType());
@@ -52,6 +53,7 @@ final class SkillContractServiceTest {
         Files.createDirectories(skillDir);
         Files.write(PathUtil.skillContract(tempDir, "devharness-local"),
                 ("{\n"
+                        + "  \"schema_version\": \"skill-contract/v1\",\n"
                         + "  \"skill_key\": \"devharness-local\",\n"
                         + "  \"version\": \"0.7.1\",\n"
                         + "  \"task_type\": \"coding\",\n"
@@ -92,6 +94,7 @@ final class SkillContractServiceTest {
         Files.createDirectories(skillDir);
         Files.write(skillDir.resolve(PathUtil.CONTRACT_JSON),
                 ("{\n"
+                        + "  \"schema_version\": \"skill-contract/v1\",\n"
                         + "  \"skill_key\": \"bad-access\",\n"
                         + "  \"version\": \"0.1.0\",\n"
                         + "  \"task_type\": \"coding\",\n"
@@ -105,6 +108,27 @@ final class SkillContractServiceTest {
                     }
                 });
         assertTrue(ex.getMessage().contains("Invalid data_access_level"));
+    }
+
+    @Test
+    void acceptsLegacyAlphaSchemaVersionDuringTransition() throws Exception {
+        Path skillDir = tempDir.resolve("legacy-schema");
+        Files.createDirectories(skillDir);
+        Files.write(skillDir.resolve(PathUtil.CONTRACT_JSON),
+                ("{\n"
+                        + "  \"schema_version\": \"skill-contract/v1-alpha\",\n"
+                        + "  \"skill_key\": \"legacy-schema\",\n"
+                        + "  \"version\": \"0.7.1\",\n"
+                        + "  \"task_type\": \"coding\",\n"
+                        + "  \"data_access_level\": \"context\",\n"
+                        + "  \"allowed_commands\": [\"dhk goal next\"],\n"
+                        + "  \"forbidden_commands\": [\"dhk db sql\"]\n"
+                        + "}\n").getBytes("UTF-8"));
+
+        SkillContract contract = service.load(skillDir);
+
+        assertEquals("skill-contract/v1", contract.schemaVersion());
+        assertEquals("legacy-schema", contract.skillKey());
     }
 
     private void copyFixture(String fixtureName, Path skillDir) throws Exception {

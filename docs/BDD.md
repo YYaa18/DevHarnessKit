@@ -1,12 +1,12 @@
 # BDD Specification Layer
 
-Status: internal alpha for V0.6.2.
+Status: stable contract in DevHarness Kit 1.0.0.
 
 DevHarness Kit BDD is a specification-level acceptance harness. It records
 features, scenarios, Given/When/Then steps, and quality issues in local SQLite,
 then exports short Markdown and `.feature` artifacts for agents and humans.
 
-It is not an executable BDD framework in V0.6.2. It does not require Cucumber,
+It is not a standalone executable BDD framework. It does not require Cucumber,
 Playwright, Postman, MockMvc, or any other test runner.
 
 ## Paths
@@ -27,6 +27,9 @@ explicitly documents otherwise.
 ```bash
 dhk bdd init --project-root <path>
 dhk bdd add --feature <key> --title <title> --scenario <key> --scenario-title <title>
+dhk bdd scenario create --scenario <key> --title <title>
+dhk bdd scenario list [--feature <key>]
+dhk bdd scenario show --scenario <key>
 dhk bdd list [--feature <key>]
 dhk bdd show --scenario <key>|--feature <key>
 dhk bdd export [--feature <key>]
@@ -38,6 +41,7 @@ dhk bdd verify [--feature <key>|--scenario <key>]
 dhk bdd coverage [--feature <key>|--scenario <key>]
 dhk bdd bind-spec --scenario <key> --change <key> --acceptance <key>
 dhk bdd bind-goal --scenario <key> --goal <goal-key>
+dhk bdd bind-workflow --scenario <key> --run <workflow-run-key>
 dhk bdd bind-graph --scenario <key> --file <path>|--symbol <symbol>|--sql-table <table>
 dhk bdd bind-test --scenario <key> --class <name> [--method <name>]
 dhk graph impact --scenario <key>
@@ -74,7 +78,8 @@ dhk bdd evidence add --scenario order-query-happy-path \
   --status passed \
   --type test \
   --summary "接口测试通过" \
-  --command "mvn test"
+  --command "mvn test" \
+  --evidence-path target/surefire-reports/TEST-example.xml
 ```
 
 Supported evidence statuses:
@@ -106,13 +111,13 @@ missing, pending, or failed. It writes:
 .agents/bdd/exports/BDD_COVERAGE.md
 ```
 
-V0.6.4 introduces an adapter SPI for executable BDD evidence. The built-in
-adapter is `manual`: it consumes `--type manual` evidence and normalizes
+DevHarness Kit 1.0.0 includes an adapter SPI for executable BDD evidence. The
+built-in adapter is `manual`: it consumes `--type manual` evidence and normalizes
 `passed`, `skipped`, and `waived` to `covered`, while preserving `pending` and
 `failed` as blocking states. Other evidence types keep the existing stored
 status behavior until a concrete framework adapter is added.
 
-V0.6.4 also includes a JUnit/MockMvc evidence adapter for Maven
+DevHarness Kit 1.0.0 also includes a JUnit/MockMvc evidence adapter for Maven
 Surefire/Failsafe XML reports. Bind a scenario to a test class or method, then
 import report results:
 
@@ -183,6 +188,15 @@ The default relation is `supports`. Bindings are persisted in `bdd_binding` and
 are exported through `bdd show` and `BDD_CONTEXT.md` so each scenario can be
 traced back to the spec acceptance and goal that introduced or verified it.
 
+`bdd bind-workflow` links a scenario to a workflow run:
+
+```bash
+dhk bdd bind-workflow --scenario order-query-happy-path --run workflow-run-key
+```
+
+The default relation is `validates`. Workflow exports include a BDD trace for
+bound scenarios and their latest evidence.
+
 `bdd bind-graph` links a scenario to graph impact inputs:
 
 ```bash
@@ -216,8 +230,8 @@ bdd_evidence
 bdd_quality_issue
 ```
 
-V0.6.2 actively uses features, scenarios, steps, spec/goal bindings, evidence
-rows, and quality issues.
+DevHarness Kit 1.0.0 actively uses features, scenarios, steps, spec/goal/
+workflow/graph/test bindings, evidence rows, and quality issues.
 
 ## Export Contract
 
@@ -274,7 +288,7 @@ duplicate_scenario_title warning
 missing_acceptance_mapping warning
 ```
 
-The command is advisory in V0.6.1 and returns success when issues are found.
+The command is advisory by default and returns success when issues are found.
 Goal checks can promote quality issues into gates through
 `.agents/devharness/goal-check-policy.json`:
 

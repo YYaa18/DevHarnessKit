@@ -119,6 +119,50 @@ final class BddIntegrationTest {
     }
 
     @Test
+    void bddScenarioAliasCreatesListsShowsAndRejectsDuplicates() throws Exception {
+        Harness create = new Harness(tempDir);
+        int createExit = new CommandRouter().run(new String[]{
+                "bdd", "scenario", "create", "--project-root", "demo",
+                "--module", "address",
+                "--scenario", "address-validation-basic",
+                "--title", "新增配送地址需要校验必填字段",
+                "--given", "用户进入新增配送地址页面",
+                "--when", "用户未填写收件人或手机号直接提交",
+                "--then", "系统提示必填字段错误"
+        }, create.context());
+        assertEquals(ExitCodes.SUCCESS, createExit);
+        assertTrue(create.stdout().contains("scenario_key: address-validation-basic"));
+        assertTrue(create.stdout().contains("status: active"));
+
+        Harness list = new Harness(tempDir);
+        int listExit = new CommandRouter().run(new String[]{
+                "bdd", "scenario", "list", "--project-root", "demo"
+        }, list.context());
+        assertEquals(ExitCodes.SUCCESS, listExit);
+        assertTrue(list.stdout().contains("address-validation-basic [active] 新增配送地址需要校验必填字段"));
+
+        Harness show = new Harness(tempDir);
+        int showExit = new CommandRouter().run(new String[]{
+                "bdd", "scenario", "show", "--project-root", "demo",
+                "--scenario", "address-validation-basic"
+        }, show.context());
+        assertEquals(ExitCodes.SUCCESS, showExit);
+        assertTrue(show.stdout().contains("- given: 用户进入新增配送地址页面"));
+        assertTrue(show.stdout().contains("- when: 用户未填写收件人或手机号直接提交"));
+        assertTrue(show.stdout().contains("- then: 系统提示必填字段错误"));
+
+        Harness duplicate = new Harness(tempDir);
+        int duplicateExit = new CommandRouter().run(new String[]{
+                "bdd", "scenario", "create", "--project-root", "demo",
+                "--scenario", "address-validation-basic",
+                "--title", "重复场景"
+        }, duplicate.context());
+        assertEquals(ExitCodes.USAGE_ERROR, duplicateExit);
+        assertTrue(duplicate.stderr().contains("error_code: BDD_SCENARIO_ALREADY_EXISTS"));
+        assertEquals(1, countRows("bdd_scenario", "scenario_key = 'address-validation-basic'"));
+    }
+
+    @Test
     void bddEnumErrorsIncludeValidValues() {
         Harness invalidScenarioType = new Harness(tempDir);
         int invalidScenarioTypeExit = new CommandRouter().run(new String[]{
@@ -385,6 +429,123 @@ final class BddIntegrationTest {
     }
 
     @Test
+    void bddVerifyGoalAggregatesOnlyGoalBoundScenarios() throws Exception {
+        addScenario("order-bound", "已绑定场景",
+                "已有订单", "用户查询订单", "返回订单结果");
+        addScenario("order-unbound", "未绑定场景",
+                "已有订单", "用户删除订单", "订单被删除");
+        Path root = tempDir.resolve("demo");
+        writeBddRequiredProfile(root);
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start", "--project-root", "demo",
+                "--profile", "bdd-required",
+                "--task", "订单查询 BDD 聚合",
+                "--module", "order"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = valueAfter(start.stdout(), "goal_key: ");
+
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "bdd", "bind-goal", "--project-root", "demo",
+                "--scenario", "order-bound",
+                "--goal", goalKey
+        }, new Harness(tempDir).context()));
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "bdd", "evidence", "add", "--project-root", "demo",
+                "--scenario", "order-bound",
+                "--goal", goalKey,
+                "--status", "passed",
+                "--summary", "绑定场景验收通过"
+        }, new Harness(tempDir).context()));
+
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "bdd", "verify", "--project-root", "demo",
+                "--goal", goalKey
+        }, verify.context());
+        assertEquals(ExitCodes.SUCCESS, verifyExit);
+        assertTrue(verify.stdout().contains("scenario_count: 1"));
+        assertTrue(verify.stdout().contains("covered_count: 1"));
+        assertTrue(verify.stdout().contains("- order-bound [covered]"));
+        assertTrue(!verify.stdout().contains("order-unbound"));
+    }
+
+    @Test
+    void specAndWorkflowExportsIncludeBddTraceability() throws Exception {
+        addOrderScenario();
+
+        Harness spec = new Harness(tempDir);
+        int specExit = new CommandRouter().run(new String[]{
+                "spec", "create", "--project-root", "demo",
+                "--change", "order-query-api",
+                "--title", "订单查询接口",
+                "--summary", "补充订单分页查询验收",
+                "--module", "order",
+                "--mode", "api"
+        }, spec.context());
+        assertEquals(ExitCodes.SUCCESS, specExit);
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "spec", "acceptance", "add", "--project-root", "demo",
+                "--change", "order-query-api",
+                "--acceptance", "A001",
+                "--description", "分页查询返回订单列表"
+        }, new Harness(tempDir).context()));
+
+        Harness goal = new Harness(tempDir);
+        int goalExit = new CommandRouter().run(new String[]{
+                "goal", "start", "--project-root", "demo",
+                "--profile", "java-api-change",
+                "--task", "订单查询 BDD trace",
+                "--module", "order"
+        }, goal.context());
+        assertEquals(ExitCodes.SUCCESS, goalExit);
+        String runKey = valueAfter(goal.stdout(), "workflow_run: ");
+
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "bdd", "bind-spec", "--project-root", "demo",
+                "--scenario", "order-query-happy-path",
+                "--change", "order-query-api",
+                "--acceptance", "A001"
+        }, new Harness(tempDir).context()));
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "bdd", "bind-workflow", "--project-root", "demo",
+                "--scenario", "order-query-happy-path",
+                "--run", runKey
+        }, new Harness(tempDir).context()));
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "bdd", "evidence", "add", "--project-root", "demo",
+                "--scenario", "order-query-happy-path",
+                "--status", "passed",
+                "--summary", "分页查询验收通过"
+        }, new Harness(tempDir).context()));
+
+        Harness specExport = new Harness(tempDir);
+        int specExportExit = new CommandRouter().run(new String[]{
+                "spec", "export", "--project-root", "demo",
+                "--change", "order-query-api"
+        }, specExport.context());
+        assertEquals(ExitCodes.SUCCESS, specExportExit);
+        String specContext = new String(Files.readAllBytes(PathUtil.specContext(tempDir.resolve("demo"))), "UTF-8");
+        assertTrue(specContext.contains("<bdd-trace>"));
+        assertTrue(specContext.contains("A001 -> order-query-happy-path [active] 分页查询订单成功"));
+        assertTrue(specContext.contains("latest_evidence=passed manual: 分页查询验收通过"));
+
+        Harness workflowExport = new Harness(tempDir);
+        int workflowExportExit = new CommandRouter().run(new String[]{
+                "workflow", "export", "--project-root", "demo",
+                "--run", runKey
+        }, workflowExport.context());
+        assertEquals(ExitCodes.SUCCESS, workflowExportExit);
+        String workflowContext = new String(Files.readAllBytes(
+                PathUtil.workflowContext(tempDir.resolve("demo"))), "UTF-8");
+        assertTrue(workflowContext.contains("<bdd-trace>"));
+        assertTrue(workflowContext.contains("order-query-happy-path [active] 分页查询订单成功"));
+        assertTrue(workflowContext.contains("latest_evidence=passed manual: 分页查询验收通过"));
+    }
+
+    @Test
     void bddEvidenceVerifyAndCoverageFailWhenEvidenceIsMissingOrPending() throws Exception {
         addOrderScenario();
 
@@ -513,6 +674,125 @@ final class BddIntegrationTest {
 
         String evidence = new String(Files.readAllBytes(PathUtil.bddEvidence(tempDir.resolve("demo"))), "UTF-8");
         assertTrue(evidence.contains("adapter: manual source_status=failed normalized_status=failed"));
+    }
+
+    @Test
+    void bddDefensiveValidationKeepsEvidenceTraceClean() throws Exception {
+        addOrderScenario();
+        Path root = tempDir.resolve("demo");
+        writeBddRequiredProfile(root);
+
+        Harness missingGoal = new Harness(tempDir);
+        int missingGoalExit = new CommandRouter().run(new String[]{
+                "bdd", "bind-goal", "--project-root", "demo",
+                "--scenario", "order-query-happy-path",
+                "--goal", "missing-goal"
+        }, missingGoal.context());
+        assertEquals(ExitCodes.NOT_FOUND, missingGoalExit);
+        assertTrue(missingGoal.stderr().contains("error_code: GOAL_RUN_NOT_FOUND"));
+
+        Harness missingScenario = new Harness(tempDir);
+        int missingScenarioExit = new CommandRouter().run(new String[]{
+                "bdd", "bind-goal", "--project-root", "demo",
+                "--scenario", "missing-scenario",
+                "--goal", "missing-goal"
+        }, missingScenario.context());
+        assertEquals(ExitCodes.NOT_FOUND, missingScenarioExit);
+        assertTrue(missingScenario.stderr().contains("error_code: BDD_SCENARIO_NOT_FOUND"));
+
+        Harness missingPath = new Harness(tempDir);
+        int missingPathExit = new CommandRouter().run(new String[]{
+                "bdd", "evidence", "add", "--project-root", "demo",
+                "--scenario", "order-query-happy-path",
+                "--status", "passed",
+                "--evidence-path", ".agents/verification/missing.md",
+                "--summary", "缺失证据路径"
+        }, missingPath.context());
+        assertEquals(ExitCodes.NOT_FOUND, missingPathExit);
+        assertTrue(missingPath.stderr().contains("error_code: BDD_EVIDENCE_PATH_NOT_FOUND"));
+        assertEquals(0, countRows("bdd_evidence", "scenario_key = 'order-query-happy-path'"));
+
+        write(root, ".agents/verification/地址验收.md", "人工验收记录\n");
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "bdd", "evidence", "add", "--project-root", "demo",
+                "--scenario", "order-query-happy-path",
+                "--status", "failed",
+                "--evidence-path", ".agents/verification/地址验收.md",
+                "--summary", "首次验收失败"
+        }, new Harness(tempDir).context()));
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "bdd", "evidence", "add", "--project-root", "demo",
+                "--scenario", "order-query-happy-path",
+                "--status", "passed",
+                "--evidence-path", ".agents/verification/地址验收.md",
+                "--summary", "修复后验收通过"
+        }, new Harness(tempDir).context()));
+
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "bdd", "verify", "--project-root", "demo",
+                "--scenario", "order-query-happy-path"
+        }, verify.context());
+        assertEquals(ExitCodes.SUCCESS, verifyExit);
+        assertTrue(verify.stdout().contains("- order-query-happy-path [covered]"));
+        String evidence = new String(Files.readAllBytes(PathUtil.bddEvidence(root)), "UTF-8");
+        assertTrue(evidence.contains("修复后验收通过"));
+        assertTrue(evidence.contains("首次验收失败"));
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start", "--project-root", "demo",
+                "--profile", "bdd-required",
+                "--task", "完成后拒绝追加 BDD evidence",
+                "--module", "order",
+                "--force-new"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = valueAfter(start.stdout(), "goal_key: ");
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "bdd", "bind-goal", "--project-root", "demo",
+                "--scenario", "order-query-happy-path",
+                "--goal", goalKey
+        }, new Harness(tempDir).context()));
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "bdd", "evidence", "add", "--project-root", "demo",
+                "--scenario", "order-query-happy-path",
+                "--goal", goalKey,
+                "--status", "passed",
+                "--summary", "goal scoped evidence passed"
+        }, new Harness(tempDir).context()));
+        recordGoalStep(goalKey, "Inspected BDD behavior",
+                "existing_controller=bdd scenario",
+                "existing_service=bdd verification",
+                "existing_mapper=bdd repositories",
+                "existing_tests=bdd defensive test");
+        recordGoalStep(goalKey, "Verified BDD behavior",
+                "compile_result=not required for fixture",
+                "test_result=bdd defensive fixture",
+                "sensitive_result=passed");
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "goal", "check", "--project-root", "demo",
+                "--goal", goalKey,
+                "--check", "bdd"
+        }, new Harness(tempDir).context()));
+        Harness complete = new Harness(tempDir);
+        int completeExit = new CommandRouter().run(new String[]{
+                "goal", "complete", "--project-root", "demo",
+                "--goal", goalKey
+        }, complete.context());
+        assertEquals(ExitCodes.SUCCESS, completeExit);
+        assertTrue(complete.stdout().contains("status: completed"));
+
+        Harness lateEvidence = new Harness(tempDir);
+        int lateEvidenceExit = new CommandRouter().run(new String[]{
+                "bdd", "evidence", "add", "--project-root", "demo",
+                "--scenario", "order-query-happy-path",
+                "--goal", goalKey,
+                "--status", "passed",
+                "--summary", "late evidence"
+        }, lateEvidence.context());
+        assertEquals(ExitCodes.USAGE_ERROR, lateEvidenceExit);
+        assertTrue(lateEvidence.stderr().contains("error_code: BDD_EVIDENCE_GOAL_COMPLETED"));
     }
 
     @Test
@@ -916,6 +1196,99 @@ final class BddIntegrationTest {
         assertTrue(impactCheck.stdout().contains("status: passed"));
     }
 
+    @Test
+    void addressDeliveryValidationEndToEndBddAcceptancePassesGoalCheck() throws Exception {
+        Path root = tempDir.resolve("demo");
+        writeBddRequiredProfile(root);
+        String[][] scenarios = new String[][]{
+                {"address-required-fields", "必填字段缺失时提示错误", "用户进入新增配送地址页面", "用户未填写收件人或手机号直接提交", "系统提示必填字段错误"},
+                {"address-phone-format", "手机号格式错误时提示错误", "用户填写错误手机号", "用户提交新增配送地址", "系统提示手机号格式错误"},
+                {"address-save-success", "地址保存成功后出现在地址列表", "用户填写完整配送地址", "用户保存地址", "地址列表展示新地址"},
+                {"address-single-default", "默认地址只能有一个", "用户已有一个默认地址", "用户将另一个地址设为默认", "旧默认地址自动取消默认"},
+                {"address-delete-refresh", "删除地址后列表刷新", "用户已有配送地址", "用户删除其中一个地址", "地址列表不再展示该地址"}
+        };
+        for (String[] scenario : scenarios) {
+            Harness create = new Harness(tempDir);
+            int createExit = new CommandRouter().run(new String[]{
+                    "bdd", "scenario", "create", "--project-root", "demo",
+                    "--module", "address",
+                    "--scenario", scenario[0],
+                    "--title", scenario[1],
+                    "--given", scenario[2],
+                    "--when", scenario[3],
+                    "--then", scenario[4]
+            }, create.context());
+            assertEquals(ExitCodes.SUCCESS, createExit);
+        }
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start", "--project-root", "demo",
+                "--profile", "bdd-required",
+                "--task", "新增配送地址校验",
+                "--module", "address"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = valueAfter(start.stdout(), "goal_key: ");
+
+        for (String[] scenario : scenarios) {
+            assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                    "bdd", "bind-goal", "--project-root", "demo",
+                    "--scenario", scenario[0],
+                    "--goal", goalKey
+            }, new Harness(tempDir).context()));
+            assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                    "bdd", "evidence", "add", "--project-root", "demo",
+                    "--scenario", scenario[0],
+                    "--goal", goalKey,
+                    "--status", "passed",
+                    "--summary", "手动验收通过: " + scenario[1]
+            }, new Harness(tempDir).context()));
+        }
+
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "bdd", "verify", "--project-root", "demo",
+                "--goal", goalKey
+        }, verify.context());
+        assertEquals(ExitCodes.SUCCESS, verifyExit);
+        assertTrue(verify.stdout().contains("scenario_count: 5"));
+        assertTrue(verify.stdout().contains("covered_count: 5"));
+        assertTrue(verify.stdout().contains("missing_evidence: 0"));
+
+        Harness coverage = new Harness(tempDir);
+        int coverageExit = new CommandRouter().run(new String[]{
+                "bdd", "coverage", "--project-root", "demo",
+                "--goal", goalKey
+        }, coverage.context());
+        assertEquals(ExitCodes.SUCCESS, coverageExit);
+        assertTrue(coverage.stdout().contains("covered_count: 5"));
+
+        Harness check = new Harness(tempDir);
+        int checkExit = new CommandRouter().run(new String[]{
+                "goal", "check", "--project-root", "demo",
+                "--goal", goalKey,
+                "--check", "bdd"
+        }, check.context());
+        assertEquals(ExitCodes.SUCCESS, checkExit);
+        assertTrue(check.stdout().contains("check_key: bdd"));
+        assertTrue(check.stdout().contains("status: passed"));
+        assertTrue(check.stdout().contains("bound_scenarios=5"));
+
+        Harness export = new Harness(tempDir);
+        int exportExit = new CommandRouter().run(new String[]{
+                "goal", "export", "--project-root", "demo",
+                "--goal", goalKey
+        }, export.context());
+        assertEquals(ExitCodes.SUCCESS, exportExit);
+        String goalContext = new String(Files.readAllBytes(PathUtil.goalContext(root)), "UTF-8");
+        assertTrue(goalContext.contains("- bound_scenario_count: 5"));
+        assertTrue(goalContext.contains("- covered_count: 5"));
+        String evidence = new String(Files.readAllBytes(PathUtil.bddEvidence(root)), "UTF-8");
+        assertTrue(evidence.contains("address-required-fields [covered]"));
+        assertTrue(evidence.contains("address-single-default [covered]"));
+    }
+
     private int countRows(String tableName, String where) throws Exception {
         try (Connection connection = DriverManager.getConnection(
                 "jdbc:sqlite:" + PathUtil.memoryDb(tempDir.resolve("demo")).toString());
@@ -960,6 +1333,25 @@ final class BddIntegrationTest {
         }, bind.context());
         assertEquals(ExitCodes.SUCCESS, bindExit);
         assertTrue(bind.stdout().contains("bdd bind-test complete"));
+    }
+
+    private void recordGoalStep(String goalKey, String summary, String... fields) {
+        Harness step = new Harness(tempDir);
+        java.util.List<String> raw = new java.util.ArrayList<String>();
+        raw.add("goal");
+        raw.add("step");
+        raw.add("--project-root");
+        raw.add("demo");
+        raw.add("--goal");
+        raw.add(goalKey);
+        raw.add("--summary");
+        raw.add(summary);
+        for (String field : fields) {
+            raw.add("--field");
+            raw.add(field);
+        }
+        int stepExit = new CommandRouter().run(raw.toArray(new String[raw.size()]), step.context());
+        assertEquals(ExitCodes.SUCCESS, stepExit, "stdout=" + step.stdout() + "\nstderr=" + step.stderr());
     }
 
     private void importReport(String adapterKey, String reportPath, String scenarioKey, String expectedStatus) {

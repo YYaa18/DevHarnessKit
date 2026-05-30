@@ -44,6 +44,7 @@ public final class SkillContractLintService {
                     PathUtil.displayPath(contractPath), null, issues);
         }
 
+        addMissing(issues, json, "schema_version", "Use skill-contract/v1");
         addMissing(issues, json, "skill_key", "Add a stable skill_key");
         addMissing(issues, json, "version", "Add a skill contract version");
         addMissing(issues, json, "task_type", "Add the primary task_type");
@@ -51,6 +52,12 @@ public final class SkillContractLintService {
         addMissingList(issues, json, "allowed_commands", "List commands this skill may run");
         addMissingList(issues, json, "forbidden_commands", "List commands this skill must not run");
 
+        String schemaVersion = stringValue(json, "schema_version");
+        if (schemaVersion.length() > 0 && !isSupportedSchemaVersion(schemaVersion)) {
+            issues.add(issue("invalid", "schema_version",
+                    "schema_version must be skill-contract/v1",
+                    "Use skill-contract/v1; skill-contract/v1-alpha is accepted only as legacy input"));
+        }
         String dataAccess = stringValue(json, "data_access_level");
         if (dataAccess.length() > 0 && !isAllowedDataAccessLevel(dataAccess)) {
             issues.add(issue("invalid", "data_access_level",
@@ -109,6 +116,10 @@ public final class SkillContractLintService {
                 || "metadata".equals(value)
                 || "context".equals(value)
                 || "raw".equals(value);
+    }
+
+    private boolean isSupportedSchemaVersion(String value) {
+        return "skill-contract/v1".equals(value) || "skill-contract/v1-alpha".equals(value);
     }
 
     private boolean matchesForbidden(String command, List<String> forbidden) {

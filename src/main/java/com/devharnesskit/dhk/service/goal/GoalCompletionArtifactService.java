@@ -96,9 +96,9 @@ final class GoalCompletionArtifactService {
                               GoalGraphArtifacts graphArtifacts, String now) throws Exception {
         String summary = summaryRenderer.render(goal, steps, checks, checkpointId, now, graphArtifacts);
         summary = sensitiveDataGuard.redact(summary);
-        if (sensitiveDataGuard.containsSensitiveData(maskGeneratedHashes(summary))) {
+        if (sensitiveDataGuard.containsSensitiveData(GeneratedHashMasker.mask(summary))) {
             throw new IllegalStateException("Sensitive data rejected during goal summary export: "
-                    + sensitiveDataGuard.findMatches(maskGeneratedHashes(summary)));
+                    + sensitiveDataGuard.findMatches(GeneratedHashMasker.mask(summary)));
         }
         Path summaryPath = PathUtil.goalSummary(projectRoot);
         Files.createDirectories(summaryPath.getParent());
@@ -117,9 +117,9 @@ final class GoalCompletionArtifactService {
         String passport = artifactPassportRenderer.render(projectRoot, goal, profile, steps,
                 checks, checkpointId, now, graphArtifacts, summaryPath, passportPath);
         passport = sensitiveDataGuard.redact(passport);
-        if (sensitiveDataGuard.containsSensitiveData(maskGeneratedHashes(passport))) {
+        if (sensitiveDataGuard.containsSensitiveData(GeneratedHashMasker.mask(passport))) {
             throw new IllegalStateException("Sensitive data rejected during artifact passport export: "
-                    + sensitiveDataGuard.findMatches(maskGeneratedHashes(passport)));
+                    + sensitiveDataGuard.findMatches(GeneratedHashMasker.mask(passport)));
         }
         Files.write(passportPath, passport.getBytes("UTF-8"));
         goalArtifactRepository.insert(connection, new GoalArtifact(0L, goal.goalKey(),
@@ -223,13 +223,5 @@ final class GoalCompletionArtifactService {
             builder.append(String.format("%02x", b & 0xff));
         }
         return builder.toString();
-    }
-
-    private String maskGeneratedHashes(String text) {
-        if (text == null || text.length() == 0) {
-            return text;
-        }
-        return text.replaceAll("\\b(sha256|git|fallback|config|context|check|workspace|artifact):[0-9a-fA-F]{32,}\\b",
-                "$1:[GENERATED_HASH]");
     }
 }

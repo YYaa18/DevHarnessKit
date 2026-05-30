@@ -1,7 +1,7 @@
 package com.devharnesskit.dhk.model.goal;
 
 public final class GoalMetricsSnapshot {
-    public static final String SCHEMA_VERSION = "goal-metrics/v1.1-alpha";
+    public static final String SCHEMA_VERSION = "goal-metrics/v1";
 
     private final String goalKey;
     private final String profileKey;

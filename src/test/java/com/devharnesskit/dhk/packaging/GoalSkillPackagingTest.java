@@ -135,6 +135,10 @@ final class GoalSkillPackagingTest {
         assertTrue(release.contains("mvn -B clean package -P release-archive"));
         assertTrue(release.contains("scripts/check-class-size.sh"));
         assertTrue(release.contains("scripts/release-gate.sh --skip-package"));
+        assertTrue(release.contains("DHK_MANIFEST=target/ARTIFACT_MANIFEST.json"));
+        assertTrue(release.contains("\"ARTIFACT_MANIFEST.json\" > SHA256SUMS"));
+        assertTrue(release.contains("${{ env.DHK_MANIFEST }}"));
+        assertTrue(release.contains("\"$DHK_MANIFEST\""));
         assertTrue(release.contains("target/SHA256SUMS"));
     }
 
@@ -165,6 +169,114 @@ final class GoalSkillPackagingTest {
         assertTrue(releaseGate.contains("\"docs/\""));
         assertTrue(releaseGate.contains("\"RELEASE.md\""));
         assertTrue(releaseGate.contains("\"scripts/lark-codex-bridge.sh\""));
+        assertTrue(releaseGate.contains("checking Workflow/Spec stable release gate contract"));
+        assertTrue(releaseGate.contains("running Workflow/Spec stable JSON smoke"));
+        assertTrue(releaseGate.contains("running BDD stable acceptance smoke"));
+        assertTrue(releaseGate.contains("checking final 1.0 boundary wording"));
+        assertTrue(releaseGate.contains("dhk workflow summary --run <run-key> --json"));
+        assertTrue(releaseGate.contains("dhk spec bind-workflow --change <key> --run <run-key> --json"));
+        assertTrue(releaseGate.contains("workflow template seed --project-root \"$SMOKE_ROOT\""));
+        assertTrue(releaseGate.contains("workflow start --project-root \"$SMOKE_ROOT\""));
+        assertTrue(releaseGate.contains("spec bind-workflow --project-root \"$SMOKE_ROOT\""));
+        assertTrue(releaseGate.contains("workflow_context_path"));
+        assertTrue(releaseGate.contains("workflow_spec_binding_id"));
+        assertTrue(releaseGate.contains("RUN_GRAPH_PRECISION=\"true\""));
+        assertTrue(releaseGate.contains("--skip-graph-lite-precision"));
+        assertTrue(releaseGate.contains("Compatibility no-op; the precision suite runs by default."));
+        assertTrue(releaseGate.contains("DHK_GRAPH_PRECISION_RESULT_DIR=\"${DHK_GRAPH_PRECISION_RESULT_DIR:-target/graph-lite-precision}\""));
+        assertTrue(releaseGate.contains("checking built-in skill governance gate"));
+        assertTrue(releaseGate.contains("skill lint --path \"$BUILTIN_GOAL_SKILL\" --json"));
+        assertTrue(releaseGate.contains("skill verify --project-root \"$SKILL_GATE_ROOT\""));
+        assertTrue(releaseGate.contains("run_skill_audit_json \"$ROOT\" \"$BUILTIN_GOAL_SKILL\""));
+        assertTrue(releaseGate.contains("\".agents/skills/devharness-goal-development/contract.json\""));
+        assertTrue(releaseGate.contains("archive goal skill contract schema_version drifted"));
+        assertTrue(releaseGate.contains("write_artifact_manifest"));
+        assertTrue(releaseGate.contains("\"schema_version\": \"devharness-release-artifacts/v1\""));
+        assertTrue(releaseGate.contains("MANIFEST=\"target/ARTIFACT_MANIFEST.json\""));
+        assertTrue(releaseGate.contains("\"path\": \"target/ARTIFACT_MANIFEST.json\""));
+        assertTrue(releaseGate.contains("verify_artifact_manifest"));
+        assertTrue(releaseGate.contains("log \"writing artifact manifest\""));
+        assertTrue(releaseGate.contains("\"ARTIFACT_MANIFEST.json\" > SHA256SUMS"));
+    }
+
+    @Test
+    void releaseArtifactManifestContractIsDocumentedAndGated() throws Exception {
+        String readme = read(Paths.get("README.md"));
+        String readmeZh = read(Paths.get("README.zh-CN.md"));
+        String stableContract = read(Paths.get("docs/STABLE_CONTRACT.md"));
+        String releaseGate = read(Paths.get("scripts/release-gate.sh"));
+
+        assertTrue(readme.contains("target/ARTIFACT_MANIFEST.json"));
+        assertTrue(readme.contains("publish both beside the jar and archives"));
+        assertTrue(readmeZh.contains("target/ARTIFACT_MANIFEST.json"));
+        assertTrue(readmeZh.contains("一起上传"));
+        assertTrue(stableContract.contains("devharness-release-artifacts/v1"));
+        assertTrue(stableContract.contains("required jar/archive"));
+        assertTrue(stableContract.contains("archive entrypoints"));
+        assertTrue(releaseGate.contains("\"checksum_file\": \"target/SHA256SUMS\""));
+        assertTrue(releaseGate.contains("\"checksum_required\": true"));
+        assertTrue(releaseGate.contains("\"entrypoints\": ["));
+        assertTrue(releaseGate.contains("\"excluded_entries\": ["));
+    }
+
+    @Test
+    void eccControlPanelStableCandidateDocsKeepEntrypointsAndInternalsClear() throws Exception {
+        String readme = read(Paths.get("README.md"));
+        String readmeZh = read(Paths.get("README.zh-CN.md"));
+        String compatibility = read(Paths.get("docs/COMPATIBILITY.md"));
+        String stableCandidate = read(Paths.get("docs/STABLE_CANDIDATE.md"));
+        String stableContract = read(Paths.get("docs/STABLE_CONTRACT.md"));
+        String moduleBoundaries = read(Paths.get("docs/MODULE_BOUNDARIES.md"));
+        String releaseNotes = read(Paths.get("docs/releases/v1.0.0.md"));
+        String controlPanel = read(Paths.get("scripts/devharness-control-panel.sh"));
+        String installer = read(Paths.get("scripts/install-agent-adapters.sh"));
+
+        assertTrue(readme.contains("these package entrypoints are stable-candidate"));
+        assertTrue(readme.contains("scripts/devharness-control-panel.sh` commands: `configure`, `plan`"));
+        assertTrue(readme.contains("does not make generated"));
+        assertTrue(readmeZh.contains("发布包入口列为 stable-candidate"));
+        assertTrue(readmeZh.contains("alpha install-state/manifest schema"));
+        assertTrue(compatibility.contains("Stable-candidate package script entrypoints"));
+        assertTrue(compatibility.contains("scripts/devharness-control-panel.sh repair"));
+        assertTrue(compatibility.contains("not make generated adapter layouts"));
+        assertTrue(stableCandidate.contains("ECC installer/control-panel user-facing entrypoints"));
+        assertTrue(stableCandidate.contains("adapter layouts and alpha local state files remain internal"));
+        assertTrue(stableContract.contains("ECC Control Panel has a stable-candidate user-facing script entrypoint subset"));
+        assertTrue(stableContract.contains("devharness-install-state/v1-alpha"));
+        assertTrue(stableContract.contains("private script helper structure"));
+        assertTrue(moduleBoundaries.contains("Stable-candidate user-facing script entrypoints"));
+        assertTrue(moduleBoundaries.contains("internal `.agents/`, `.claude/`, `.comate/`"));
+        assertTrue(releaseNotes.contains("stable-candidate installer/control-panel script entrypoints"));
+        assertTrue(releaseNotes.contains("private helper structure remain experimental or internal"));
+
+        assertTrue(controlPanel.contains("configure     Generate config/policy/graph config/manifest"));
+        assertTrue(controlPanel.contains("plan          Show planned adapter/config changes without applying"));
+        assertTrue(controlPanel.contains("status        Print local DevHarness readiness status"));
+        assertTrue(controlPanel.contains("doctor        Diagnose missing local DevHarness files and adapters"));
+        assertTrue(controlPanel.contains("repair        Reinstall adapters from source of truth"));
+        assertTrue(controlPanel.contains("uninstall     Remove generated adapters"));
+        assertTrue(controlPanel.contains("--status-format <format>       text | json | markdown"));
+        assertTrue(installer.contains("scripts/devharness-control-panel.sh configure <args>"));
+        assertTrue(installer.contains("Scripted package entrypoint performs a full local install"));
+    }
+
+    @Test
+    void finalStableContractSweepDocsAgreeWithReleaseGate() throws Exception {
+        String releaseGate = read(Paths.get("scripts/release-gate.sh"));
+        String roadmap = read(Paths.get("docs/ROADMAP.md"));
+        String changelog = read(Paths.get("CHANGELOG.md"));
+        String stableContract = read(Paths.get("docs/STABLE_CONTRACT.md"));
+
+        assertTrue(releaseGate.contains("running BDD stable acceptance smoke"));
+        assertTrue(releaseGate.contains("checking final 1.0 boundary wording"));
+        assertTrue(roadmap.contains("BDD acceptance harness is stable"));
+        assertTrue(roadmap.contains("Graph Lite stable-advisory"));
+        assertTrue(roadmap.contains("Skill, Policy, Routine, and ECC Control Panel user-facing subsets are"));
+        assertTrue(roadmap.contains("stable-candidate where their compatibility docs and release gates name"));
+        assertTrue(changelog.contains("BDD acceptance harness, Graph Lite stable-advisory output"));
+        assertTrue(changelog.contains("stable-candidate governance and"));
+        assertTrue(changelog.contains("installer/reporting subsets"));
+        assertTrue(stableContract.contains("default release gate now checks built-in skill"));
     }
 
     @Test
@@ -184,6 +296,159 @@ final class GoalSkillPackagingTest {
         assertTrue(stableContract.contains("For 1.0 and later"));
         assertTrue(stableContract.contains("under semantic"));
         assertTrue(stableContract.contains("1.0 Boundary Decisions"));
+    }
+
+    @Test
+    void graphStableAdvisoryDocsKeepContractAndBoundaryClear() throws Exception {
+        String stableContract = read(Paths.get("docs/STABLE_CONTRACT.md"));
+        String compatibility = read(Paths.get("docs/COMPATIBILITY.md"));
+        String graphContext = read(Paths.get("docs/GRAPH_CONTEXT_LAYER.md"));
+        String graphSchema = read(Paths.get("docs/GRAPH_SCHEMA.md"));
+        String graphLimits = read(Paths.get("docs/GRAPH_LIMITS.md"));
+        String jsonOutput = read(Paths.get("docs/JSON_OUTPUT.md"));
+
+        assertTrue(stableContract.contains("Graph Lite stable-advisory subset"));
+        assertTrue(stableContract.contains("static-analysis oracle"));
+        assertTrue(stableContract.contains("Graph Lite SQLite tables"));
+        assertTrue(compatibility.contains("Stable-advisory"));
+        assertTrue(compatibility.contains("dhk graph impact"));
+        assertTrue(compatibility.contains("must not treat `related_files`, `recommended_read_files`"));
+        assertTrue(graphContext.contains("Status: stable-advisory"));
+        assertTrue(graphContext.contains("Stable export anchors"));
+        assertTrue(graphSchema.contains("not a stable public database API"));
+        assertTrue(graphSchema.contains("not a public read or write API"));
+        assertTrue(graphLimits.contains("limit names, skip reasons, freshness flags"));
+        assertTrue(jsonOutput.contains("graph impact --file|--symbol|--sql-table"));
+        assertTrue(jsonOutput.contains("Graph Lite JSON output is stable-advisory"));
+    }
+
+    @Test
+    void dbCompatibilityDocsKeepMatrixEvidenceAndBetaBoundaryClear() throws Exception {
+        String dbCompatibility = read(Paths.get("docs/DB_COMPATIBILITY.md"));
+        String compatibility = read(Paths.get("docs/COMPATIBILITY.md"));
+        String stableCandidate = read(Paths.get("docs/STABLE_CANDIDATE.md"));
+        String releaseNotes = read(Paths.get("docs/releases/v1.0.0.md"));
+
+        assertTrue(dbCompatibility.contains("## Compatibility Matrix"));
+        assertTrue(dbCompatibility.contains("| Target | 1.0 status | Evidence type | Current evidence | Required constraints |"));
+        assertTrue(dbCompatibility.contains("MySQL Server 5.1 production floor"));
+        assertTrue(dbCompatibility.contains("MySQL Server 8 local target"));
+        assertTrue(dbCompatibility.contains("Connector/J 5.1.49 default driver"));
+        assertTrue(dbCompatibility.contains("Fixture/unit tests cover URL construction and probe formatting only"));
+        assertTrue(dbCompatibility.contains("Optional live smoke is available through `DHK_TEST_MYSQL_*`"));
+        assertTrue(dbCompatibility.contains("A fixture/unit test proves only the"));
+        assertTrue(dbCompatibility.contains("local Java behavior named in the test"));
+        assertTrue(dbCompatibility.contains("## Automated And Manual Evidence Path"));
+        assertTrue(dbCompatibility.contains("mvn -q -Dtest=MysqlConnectionServiceTest,DbCompatibilityProbeServiceTest"));
+        assertTrue(dbCompatibility.contains("DbSqlDryRunIntegrationTest#liveMysqlSmokeRunsWhenEnvironmentIsConfigured"));
+        assertTrue(dbCompatibility.contains("Do not store passwords, full JDBC URLs, hostnames, tokens, or raw SQL result"));
+
+        assertTrue(compatibility.contains("compatibility matrix and evidence classification"));
+        assertTrue(compatibility.contains("Fixture/unit tests, SQLite"));
+        assertTrue(stableCandidate.contains("DB inspection remains beta even with deterministic SQL guard fuzz tests"));
+        assertTrue(releaseNotes.contains("fixture/unit coverage"));
+        assertTrue(releaseNotes.contains("does not promote DB inspection to stable"));
+    }
+
+    @Test
+    void dbReadonlyJsonContractDocsKeepExitCodesAndBoundaryClear() throws Exception {
+        String jsonOutput = read(Paths.get("docs/JSON_OUTPUT.md"));
+        String compatibility = read(Paths.get("docs/COMPATIBILITY.md"));
+
+        assertTrue(jsonOutput.contains("## DB Readonly JSON Contract"));
+        assertTrue(jsonOutput.contains("Status: beta readonly DB inspection contract"));
+        assertTrue(jsonOutput.contains("db sql --dry-run --format json"));
+        assertTrue(jsonOutput.contains("db sql --format json` rejected"));
+        assertTrue(jsonOutput.contains("2 usage, input, or connection-argument validation failure"));
+        assertTrue(jsonOutput.contains("3 SQL safety, policy, or sensitive-output rejection"));
+        assertTrue(jsonOutput.contains("not database permission boundaries"));
+        assertTrue(jsonOutput.contains("Use a database account with read-only"));
+        assertTrue(jsonOutput.contains("privileges when the target environment requires that boundary"));
+        assertTrue(compatibility.contains("DB inspection JSON output is beta"));
+        assertTrue(compatibility.contains("documented minimum fields and"));
+        assertTrue(compatibility.contains("exit semantics in [JSON_OUTPUT.md]"));
+        assertTrue(compatibility.contains("must not treat the SQL"));
+        assertTrue(compatibility.contains("guard or JDBC read-only hint as a database permission boundary"));
+    }
+
+    @Test
+    void skillContractStableCandidateDocsKeepSchemaAndBoundaryClear() throws Exception {
+        String skillContract = read(Paths.get("docs/SKILL_CONTRACT.md"));
+        String skillEvaluation = read(Paths.get("docs/SKILL_EVALUATION.md"));
+        String stableContract = read(Paths.get("docs/STABLE_CONTRACT.md"));
+        String compatibility = read(Paths.get("docs/COMPATIBILITY.md"));
+        String jsonOutput = read(Paths.get("docs/JSON_OUTPUT.md"));
+        String builtinContract = read(Paths.get(".agents/skills/devharness-goal-development/contract.json"));
+        String schema = read(Paths.get("src/main/resources/schema/skill_contract.schema.json"));
+
+        assertTrue(skillContract.contains("Status: stable-candidate contract subset for 1.0."));
+        assertTrue(skillContract.contains("\"schema_version\": \"skill-contract/v1\""));
+        assertTrue(skillContract.contains("Older `skill-contract/v1-alpha` files are accepted as legacy input"));
+        assertTrue(skillContract.contains("They do not execute skill scripts, replace BDD evidence, create a"));
+        assertTrue(skillContract.contains("sandbox, or prove behavioral correctness."));
+        assertTrue(skillContract.contains("the default release gate runs"));
+        assertTrue(skillContract.contains("zero `critical` and zero `high`"));
+        assertTrue(skillEvaluation.contains("Status: stable-candidate local report schema"));
+        assertTrue(skillEvaluation.contains("direct SQLite reads"));
+        assertTrue(stableContract.contains("Skill governance has a documented stable-candidate subset"));
+        assertTrue(stableContract.contains("Trust status and scores are"));
+        assertTrue(compatibility.contains("Stable-candidate governance command surface"));
+        assertTrue(compatibility.contains("Skill governance JSON output is stable-candidate"));
+        assertTrue(jsonOutput.contains("`skill lint`, `skill verify`, and `skill trust`"));
+        assertTrue(jsonOutput.contains("Skill governance JSON output is stable-candidate"));
+        assertTrue(builtinContract.contains("\"schema_version\": \"skill-contract/v1\""));
+        assertTrue(schema.contains("\"schema_version\": \"skill-contract-schema/v1\""));
+    }
+
+    @Test
+    void policyStableCandidateDocsKeepHookBoundaryClear() throws Exception {
+        String policy = read(Paths.get("docs/POLICY.md"));
+        String stableContract = read(Paths.get("docs/STABLE_CONTRACT.md"));
+        String stableCandidate = read(Paths.get("docs/STABLE_CANDIDATE.md"));
+        String releaseNotes = read(Paths.get("docs/releases/v1.0.0.md"));
+        String readme = read(Paths.get("README.md"));
+        String readmeZh = read(Paths.get("README.zh-CN.md"));
+
+        assertTrue(policy.contains("Status: stable-candidate local schema and hook behavior for 1.0."));
+        assertTrue(policy.contains("\"schema_version\": \"devharness-policy/v1\""));
+        assertTrue(policy.contains("Hook decisions use three stable-candidate outcomes"));
+        assertTrue(policy.contains("next_command:"));
+        assertTrue(policy.contains("general sandbox"));
+        assertTrue(stableContract.contains("Policy/Hook governance has a documented stable-candidate local schema"));
+        assertTrue(stableContract.contains("It does not make policy files a sandbox"));
+        assertTrue(stableCandidate.contains("Policy hooks are local DevHarnessKit command guards"));
+        assertTrue(releaseNotes.contains("Policy hooks have a stable-candidate local `devharness-policy/v1` schema"));
+        assertTrue(readme.contains("stable-candidate local schema"));
+        assertTrue(readmeZh.contains("Policy hook"));
+        assertTrue(readmeZh.contains("不是沙箱，也不是权限边界"));
+    }
+
+    @Test
+    void routineStableCandidateDocsKeepReportBoundaryClear() throws Exception {
+        String metrics = read(Paths.get("docs/GOAL_METRICS_REPLAY.md"));
+        String routine = read(Paths.get("docs/ROUTINE_LOCAL_CI_EXPORT.md"));
+        String stableContract = read(Paths.get("docs/STABLE_CONTRACT.md"));
+        String jsonOutput = read(Paths.get("docs/JSON_OUTPUT.md"));
+        String moduleBoundaries = read(Paths.get("docs/MODULE_BOUNDARIES.md"));
+        String releaseNotes = read(Paths.get("docs/releases/v1.0.0.md"));
+
+        assertTrue(metrics.contains("Status: stable-candidate local report schema for 1.0."));
+        assertTrue(metrics.contains("goal-metrics/v1"));
+        assertTrue(metrics.contains("goal-replay/v1"));
+        assertTrue(metrics.contains("sorts by status, summary"));
+        assertTrue(routine.contains("routine-summary/v1"));
+        assertTrue(routine.contains("public routine commands"));
+        assertTrue(routine.contains("RoutineLocalExportService.exportCi"));
+        assertTrue(routine.contains("CI-safe export helper tests"));
+        assertTrue(stableContract.contains("Routine reporting has a documented stable-candidate local report subset"));
+        assertTrue(stableContract.contains("`dhk routine` a stable public"));
+        assertTrue(stableContract.contains("CI-safe"));
+        assertTrue(jsonOutput.contains("Routine local report JSON is stable-candidate"));
+        assertTrue(jsonOutput.contains("routine-summary/v1"));
+        assertTrue(jsonOutput.contains("routine-checks.ndjson"));
+        assertTrue(moduleBoundaries.contains("Stable-candidate local report schema"));
+        assertTrue(releaseNotes.contains("Routine reporting has stable-candidate local report schemas"));
+        assertTrue(releaseNotes.contains("CI-safe"));
     }
 
     @Test
@@ -640,6 +905,26 @@ final class GoalSkillPackagingTest {
         assertTrue(Files.isRegularFile(project.resolve(".agents/skills/devharness-graph-aware-development/SKILL.md")));
         assertTrue(Files.isRegularFile(project.resolve(".comate/rules/devharness-goal-protocol.mdr")));
         assertTrue(Files.isRegularFile(project.resolve(".agents/tools/devharness-kit/dhk.jar")));
+    }
+
+    @Test
+    void scriptedInstallerDryRunWorksForEmptyProjectWithoutWriting() throws Exception {
+        Path project = tempDir.resolve("empty-scripted-dry-run-project");
+        Files.createDirectories(project);
+
+        CommandResult result = runInstaller("--project-root", project.toString(),
+                "--target", "all",
+                "--force",
+                "--dry-run");
+
+        assertEquals(0, result.exitCode, result.stderr);
+        assertTrue(result.stdout.contains("[dry-run] write " + project.resolve(".agents/devharness/config.json")));
+        assertTrue(result.stdout.contains("[dry-run] install adapters target=all mode=copy"));
+        assertTrue(result.stdout.contains("configure complete"));
+        assertFalse(Files.exists(project.resolve(".agents/devharness/config.json")));
+        assertFalse(Files.exists(project.resolve(".agents/skills")));
+        assertFalse(Files.exists(project.resolve(".claude")));
+        assertFalse(Files.exists(project.resolve(".comate")));
     }
 
     private void assertScriptPair(Path skillRoot, String name) {

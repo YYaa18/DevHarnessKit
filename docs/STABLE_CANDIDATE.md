@@ -17,11 +17,25 @@ The first stable-candidate track should be limited to:
   `checkpoint`, `recover`, and `backup`;
 - goal core commands: `start`, `resume`, `next`, `step`, `status`, `export`,
   `verify`, `complete`, `audit`, and `recheck`;
+- BDD acceptance commands: `init`, `add`, `scenario create/list/show`, `list`,
+  `show`, `export`, `lint`, evidence import, `verify`, `coverage`, and
+  traceability bindings for spec, goal, workflow, graph input, and tests;
+- Skill Contract stable-candidate schema and local report fields documented in
+  `docs/SKILL_CONTRACT.md` and `docs/SKILL_EVALUATION.md`, covered by the
+  default release gate before any future promotion into the stable surface;
 - generated `WORK_BRIEF.md`, `CURRENT_CONTEXT.md`, `RECOVERY_CONTEXT.md`,
   `GOAL_CONTEXT.md`, `GOAL_SUMMARY.md`, and `ARTIFACT_PASSPORT.json` section
-  names covered by contract tests. `AGENT_BRIEF.json` remains alpha schema;
+  names covered by contract tests. BDD context/evidence/coverage export anchors
+  are stable for generated artifacts. `AGENT_BRIEF.json` remains alpha schema;
 - release archives, checksums, third-party notices, and recovery-oriented
   migration behavior.
+- ECC installer/control-panel user-facing entrypoints: `install.sh`,
+  `scripts/install-agent-adapters.sh`, and `scripts/devharness-control-panel.sh`
+  commands `configure`, `plan`, `install`, `status`, `doctor`, `repair`, and
+  `uninstall`. The stable-candidate promise covers documented command/option
+  names, non-mutating `plan` and `--dry-run` behavior, status formats
+  `text|json|markdown`, and the local `doctor`/`repair` flow. Generated
+  adapter layouts and alpha local state files remain internal.
 
 Stable candidate does not mean the CLI proves code correctness. It means the
 command contracts, generated artifacts, migration behavior, and release
@@ -39,25 +53,31 @@ DB inspection remains beta:
   privilege accounts are recommended when practical.
 - MySQL compatibility currently keeps Connector/J 5.1 as the default because the
   production floor includes MySQL Server 5.1.
-- DB inspection should remain beta until deterministic SQL guard fuzz tests and
-  real-version compatibility checks are stronger.
+- DB inspection remains beta even with deterministic SQL guard fuzz tests. It
+  needs routinely captured, release-gated real-version compatibility evidence
+  before any stable readonly claim.
 
 ## Experimental Surface
 
 The following capabilities are useful for internal use, but they are not part
 of the stable candidate promise:
 
-- Graph Lite and Graph-aware Goal;
-- BDD acceptance harness;
-- Skill Contract, Skill Evaluation, and Skill Trust;
-- Policy/Hook governance;
-- ECC Control Panel;
-- Routine, metrics, and replay;
+- Graph-aware Goal orchestration beyond the documented Graph Lite
+  stable-advisory output contract;
+- Skill governance enforcement beyond the documented stable-candidate subset;
+- Policy/Hook governance beyond the documented `devharness-policy/v1` local
+  schema and hook behavior subset in `docs/POLICY.md`;
+- ECC Control Panel internals beyond the documented stable-candidate package
+  script entrypoints;
+- Routine CLI, dashboards, schedulers, and cross-project replay beyond the
+  documented local report schemas;
 - direct SQLite table or column details.
 
 Experimental surface may change in later releases with release notes. Generated
-graph, BDD, skill, policy, and routine artifacts are local evidence and
-guidance, not proof of correctness.
+graph, skill, policy, and routine artifacts are local evidence and guidance, not
+proof of correctness. Policy hooks are local DevHarnessKit command guards, not
+sandboxing or permissions. BDD artifacts are stable acceptance context, but they
+still require evidence and goal checks before they support completion.
 
 ## Release Gate Expectations
 
@@ -95,5 +115,6 @@ Before a stable or stable-candidate tag:
 - Do not treat BDD scenarios as executable test proof without evidence.
 - Do not make SQLite tables a public write API.
 - Do not add network services, daemons, or cloud sync.
-- Do not make DB inspection stable until SQL safety tests, compatibility checks,
-  and development-environment risk guidance are stronger.
+- Do not make DB inspection stable until SQL safety tests, real MySQL
+  compatibility evidence, and development-environment risk guidance are
+  release-gated together.

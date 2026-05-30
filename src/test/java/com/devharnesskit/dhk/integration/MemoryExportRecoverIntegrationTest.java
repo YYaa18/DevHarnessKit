@@ -133,6 +133,7 @@ final class MemoryExportRecoverIntegrationTest {
         assertEquals(ExitCodes.VALIDATION_ERROR, exportExit);
         assertTrue(export.stderr().contains("Policy blocked context export"));
         assertTrue(export.stderr().contains("output path is forbidden"));
+        assertTrue(export.stderr().contains("next_command: dhk doctor --project-root"));
         assertFalse(Files.isRegularFile(PathUtil.currentContext(root)));
     }
 

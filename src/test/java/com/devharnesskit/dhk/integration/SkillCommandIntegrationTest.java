@@ -150,6 +150,53 @@ final class SkillCommandIntegrationTest {
     }
 
     @Test
+    void skillTrustDoesNotExecuteScriptsAndScriptTamperRequiresReview() throws Exception {
+        Path projectRoot = tempDir.resolve("demo-trust-script");
+        Path skillDir = projectRoot.resolve(".agents/skills/devharness-strict");
+        Path scriptsDir = skillDir.resolve("scripts");
+        Path script = scriptsDir.resolve("trust-smoke.sh");
+        Path executionMarker = projectRoot.resolve("script-executed.txt");
+        copyFixture("valid-contract.json", skillDir);
+        Files.createDirectories(scriptsDir);
+        Files.write(script, ("#!/usr/bin/env sh\n"
+                + "echo executed > \"" + executionMarker.toString().replace("\\", "/") + "\"\n")
+                .getBytes("UTF-8"));
+
+        Harness trust = new Harness(tempDir);
+        int trustExit = new CommandRouter().run(new String[]{
+                "skill", "trust", "--project-root", "demo-trust-script", "--skill", "devharness-strict"
+        }, trust.context());
+
+        assertEquals(ExitCodes.SUCCESS, trustExit, trust.stdout() + trust.stderr());
+        assertTrue(trust.stdout().contains("trust_status: trusted"));
+        assertTrue(trust.stdout().contains("trusted: true"));
+        assertFalse(Files.exists(executionMarker), "skill trust must not execute skill scripts");
+        String trustedHash = firstValue(trust.stdout(), "source_hash: ");
+        assertTrue(trustedHash.startsWith("sha256:"));
+
+        Files.write(script, ("#!/usr/bin/env sh\n"
+                + "echo tampered > \"" + executionMarker.toString().replace("\\", "/") + "\"\n")
+                .getBytes("UTF-8"));
+
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "skill", "verify", "--project-root", "demo-trust-script", "--skill", "devharness-strict"
+        }, verify.context());
+
+        assertEquals(ExitCodes.SUCCESS, verifyExit, verify.stdout() + verify.stderr());
+        assertTrue(verify.stdout().contains("trust_status: review_required"));
+        assertTrue(verify.stdout().contains("trusted: false"));
+        assertFalse(Files.exists(executionMarker), "skill verify must not execute changed skill scripts");
+        String currentHash = firstValue(verify.stdout(), "source_hash: ");
+        assertTrue(currentHash.startsWith("sha256:"));
+        assertFalse(trustedHash.equals(currentHash));
+        assertEquals(1, countRows(projectRoot, "skill_contract",
+                "skill_key = 'devharness-strict' AND trusted = 0 AND trust_status = 'review_required' "
+                        + "AND trusted_source_hash = '" + trustedHash + "' "
+                        + "AND source_hash = '" + currentHash + "'"));
+    }
+
+    @Test
     void skillAuditPassesReviewedLocalSkillWithLicense() throws Exception {
         Path projectRoot = tempDir.resolve("demo-audit-pass");
         Path skillDir = projectRoot.resolve(".agents/skills/devharness-strict");
@@ -166,6 +213,27 @@ final class SkillCommandIntegrationTest {
         assertTrue(audit.stdout().contains("decision: passed"));
         assertTrue(audit.stdout().contains("issue_count: 0"));
         assertTrue(audit.stdout().contains("source_hash: sha256:"));
+    }
+
+    @Test
+    void skillAuditDoesNotTreatForbiddenCommandDeclarationsAsExecution() throws Exception {
+        Path projectRoot = tempDir.resolve("demo-audit-declarations");
+        Path skillDir = projectRoot.resolve(".agents/skills/devharness-strict");
+        copyFixture("valid-contract.json", skillDir);
+        Files.write(skillDir.resolve("LICENSE"), "MIT\n".getBytes("UTF-8"));
+        Files.write(skillDir.resolve("SKILL.md"), ("# DevHarness Strict\n\n"
+                + "- forbidden_commands: `dhk workflow gate waive`, `dhk memory confirm`, `dhk db sql`\n")
+                .getBytes("UTF-8"));
+
+        Harness audit = new Harness(tempDir);
+        int exit = new CommandRouter().run(new String[]{
+                "skill", "audit", "--project-root", "demo-audit-declarations", "--skill", "devharness-strict"
+        }, audit.context());
+
+        assertEquals(ExitCodes.SUCCESS, exit, audit.stdout() + audit.stderr());
+        assertTrue(audit.stdout().contains("decision: passed"));
+        assertTrue(audit.stdout().contains("issue_count: 0"));
+        assertFalse(audit.stdout().contains("dangerous_command"));
     }
 
     @Test

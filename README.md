@@ -14,7 +14,8 @@ verification status, and a local recovery trail.
 
 DevHarness Kit `1.0.0` is the first stable release. The stable contract is
 intentionally narrow: core CLI, memory, goal, status, readiness, configure,
-brief, release packaging, and documented generated-export anchors.
+brief, BDD acceptance evidence, release packaging, and documented
+generated-export anchors.
 
 Current stable release: `1.0.0`.
 
@@ -100,6 +101,20 @@ Typical result:
 - stale checks are detected after later changes;
 - completion summaries show what was verified and what remains risky.
 
+### Turn Acceptance Intent Into Evidence
+
+The BDD layer records features, scenarios, Given/When/Then steps, evidence, and
+traceability links. It can import manual notes, JUnit XML, Cucumber, Postman, and
+Playwright report files without running those tools itself.
+
+Typical result:
+
+- product acceptance intent is visible to the agent;
+- scenarios can be bound to specs, goals, workflows, graph inputs, and tests;
+- missing or failing BDD evidence blocks BDD-required goals;
+- passing BDD evidence supports verification without pretending scenarios alone
+  prove the implementation.
+
 ### Help With Impact Analysis
 
 Graph Lite can build local snapshots of code relationships and generate impact
@@ -171,6 +186,20 @@ Check the version:
 java -jar lib/dhk.jar version
 ```
 
+For local install automation, these package entrypoints are stable-candidate in
+1.0:
+
+- `install.sh`
+- `scripts/install-agent-adapters.sh`
+- `scripts/devharness-control-panel.sh` commands: `configure`, `plan`,
+  `install`, `status`, `doctor`, `repair`, and `uninstall`
+
+The stable-candidate promise covers the documented command and option names,
+non-mutating `plan` and `--dry-run` behavior, `status --status-format
+text|json|markdown`, and the `doctor`/`repair` flow. It does not make generated
+`.agents/`, `.claude/`, or `.comate/` layouts, rule file contents, or alpha
+install-state/manifest schemas stable APIs.
+
 ## Typical Workflow
 
 1. Install DevHarness Kit into a project.
@@ -181,7 +210,7 @@ java -jar lib/dhk.jar version
 6. Run goal verification before claiming completion.
 7. Use the summary and artifact passport for review or release evidence.
 
-The stable-candidate entrypoints are:
+The stable entrypoints are:
 
 - `dhk doctor`
 - `dhk configure`
@@ -191,10 +220,16 @@ The stable-candidate entrypoints are:
 - `dhk quickstart`
 - `dhk memory`
 - `dhk goal`
+- `dhk graph` stable-advisory subset: status, index, impact, export
+- `dhk bdd`
 
-Experimental surfaces such as Graph Lite, BDD, skill governance, and policy
-hooks are included for dogfooding and feedback, but they are outside the 1.0
-stable contract unless a later release note explicitly promotes them.
+Graph Lite is stable-advisory: its documented output shape is stable, but its
+impact analysis remains heuristic and must be verified with tests, review, and
+goal checks. Skill governance has a stable-candidate contract/report subset, but
+full governance enforcement remains outside the stable contract. Policy hooks
+have a stable-candidate local schema and hook-behavior subset, but they are not
+a sandbox or permission boundary. Routine metrics/replay have stable-candidate
+local report schemas, while public routine automation remains experimental.
 
 ## Build From Source
 
@@ -224,6 +259,8 @@ mvn -DskipTests package -P release-archive
 Release archives include the runtime jar, installer, agent packaging, license,
 security notes, changelog, and user-facing README files. The repository `docs/`
 directory is intentionally not bundled into the user package.
+`scripts/release-gate.sh` writes `target/ARTIFACT_MANIFEST.json` and
+`target/SHA256SUMS`; publish both beside the jar and archives.
 
 ## Documentation
 

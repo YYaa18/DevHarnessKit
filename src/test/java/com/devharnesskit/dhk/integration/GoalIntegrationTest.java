@@ -1125,6 +1125,55 @@ final class GoalIntegrationTest {
     }
 
     @Test
+    void goalChecksPassAcceptanceUsesActivePolicyRequiredChecks() throws Exception {
+        Path root = tempDir.resolve("demo");
+        Files.createDirectories(PathUtil.goalProfilesDirectory(root));
+        Files.write(PathUtil.goalProfile(root, "custom-policy-backed-goal-acceptance"), ("{\n"
+                + "  \"workflow_key\": \"api-change\",\n"
+                + "  \"requires_spec\": \"true\",\n"
+                + "  \"default_mode\": \"api\",\n"
+                + "  \"actions\": \"inspect,verify\",\n"
+                + "  \"required_checks\": \"sensitive,spec\",\n"
+                + "  \"completion_allow_skipped_checks\": \"false\",\n"
+                + "  \"mapping.inspect.spec_task\": \"inspect\",\n"
+                + "  \"mapping.verify.spec_task\": \"verify\",\n"
+                + "  \"acceptance.goal_checks_pass.description\": \"Required goal checks are accepted\",\n"
+                + "  \"acceptance.goal_checks_pass.expected\": \"The active policy checks pass\",\n"
+                + "  \"acceptance.goal_checks_pass.source\": \"checks\",\n"
+                + "  \"acceptance.goal_checks_pass.required_checks\": \"sensitive,architecture\"\n"
+                + "}\n").getBytes("UTF-8"));
+        Files.write(PathUtil.goalCheckPolicy(root), ("{\n"
+                + "  \"required_checks\": \"sensitive,spec\",\n"
+                + "  \"accepted_sensitive_statuses\": \"passed\",\n"
+                + "  \"accepted_spec_statuses\": \"passed\"\n"
+                + "}\n").getBytes("UTF-8"));
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo",
+                "--profile", "custom-policy-backed-goal-acceptance",
+                "--task", "Policy-backed goal acceptance",
+                "--module", "goal"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+        String specChange = firstValue(start.stdout(), "spec_change: ");
+
+        recordTwoStepGoal(goalKey);
+
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, verify.context());
+        assertEquals(ExitCodes.SUCCESS, verifyExit);
+        assertTrue(verify.stdout().contains("\"decision\": \"ready_to_complete\""));
+        assertFalse(verify.stdout().contains("\"check_key\": \"architecture\""));
+        assertEquals("passed", singleString(root, "SELECT status FROM spec_acceptance "
+                + "WHERE change_key = '" + specChange + "' AND acceptance_key = 'goal_checks_pass'"));
+    }
+
+    @Test
     void profileAcceptanceMappingPassesFromTestSource() throws Exception {
         Path root = tempDir.resolve("demo");
         Files.createDirectories(PathUtil.goalProfilesDirectory(root));
@@ -1342,6 +1391,7 @@ final class GoalIntegrationTest {
         assertEquals(ExitCodes.VALIDATION_ERROR, completeExit);
         assertTrue(complete.stderr().contains("Policy blocked goal complete"));
         assertTrue(complete.stderr().contains("protected file changed"));
+        assertTrue(complete.stderr().contains("next_command: dhk doctor --project-root"));
     }
 
     @Test
@@ -1375,6 +1425,7 @@ final class GoalIntegrationTest {
         assertEquals(ExitCodes.VALIDATION_ERROR, stepExit);
         assertTrue(step.stderr().contains("Policy blocked goal step"));
         assertTrue(step.stderr().contains("command is forbidden by policy"));
+        assertTrue(step.stderr().contains("next_command: dhk doctor --project-root"));
         assertEquals(0, countRows(root, "goal_step WHERE goal_key = '" + goalKey + "'"));
         assertEquals("inspect_existing_code", singleString(root,
                 "SELECT current_action FROM goal_run WHERE goal_key = '" + goalKey + "'"));
@@ -1412,6 +1463,7 @@ final class GoalIntegrationTest {
         assertEquals(ExitCodes.VALIDATION_ERROR, stepExit);
         assertTrue(step.stderr().contains("Policy blocked goal step"));
         assertTrue(step.stderr().contains("protected file changed"));
+        assertTrue(step.stderr().contains("next_command: dhk doctor --project-root"));
         assertEquals(0, countRows(root, "goal_step WHERE goal_key = '" + goalKey + "'"));
     }
 
@@ -1447,6 +1499,7 @@ final class GoalIntegrationTest {
         assertEquals(ExitCodes.VALIDATION_ERROR, stepExit);
         assertTrue(step.stderr().contains("Policy blocked goal step"));
         assertTrue(step.stderr().contains("outside allowed_write_paths"));
+        assertTrue(step.stderr().contains("next_command: dhk doctor --project-root"));
         assertEquals(0, countRows(root, "goal_step WHERE goal_key = '" + goalKey + "'"));
     }
 
@@ -1480,6 +1533,7 @@ final class GoalIntegrationTest {
         assertEquals(ExitCodes.VALIDATION_ERROR, checkExit);
         assertTrue(check.stderr().contains("Policy blocked goal check"));
         assertTrue(check.stderr().contains("command is forbidden by policy"));
+        assertTrue(check.stderr().contains("next_command: dhk doctor --project-root"));
         assertEquals(0, countRows(root, "goal_check WHERE goal_key = '" + goalKey + "'"));
     }
 
@@ -1512,6 +1566,7 @@ final class GoalIntegrationTest {
         assertEquals(ExitCodes.VALIDATION_ERROR, exportExit);
         assertTrue(export.stderr().contains("Policy blocked context export"));
         assertTrue(export.stderr().contains("output path is forbidden"));
+        assertTrue(export.stderr().contains("next_command: dhk doctor --project-root"));
         assertFalse(export.stderr().contains("ERROR goal export failed"));
     }
 
@@ -2314,6 +2369,98 @@ final class GoalIntegrationTest {
     }
 
     @Test
+    void graphAwareGoalVerifyAcceptsExplicitMultiImpactEvidence() throws Exception {
+        Path root = tempDir.resolve("demo-multi-impact-coverage");
+        writeSource(root, "src/main/java/com/example/App.java",
+                "package com.example;\npublic class App { public void run() {} }\n");
+        writeSource(root, "src/main/java/org/acme/Other.java",
+                "package org.acme;\npublic class Other { public void run() {} }\n");
+        writeGraphProfile(root, "custom-multi-impact-coverage", true);
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo-multi-impact-coverage",
+                "--profile", "custom-multi-impact-coverage",
+                "--task", "Impact evidence can cover multiple disjoint changes",
+                "--module", "graph"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "index", "--project-root", "demo-multi-impact-coverage"
+        }, new Harness(tempDir).context()));
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "export", "--project-root", "demo-multi-impact-coverage"
+        }, new Harness(tempDir).context()));
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", "demo-multi-impact-coverage",
+                "--file", "src/main/java/com/example/App.java"
+        }, new Harness(tempDir).context()));
+        writeSource(root, ".agents/verification/multi-impact.txt",
+                "graph impact --file src/main/java/org/acme/Other.java passed\n");
+        recordCustomGraphGoalSteps("demo-multi-impact-coverage", goalKey,
+                "src/main/java/org/acme/Other.java", true,
+                "; multi_impact_evidence_status=passed"
+                        + "; impact_covered_files=src/main/java/org/acme/Other.java"
+                        + "; multi_impact_evidence_path=.agents/verification/multi-impact.txt");
+
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "demo-multi-impact-coverage", "--goal", goalKey
+        }, verify.context());
+
+        assertEquals(ExitCodes.SUCCESS, verifyExit);
+        assertTrue(verify.stdout().contains("impact: passed - impact map fresh and covers changed files"));
+        assertFalse(verify.stdout().contains("changed files not covered by impact map"));
+    }
+
+    @Test
+    void graphAwareGoalVerifyDoesNotRequireTestSourceCoverageInImpactMap() throws Exception {
+        Path root = tempDir.resolve("demo-test-impact-coverage");
+        writeSource(root, "src/main/java/com/example/App.java",
+                "package com.example;\npublic class App { public void run() {} }\n");
+        writeSource(root, "src/test/java/com/example/AppTest.java",
+                "package com.example;\nclass AppTest { void smoke() {} }\n");
+        writeGraphProfile(root, "custom-test-coverage", true);
+
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "demo-test-impact-coverage",
+                "--profile", "custom-test-coverage",
+                "--task", "Test source changes are verification evidence",
+                "--module", "graph"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "index", "--project-root", "demo-test-impact-coverage"
+        }, new Harness(tempDir).context()));
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "export", "--project-root", "demo-test-impact-coverage"
+        }, new Harness(tempDir).context()));
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", "demo-test-impact-coverage",
+                "--file", "src/main/java/com/example/App.java"
+        }, new Harness(tempDir).context()));
+        recordCustomGraphGoalSteps("demo-test-impact-coverage", goalKey,
+                "src/test/java/com/example/AppTest.java", true);
+
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "demo-test-impact-coverage", "--goal", goalKey
+        }, verify.context());
+
+        assertEquals(ExitCodes.SUCCESS, verifyExit);
+        assertTrue(verify.stdout().contains("decision: ready_to_complete"));
+        assertTrue(verify.stdout().contains("impact: passed - impact map fresh and covers changed files"));
+        assertFalse(verify.stdout().contains("changed files not covered by impact map"));
+    }
+
+    @Test
     void goalVerifyFailsArchitectureCheckWhenModeIsFail() throws Exception {
         Path root = copyFixture("modern-java-api", tempDir.resolve("modern-java-api-arch-fail"));
         String projectRoot = root.toString();
@@ -3076,6 +3223,11 @@ final class GoalIntegrationTest {
 
     private void recordCustomGraphGoalSteps(String projectRoot, String goalKey, String changedFile,
                                             boolean impactMapReady) {
+        recordCustomGraphGoalSteps(projectRoot, goalKey, changedFile, impactMapReady, "");
+    }
+
+    private void recordCustomGraphGoalSteps(String projectRoot, String goalKey, String changedFile,
+                                            boolean impactMapReady, String extraVerifyEvidence) {
         Harness graphStep = new Harness(tempDir);
         int graphStepExit = new CommandRouter().run(new String[]{
                 "goal", "step",
@@ -3114,6 +3266,7 @@ final class GoalIntegrationTest {
                 "--goal", goalKey,
                 "--summary", "Verification evidence recorded",
                 "--evidence", "compile_result=not required; test_result=not required; sensitive_result=not required"
+                + (extraVerifyEvidence == null ? "" : extraVerifyEvidence)
         }, verifyStep.context());
         assertEquals(ExitCodes.SUCCESS, verifyStepExit);
     }

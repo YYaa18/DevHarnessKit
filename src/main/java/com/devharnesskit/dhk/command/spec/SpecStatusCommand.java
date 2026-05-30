@@ -20,6 +20,7 @@ import com.devharnesskit.dhk.repository.spec.SpecDocumentRepository;
 import com.devharnesskit.dhk.repository.spec.SpecTaskRepository;
 import com.devharnesskit.dhk.repository.spec.WorkflowSpecBindingRepository;
 import com.devharnesskit.dhk.service.ProjectService;
+import com.devharnesskit.dhk.util.JsonOutput;
 
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -53,6 +54,14 @@ public final class SpecStatusCommand implements Command {
                         "spec change", changeKey, "dhk spec create --change <key> --title \"<title>\"",
                         "docs/GOAL_CONFIGURATION.md");
             }
+            List<SpecDocument> documents = documentRepository.listByChange(connection, change.changeKey());
+            List<SpecTask> tasks = taskRepository.listByChange(connection, change.changeKey());
+            List<SpecAcceptance> acceptances = acceptanceRepository.listByChange(connection, change.changeKey());
+            List<WorkflowSpecBinding> bindings = bindingRepository.listByChange(connection, change.changeKey());
+            if (JsonOutput.enabled(args)) {
+                context.out().print(SpecJsonSupport.status(change, tasks, acceptances, bindings));
+                return ExitCodes.SUCCESS;
+            }
             context.out().println("change: " + change.changeKey());
             context.out().println("title: " + change.title());
             context.out().println("status: " + change.status());
@@ -60,27 +69,23 @@ public final class SpecStatusCommand implements Command {
             context.out().println("mode: " + change.mode());
             context.out().println();
             context.out().println("documents:");
-            List<SpecDocument> documents = documentRepository.listByChange(connection, change.changeKey());
             for (SpecDocument document : documents) {
                 context.out().println("- " + document.documentType() + " " + document.status()
                         + " v" + document.version());
             }
             context.out().println();
             context.out().println("tasks:");
-            List<SpecTask> tasks = taskRepository.listByChange(connection, change.changeKey());
             for (SpecTask task : tasks) {
                 context.out().println("[" + task.status() + "] " + task.taskKey() + " " + task.title());
             }
             context.out().println();
             context.out().println("acceptance:");
-            List<SpecAcceptance> acceptances = acceptanceRepository.listByChange(connection, change.changeKey());
             for (SpecAcceptance acceptance : acceptances) {
                 context.out().println("[" + acceptance.status() + "] "
                         + acceptance.acceptanceKey() + " " + acceptance.description());
             }
             context.out().println();
             context.out().println("bound_workflows:");
-            List<WorkflowSpecBinding> bindings = bindingRepository.listByChange(connection, change.changeKey());
             for (WorkflowSpecBinding binding : bindings) {
                 context.out().println("- " + binding.runKey() + " " + binding.bindingType());
             }

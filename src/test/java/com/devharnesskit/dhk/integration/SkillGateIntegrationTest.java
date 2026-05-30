@@ -73,6 +73,33 @@ final class SkillGateIntegrationTest {
     }
 
     @Test
+    void thinkBeforeCodingGateAllowsExplicitRepairEvidenceForRecordedGoal() throws Exception {
+        String goalKey = startGoal("demo-repair");
+        recordInspectStep("demo-repair", goalKey,
+                "existing_controller=OrderController; existing_service=OrderService; "
+                        + "existing_mapper=OrderMapper; existing_tests=OrderServiceTest");
+        recordStep("demo-repair", goalKey, "Planned impacted files", "",
+                "impacted_files=OrderController; risk_points=missing goal understanding; verification_plan=mvn test");
+        recordStep("demo-repair", goalKey, "Implemented change", "src/main/java/OrderController.java",
+                "implementation_summary=Implemented before the missing evidence was noticed");
+        recordStep("demo-repair", goalKey, "Repaired missing pre-coding evidence", "",
+                "think_before_coding_repair=acknowledged; "
+                        + "goal_understanding=Implement a focused order lookup change; "
+                        + "assumptions=No schema or DB changes; "
+                        + "compile_result=passed; test_result=passed; sensitive_result=passed");
+
+        Harness gate = new Harness(tempDir);
+        int exit = new CommandRouter().run(new String[]{
+                "skill", "gate", "think-before-coding",
+                "--project-root", "demo-repair",
+                "--goal", goalKey
+        }, gate.context());
+
+        assertEquals(ExitCodes.SUCCESS, exit);
+        assertTrue(gate.stdout().contains("status: passed"), gate.stdout());
+    }
+
+    @Test
     void thinkBeforeCodingGateAcceptsBugfixPreCodingEvidence() throws Exception {
         String goalKey = startGoal("demo-bugfix", "bugfix");
         recordStep("demo-bugfix", goalKey, "Collected release hardening symptoms", "",

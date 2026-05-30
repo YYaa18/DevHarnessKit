@@ -12,6 +12,14 @@ public final class SpecContextRenderer {
     public String renderFull(SpecChange change, List<SpecDocument> documents,
                              List<SpecTask> tasks, List<SpecAcceptance> acceptances,
                              List<WorkflowSpecBinding> bindings, String generatedAt) {
+        return renderFull(change, documents, tasks, acceptances, bindings,
+                java.util.Collections.<String>emptyList(), generatedAt);
+    }
+
+    public String renderFull(SpecChange change, List<SpecDocument> documents,
+                             List<SpecTask> tasks, List<SpecAcceptance> acceptances,
+                             List<WorkflowSpecBinding> bindings, List<String> bddTrace,
+                             String generatedAt) {
         StringBuilder builder = new StringBuilder();
         builder.append("# SPEC_CONTEXT\n\n");
         builder.append("<generated-at>").append(generatedAt).append("</generated-at>\n\n");
@@ -64,6 +72,16 @@ public final class SpecContextRenderer {
             }
         }
         builder.append("</acceptance>\n\n");
+
+        builder.append("<bdd-trace>\n");
+        if (bddTrace == null || bddTrace.isEmpty()) {
+            builder.append("none\n");
+        } else {
+            for (String trace : bddTrace) {
+                builder.append("- ").append(trace).append('\n');
+            }
+        }
+        builder.append("</bdd-trace>\n\n");
 
         builder.append("<bound-workflows>\n");
         for (WorkflowSpecBinding binding : bindings) {

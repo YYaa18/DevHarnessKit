@@ -15,10 +15,12 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 public final class DevHarnessPolicyService {
+    public static final String SCHEMA_VERSION = "devharness-policy/v1";
+    private static final String LEGACY_SCHEMA_VERSION = "devharness-policy/v1-alpha";
     private static final Pattern COMMAND_PATTERN =
             Pattern.compile("[a-z][a-z0-9_-]*(\\s+[a-z][a-z0-9_-]*)*");
     private static final Pattern ENV_PATTERN = Pattern.compile("[a-z0-9][a-z0-9_-]*");
-    private static final Set<String> FIELDS = set("mode", "allowed_dhk_commands",
+    private static final Set<String> FIELDS = set("schema_version", "mode", "allowed_dhk_commands",
             "forbidden_dhk_commands", "protected_files", "allowed_write_paths",
             "db_sql_requires_explicit_request", "db_require_readonly_credentials",
             "db_allowed_environments", "context_export_require_sensitive_scan",
@@ -84,13 +86,18 @@ public final class DevHarnessPolicyService {
             return diagnostics;
         }
         warnUnknownFields(policyPath, raw, diagnostics);
+        diagnoseSchemaVersion(policyPath, raw, diagnostics);
         diagnoseMode(policyPath, raw, diagnostics);
         diagnoseCommandList(policyPath, "allowed_dhk_commands", raw.get("allowed_dhk_commands"), diagnostics);
         diagnoseCommandList(policyPath, "forbidden_dhk_commands", raw.get("forbidden_dhk_commands"), diagnostics);
+        diagnoseCommandConflicts(policyPath, raw, diagnostics);
         diagnosePathList(policyPath, "protected_files", raw.get("protected_files"), diagnostics);
         diagnosePathList(policyPath, "allowed_write_paths", raw.get("allowed_write_paths"), diagnostics);
         diagnosePathList(policyPath, "context_export_allowed_files", raw.get("context_export_allowed_files"), diagnostics);
         diagnosePathList(policyPath, "context_export_forbidden_files", raw.get("context_export_forbidden_files"), diagnostics);
+        diagnosePathConflicts(policyPath, "context_export_allowed_files",
+                raw.get("context_export_allowed_files"), "context_export_forbidden_files",
+                raw.get("context_export_forbidden_files"), diagnostics);
         diagnoseBoolean(policyPath, raw, "db_sql_requires_explicit_request", diagnostics);
         diagnoseBoolean(policyPath, raw, "db_require_readonly_credentials", diagnostics);
         diagnoseBoolean(policyPath, raw, "context_export_require_sensitive_scan", diagnostics);
@@ -105,6 +112,19 @@ public final class DevHarnessPolicyService {
         diagnoseSkillTrustCheckpointType(policyPath, raw, diagnostics);
         diagnoseEnvironmentList(policyPath, raw.get("db_allowed_environments"), diagnostics);
         return diagnostics;
+    }
+
+    private void diagnoseSchemaVersion(Path file, Map<String, String> raw, List<Diagnostic> diagnostics) {
+        String schemaVersion = value(raw, "schema_version", "");
+        if (schemaVersion.length() == 0) {
+            diagnostics.add(warning(file.toString(),
+                    "schema_version is missing; use " + SCHEMA_VERSION));
+            return;
+        }
+        if (!SCHEMA_VERSION.equals(schemaVersion) && !LEGACY_SCHEMA_VERSION.equals(schemaVersion)) {
+            diagnostics.add(warning(file.toString(),
+                    "schema_version should be " + SCHEMA_VERSION));
+        }
     }
 
     private void diagnoseSkillTrust(Path file, Map<String, String> raw, List<Diagnostic> diagnostics) {
@@ -154,6 +174,51 @@ public final class DevHarnessPolicyService {
                 diagnostics.add(warning(file.toString(), field + " contains invalid command pattern: " + item));
             }
         }
+    }
+
+    private void diagnoseCommandConflicts(Path file, Map<String, String> raw,
+                                          List<Diagnostic> diagnostics) {
+        List<String> allowed = diagnoseList(file, "allowed_dhk_commands",
+                raw.get("allowed_dhk_commands"), new ArrayList<Diagnostic>());
+        List<String> forbidden = diagnoseList(file, "forbidden_dhk_commands",
+                raw.get("forbidden_dhk_commands"), new ArrayList<Diagnostic>());
+        Set<String> conflicts = new LinkedHashSet<String>();
+        for (String allow : allowed) {
+            for (String forbid : forbidden) {
+                if (commandPrefixesOverlap(allow, forbid)) {
+                    conflicts.add(allow + " <> " + forbid);
+                }
+            }
+        }
+        if (!conflicts.isEmpty()) {
+            diagnostics.add(warning(file.toString(),
+                    "allowed_dhk_commands conflicts with forbidden_dhk_commands: "
+                            + join(new ArrayList<String>(conflicts))));
+        }
+    }
+
+    private void diagnosePathConflicts(Path file, String leftField, String leftValue,
+                                       String rightField, String rightValue,
+                                       List<Diagnostic> diagnostics) {
+        List<String> left = diagnoseList(file, leftField, leftValue, new ArrayList<Diagnostic>());
+        List<String> right = diagnoseList(file, rightField, rightValue, new ArrayList<Diagnostic>());
+        Set<String> conflicts = new LinkedHashSet<String>();
+        for (String leftPath : left) {
+            for (String rightPath : right) {
+                if (normalize(leftPath).equals(normalize(rightPath))) {
+                    conflicts.add(leftPath);
+                }
+            }
+        }
+        if (!conflicts.isEmpty()) {
+            diagnostics.add(warning(file.toString(),
+                    leftField + " conflicts with " + rightField + ": "
+                            + join(new ArrayList<String>(conflicts))));
+        }
+    }
+
+    private boolean commandPrefixesOverlap(String left, String right) {
+        return left.equals(right) || left.startsWith(right + " ") || right.startsWith(left + " ");
     }
 
     private void diagnosePathList(Path file, String field, String value, List<Diagnostic> diagnostics) {
@@ -234,6 +299,10 @@ public final class DevHarnessPolicyService {
         if (!unknown.isEmpty()) {
             diagnostics.add(warning(file.toString(), "unknown fields: " + join(unknown)));
         }
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.trim().replace('\\', '/');
     }
 
     private String[] splitList(String value) {

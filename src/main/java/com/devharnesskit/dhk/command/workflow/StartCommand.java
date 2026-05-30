@@ -10,6 +10,8 @@ import com.devharnesskit.dhk.db.TransactionTemplate;
 import com.devharnesskit.dhk.guidance.CommandErrorGuidance;
 import com.devharnesskit.dhk.guidance.EnumGuidance;
 import com.devharnesskit.dhk.model.Project;
+import com.devharnesskit.dhk.model.workflow.WorkflowGateRun;
+import com.devharnesskit.dhk.model.workflow.WorkflowPhaseRun;
 import com.devharnesskit.dhk.model.workflow.WorkflowRun;
 import com.devharnesskit.dhk.model.workflow.WorkflowTemplate;
 import com.devharnesskit.dhk.repository.ProjectRepository;
@@ -23,10 +25,12 @@ import com.devharnesskit.dhk.repository.workflow.WorkflowTemplateRepository;
 import com.devharnesskit.dhk.service.ProjectService;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
 import com.devharnesskit.dhk.service.workflow.WorkflowStartService;
+import com.devharnesskit.dhk.util.JsonOutput;
 import com.devharnesskit.dhk.util.PathUtil;
 
 import java.nio.file.Path;
 import java.sql.Connection;
+import java.util.List;
 
 public final class StartCommand implements Command {
     private final DbConnectionFactory connectionFactory = new DbConnectionFactory();
@@ -34,11 +38,13 @@ public final class StartCommand implements Command {
     private final ProjectService projectService = new ProjectService();
     private final ProjectRepository projectRepository = new ProjectRepository();
     private final WorkflowTemplateRepository templateRepository = new WorkflowTemplateRepository();
+    private final WorkflowPhaseRunRepository phaseRunRepository = new WorkflowPhaseRunRepository();
+    private final WorkflowGateRunRepository gateRunRepository = new WorkflowGateRunRepository();
     private final SensitiveDataGuard sensitiveDataGuard = new SensitiveDataGuard();
     private final WorkflowStartService startService = new WorkflowStartService(
             new WorkflowPhaseTemplateRepository(), new WorkflowGateTemplateRepository(),
-            new WorkflowRunRepository(), new WorkflowPhaseRunRepository(),
-            new WorkflowGateRunRepository(), new WorkflowEventRepository());
+            new WorkflowRunRepository(), phaseRunRepository,
+            gateRunRepository, new WorkflowEventRepository());
     private final TransactionTemplate transactionTemplate = new TransactionTemplate();
 
     public int run(CommandContext context, Args args) {
@@ -90,6 +96,12 @@ public final class StartCommand implements Command {
                             selectedTask, selectedSummary, selectedModule, selectedMode, context.clock().now());
                 }
             });
+            if (JsonOutput.enabled(args)) {
+                List<WorkflowPhaseRun> phases = phaseRunRepository.listByRun(connection, run.runKey());
+                List<WorkflowGateRun> gates = gateRunRepository.listByRun(connection, run.runKey());
+                context.out().print(WorkflowJsonSupport.run("workflow start", run, phases, gates));
+                return ExitCodes.SUCCESS;
+            }
             context.out().println("run_key: " + run.runKey());
             context.out().println("workflow: " + run.workflowKey());
             context.out().println("status: " + run.status());

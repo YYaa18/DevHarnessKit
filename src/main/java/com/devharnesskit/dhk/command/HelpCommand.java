@@ -105,8 +105,8 @@ public final class HelpCommand implements Command {
         context.out().println("  dhk spec archive --change <key> --reason <reason>");
         context.out().println();
         context.out().println("Stability:");
-        context.out().println("  Current build: beta developer preview; not stable or 1.0-ready.");
-        context.out().println("  Stable-candidate track: help/version/doctor, memory core, goal core, release packaging.");
+        context.out().println("  Current build: stable 1.0 surface.");
+        context.out().println("  Stable surface: help/version/doctor, memory core, goal core, configure/status/readiness, release packaging.");
         context.out().println("  Beta surface: DB inspection. SQL guard is not a database permission boundary.");
         context.out().println("  Experimental surface: graph, BDD, skill contract/trust, policy governance, ECC control panel, routine.");
         context.out().println("  See docs/STABLE_CANDIDATE.md and docs/COMPATIBILITY.md.");

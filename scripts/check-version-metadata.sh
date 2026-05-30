@@ -19,10 +19,20 @@ grep -F "## $VERSION" CHANGELOG.md >/dev/null || {
   exit 1
 }
 
-grep -F "Current beta release target: \`$VERSION\`" README.md >/dev/null || {
-  echo "ERROR: README.md is missing current release target: $VERSION" >&2
-  exit 1
-}
+case "$VERSION" in
+  *-*)
+    grep -F "Current beta release target: \`$VERSION\`" README.md >/dev/null || {
+      echo "ERROR: README.md is missing current prerelease target: $VERSION" >&2
+      exit 1
+    }
+    ;;
+  *)
+    grep -F "Current stable release: \`$VERSION\`" README.md >/dev/null || {
+      echo "ERROR: README.md is missing current stable release: $VERSION" >&2
+      exit 1
+    }
+    ;;
+esac
 
 [ -f "docs/releases/v$VERSION.md" ] || {
   echo "ERROR: missing release note docs/releases/v$VERSION.md" >&2

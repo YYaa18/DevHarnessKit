@@ -11,8 +11,8 @@ public final class VersionCommand implements Command {
         context.out().println("DevHarness Kit " + VersionInfo.version());
         context.out().println("release_channel: " + VersionInfo.RELEASE_CHANNEL);
         context.out().println("schema_version: " + VersionInfo.CURRENT_SCHEMA_VERSION);
-        context.out().println("stability: beta developer preview; not stable or 1.0-ready");
-        context.out().println("stable_candidate_surface: help,version,doctor,memory-core,goal-core,release-packaging");
+        context.out().println("stability: stable; experimental surfaces remain outside the stable contract");
+        context.out().println("stable_surface: help,version,doctor,memory-core,goal-core,configure,status,readiness,advise,quickstart,release-packaging");
         context.out().println("beta_surface: db-readonly");
         context.out().println("experimental_surface: graph,bdd,skill-contract,policy-governance,ecc-control-panel,routine");
         context.out().println("java: " + System.getProperty("java.version"));

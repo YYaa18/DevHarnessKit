@@ -1,9 +1,8 @@
 # Stable Contract
 
-DevHarness Kit is still a beta developer preview until a stable release tag
-explicitly promotes it. This document defines the smallest surface intended to
-become the 1.0 stable contract. Anything not listed here is beta-only,
-experimental, or internal.
+DevHarness Kit `1.0.0` promotes the smallest documented surface to the
+1.0 stable contract. Anything not listed here is beta-only, experimental, or
+internal.
 
 ## Stable Surface Candidate
 
@@ -26,8 +25,7 @@ For 1.0 and later, command names, required option names, exit code meanings,
 and the minimum machine-readable fields below should change only under semantic
 versioning and documented deprecation windows.
 
-The current artifact remains `0.4.6-beta.1`; this contract is the freeze target,
-not a current stable claim.
+The current stable artifact is `1.0.0`.
 
 ## Exit Codes
 
@@ -119,7 +117,7 @@ succeeds, and may scan the listed anchors.
 - user choices
 - confirmation requirement
 
-`AGENT_BRIEF.json` is alpha machine-readable adapter protocol, not stable-beta
+`AGENT_BRIEF.json` is alpha machine-readable adapter protocol, not stable
 public API. Its schema is versioned with `devharness-agent-brief/v1-alpha`.
 
 ## Beta But Included
@@ -145,7 +143,7 @@ reduces user risk more than it increases install and adapter complexity.
 ## Experimental Outside The Contract
 
 The following surfaces are included for dogfooding and feedback, but are not
-part of the stable-beta contract:
+part of the stable contract:
 
 - Graph Lite and Graph-aware Goal
 - BDD acceptance harness
@@ -156,4 +154,4 @@ part of the stable-beta contract:
 - Routine, metrics, and replay
 - direct SQLite table or column details
 
-These surfaces may change before 1.0 with release notes.
+These surfaces may change in later releases with release notes.

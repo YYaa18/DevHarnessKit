@@ -6,7 +6,8 @@ DevHarness Kit is a local-first CLI. It does not run a daemon, open an HTTP port
 
 | Version | Status |
 | --- | --- |
-| `0.4.6-beta.1` | Beta developer preview. Security fixes are best-effort while the public API and schema are still stabilizing. |
+| `1.0.0` | Current stable release. Security fixes are prioritized for the documented stable surface. |
+| `0.4.6-beta.1` | Superseded beta developer preview. Upgrade to `1.0.0` when possible. |
 
 ## Threat Model
 

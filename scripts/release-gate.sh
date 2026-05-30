@@ -85,6 +85,13 @@ check_no_hardcoded_wrapper_version() {
   fi
 }
 
+is_prerelease() {
+  case "$VERSION" in
+    *-*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 VERSION="$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)"
 [ -n "$VERSION" ] || fail "could not resolve Maven project.version"
 
@@ -131,11 +138,20 @@ log "checking class size boundaries"
 scripts/check-class-size.sh >/dev/null
 
 log "checking status wording"
-grep -n "developer preview" README.md RELEASE.md >/dev/null || fail "developer preview wording missing"
-grep -n "not production-ready" README.md >/dev/null \
-  || fail "production-readiness warning missing from README"
-grep -n "do not describe it" README.md >/dev/null \
-  || fail "not-stable warning missing from README"
+if is_prerelease; then
+  grep -n "developer preview" README.md RELEASE.md >/dev/null || fail "developer preview wording missing"
+  grep -n "not production-ready" README.md >/dev/null \
+    || fail "production-readiness warning missing from README"
+  grep -n "do not describe it" README.md >/dev/null \
+    || fail "not-stable warning missing from README"
+else
+  grep -n "Current stable release: \`$VERSION\`" README.md >/dev/null \
+    || fail "stable release marker missing from README"
+  grep -n "Current release channel: \`stable\`" RELEASE.md >/dev/null \
+    || fail "stable release channel missing from RELEASE.md"
+  grep -n "1.0 stable contract" docs/STABLE_CONTRACT.md >/dev/null \
+    || fail "1.0 stable contract wording missing"
+fi
 grep -ni "Stable candidate surface" docs/STABLE_CANDIDATE.md >/dev/null \
   || fail "stable candidate contract missing"
 grep -ni "Experimental surface" docs/STABLE_CANDIDATE.md >/dev/null \

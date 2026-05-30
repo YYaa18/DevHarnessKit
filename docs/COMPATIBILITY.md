@@ -1,11 +1,11 @@
 # Compatibility Contract
 
-Current release channel: beta developer preview. The artifact version is defined
-by Maven `project.version` and printed by `dhk version`.
+Current release channel: stable. The artifact version is defined by Maven
+`project.version` and printed by `dhk version`.
 
-This document defines what users and scripts may cautiously depend on before
-1.0, and what remains experimental. It is a contract for release notes and
-documentation, not a promise that every current behavior is stable.
+This document defines what users and scripts may depend on for the 1.0 stable
+surface, and what remains beta or experimental. It is a contract for release
+notes and documentation, not a promise that every bundled behavior is stable.
 
 See [STABLE_CANDIDATE.md](STABLE_CANDIDATE.md) for the narrower
 stable-candidate boundary. The stable-candidate track is intentionally smaller
@@ -15,13 +15,14 @@ than the full current command surface.
 
 | Level | Meaning |
 | --- | --- |
-| Beta | Useful for real workflows before 1.0; breaking changes require a changelog note and migration guidance. Some beta areas still have safety, environment, or dependency constraints that users must review. |
-| Alpha | Usable for developer preview feedback. Shape may change before 1.0 with documented release notes. |
+| Stable | Part of the 1.0 public contract. Breaking changes follow semantic versioning and documented deprecation windows. |
+| Beta | Useful for real workflows, but outside the stable contract. Breaking changes require a changelog note and migration guidance. Some beta areas still have safety, environment, or dependency constraints that users must review. |
+| Alpha | Usable for developer feedback. Shape may change with documented release notes. |
 | Internal | Historical plans, implementation notes, tests, and helper internals. Do not build automation against these. |
 
 ## Command Surface
 
-Beta core:
+Stable core:
 
 - `dhk help`
 - `dhk version`
@@ -35,7 +36,7 @@ Beta core:
 - `dhk memory recover`
 - `dhk memory backup`
 
-Stable-candidate beta:
+Stable:
 
 - `dhk configure init`
 - `dhk configure show`
@@ -135,9 +136,9 @@ human-readable output.
 
 ## JSON Output Contract
 
-JSON output remains conservative before 1.0. The minimum stable-beta JSON fields
-for stable-beta commands are listed in [STABLE_CONTRACT.md](STABLE_CONTRACT.md).
-Other JSON output is alpha, but scripts may depend on:
+JSON output remains conservative. The minimum stable JSON fields for stable
+commands are listed in [STABLE_CONTRACT.md](STABLE_CONTRACT.md). Other JSON
+output is alpha, but scripts may depend on:
 
 - valid JSON on stdout for commands listed in [JSON_OUTPUT.md](JSON_OUTPUT.md);
 - existing required field names changing conservatively in beta patch releases;
@@ -171,8 +172,7 @@ Alpha exports:
 
 Export section names and order documented in [EXPORT_CONTRACTS.md](EXPORT_CONTRACTS.md)
 should change only with a changelog note. New fields or sections may be added
-before 1.0 when they do not invalidate existing readers that ignore unknown
-content.
+when they do not invalidate existing readers that ignore unknown content.
 
 Do not hand-edit generated Markdown to change durable state. Regenerate exports
 with the matching CLI version.
@@ -181,8 +181,8 @@ with the matching CLI version.
 
 Current schema version: `15`.
 
-Before 1.0, the schema is not a stable public API. Users may rely on these
-operational guarantees:
+The SQLite database is an internal storage format, not a public write API.
+Users may rely on these operational guarantees:
 
 - DevHarness Kit treats `.agents/memory/memory.db` as source of truth.
 - Older non-empty databases are backed up before an in-place migration.
@@ -202,7 +202,7 @@ Unsupported:
 - direct third-party writes to `memory.db`;
 - downgrade migrations;
 - modifying generated exports and expecting SQLite state to change;
-- relying on table or column details as public API before 1.0.
+- relying on table or column details as public API.
 - treating graph snapshots as confirmed project memory.
 - treating BDD scenario rows as proof that behavior is implemented without
   passing evidence, coverage, or goal checks.

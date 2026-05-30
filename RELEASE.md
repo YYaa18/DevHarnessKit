@@ -1,6 +1,6 @@
 # Release Checklist
 
-Current release channel: `beta / developer preview`.
+Current release channel: `stable`.
 
 ## Version Source
 
@@ -167,13 +167,13 @@ checksums.
    mvn -q -Dtest=GoalSkillPackagingTest test
    ```
 
-11. Confirm beta and stable-candidate wording:
+11. Confirm release status and stability-boundary wording:
 
    ```bash
-   grep -n "developer preview" README.md RELEASE.md
-   grep -n "not production-ready" README.md
-   grep -n "do not describe it" README.md
-   grep -n "Beta core" docs/COMPATIBILITY.md
+   grep -n "Current stable release" README.md
+   grep -n "Current release channel: \`stable\`" RELEASE.md
+   grep -n "1.0 stable contract" docs/STABLE_CONTRACT.md
+   grep -n "Stable core" docs/COMPATIBILITY.md
    grep -n "Stable candidate surface" docs/STABLE_CANDIDATE.md
    grep -n "Experimental surface" docs/STABLE_CANDIDATE.md
    grep -n "downgrade" docs/COMPATIBILITY.md docs/MIGRATIONS.md
@@ -214,20 +214,19 @@ Tag-triggered releases are created as drafts. The workflow resolves
 `SHA256SUMS`.
 
 For beta tags, keep the GitHub release as a prerelease or draft until release
-notes are reviewed. For the first stable tag, publish a non-draft,
-non-prerelease release only after remote CI is green, checksums are attached,
-manual Windows archive smoke evidence is recorded, and the stable contract docs
-name the exact promoted surface. GitHub only allows a non-prerelease release to
-be marked as Latest.
+notes are reviewed. For stable tags, publish a non-draft, non-prerelease release
+only after remote CI is green, checksums are attached, and the stable contract
+docs name the exact promoted surface. GitHub only allows a non-prerelease
+release to be marked as Latest.
 
 Release notes must state:
 
-- DevHarness Kit is beta/developer preview unless a later release explicitly
-  promotes it.
+- DevHarness Kit `1.0.0` is the first stable release.
 - The current CLI, JSON, export, and schema compatibility contract is in
   `docs/COMPATIBILITY.md`.
-- The stable-candidate boundary is in `docs/STABLE_CANDIDATE.md`.
-- Memory core is usable but schema compatibility is not stable yet.
+- The stable boundary is in `docs/STABLE_CONTRACT.md` and
+  `docs/STABLE_CANDIDATE.md`.
+- Memory and goal core are part of the stable surface.
 - DB readonly is beta and requires read-only database credentials.
 - Graph, BDD, Skill Contract, Policy/Governance, Routine, and ECC Control Panel
   are experimental unless their release notes say otherwise.

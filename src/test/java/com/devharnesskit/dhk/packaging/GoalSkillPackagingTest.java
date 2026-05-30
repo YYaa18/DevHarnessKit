@@ -601,7 +601,7 @@ final class GoalSkillPackagingTest {
         assertTrue(installer.contains("DevHarnessKit 交互式安装向导"));
         assertTrue(installer.contains("傻瓜式安装流程"));
         assertTrue(installer.contains("项目绝对路径"));
-        assertTrue(installer.contains("请输入以 / 开头的绝对路径"));
+        assertTrue(installer.contains("请输入绝对路径（以 / 开头），或用 ~ / Desktop 开头的快捷路径"));
         assertFalse(installer.contains("~/Desktop"));
         assertFalse(installer.contains("Desktop/simple-java"));
         assertTrue(installer.contains("使用场景"));

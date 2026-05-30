@@ -53,6 +53,24 @@ fail() {
   exit 1
 }
 
+# --- visual helpers (TTY-aware, ASCII-safe fallback) ---
+if [ -t 1 ] && command -v tput >/dev/null 2>&1 && [ "$(tput colors 2>/dev/null || echo 0)" -ge 8 ]; then
+  C_BOLD=$(tput bold 2>/dev/null || true)
+  C_GREEN=$(tput setaf 2 2>/dev/null || true)
+  C_CYAN=$(tput setaf 6 2>/dev/null || true)
+  C_YELLOW=$(tput setaf 3 2>/dev/null || true)
+  C_GRAY=$(tput setaf 8 2>/dev/null || true)
+  C_RESET=$(tput sgr0 2>/dev/null || true)
+else
+  C_BOLD=''; C_GREEN=''; C_CYAN=''; C_YELLOW=''; C_GRAY=''; C_RESET=''
+fi
+
+hr()      { printf '%s──────────────────────────────────────────────%s\n' "$C_GRAY" "$C_RESET"; }
+section() { printf '\n%s%s%s\n' "$C_BOLD$C_CYAN" "$1" "$C_RESET"; }
+ok()      { printf '  %s✓%s %s\n' "$C_GREEN" "$C_RESET" "$1"; }
+warn()    { printf '  %s⚠%s %s\n' "$C_YELLOW" "$C_RESET" "$1"; }
+info()    { printf '  %s%s%s\n' "$C_GRAY" "$1" "$C_RESET"; }
+
 ask() {
   prompt="$1"
   default="$2"
@@ -104,7 +122,7 @@ expand_user_path() {
   input="$1"
   case "$input" in
     "~") printf '%s' "$HOME" ;;
-    "~/"*) printf '%s/%s' "$HOME" "${input#~/}" ;;
+    "~/"*) printf '%s/%s' "$HOME" "${input#"~/"}" ;;
     "\$HOME") printf '%s' "$HOME" ;;
     "\$HOME/"*) printf '%s/%s' "$HOME" "${input#\$HOME/}" ;;
     "Desktop") printf '%s/Desktop' "$HOME" ;;
@@ -121,8 +139,6 @@ first_existing_jar() {
   for path in \
     "$dist_root/lib/dhk.jar" \
     "$dist_root/.agents/tools/devharness-kit/dhk.jar" \
-    "$dist_root/target/dhk-cli-0.4.6-beta.1-all.jar" \
-    "$root/target/dhk-cli-0.4.6-beta.1-all.jar" \
     "$root/.agents/tools/devharness-kit/dhk.jar"
   do
     [ -f "$path" ] && { printf '%s' "$path"; return 0; }
@@ -199,7 +215,7 @@ detect_default_preset() {
 }
 
 choose_target() {
-  printf '\n第 2 步：选择要接入的 Agent\n'
+  section '第 2 步：选择要接入的 Agent'
   printf '  1) 文心快码 Comate（推荐，如果你正在用文心快码）\n'
   printf '  2) Claude Code\n'
   printf '  3) OpenCode\n'
@@ -218,7 +234,7 @@ choose_scenario() {
   default_choice="1"
   [ -f "$root/pom.xml" ] && default_choice="2"
 
-  printf '\n第 3 步：选择使用场景\n'
+  section '第 3 步：选择使用场景'
   printf '  1) 只是先体验一下，目标项目可能还是空的\n'
   printf '     不跑编译/测试，适合第一次试用。\n\n'
   printf '  2) 公司 Java 项目，编译/测试通常在 IDE、CI 或公司环境里做\n'
@@ -305,23 +321,27 @@ run_wizard() {
   [ -x "$CONTROL_PANEL" ] || fail "missing control panel: $CONTROL_PANEL"
   ensure_packaged_assets
 
-  printf '\nDevHarnessKit 安装向导\n'
-  printf '这个向导会把 DevHarnessKit 安装到你的项目里，并生成 Agent 规则。\n'
-  printf '你现在所在的是安装包目录，不是业务项目目录。\n\n'
+  printf '\n'
+  hr
+  printf '%s  DevHarnessKit 安装向导%s\n' "$C_BOLD$C_CYAN" "$C_RESET"
+  hr
+  info '把 DevHarnessKit 安装到你的项目，并生成 Agent 规则。'
+  info '当前目录是安装包，不是业务项目目录。'
 
-  printf '第 1 步：选择要安装到哪个项目\n'
-  printf '请输入项目的绝对路径，路径必须以 / 开头。\n'
+  section '第 1 步：选择要安装到哪个项目'
+  info '支持绝对路径，或以 ~ / Desktop 开头的快捷路径（如 ~/code/myapp）。'
   project_root=""
   while [ -z "$project_root" ]; do
-    input=$(ask "项目绝对路径" "")
+    input=$(ask "项目路径" "")
     if [ -z "$input" ]; then
-      printf '项目绝对路径不能为空。\n' >&2
+      printf '路径不能为空。\n' >&2
       continue
     fi
+    input=$(expand_user_path "$input")
     case "$input" in
       /*) ;;
       *)
-        printf '请输入以 / 开头的绝对路径。\n' >&2
+        printf '请输入绝对路径（以 / 开头），或用 ~ / Desktop 开头的快捷路径。\n' >&2
         continue
         ;;
     esac
@@ -336,6 +356,7 @@ run_wizard() {
     fi
     project_root=$(cd "$input" && pwd)
   done
+  ok "项目目录：$project_root"
 
   choose_target
   target="$selected_target"
@@ -345,17 +366,22 @@ run_wizard() {
   jar_default=$(first_existing_jar "$project_root")
   if [ -n "$jar_default" ]; then
     jar_path="$jar_default"
-    printf '\n第 4 步：使用安装包内的 DevHarnessKit jar\n'
-    printf '  %s\n' "$jar_path"
+    section '第 4 步：DevHarnessKit jar'
+    ok "使用安装包内置 jar：$jar_path"
   else
-    printf '\n第 4 步：选择 DevHarnessKit jar\n'
+    section '第 4 步：选择 DevHarnessKit jar'
     jar_path=$(ask "jar 路径" "")
     jar_path=$(expand_user_path "$jar_path")
     [ -f "$jar_path" ] || fail "jar not found: $jar_path"
   fi
 
-  printf '\n第 5 步：安装策略\n'
-  force=$(ask_yes_no "如果项目里已有 DevHarnessKit 文件，是否刷新它们?" "yes")
+  section '第 5 步：安装策略'
+  if [ -d "$project_root/.agents/skills" ] || [ -d "$project_root/.agents/devharness" ]; then
+    force=$(ask_yes_no "项目里已有 DevHarnessKit 文件，是否刷新覆盖?" "yes")
+  else
+    force="yes"
+    ok "全新项目，将直接安装。"
+  fi
   if [ "$force" = "yes" ]; then
     force_arg="--force"
   else
@@ -370,13 +396,16 @@ run_wizard() {
     module=$(ask "模块名" "demo")
   fi
 
-  printf '\n安装计划\n'
-  printf '  项目目录：%s\n' "$project_root"
-  printf '  Agent：%s\n' "$selected_target_label"
-  printf '  场景：%s\n' "$selected_scenario_label"
-  printf '  验证方式：compile=%s, test=%s, graph=%s\n' "$compile_mode" "$test_mode" "$graph_mode"
-  printf '  初始 Work Brief/Goal：%s\n' "$create_brief"
-  printf '  jar：%s\n\n' "$jar_path"
+  printf '\n'
+  hr
+  printf '%s安装计划%s\n' "$C_BOLD" "$C_RESET"
+  printf '  项目目录   : %s\n' "$project_root"
+  printf '  Agent      : %s\n' "$selected_target_label"
+  printf '  场景       : %s\n' "$selected_scenario_label"
+  printf '  验证方式   : compile=%s  test=%s  graph=%s\n' "$compile_mode" "$test_mode" "$graph_mode"
+  printf '  初始 Goal  : %s\n' "$create_brief"
+  printf '  jar        : %s\n' "$jar_path"
+  hr
 
   proceed=$(ask_yes_no "确认开始安装?" "yes")
   [ "$proceed" = "yes" ] || fail "用户取消安装"
@@ -416,23 +445,37 @@ run_wizard() {
     --force >/dev/null
 
   status_output=$("$CONTROL_PANEL" status --project-root "$project_root" --target "$target" --status-format text)
-  printf '\n安装完成\n'
-  printf '  配置：ok\n'
+  section '安装完成'
+  ok '配置已写入'
   case "$target" in
     comate)
-      printf '  文心快码规则：%s\n' "$(printf '%s\n' "$status_output" | sed -n 's/^comate_adapter: //p')"
+      ok "文心快码规则：$(printf '%s\n' "$status_output" | sed -n 's/^comate_adapter: //p')"
       ;;
     claude)
-      printf '  Claude Code 适配：%s\n' "$(printf '%s\n' "$status_output" | sed -n 's/^claude_adapter: //p')"
+      ok "Claude Code 适配：$(printf '%s\n' "$status_output" | sed -n 's/^claude_adapter: //p')"
       ;;
     opencode)
-      printf '  OpenCode 适配：%s\n' "$(printf '%s\n' "$status_output" | sed -n 's/^opencode_adapter: //p')"
+      ok "OpenCode 适配：$(printf '%s\n' "$status_output" | sed -n 's/^opencode_adapter: //p')"
       ;;
     all)
-      printf '  Agent 适配：all\n'
+      ok 'Agent 适配：all'
       ;;
   esac
-  printf '  本地 jar：%s\n' "$installed_jar"
+  ok "本地 jar：$installed_jar"
+
+  # 装后验证：用安装好的 wrapper 跑一次 doctor，确认 agent 真实调用路径可用。
+  # 只检查 banner 输出，不依赖退出码——刚装好、未 memory init 的项目 doctor 会返回 4，属正常。
+  wrapper="$project_root/.agents/skills/devharness-goal-development/scripts/dhk.sh"
+  if [ -x "$wrapper" ]; then
+    verify_out=$("$wrapper" doctor 2>&1 || true)
+    if printf '%s' "$verify_out" | grep -q 'DevHarness Kit doctor'; then
+      ok '验证通过：wrapper + jar 可运行（dhk doctor）'
+    else
+      warn '验证未通过：wrapper 无法运行 dhk，请检查 jar 路径与脚本执行权限。'
+    fi
+  else
+    warn "验证未通过：缺少可执行 wrapper（$wrapper）。"
+  fi
 
   if [ "$create_brief" = "yes" ]; then
     quickstart_output=$(java -jar "$installed_jar" quickstart \
@@ -447,16 +490,17 @@ run_wizard() {
     agent_brief_path=$(printf '%s\n' "$quickstart_output" | sed -n 's/^agent_brief_path: //p')
     goal_key=$(printf '%s\n' "$quickstart_output" | sed -n 's/^goal_key: //p')
     current_action=$(printf '%s\n' "$quickstart_output" | sed -n 's/^current_action: //p')
-    printf '\n已创建第一份工作说明\n'
-    printf '  Work Brief：%s\n' "$work_brief_path"
-    printf '  Agent Brief：%s\n' "$agent_brief_path"
-    printf '  Goal：%s\n' "$goal_key"
-    printf '  当前动作：%s\n' "$current_action"
+    section '已创建第一份工作说明'
+    ok "Work Brief ：$work_brief_path"
+    ok "Agent Brief：$agent_brief_path"
+    ok "Goal       ：$goal_key"
+    ok "当前动作   ：$current_action"
   fi
 
-  printf '\n下一步\n'
-  printf '  1. 用 %s 打开项目目录：%s\n' "$selected_target_label" "$project_root"
-  printf '  2. 对 Agent 说：读取项目规则、Work Brief 和 Agent Brief，按照 DevHarnessKit 流程完成当前任务。\n'
+  section '下一步'
+  info "1. 用 $selected_target_label 打开项目目录：$project_root"
+  info '2. 对 Agent 说：读取项目规则、Work Brief 和 Agent Brief，按照 DevHarnessKit 流程完成当前任务。'
+  printf '\n'
 }
 
 case "${1:-}" in

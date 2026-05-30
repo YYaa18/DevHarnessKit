@@ -1,8 +1,8 @@
 # Stable Candidate Contract
 
-DevHarness Kit is not stable yet. This document defines the intended
-stable-candidate boundary so beta releases can converge without expanding the
-public promise by accident.
+DevHarness Kit `1.0.0` promotes the stable-candidate boundary into the first
+stable contract. This document remains as the boundary map so future releases do
+not expand the public promise by accident.
 
 ## Stable Candidate Surface
 
@@ -55,13 +55,13 @@ of the stable candidate promise:
 - Routine, metrics, and replay;
 - direct SQLite table or column details.
 
-Experimental surface may change before 1.0 with release notes. Generated graph,
-BDD, skill, policy, and routine artifacts are local evidence and guidance, not
-proof of correctness.
+Experimental surface may change in later releases with release notes. Generated
+graph, BDD, skill, policy, and routine artifacts are local evidence and
+guidance, not proof of correctness.
 
 ## Release Gate Expectations
 
-Before a stable-candidate tag:
+Before a stable or stable-candidate tag:
 
 1. `scripts/release-gate.sh` must pass.
    The line coverage threshold is sourced from
@@ -83,14 +83,13 @@ Before a stable-candidate tag:
    goal-to-BDD, and goal-to-governance debt is reported as boundary debt until
    the next physical runner split.
 8. Remote CI on `main` must be green across the configured Linux, macOS,
-   Windows, Java 8, and Java 17 matrix. For the first stable tag, the Windows
-   release-archive wrapper smoke may be recorded as separate manual evidence
-   when it cannot run in local release-gate automation.
+   Windows, Java 8, and Java 17 matrix. Windows-specific smoke that cannot run
+   locally may be recorded as separate CI or manual evidence.
 9. README, compatibility docs, migration docs, and `dhk version` must agree on
    the current schema version. `scripts/check-version-metadata.sh` enforces
    this before packaging.
 
-## Non-Goals Before 1.0
+## Non-Goals For 1.0
 
 - Do not make Graph Lite a completeness claim for code impact.
 - Do not treat BDD scenarios as executable test proof without evidence.

@@ -12,13 +12,15 @@ verification status, and a local recovery trail.
 
 ## Status
 
-This project is a beta developer preview. It is not production-ready; do not describe it as stable or 1.0-ready.
+DevHarness Kit `1.0.0` is the first stable release. The stable contract is
+intentionally narrow: core CLI, memory, goal, status, readiness, configure,
+brief, release packaging, and documented generated-export anchors.
 
-Current beta release target: `0.4.6-beta.1`.
+Current stable release: `1.0.0`.
 
 Current schema version is v15.
 
-The intended 1.0 stable surface is intentionally narrow. See
+See
 [docs/STABLE_CONTRACT.md](docs/STABLE_CONTRACT.md) and
 [docs/STABLE_CANDIDATE.md](docs/STABLE_CANDIDATE.md) for the exact boundary.
 
@@ -132,7 +134,8 @@ It is also not:
 - a replacement for tests or review;
 - a database permission system;
 - a full DLP system;
-- a stable 1.0 API.
+- a guarantee that every bundled experimental command is part of the stable
+  contract.
 
 Database inspection is a local developer tool. Use read-only credentials for
 real databases. The SQL guard is a safety aid, not a database permission
@@ -140,7 +143,7 @@ boundary.
 
 ## Install From A Release
 
-Download the latest prerelease package from
+Download the latest release package from
 [GitHub Releases](https://github.com/YYaa18/DevHarnessKit/releases).
 
 For most users, choose the zip or tar.gz package, unpack it, and run:
@@ -190,7 +193,8 @@ The stable-candidate entrypoints are:
 - `dhk goal`
 
 Experimental surfaces such as Graph Lite, BDD, skill governance, and policy
-hooks are included for dogfooding and feedback, but they may change before 1.0.
+hooks are included for dogfooding and feedback, but they are outside the 1.0
+stable contract unless a later release note explicitly promotes them.
 
 ## Build From Source
 

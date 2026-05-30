@@ -11,14 +11,15 @@ DevHarness Kit 是一个本地优先的 AI 编程协作工具。它不是让模�
 
 ## 当前状态
 
-本项目目前是 beta developer preview。它还不是生产稳定版本；请不要把它描述成
-stable 或 1.0-ready。
+DevHarness Kit `1.0.0` 是第一个正式稳定版本。稳定承诺范围刻意收窄：
+核心 CLI、memory、goal、status、readiness、configure、brief、发布包，以及文档中
+列出的导出文件锚点。
 
-当前 beta 发布目标：`0.4.6-beta.1`。
+当前稳定版本：`1.0.0`。
 
 当前 SQLite schema 版本：v15。
 
-1.0 前会收窄稳定承诺范围。准确边界见
+准确边界见
 [docs/STABLE_CONTRACT.md](docs/STABLE_CONTRACT.md) 和
 [docs/STABLE_CANDIDATE.md](docs/STABLE_CANDIDATE.md)。
 
@@ -128,7 +129,7 @@ DevHarness Kit 不证明代码一定正确。它做的是记录过程、约束�
 - 测试或代码审查的替代品；
 - 数据库权限系统；
 - 完整的数据泄露防护系统；
-- 已经稳定的 1.0 API。
+- 所有随包附带实验命令的稳定承诺。
 
 数据库检查功能只适合可信的本地开发环境。真实数据库请使用只读账号。SQL guard 是
 安全辅助，不是数据库权限边界。
@@ -136,7 +137,7 @@ DevHarness Kit 不证明代码一定正确。它做的是记录过程、约束�
 ## 安装使用
 
 从 [GitHub Releases](https://github.com/YYaa18/DevHarnessKit/releases) 下载最新
-prerelease 包。
+正式发布包。
 
 大多数用户选择 zip 或 tar.gz，解压后运行：
 
@@ -184,8 +185,8 @@ java -jar lib/dhk.jar version
 - `dhk memory`
 - `dhk goal`
 
-Graph Lite、BDD、skill governance、policy hook 等能力仍属于实验性范围，随 beta
-版本可能继续调整。
+Graph Lite、BDD、skill governance、policy hook 等能力仍属于实验性范围，不属于
+1.0 稳定合同，除非后续 release note 明确提升它们的稳定级别。
 
 ## 从源码构建
 

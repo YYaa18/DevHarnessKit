@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.0.0
+
+First stable release.
+
+- Promoted the documented core surface to the 1.0 stable contract: core CLI,
+  memory, goal, configure, status, readiness, advise/quickstart, release
+  packaging, checksums, and documented generated-export anchors.
+- Kept DB inspection as beta and Graph Lite, BDD, skill governance,
+  policy/hook governance, routine, and direct SQLite table details outside the
+  stable contract.
+- Updated release metadata, README status, security policy, compatibility docs,
+  and release gates so stable releases no longer require beta/developer-preview
+  wording.
+- Hardened the installer wizard for user-facing 1.0 packages and removed fixed
+  `0.4.6-beta.1` jar fallbacks from installer lookup.
+- 1.0 artifacts are built from Maven `project.version` as
+  `dhk-cli-1.0.0-all.jar`, `devharnesskit-1.0.0.zip`, and
+  `devharnesskit-1.0.0.tar.gz`.
+
 ## 0.4.6-beta.1
 
 Release-readiness, control-panel, and onboarding hardening beta.

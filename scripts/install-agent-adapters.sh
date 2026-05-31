@@ -498,8 +498,19 @@ run_wizard() {
   fi
 
   section '下一步'
-  info "1. 用 $selected_target_label 打开项目目录：$project_root"
-  info '2. 对 Agent 说：读取项目规则、Work Brief 和 Agent Brief，按照 DevHarnessKit 流程完成当前任务。'
+  info "1. 用 $selected_target_label 打开项目目录："
+  info "   $project_root"
+  if [ "$create_brief" = "yes" ]; then
+    info '2. 打开工作说明，确认任务描述无误：'
+    info "   $work_brief_path"
+    info '3. 对 Agent 说：'
+    info '   「按工作说明开始吧」'
+  else
+    info '2. 把你的任务直接告诉 Agent，例如：'
+    info '   「帮我给 UserService 加一个邮箱格式校验」'
+    info '   Agent 会自动生成工作说明、按步推进、验证后完成。'
+    info '   第一次用完后，可以在 .agents/devharness/briefs/ 查看它生成的工作记录。'
+  fi
   printf '\n'
 }
 

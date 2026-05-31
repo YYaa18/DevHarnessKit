@@ -7,5 +7,5 @@ for %%A in (%*) do (
     )
   )
 )
-call "%~dp0..\..\devharness-goal-development\scripts\dhk.bat" graph impact %*
+call "%~dp0dhk.bat" graph impact %*
 exit /b %ERRORLEVEL%

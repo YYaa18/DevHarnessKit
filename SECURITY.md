@@ -74,7 +74,7 @@ Workflow and spec commands record manual/audit state for agents and humans. They
 Graph impact maps are snapshot-bound generated facts. `dhk graph impact` rejects
 stale snapshots by default. The `--allow-stale` escape hatch is not intended for
 weak-model self-service: by default it requires `--allow-stale-evidence`, and
-strict graph-aware skill wrappers also require an external
+the graph wrappers in `devharness-goal-development` also require an external
 `DHK_ALLOW_STALE_APPROVED=true` approval. Projects may explicitly relax this in
 `.agents/devharness/policy.json` with
 `graph_allow_stale_requires_approval=false`, but stale graph output remains

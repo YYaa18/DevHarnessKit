@@ -128,7 +128,9 @@ public final class GoalActionSyncService {
                                String now) throws Exception {
         workflowSyncSupport.passCheckpoint(connection, project, goal, profile, checkpointId, now);
         workflowSyncSupport.passOptionalFinalWorkflowPhases(connection, project, goal, profile, now);
-        workflowSyncSupport.refreshProgress(connection, goal.workflowRunKey(), now);
+        if (!workflowSyncSupport.completeUnmappedWorkflow(connection, project, goal, profile, checkpointId, now)) {
+            workflowSyncSupport.refreshProgress(connection, goal.workflowRunKey(), now);
+        }
         specSyncSupport.verifyChange(connection, goal, profile, now);
     }
 

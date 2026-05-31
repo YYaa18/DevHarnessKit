@@ -190,7 +190,8 @@ public final class QuickstartCommand implements Command {
 
     private String defaultProfile(String preset) {
         String normalized = preset == null ? "" : preset.trim().toLowerCase(java.util.Locale.ROOT);
-        return "demo-no-build".equals(normalized) ? "java-api-patch" : "java-api-change";
+        return "initial-new-project".equals(normalized) || "demo-no-build".equals(normalized)
+                ? "java-api-patch" : "java-api-change";
     }
 
     private ConfigureInitResult ensureConfig(Path projectRoot, String preset, boolean force,

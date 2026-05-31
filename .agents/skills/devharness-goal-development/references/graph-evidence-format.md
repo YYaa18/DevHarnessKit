@@ -39,4 +39,5 @@ For `goal step`, also use structured fields:
 --pending none
 ```
 
-Do not paste raw graph output into long-term memory. Reference generated files by path and summarize only the relevant impact.
+Do not paste raw graph output into long-term memory. Reference generated files
+by path and summarize only the relevant impact.

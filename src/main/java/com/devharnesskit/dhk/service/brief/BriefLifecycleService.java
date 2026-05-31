@@ -49,6 +49,7 @@ public final class BriefLifecycleService {
     private final KnowledgeCandidatesBriefRenderer knowledgeBriefRenderer;
     private final TransactionTemplate transactionTemplate;
     private final SensitiveDataGuard sensitiveDataGuard;
+    private final PreWorkGuardService preWorkGuardService;
     private final Clock systemClock = new SystemClock();
 
     public BriefLifecycleService() {
@@ -56,7 +57,8 @@ public final class BriefLifecycleService {
                 new MemoryRepository(), new FtsRepository(), new KnowledgeCandidateRepository(),
                 new InteractionRequestRepository(), new GrowthLessonRepository(), new BriefLifecycleCompatibilityStoreWriter(),
                 new ManualVerificationInteractionSupport(), new ProfessionalKnowledgeCandidateFactory(),
-                new KnowledgeCandidatesBriefRenderer(), new TransactionTemplate(), new SensitiveDataGuard());
+                new KnowledgeCandidatesBriefRenderer(), new TransactionTemplate(), new SensitiveDataGuard(),
+                new PreWorkGuardService());
     }
 
     BriefLifecycleService(DbConnectionFactory connectionFactory, MigrationRunner migrationRunner,
@@ -67,7 +69,8 @@ public final class BriefLifecycleService {
                           ManualVerificationInteractionSupport manualVerificationInteractionSupport,
                           ProfessionalKnowledgeCandidateFactory knowledgeCandidateFactory,
                           KnowledgeCandidatesBriefRenderer knowledgeBriefRenderer,
-                          TransactionTemplate transactionTemplate, SensitiveDataGuard sensitiveDataGuard) {
+                          TransactionTemplate transactionTemplate, SensitiveDataGuard sensitiveDataGuard,
+                          PreWorkGuardService preWorkGuardService) {
         this.connectionFactory = connectionFactory;
         this.migrationRunner = migrationRunner;
         this.projectService = projectService;
@@ -83,6 +86,7 @@ public final class BriefLifecycleService {
         this.knowledgeBriefRenderer = knowledgeBriefRenderer;
         this.transactionTemplate = transactionTemplate;
         this.sensitiveDataGuard = sensitiveDataGuard;
+        this.preWorkGuardService = preWorkGuardService;
     }
 
     public void recordPreWorkInteraction(Path projectRoot, WorkBrief brief) throws Exception {
@@ -107,6 +111,7 @@ public final class BriefLifecycleService {
                 "open",
                 "");
         upsertInteraction(projectRoot, request);
+        preWorkGuardService.ensureBaseline(projectRoot, request);
         writeInteractionsBrief(projectRoot);
     }
 
@@ -122,13 +127,24 @@ public final class BriefLifecycleService {
         }
     }
 
+    public InteractionRequest findOpenBlockingInteraction(Path projectRoot, String goalKey) {
+        for (InteractionRequest request : loadInteractions(projectRoot)) {
+            if (request.openBlockingFor(goalKey)) {
+                return request;
+            }
+        }
+        return null;
+    }
+
     public InteractionRequest answerInteraction(Path projectRoot, String requestId, String answer) throws Exception {
         List<InteractionRequest> requests = loadInteractions(projectRoot);
         List<InteractionRequest> updated = new ArrayList<InteractionRequest>();
         InteractionRequest answered = null;
+        boolean preWorkAnswered = false;
         for (InteractionRequest request : requests) {
             if (request.requestId().equals(requestId)) {
                 answered = request.answered(answer);
+                preWorkAnswered = "pre_work".equals(request.phase());
                 updated.add(answered);
             } else {
                 updated.add(request);
@@ -136,6 +152,9 @@ public final class BriefLifecycleService {
         }
         if (answered == null) {
             throw new IllegalArgumentException("Interaction request not found: " + requestId);
+        }
+        if (preWorkAnswered) {
+            preWorkGuardService.markAnswered(projectRoot, requestId);
         }
         saveInteractions(projectRoot, updated);
         writeInteractionsBrief(projectRoot);
@@ -235,11 +254,36 @@ public final class BriefLifecycleService {
         Path path = PathUtil.completionBrief(projectRoot);
         Files.write(path, builder.toString().getBytes("UTF-8"));
         writeKnowledgeBrief(projectRoot);
+        writeCompletedProgressBrief(projectRoot, goal, checkpointId, summaryPath);
         refreshAgentBriefGoalState(projectRoot, goal);
         return path;
     }
 
+    private Path writeCompletedProgressBrief(Path projectRoot, GoalRun goal, long checkpointId, Path summaryPath)
+            throws Exception {
+        Files.createDirectories(PathUtil.devharnessBriefsDirectory(projectRoot));
+        StringBuilder builder = new StringBuilder();
+        builder.append("# Progress Brief\n\n");
+        builder.append("- goal_key: ").append(goal.goalKey()).append('\n');
+        builder.append("- status: completed\n");
+        builder.append("- current_action: completed\n");
+        builder.append("- checkpoint_id: ").append(checkpointId).append('\n');
+        builder.append("- step_number: ").append(goal.stepCount()).append('\n');
+        builder.append("- summary_path: ").append(summaryPath).append("\n\n");
+        builder.append("## 已完成\n\n");
+        builder.append("- 本次 goal 已完成，详细审计见 GOAL_SUMMARY.md 与 ARTIFACT_PASSPORT.json。\n\n");
+        builder.append("## 下一步\n\n");
+        builder.append("- 没有待执行步骤。新任务请从新的 Work Brief/Goal 开始。\n");
+        Path path = PathUtil.progressBrief(projectRoot);
+        Files.write(path, builder.toString().getBytes("UTF-8"));
+        return path;
+    }
+
     public void refreshAgentBriefGoalState(Path projectRoot, GoalRun goal) throws Exception {
+        refreshAgentBriefCurrentAction(projectRoot, goal, goal == null ? "" : goal.currentAction());
+    }
+
+    public void refreshAgentBriefCurrentAction(Path projectRoot, GoalRun goal, String currentAction) throws Exception {
         Path path = PathUtil.agentBrief(projectRoot);
         if (!Files.isRegularFile(path) || goal == null || goal.goalKey().length() == 0) {
             return;
@@ -250,7 +294,7 @@ public final class BriefLifecycleService {
             return;
         }
         String updated = text.replaceFirst("\\\"current_action\\\"\\s*:\\s*\\\"[^\\\"]*\\\"",
-                Matcher.quoteReplacement("\"current_action\": \"" + jsonEscape(goal.currentAction()) + "\""));
+                Matcher.quoteReplacement("\"current_action\": \"" + jsonEscape(currentAction) + "\""));
         Files.write(path, updated.getBytes("UTF-8"));
     }
 

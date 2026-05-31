@@ -5,6 +5,7 @@ import com.devharnesskit.dhk.model.goal.GoalCheck;
 import com.devharnesskit.dhk.model.goal.GoalEvaluation;
 import com.devharnesskit.dhk.model.goal.GoalRun;
 import com.devharnesskit.dhk.model.goal.GoalStep;
+import com.devharnesskit.dhk.util.ChangedFileText;
 import com.devharnesskit.dhk.util.EvidenceValueParser;
 import com.devharnesskit.dhk.util.JsonOutput;
 
@@ -189,16 +190,7 @@ public final class GoalRetrospectiveRenderer {
     }
 
     private void addFiles(Set<String> files, String raw) {
-        if (raw == null || raw.trim().length() == 0 || "none".equalsIgnoreCase(raw.trim())) {
-            return;
-        }
-        String[] parts = raw.replace('\n', ',').replace(';', ',').split(",");
-        for (String part : parts) {
-            String file = normalizePathText(part.trim());
-            if (file.length() > 0) {
-                files.add(file);
-            }
-        }
+        ChangedFileText.addFiles(files, raw);
     }
 
     private String evidenceValue(String evidence, String key) {

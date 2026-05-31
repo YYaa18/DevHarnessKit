@@ -63,9 +63,9 @@ explicit escape hatch and is governed by `.agents/devharness/policy.json`:
 ```
 
 The default is `true`. With that default, callers must pass
-`--allow-stale-evidence <evidence>` when using `--allow-stale`; strict
-graph-aware skill wrappers also block stale overrides unless a human or policy
-sets `DHK_ALLOW_STALE_APPROVED=true`. A project may set
+`--allow-stale-evidence <evidence>` when using `--allow-stale`; the graph
+wrappers inside `devharness-goal-development` also block stale overrides unless
+a human or policy sets `DHK_ALLOW_STALE_APPROVED=true`. A project may set
 `graph_allow_stale_requires_approval=false` to authorize stale impact maps as an
 expert-mode local policy, but graph-aware goals should still prefer re-indexing.
 

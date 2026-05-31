@@ -314,6 +314,10 @@ final class BriefCommandIntegrationTest {
                 3, 3, "", "", "");
         service.writeCompletionBrief(root, completedGoal, 2L, root.resolve("GOAL_SUMMARY.md"));
         assertTrue(read(PathUtil.agentBrief(root)).contains("\"current_action\": \"completed\""));
+        String progressBrief = read(PathUtil.progressBrief(root));
+        assertTrue(progressBrief.contains("- status: completed"));
+        assertTrue(progressBrief.contains("- current_action: completed"));
+        assertTrue(progressBrief.contains("没有待执行步骤"));
     }
 
     @Test

@@ -5,6 +5,7 @@ import com.devharnesskit.dhk.model.goal.GoalGraphArtifacts;
 import com.devharnesskit.dhk.model.goal.GoalProfile;
 import com.devharnesskit.dhk.model.goal.GoalRun;
 import com.devharnesskit.dhk.model.goal.GoalStep;
+import com.devharnesskit.dhk.util.ChangedFileText;
 import com.devharnesskit.dhk.util.EvidenceValueParser;
 import com.devharnesskit.dhk.util.JsonOutput;
 import com.devharnesskit.dhk.util.PathUtil;
@@ -173,16 +174,7 @@ public final class ArtifactPassportRenderer {
     }
 
     private void addFiles(java.util.Set<String> files, String raw) {
-        if (raw == null || raw.trim().length() == 0 || "none".equalsIgnoreCase(raw.trim())) {
-            return;
-        }
-        String[] parts = raw.replace('\n', ',').replace(';', ',').split(",");
-        for (String part : parts) {
-            String file = part.trim();
-            if (file.length() > 0) {
-                files.add(file);
-            }
-        }
+        ChangedFileText.addFiles(files, raw);
     }
 
     private String[] checkLogs(List<GoalCheck> checks) {

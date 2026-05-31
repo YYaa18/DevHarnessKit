@@ -12,7 +12,7 @@ import com.devharnesskit.dhk.model.knowledge.ProfessionalKnowledgeContext;
 public final class GoalContextRenderer {
     private static final int MAX_CHARS = 16 * 1024;
     private static final String GOAL_SCRIPT_DIR = ".agents/skills/devharness-goal-development/scripts/";
-    private static final String GRAPH_SCRIPT_DIR = ".agents/skills/devharness-graph-aware-development/scripts/";
+    private static final String GRAPH_SCRIPT_DIR = ".agents/skills/devharness-goal-development/scripts/";
 
     public String render(GoalRun goal, GoalPlan plan, String generatedAt) {
         return render(goal, plan, new String[0], new String[0], generatedAt);
@@ -175,7 +175,7 @@ public final class GoalContextRenderer {
         appendList(builder, requiredChecks, "none");
         builder.append("</required-checks>\n\n");
 
-        appendDemoWarning(builder, config);
+        appendInitialProjectWarning(builder, config);
         appendVerificationPolicySection(builder, config);
         appendDisciplineGateSection(builder, disciplineGateStatus);
         appendRequiredCheckpointSection(builder, requiredCheckpointStatus);
@@ -467,16 +467,16 @@ public final class GoalContextRenderer {
         }
     }
 
-    private void appendDemoWarning(StringBuilder builder, DevHarnessConfig config) {
-        if (!config.demoMode()) {
+    private void appendInitialProjectWarning(StringBuilder builder, DevHarnessConfig config) {
+        if (!config.initialProjectMode()) {
             return;
         }
-        builder.append("<demo-warning>\n");
-        builder.append("- verification_mode: demo\n");
-        builder.append("- warning: demo mode does not prove code correctness\n");
-        builder.append("- allowed_for: quickstart, examples, mock projects\n");
-        builder.append("- not_allowed_for: production development\n");
-        builder.append("</demo-warning>\n\n");
+        builder.append("<initial-project-warning>\n");
+        builder.append("- verification_mode: initial-new-project\n");
+        builder.append("- warning: ").append(config.initialProjectWarning()).append('\n');
+        builder.append("- allowed_for: new empty projects, scaffolding, first setup\n");
+        builder.append("- not_allowed_for: production correctness claims without real compile/test evidence\n");
+        builder.append("</initial-project-warning>\n\n");
     }
 
     private String limit(String text) {

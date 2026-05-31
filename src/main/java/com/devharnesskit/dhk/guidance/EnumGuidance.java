@@ -34,7 +34,7 @@ public final class EnumGuidance {
     public static final String[] CONFIGURE_PRESETS = values("springboot-manual-ide-test",
             "springboot-auto-test", "springboot-ci-only-test", "legacy-java-small-fix",
             "legacy-jsp-servlet", "mybatis-monolith-manual-test", "graph-advisory",
-            "safe-refactor-graph", "demo-no-build", "manual-ide-test");
+            "safe-refactor-graph", "initial-new-project", "manual-ide-test");
     public static final String[] BDD_SCENARIO_TYPES = values("acceptance", "edge_case", "regression",
             "manual", "exploratory");
     public static final String[] BDD_SCENARIO_STATUSES = values("draft", "active", "implemented",
@@ -117,6 +117,9 @@ public final class EnumGuidance {
     public static boolean isConfigurePresetAllowed(String preset) {
         String normalized = normalize(preset);
         if (normalized.length() == 0 || "auto".equals(normalized)) {
+            return true;
+        }
+        if ("demo-no-build".equals(normalized)) {
             return true;
         }
         for (String value : CONFIGURE_PRESETS) {

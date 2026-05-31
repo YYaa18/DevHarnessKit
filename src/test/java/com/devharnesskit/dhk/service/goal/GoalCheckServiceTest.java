@@ -32,6 +32,7 @@ class GoalCheckServiceTest {
         assertNotNull(registry.find("legacy"));
         assertNotNull(registry.find("architecture"));
         assertNotNull(registry.find("bdd"));
+        assertNotNull(registry.find("pre-work-file-write"));
         assertNotNull(registry.find("think-before-coding"));
         assertNotNull(registry.find("goal-driven"));
         assertNotNull(registry.find("simplicity"));

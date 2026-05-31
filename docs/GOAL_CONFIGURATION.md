@@ -191,7 +191,7 @@ Supported starter presets:
 | `springboot-manual-ide-test` | Spring Boot or company-runtime projects where compile/test evidence comes from IDE, CI, or another manual source. |
 | `springboot-auto-test` | Projects where CLI compile/test commands are expected to run locally. |
 | `graph-advisory` | CLI compile/test remains automatic, while graph configuration is advisory and does not become a completion gate. |
-| `demo-no-build` | Demo/mock projects without a build file. Compile/test are disabled and `GOAL_CONTEXT.md` warns that demo mode does not prove correctness. |
+| `initial-new-project` | Empty or newly created projects before a build entry exists. Compile/test are disabled and `GOAL_CONTEXT.md` warns that production correctness still needs real compile/test evidence. |
 | `legacy-java-small-fix` | High-risk legacy maintenance where auto compile/test may be unavailable and rollback evidence is required. |
 
 `verification.compile.mode` and `verification.test.mode` accept:
@@ -200,7 +200,7 @@ Supported starter presets:
 | --- | --- |
 | `auto` | `goal verify` runs configured compile/test commands. |
 | `manual` | `goal verify` does not run the command and instead requires manual evidence. |
-| `disabled` | The direct check is replaced with `verification-risk`, which requires waiver, approver, risk scope, and rollback evidence. `demo-no-build` is the only built-in exception and is for quick evaluation only. |
+| `disabled` | The direct check is replaced with `verification-risk`, which requires waiver, approver, risk scope, and rollback evidence. `initial-new-project` is the only built-in exception and is limited to scaffolding before real verification exists. |
 
 `verification.graph.mode` accepts:
 
@@ -564,9 +564,10 @@ Graph stale overrides are denied-by-default for weak-model flows:
 
 The default is `true`. When a caller uses `dhk graph impact --allow-stale`, the
 CLI requires `--allow-stale-evidence <evidence>` unless project policy
-explicitly sets `graph_allow_stale_requires_approval` to `false`. Strict
-graph-aware skill scripts also block `--allow-stale` unless a human or policy
-sets `DHK_ALLOW_STALE_APPROVED=true` outside the model-controlled flow.
+explicitly sets `graph_allow_stale_requires_approval` to `false`. The graph
+scripts inside `devharness-goal-development` also block `--allow-stale` unless
+a human or policy sets `DHK_ALLOW_STALE_APPROVED=true` outside the
+model-controlled flow.
 
 ## Financial-System Example
 

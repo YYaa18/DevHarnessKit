@@ -107,9 +107,9 @@ public final class BriefService {
                                   WorkBrief workBrief, GoalRun goal, GoalPlan plan,
                                   ProfessionalKnowledgeContext knowledge) {
         String goalKey = goal == null ? "" : goal.goalKey();
-        String currentAction = plan == null
-                ? (workBrief.confirmationRequired() || !workBrief.safeToStart() ? "wait_for_user_answer" : "")
-                : plan.currentAction();
+        boolean waitingForConfirmation = workBrief.confirmationRequired() || !workBrief.safeToStart();
+        String currentAction = waitingForConfirmation ? "wait_for_user_answer"
+                : (plan == null ? "" : plan.currentAction());
         String[] requiredEvidence = plan == null ? defaultRequiredEvidence(advice) : plan.requiredEvidence();
         return new AgentBrief(workBrief.briefId(), workBrief.recommendationId(),
                 stableKey(request.task(), request.module(), request.target()), goalKey,

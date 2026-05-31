@@ -151,6 +151,45 @@ final class GoalWorkflowSyncSupport {
         workflowRunRepository.updateStatus(connection, workflowRunKey, "completed", now, now);
     }
 
+    boolean completeUnmappedWorkflow(Connection connection, Project project, GoalRun goal,
+                                     GoalProfile profile, long checkpointId, String now) throws Exception {
+        if (goal.workflowRunKey().length() == 0 || profile == null || !profile.actionMappings().isEmpty()) {
+            return false;
+        }
+        String evidence = "goal_complete checkpoint_id=" + checkpointId;
+        for (WorkflowGateRun gate : gateRunRepository.listByRun(connection, goal.workflowRunKey())) {
+            if ("passed".equals(gate.status()) || "waived".equals(gate.status()) || "failed".equals(gate.status())) {
+                continue;
+            }
+            gateRunRepository.updateStatus(connection, gate.id(), "passed",
+                    "Satisfied by completed lightweight goal protocol", "", evidence, now, now);
+            workflowEventRepository.insert(connection, new WorkflowEvent(0L, project.projectKey(),
+                    goal.workflowRunKey(), "gate_checked", gate.phaseKey(), gate.gateKey(), "info",
+                    "Gate passed by lightweight goal completion: " + gate.gateKey(),
+                    "Satisfied by completed lightweight goal protocol", now));
+        }
+
+        String lastPhaseKey = "";
+        for (WorkflowPhaseRun phase : phaseRunRepository.listByRun(connection, goal.workflowRunKey())) {
+            lastPhaseKey = phase.phaseKey();
+            if ("passed".equals(phase.status()) || "failed".equals(phase.status())
+                    || "blocked".equals(phase.status())) {
+                continue;
+            }
+            phaseRunRepository.updateStatus(connection, goal.workflowRunKey(), phase.phaseKey(), "passed",
+                    "Satisfied by completed lightweight goal protocol", evidence, now, now);
+            workflowEventRepository.insert(connection, new WorkflowEvent(0L, project.projectKey(),
+                    goal.workflowRunKey(), "phase_completed", phase.phaseKey(), "", "info",
+                    "Phase passed by lightweight goal completion: " + phase.phaseKey(),
+                    "Satisfied by completed lightweight goal protocol", now));
+        }
+        workflowRunRepository.complete(connection, goal.workflowRunKey(), lastPhaseKey, now, now);
+        workflowEventRepository.insert(connection, new WorkflowEvent(0L, project.projectKey(),
+                goal.workflowRunKey(), "run_completed", lastPhaseKey, "", "info",
+                "Workflow completed by lightweight goal completion", evidence, now));
+        return true;
+    }
+
     private WorkflowPhaseRun priorIncompletePhase(Connection connection, GoalRun goal, GoalProfile profile,
                                                  WorkflowPhaseRun target) throws Exception {
         if (profile == null || !profile.strictWorkflowPhaseOrder()) {

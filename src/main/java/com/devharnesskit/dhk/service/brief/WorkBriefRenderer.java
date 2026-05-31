@@ -34,7 +34,11 @@ public final class WorkBriefRenderer {
         if (brief.confirmationRequired()) {
             builder.append("请确认以下事项后，告诉 Agent「按工作说明开始」：\n\n");
             builder.append("- [ ] 任务描述准确，和你的预期一致\n");
-            builder.append("- [ ] 了解验证证据需要人工在 IDE 中操作\n");
+            builder.append("- [ ] 同意当前任务边界、实施范围和推进顺序\n");
+            builder.append("- [ ] 如任务包含分步交付，同意每一步完成后先停下等待确认\n");
+            if (hasRiskFlag(brief, "manual_or_limited_tests")) {
+                builder.append("- [ ] 了解验证证据可能需要人工、IDE 或替代风险说明\n");
+            }
             if (brief.riskScore() > 50) {
                 builder.append("- [ ] 已知晓这是较高风险变更，留意 Agent 的影响面分析\n");
             }
@@ -89,5 +93,14 @@ public final class WorkBriefRenderer {
         if (value == null) return false;
         // suppress internal "Knowledge file missing" notes — not actionable for end users
         return value.contains("Knowledge file missing:");
+    }
+
+    private boolean hasRiskFlag(WorkBrief brief, String flag) {
+        for (String value : brief.riskFlags()) {
+            if (flag.equals(value)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

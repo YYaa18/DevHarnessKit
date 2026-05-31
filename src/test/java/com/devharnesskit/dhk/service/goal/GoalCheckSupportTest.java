@@ -3,8 +3,12 @@ package com.devharnesskit.dhk.service.goal;
 import com.devharnesskit.dhk.model.goal.GoalStep;
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -64,8 +68,34 @@ final class GoalCheckSupportTest {
         assertEquals("developer", GoalCheckSupport.latestEvidenceValue(steps, "tester"));
     }
 
+    @Test
+    void changedFileAggregationIgnoresUnavailableSentinels() {
+        Set<String> files = new LinkedHashSet<String>();
+
+        GoalCheckSupport.addChangedFiles(files, Paths.get("/tmp/project"),
+                "unavailable, src/main/java/Demo.java; none\n./src/test/java/DemoTest.java");
+
+        assertEquals(Arrays.asList("src/main/java/Demo.java", "src/test/java/DemoTest.java"),
+                new ArrayList<String>(files));
+    }
+
+    @Test
+    void stepEvidenceValidatorChangedFilesIgnoresUnavailableSentinels() {
+        GoalStepEvidenceValidator validator = new GoalStepEvidenceValidator();
+        List<GoalStep> steps = Arrays.asList(
+                stepWithChangedFiles("unavailable"),
+                stepWithChangedFiles("src/main/java/Demo.java\nunknown"));
+
+        assertEquals("src/main/java/Demo.java", validator.changedFiles(steps));
+    }
+
     private GoalStep step(String evidence) {
         return new GoalStep(1L, "goal", 1, "verify", "summary", "", evidence,
+                "recorded", "now");
+    }
+
+    private GoalStep stepWithChangedFiles(String changedFiles) {
+        return new GoalStep(1L, "goal", 1, "verify", "summary", changedFiles, "",
                 "recorded", "now");
     }
 }

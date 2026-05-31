@@ -14,9 +14,9 @@ public final class ModeAdvisor {
         String requested = normalizeMode(request.requestedMode());
         Scores scores = score(request, config);
         String recommendation = recommendation(requested, scores);
-        boolean confirmation = confirmationRequired(recommendation, scores, config);
+        boolean confirmation = confirmationRequired(request, recommendation, scores, config);
         boolean safeToStart = !(ModeAdvice.ASK.equals(recommendation) || ModeAdvice.ANALYZE_ONLY.equals(recommendation));
-        String reason = confirmation ? confirmationReason(recommendation, scores, config) : "none";
+        String reason = confirmation ? confirmationReason(request, recommendation, scores, config) : "none";
         String profile = profileFor(recommendation, request.profileKey(), config);
         return new ModeAdvice(recommendation, confidence(recommendation, scores), scores.total(),
                 scores.security, scores.db, scores.config, scores.crossModule, scores.testGap, scores.graphScope,
@@ -97,16 +97,20 @@ public final class ModeAdvisor {
         return ModeAdvice.STANDARD;
     }
 
-    private boolean confirmationRequired(String recommendation, Scores scores, DevHarnessConfig config) {
+    private boolean confirmationRequired(BriefRequest request, String recommendation, Scores scores,
+                                         DevHarnessConfig config) {
         return ModeAdvice.STRICT.equals(recommendation)
                 || ModeAdvice.ASK.equals(recommendation)
                 || ModeAdvice.ANALYZE_ONLY.equals(recommendation)
                 || scores.hardRisk()
+                || config.preWorkConfirmationRequired()
+                || userConfirmationRequested(request)
                 || "manual".equals(config.testMode())
                 || "manual".equals(config.compileMode());
     }
 
-    private String confirmationReason(String recommendation, Scores scores, DevHarnessConfig config) {
+    private String confirmationReason(BriefRequest request, String recommendation, Scores scores,
+                                      DevHarnessConfig config) {
         if (ModeAdvice.ASK.equals(recommendation)) {
             return "任务描述不够明确，需要先确认边界。";
         }
@@ -116,10 +120,34 @@ public final class ModeAdvisor {
         if (scores.hardRisk()) {
             return "命中安全、权限、支付、数据库结构或受保护配置等高风险信号。";
         }
+        if (config.preWorkConfirmationRequired()) {
+            return config.preWorkConfirmationReason();
+        }
+        if (userConfirmationRequested(request)) {
+            return "任务要求分步或确认后推进，需要等待用户确认。";
+        }
         if ("manual".equals(config.testMode()) || "manual".equals(config.compileMode())) {
             return "项目配置要求人工或 IDE 验证证据。";
         }
         return "none";
+    }
+
+    private boolean userConfirmationRequested(BriefRequest request) {
+        return explicitConfirmationRequested(request) || stepByStepDelivery(request);
+    }
+
+    private boolean explicitConfirmationRequested(BriefRequest request) {
+        String text = (request.task() + " " + request.module() + " " + request.target()).toLowerCase(Locale.ROOT);
+        return containsAny(text, "wait for confirmation", "ask for confirmation", "after confirmation",
+                "explicit approval", "user approval", "do not continue", "pause after", "stop after",
+                "用户确认", "向用户确认", "等待确认", "等我确认", "确认后", "明确确认", "先确认",
+                "人工确认", "不要继续", "先停", "停下来");
+    }
+
+    private boolean stepByStepDelivery(BriefRequest request) {
+        String text = (request.task() + " " + request.module() + " " + request.target()).toLowerCase(Locale.ROOT);
+        return containsAny(text, "step-by-step", "step by step", "l1", "l2", "l3",
+                "逐步", "分步", "步骤", "每一步", "一步步");
     }
 
     private String profileFor(String recommendation, String requestedProfile, DevHarnessConfig config) {

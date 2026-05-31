@@ -6,4 +6,4 @@ for arg in "$@"; do
     exit 3
   fi
 done
-exec "$SCRIPT_DIR/../../devharness-goal-development/scripts/dhk.sh" graph impact "$@"
+exec "$SCRIPT_DIR/dhk.sh" graph impact "$@"

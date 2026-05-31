@@ -30,6 +30,9 @@ final class GoalSkillPackagingTest {
         assertTrue(Files.isRegularFile(skillRoot.resolve("references/evidence-format.md")));
         assertTrue(Files.isRegularFile(skillRoot.resolve("references/self-check-format.md")));
         assertTrue(Files.isRegularFile(skillRoot.resolve("references/forbidden-actions.md")));
+        assertTrue(Files.isRegularFile(skillRoot.resolve("references/graph-protocol.md")));
+        assertTrue(Files.isRegularFile(skillRoot.resolve("references/graph-evidence-format.md")));
+        assertTrue(Files.isRegularFile(skillRoot.resolve("references/graph-forbidden-actions.md")));
 
         assertScriptPair(skillRoot, "dhk");
         assertScriptPair(skillRoot, "quickstart");
@@ -49,6 +52,11 @@ final class GoalSkillPackagingTest {
         assertScriptPair(skillRoot, "goal-retrospective");
         assertScriptPair(skillRoot, "goal-review-summary");
         assertScriptPair(skillRoot, "goal-mr-summary");
+        assertScriptPair(skillRoot, "graph-index");
+        assertScriptPair(skillRoot, "graph-export");
+        assertScriptPair(skillRoot, "graph-index-export");
+        assertScriptPair(skillRoot, "graph-impact");
+        assertScriptPair(skillRoot, "graph-status");
 
         String skill = read(skillRoot.resolve("SKILL.md"));
         String contract = read(skillRoot.resolve("contract.json"));
@@ -72,6 +80,8 @@ final class GoalSkillPackagingTest {
         assertTrue(skill.contains("goal-complete.sh"));
         assertTrue(skill.contains("required evidence keys from GOAL_CONTEXT"));
         assertTrue(skill.contains("Perform only the `current_action`"));
+        assertTrue(skill.contains("graph-assist"));
+        assertTrue(skill.contains("not as a separate workflow"));
         assertFalse(skill.contains("Do not bypass failed discipline checks"));
         assertTrue(contract.contains("\"dhk goal retrospective\""));
         assertTrue(contract.contains("\"dhk goal review-summary\""));
@@ -100,11 +110,18 @@ final class GoalSkillPackagingTest {
         assertGoalWrapper(skillRoot, "goal-retrospective", "retrospective");
         assertGoalWrapper(skillRoot, "goal-review-summary", "review-summary");
         assertGoalWrapper(skillRoot, "goal-mr-summary", "mr-summary");
+        assertGraphWrapper(skillRoot, "graph-index", "index");
+        assertGraphWrapper(skillRoot, "graph-export", "export");
+        assertGraphWrapper(skillRoot, "graph-impact", "impact");
+        assertGraphWrapper(skillRoot, "graph-status", "status");
 
         String protocol = read(skillRoot.resolve("references/goal-protocol.md"));
         String evidence = read(skillRoot.resolve("references/evidence-format.md"));
         String forbidden = read(skillRoot.resolve("references/forbidden-actions.md"));
         String selfCheck = read(skillRoot.resolve("references/self-check-format.md"));
+        String graphProtocol = read(skillRoot.resolve("references/graph-protocol.md"));
+        String graphEvidence = read(skillRoot.resolve("references/graph-evidence-format.md"));
+        String graphForbidden = read(skillRoot.resolve("references/graph-forbidden-actions.md"));
         assertTrue(protocol.contains("Use wrapper scripts under `.agents/skills/devharness-goal-development/scripts/`"));
         assertTrue(protocol.contains("Run `goal verify` before final completion"));
         assertTrue(protocol.contains("goal-retrospective.sh --goal <goal-key>"));
@@ -114,11 +131,34 @@ final class GoalSkillPackagingTest {
         assertTrue(forbidden.contains("`db sql`"));
         assertTrue(forbidden.contains("claiming completion before `goal verify`"));
         assertTrue(selfCheck.contains("goal evaluate"));
+        assertTrue(graphProtocol.contains("Re-run `graph-impact` after implementation"));
+        assertTrue(graphProtocol.contains("current verify step"));
+        assertTrue(graphProtocol.contains("rollback plan artifact"));
+        assertTrue(graphEvidence.contains("post_change_impact_map"));
+        assertTrue(graphEvidence.contains("changed_files_covered"));
+        assertTrue(graphEvidence.contains("manual_evidence_status=passed"));
+        assertTrue(graphForbidden.contains("editing before graph snapshot and impact map are ready"));
+        assertTrue(graphForbidden.contains("graph-assist"));
+        assertTrue(graphForbidden.contains("failed or stale `graph` / `impact` checks"));
+        assertTrue(graphForbidden.contains("protected-impact-risk"));
+
+        String indexExportShell = read(skillRoot.resolve("scripts/graph-index-export.sh"));
+        String indexExportBatch = read(skillRoot.resolve("scripts/graph-index-export.bat"));
+        assertTrue(indexExportShell.contains("graph index"));
+        assertTrue(indexExportShell.contains("graph export"));
+        assertTrue(indexExportBatch.contains("graph index"));
+        assertTrue(indexExportBatch.contains("graph export"));
     }
 
     @Test
     void legacyMemoryFirstSkillPackageIsRemoved() {
         assertFalse(Files.exists(Paths.get(".agents/skills/devharness-java-development")));
+    }
+
+    @Test
+    void obsoleteGraphAwareSkillPackageIsRemoved() {
+        assertFalse(Files.exists(Paths.get(".agents/skills/devharness-graph-aware-development")));
+        assertFalse(Files.exists(Paths.get(".comate/rules/devharness-graph-aware-protocol.mdr")));
     }
 
     @Test
@@ -483,17 +523,18 @@ final class GoalSkillPackagingTest {
         Path rulesRoot = Paths.get(".comate/rules");
 
         assertTrue(Files.isRegularFile(rulesRoot.resolve("devharness-goal-protocol.mdr")));
-        assertTrue(Files.isRegularFile(rulesRoot.resolve("devharness-graph-aware-protocol.mdr")));
+        assertFalse(Files.exists(rulesRoot.resolve("devharness-graph-aware-protocol.mdr")));
         assertFalse(Files.exists(rulesRoot.resolve("project-memory-bootstrap.mdr")));
         assertFalse(Files.exists(rulesRoot.resolve("java-development-guard.mdr")));
 
         String goalRule = read(rulesRoot.resolve("devharness-goal-protocol.mdr"));
-        String graphRule = read(rulesRoot.resolve("devharness-graph-aware-protocol.mdr"));
         assertTrue(goalRule.contains("quickstart.sh"));
         assertTrue(goalRule.contains("goal-next.sh"));
         assertTrue(goalRule.contains("goal-verify.sh"));
         assertTrue(goalRule.contains("AGENT_BRIEF.json"));
         assertTrue(goalRule.contains("Do not assume a global `dhk` command exists"));
+        assertTrue(goalRule.contains("Do not silently choose for the user"));
+        assertTrue(goalRule.contains("pause after each step"));
         assertTrue(goalRule.contains("Treat an Agent Brief with `current_action` = `completed` as historical"));
         assertTrue(goalRule.contains("latest user request verbatim"));
         assertTrue(goalRule.contains("Never copy the task from an old Work Brief or GOAL_CONTEXT"));
@@ -506,60 +547,26 @@ final class GoalSkillPackagingTest {
         assertTrue(goalRule.contains("Harness self-check"));
         assertTrue(goalRule.contains("step_recorded_after_edit"));
         assertTrue(goalRule.contains("Do not bypass goal"));
-        assertTrue(graphRule.contains("graph_required=true"));
-        assertTrue(graphRule.contains("Do not use --allow-stale"));
+        assertTrue(goalRule.contains("graph_required=true"));
+        assertTrue(goalRule.contains("Do not create a separate graph step"));
+        assertTrue(goalRule.contains("Do not use `graph impact --allow-stale`"));
     }
 
     @Test
-    void graphAwareSkillPackageContainsRequiredProtocolAndScripts() throws Exception {
-        Path skillRoot = Paths.get(".agents/skills/devharness-graph-aware-development");
+    void integratedGraphSkillPackageDoesNotExposeASecondSkill() throws Exception {
+        Path skillRoot = Paths.get(".agents/skills/devharness-goal-development");
 
-        assertTrue(Files.isRegularFile(skillRoot.resolve("SKILL.md")));
         assertTrue(Files.isRegularFile(skillRoot.resolve("references/graph-protocol.md")));
         assertTrue(Files.isRegularFile(skillRoot.resolve("references/graph-evidence-format.md")));
         assertTrue(Files.isRegularFile(skillRoot.resolve("references/graph-forbidden-actions.md")));
-
         assertScriptPair(skillRoot, "graph-index");
         assertScriptPair(skillRoot, "graph-export");
         assertScriptPair(skillRoot, "graph-index-export");
         assertScriptPair(skillRoot, "graph-impact");
         assertScriptPair(skillRoot, "graph-status");
 
-        String skill = read(skillRoot.resolve("SKILL.md"));
-        assertTrue(skill.contains("graph-assist"));
-        assertTrue(skill.contains("current action"));
-        assertTrue(skill.contains("GRAPH_CONTEXT.md"));
-        assertTrue(skill.contains("IMPACT_MAP.md"));
-        assertTrue(skill.contains("ready_to_complete"));
-        assertTrue(skill.contains("snapshot-bound generated facts"));
-        assertTrue(skill.contains("AGENT_BRIEF.json"));
-        assertTrue(skill.contains("legacy-java-small-fix-with-graph"));
-        assertTrue(skill.contains("rollback_plan"));
-
-        String protocol = read(skillRoot.resolve("references/graph-protocol.md"));
-        String evidence = read(skillRoot.resolve("references/graph-evidence-format.md"));
-        String forbidden = read(skillRoot.resolve("references/graph-forbidden-actions.md"));
-        assertTrue(protocol.contains("Re-run `graph-impact` after implementation"));
-        assertTrue(protocol.contains("current verify step"));
-        assertTrue(protocol.contains("rollback plan artifact"));
-        assertTrue(evidence.contains("post_change_impact_map"));
-        assertTrue(evidence.contains("changed_files_covered"));
-        assertTrue(evidence.contains("manual_evidence_status=passed"));
-        assertTrue(forbidden.contains("editing before graph snapshot and impact map are ready"));
-        assertTrue(forbidden.contains("graph-assist"));
-        assertTrue(forbidden.contains("failed or stale `graph` / `impact` checks"));
-        assertTrue(forbidden.contains("protected-impact-risk"));
-
-        assertGraphWrapper(skillRoot, "graph-index", "index");
-        assertGraphWrapper(skillRoot, "graph-export", "export");
-        assertGraphWrapper(skillRoot, "graph-impact", "impact");
-        assertGraphWrapper(skillRoot, "graph-status", "status");
-        String indexExportShell = read(skillRoot.resolve("scripts/graph-index-export.sh"));
-        String indexExportBatch = read(skillRoot.resolve("scripts/graph-index-export.bat"));
-        assertTrue(indexExportShell.contains("graph index"));
-        assertTrue(indexExportShell.contains("graph export"));
-        assertTrue(indexExportBatch.contains("graph index"));
-        assertTrue(indexExportBatch.contains("graph export"));
+        assertFalse(Files.exists(Paths.get(".agents/skills/devharness-graph-aware-development")));
+        assertFalse(Files.exists(Paths.get(".comate/rules/devharness-graph-aware-protocol.mdr")));
     }
 
     @Test
@@ -567,9 +574,12 @@ final class GoalSkillPackagingTest {
         Path project = tempDir.resolve("adapter-project");
         prepareAdapterProject(project);
         Files.createDirectories(project.resolve(".agents/skills/devharness-java-development"));
+        Files.createDirectories(project.resolve(".agents/skills/devharness-graph-aware-development"));
+        Files.createDirectories(project.resolve(".claude/skills/devharness-graph-aware-development"));
         Files.createDirectories(project.resolve(".comate/rules"));
         Files.write(project.resolve(".comate/rules/project-memory-bootstrap.mdr"), bytes("old memory rule"));
         Files.write(project.resolve(".comate/rules/java-development-guard.mdr"), bytes("old java rule"));
+        Files.write(project.resolve(".comate/rules/devharness-graph-aware-protocol.mdr"), bytes("old graph rule"));
         Path jar = tempDir.resolve("dhk.jar");
         Files.write(jar, bytes("fake jar"));
 
@@ -578,17 +588,17 @@ final class GoalSkillPackagingTest {
 
         assertEquals(0, result.exitCode, result.stderr);
         assertTrue(Files.isRegularFile(project.resolve(".claude/skills/devharness-goal-development/SKILL.md")));
-        assertTrue(Files.isRegularFile(project.resolve(".claude/skills/devharness-graph-aware-development/SKILL.md")));
         assertTrue(Files.isRegularFile(project.resolve("CLAUDE.md")));
         assertTrue(read(project.resolve("CLAUDE.md")).contains("Do not bypass goal"));
         assertTrue(read(project.resolve("CLAUDE.md")).contains("Do not use graph impact --allow-stale"));
         assertTrue(Files.isRegularFile(project.resolve("AGENTS.md")));
         assertTrue(read(project.resolve("AGENTS.md")).contains("Do not call lower-level memory/workflow/spec/db commands"));
         assertTrue(Files.isRegularFile(project.resolve(".comate/rules/devharness-goal-protocol.mdr")));
-        assertTrue(Files.isRegularFile(project.resolve(".comate/rules/devharness-graph-aware-protocol.mdr")));
         String comateRule = read(project.resolve(".comate/rules/devharness-goal-protocol.mdr"));
         assertTrue(comateRule.contains("AGENT_BRIEF.json"));
         assertTrue(comateRule.contains("Do not assume a global `dhk` command exists"));
+        assertTrue(comateRule.contains("Do not silently choose for the user"));
+        assertTrue(comateRule.contains("pause after each step"));
         assertTrue(comateRule.contains("Treat an Agent Brief with `current_action` = `completed` as historical"));
         assertTrue(comateRule.contains("quickstart.sh --task"));
         assertTrue(comateRule.contains("latest user request verbatim"));
@@ -600,12 +610,14 @@ final class GoalSkillPackagingTest {
         assertTrue(comateRule.contains("--field \"manual_evidence_status=passed\""));
         assertTrue(comateRule.contains("self-repair by recording the missing goal step"));
         assertTrue(comateRule.contains("Harness self-check"));
-        assertTrue(read(project.resolve(".comate/rules/devharness-graph-aware-protocol.mdr"))
-                .contains("Do not use --allow-stale"));
+        assertTrue(comateRule.contains("Do not use `graph impact --allow-stale`"));
         assertFalse(Files.exists(project.resolve(".claude/skills/devharness-java-development")));
         assertFalse(Files.exists(project.resolve(".agents/skills/devharness-java-development")));
+        assertFalse(Files.exists(project.resolve(".agents/skills/devharness-graph-aware-development")));
+        assertFalse(Files.exists(project.resolve(".claude/skills/devharness-graph-aware-development")));
         assertFalse(Files.exists(project.resolve(".comate/rules/project-memory-bootstrap.mdr")));
         assertFalse(Files.exists(project.resolve(".comate/rules/java-development-guard.mdr")));
+        assertFalse(Files.exists(project.resolve(".comate/rules/devharness-graph-aware-protocol.mdr")));
         assertTrue(Files.isRegularFile(project.resolve(".agents/tools/devharness-kit/dhk.jar")));
         assertTrue(Files.isExecutable(project.resolve(".claude/skills/devharness-goal-development/scripts/goal-start.sh")));
         assertTrue(Files.isExecutable(project.resolve(".agents/skills/devharness-goal-development/scripts/goal-start.sh")));
@@ -616,9 +628,12 @@ final class GoalSkillPackagingTest {
         Path project = tempDir.resolve("control-panel-project");
         prepareAdapterProject(project);
         Files.createDirectories(project.resolve(".agents/skills/devharness-java-development"));
+        Files.createDirectories(project.resolve(".agents/skills/devharness-graph-aware-development"));
+        Files.createDirectories(project.resolve(".claude/skills/devharness-graph-aware-development"));
         Files.createDirectories(project.resolve(".comate/rules"));
         Files.write(project.resolve(".comate/rules/project-memory-bootstrap.mdr"), bytes("old memory rule"));
         Files.write(project.resolve(".comate/rules/java-development-guard.mdr"), bytes("old java rule"));
+        Files.write(project.resolve(".comate/rules/devharness-graph-aware-protocol.mdr"), bytes("old graph rule"));
 
         CommandResult result = runControlPanel("configure",
                 "--project-root", project.toString(),
@@ -636,14 +651,15 @@ final class GoalSkillPackagingTest {
         assertTrue(Files.isRegularFile(project.resolve(".agents/devharness/install-state.json")));
         assertTrue(Files.isRegularFile(project.resolve(".agents/graph/config.json")));
         assertTrue(Files.isRegularFile(project.resolve(".claude/skills/devharness-goal-development/SKILL.md")));
-        assertTrue(Files.isRegularFile(project.resolve(".claude/skills/devharness-graph-aware-development/SKILL.md")));
         assertTrue(Files.isRegularFile(project.resolve("AGENTS.md")));
         assertTrue(Files.isRegularFile(project.resolve("CLAUDE.md")));
         assertTrue(Files.isRegularFile(project.resolve(".comate/rules/devharness-goal-protocol.mdr")));
-        assertTrue(Files.isRegularFile(project.resolve(".comate/rules/devharness-graph-aware-protocol.mdr")));
         assertFalse(Files.exists(project.resolve(".agents/skills/devharness-java-development")));
+        assertFalse(Files.exists(project.resolve(".agents/skills/devharness-graph-aware-development")));
+        assertFalse(Files.exists(project.resolve(".claude/skills/devharness-graph-aware-development")));
         assertFalse(Files.exists(project.resolve(".comate/rules/project-memory-bootstrap.mdr")));
         assertFalse(Files.exists(project.resolve(".comate/rules/java-development-guard.mdr")));
+        assertFalse(Files.exists(project.resolve(".comate/rules/devharness-graph-aware-protocol.mdr")));
 
         String config = read(project.resolve(".agents/devharness/config.json"));
         assertTrue(config.contains("\"schema_version\": \"devharness-config/v1-alpha\""));
@@ -655,7 +671,8 @@ final class GoalSkillPackagingTest {
 
         String manifest = read(project.resolve(".agents/devharness/agent-manifest.json"));
         assertTrue(manifest.contains("\"default_skill\": \"devharness-goal-development\""));
-        assertTrue(manifest.contains("\"name\": \"devharness-graph-aware-development\""));
+        assertTrue(manifest.contains("\"handling\": \"integrated_in_default_skill\""));
+        assertFalse(manifest.contains("\"name\": \"devharness-graph-aware-development\""));
         assertTrue(manifest.contains("\"remove_memory_first_skill\": true"));
 
         String state = read(project.resolve(".agents/devharness/install-state.json"));
@@ -677,13 +694,15 @@ final class GoalSkillPackagingTest {
         assertTrue(statusJson.stdout.contains("\"manifest\": \"ok\""));
         assertTrue(statusJson.stdout.contains("\"install_state\": \"ok\""));
         assertTrue(statusJson.stdout.contains("\"legacy_memory_first\": \"removed\""));
+        assertTrue(statusJson.stdout.contains("\"obsolete_graph_artifacts\": \"removed\""));
 
         CommandResult statusMarkdown = runControlPanel("status",
                 "--project-root", project.toString(),
                 "--status-format", "markdown");
         assertEquals(0, statusMarkdown.exitCode, statusMarkdown.stderr);
         assertTrue(statusMarkdown.stdout.contains("| manifest | ok |"));
-        assertTrue(statusMarkdown.stdout.contains("| comate_graph_adapter | ok |"));
+        assertTrue(statusMarkdown.stdout.contains("| graph_support | integrated |"));
+        assertFalse(statusMarkdown.stdout.contains("comate_graph_adapter"));
 
         CommandResult doctor = runControlPanel("doctor",
                 "--project-root", project.toString(),
@@ -693,8 +712,8 @@ final class GoalSkillPackagingTest {
     }
 
     @Test
-    void controlPanelConfigureSupportsDemoNoBuildPresetForEmptyProjects() throws Exception {
-        Path project = tempDir.resolve("control-panel-demo-project");
+    void controlPanelConfigureSupportsInitialNewProjectPresetForEmptyProjects() throws Exception {
+        Path project = tempDir.resolve("control-panel-initial-project");
         prepareAdapterProject(project);
         Path jar = tempDir.resolve("dhk.jar");
         Files.write(jar, bytes("fake jar"));
@@ -702,24 +721,31 @@ final class GoalSkillPackagingTest {
         CommandResult result = runControlPanel("configure",
                 "--project-root", project.toString(),
                 "--target", "comate",
-                "--preset", "demo-no-build",
+                "--preset", "initial-new-project",
                 "--jar", jar.toString(),
                 "--force");
 
         assertEquals(0, result.exitCode, result.stderr);
         String config = read(project.resolve(".agents/devharness/config.json"));
         String state = read(project.resolve(".agents/devharness/install-state.json"));
-        assertTrue(config.contains("\"preset\": \"demo-no-build\""));
-        assertTrue(config.contains("\"project.type\": \"demo-no-build\""));
-        assertTrue(config.contains("\"project.runtime\": \"local-demo\""));
+        assertTrue(config.contains("\"preset\": \"initial-new-project\""));
+        assertTrue(config.contains("\"project.type\": \"initial-new-project\""));
+        assertTrue(config.contains("\"project.runtime\": \"local-new-project\""));
         assertTrue(config.contains("\"verification.compile.mode\": \"disabled\""));
         assertTrue(config.contains("\"verification.test.mode\": \"disabled\""));
         assertTrue(config.contains("\"verification.graph.mode\": \"off\""));
-        assertTrue(state.contains("\"preset\": \"demo-no-build\""));
+        assertTrue(config.contains("\"verification.initial_project.enabled\": \"true\""));
+        assertTrue(state.contains("\"preset\": \"initial-new-project\""));
         assertTrue(state.contains("\"compile_mode\": \"disabled\""));
         assertTrue(state.contains("\"test_mode\": \"disabled\""));
         assertTrue(state.contains("\"graph\": \"off\""));
         assertTrue(Files.isRegularFile(project.resolve(".comate/rules/devharness-goal-protocol.mdr")));
+
+        CommandResult doctor = runControlPanel("doctor",
+                "--project-root", project.toString(),
+                "--target", "comate");
+        assertEquals(0, doctor.exitCode, doctor.stderr);
+        assertTrue(doctor.stdout.contains("doctor: ok"));
     }
 
     @Test
@@ -846,19 +872,26 @@ final class GoalSkillPackagingTest {
     }
 
     @Test
-    void agentAdapterInstallerBootstrapsMissingPackagedSkill() throws Exception {
-        Path project = tempDir.resolve("missing-skill-project");
+    void agentAdapterInstallerRemovesObsoleteGraphSkillFromProject() throws Exception {
+        Path project = tempDir.resolve("obsolete-graph-skill-project");
         Files.createDirectories(project.resolve(".agents/skills"));
         copyTree(Paths.get(".agents/skills/devharness-goal-development"),
                 project.resolve(".agents/skills/devharness-goal-development"));
+        Files.createDirectories(project.resolve(".agents/skills/devharness-graph-aware-development"));
+        Files.createDirectories(project.resolve(".claude/skills/devharness-graph-aware-development"));
+        Files.createDirectories(project.resolve(".comate/rules"));
+        Files.write(project.resolve(".comate/rules/devharness-graph-aware-protocol.mdr"), bytes("old graph rule"));
 
         CommandResult result = runInstaller("--project-root", project.toString(),
                 "--target", "all", "--force");
 
         assertEquals(0, result.exitCode, result.stderr);
-        assertTrue(Files.isRegularFile(project.resolve(".agents/skills/devharness-graph-aware-development/SKILL.md")));
-        assertTrue(Files.isRegularFile(project.resolve(".claude/skills/devharness-graph-aware-development/SKILL.md")));
-        assertTrue(Files.isRegularFile(project.resolve(".comate/rules/devharness-graph-aware-protocol.mdr")));
+        assertTrue(Files.isRegularFile(project.resolve(".agents/skills/devharness-goal-development/SKILL.md")));
+        assertTrue(Files.isRegularFile(project.resolve(".claude/skills/devharness-goal-development/SKILL.md")));
+        assertTrue(Files.isRegularFile(project.resolve(".comate/rules/devharness-goal-protocol.mdr")));
+        assertFalse(Files.exists(project.resolve(".agents/skills/devharness-graph-aware-development")));
+        assertFalse(Files.exists(project.resolve(".claude/skills/devharness-graph-aware-development")));
+        assertFalse(Files.exists(project.resolve(".comate/rules/devharness-graph-aware-protocol.mdr")));
     }
 
     @Test
@@ -890,6 +923,7 @@ final class GoalSkillPackagingTest {
         assertTrue(rootInstaller.contains("DevHarnessKit 安装向导"));
         assertTrue(rootInstaller.contains("代码项目绝对路径"));
         assertTrue(rootInstaller.contains("使用场景"));
+        assertTrue(rootInstaller.contains("初始新项目"));
         assertTrue(installer.contains("DevHarnessKit 交互式安装向导"));
         assertTrue(installer.contains("傻瓜式安装流程"));
         assertTrue(installer.contains("项目绝对路径"));
@@ -897,6 +931,8 @@ final class GoalSkillPackagingTest {
         assertFalse(installer.contains("~/Desktop"));
         assertFalse(installer.contains("Desktop/simple-java"));
         assertTrue(installer.contains("使用场景"));
+        assertTrue(installer.contains("初始新项目"));
+        assertTrue(installer.contains("refresh-state"));
         assertTrue(installer.contains("Please run this installer from the DevHarnessKit release package"));
         assertTrue(installer.contains("lib/dhk.jar"));
         assertTrue(installer.contains("install_packaged_assets_to_project"));
@@ -923,14 +959,18 @@ final class GoalSkillPackagingTest {
         assertEquals(0, result.exitCode, result.stderr);
         assertTrue(result.stdout.contains("configure complete"), result.stdout);
         assertTrue(Files.isRegularFile(project.resolve(".agents/devharness/config.json")));
+        String config = read(project.resolve(".agents/devharness/config.json"));
+        assertTrue(config.contains("\"preset\": \"initial-new-project\""));
         assertTrue(Files.isRegularFile(project.resolve(".agents/devharness/policy.json")));
         assertTrue(Files.isRegularFile(project.resolve(".agents/devharness/agent-manifest.json")));
         assertTrue(Files.isRegularFile(project.resolve(".agents/devharness/install-state.json")));
         assertTrue(Files.isRegularFile(project.resolve(".agents/graph/config.json")));
         assertTrue(Files.isRegularFile(project.resolve(".agents/skills/devharness-goal-development/SKILL.md")));
         assertTrue(Files.isRegularFile(project.resolve(".agents/skills/devharness-goal-development/scripts/quickstart.sh")));
-        assertTrue(Files.isRegularFile(project.resolve(".agents/skills/devharness-graph-aware-development/SKILL.md")));
+        assertTrue(Files.isRegularFile(project.resolve(".agents/skills/devharness-goal-development/scripts/graph-impact.sh")));
+        assertFalse(Files.exists(project.resolve(".agents/skills/devharness-graph-aware-development")));
         assertTrue(Files.isRegularFile(project.resolve(".comate/rules/devharness-goal-protocol.mdr")));
+        assertFalse(Files.exists(project.resolve(".comate/rules/devharness-graph-aware-protocol.mdr")));
         assertTrue(Files.isRegularFile(project.resolve(".agents/tools/devharness-kit/dhk.jar")));
     }
 
@@ -989,10 +1029,8 @@ final class GoalSkillPackagingTest {
     private void assertGraphWrapper(Path skillRoot, String scriptName, String graphCommand) throws Exception {
         String shell = read(skillRoot.resolve("scripts/" + scriptName + ".sh"));
         String batch = read(skillRoot.resolve("scripts/" + scriptName + ".bat"));
-        assertTrue(shell.contains("devharness-goal-development/scripts/dhk.sh\" graph "
-                + graphCommand + " \"$@\""));
-        assertTrue(batch.contains("devharness-goal-development\\scripts\\dhk.bat\" graph "
-                + graphCommand + " %*"));
+        assertTrue(shell.contains("exec \"$SCRIPT_DIR/dhk.sh\" graph " + graphCommand + " \"$@\""));
+        assertTrue(batch.contains("dhk.bat\" graph " + graphCommand + " %*"));
     }
 
     private String read(Path path) throws Exception {
@@ -1002,8 +1040,6 @@ final class GoalSkillPackagingTest {
     private void prepareAdapterProject(Path project) throws Exception {
         copyTree(Paths.get(".agents/skills/devharness-goal-development"),
                 project.resolve(".agents/skills/devharness-goal-development"));
-        copyTree(Paths.get(".agents/skills/devharness-graph-aware-development"),
-                project.resolve(".agents/skills/devharness-graph-aware-development"));
     }
 
     private void copyTree(Path source, Path target) throws Exception {

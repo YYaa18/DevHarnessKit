@@ -14,6 +14,7 @@ import com.devharnesskit.dhk.repository.workflow.WorkflowRunRepository;
 import com.devharnesskit.dhk.service.SensitiveDataGuard;
 import com.devharnesskit.dhk.service.bdd.BddService;
 import com.devharnesskit.dhk.service.bdd.BddVerificationService;
+import com.devharnesskit.dhk.service.brief.PreWorkGuardService;
 import com.devharnesskit.dhk.service.graph.GraphArchitectureCheckService;
 import com.devharnesskit.dhk.service.policy.DevHarnessPolicyService;
 import com.devharnesskit.dhk.service.skill.SkillDisciplineGateService;
@@ -68,6 +69,8 @@ final class DefaultGoalCheckRunnerFactory {
                 new LegacyGoalCheckRunner(recorder, stepRepository, devHarnessPolicyService),
                 new ArchitectureGoalCheckRunner(recorder, architectureCheckService),
                 new BddGoalCheckRunner(recorder, bddBindingRepository, bddService, bddVerificationService),
+                new PreWorkFileWriteGoalCheckRunner(recorder, new InteractionRequestRepository(),
+                        new PreWorkGuardService()),
                 new DisciplineGateGoalCheckRunner("think-before-coding", recorder, stepRepository,
                         devHarnessPolicyService, disciplineGateService),
                 new DisciplineGateGoalCheckRunner("goal-driven", recorder, stepRepository,

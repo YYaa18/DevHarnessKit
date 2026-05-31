@@ -28,8 +28,10 @@ public final class DevHarnessConfigService {
             "verification.test.expected_duration", "verification.test.required_evidence",
             "verification.graph.mode", "verification.graph.required", "verification.graph.fresh_snapshot_required",
             "verification.graph.impact_map_required", "verification.graph.allow_stale_requires_approval",
+            "verification.initial_project.enabled", "verification.initial_project.warning",
             "verification.demo.enabled", "verification.demo.warning",
             "verification.architecture.mode", "verification.rollback.required_when_auto_tests_unavailable",
+            "workflow.pre_work.confirmation.required", "workflow.pre_work.confirmation.reason",
             "adapter.target");
 
     public ConfigureInitResult init(Path projectRoot, String preset, boolean force,
@@ -182,10 +184,10 @@ public final class DevHarnessConfigService {
             values.put("verification.graph.impact_map_required", "true");
             return values;
         }
-        if ("demo-no-build".equals(normalized)) {
+        if ("initial-new-project".equals(normalized)) {
             Map<String, String> values = defaultValues(normalized);
-            values.put("project.type", "demo");
-            values.put("project.runtime", "mock-project");
+            values.put("project.type", "initial-new-project");
+            values.put("project.runtime", "local-new-project");
             values.put("verification.compile.mode", "disabled");
             values.put("verification.compile.command", "");
             values.put("verification.test.mode", "disabled");
@@ -195,8 +197,11 @@ public final class DevHarnessConfigService {
             values.put("verification.graph.fresh_snapshot_required", "false");
             values.put("verification.graph.impact_map_required", "false");
             values.put("verification.rollback.required_when_auto_tests_unavailable", "false");
-            values.put("verification.demo.enabled", "true");
-            values.put("verification.demo.warning", "demo mode does not prove code correctness");
+            values.put("verification.initial_project.enabled", "true");
+            values.put("verification.initial_project.warning",
+                    "initial project mode does not prove production correctness until real compile/test evidence exists");
+            values.put("workflow.pre_work.confirmation.required", "true");
+            values.put("workflow.pre_work.confirmation.reason", "项目配置要求实施前确认任务边界和推进顺序。");
             return values;
         }
         if ("springboot-ci-only-test".equals(normalized)) {
@@ -267,6 +272,7 @@ public final class DevHarnessConfigService {
         values.put("verification.graph.allow_stale_requires_approval", "true");
         values.put("verification.architecture.mode", "warn");
         values.put("verification.rollback.required_when_auto_tests_unavailable", "true");
+        values.put("workflow.pre_work.confirmation.required", "false");
         return values;
     }
 
@@ -277,6 +283,12 @@ public final class DevHarnessConfigService {
         String normalized = preset.trim().toLowerCase(Locale.ROOT);
         if ("manual-ide-test".equals(normalized)) {
             return "springboot-manual-ide-test";
+        }
+        if ("demo-no-build".equals(normalized)
+                || "empty-project".equals(normalized)
+                || "new-project".equals(normalized)
+                || "initial-project".equals(normalized)) {
+            return "initial-new-project";
         }
         return normalized;
     }

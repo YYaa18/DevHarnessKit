@@ -23,6 +23,8 @@ Do not use commands outside this contract unless `GOAL_CONTEXT.md` explicitly au
 For ordinary code tasks, keep the user-facing flow simple:
 
 1. Show the user the Work Brief summary: task intent, recommended mode, risk, confirmation needs, and expected work.
+   - If the Work Brief says `confirmation_required: true`, show the confirmation reason and checklist, then wait for explicit user confirmation before answering the interaction or continuing. Do not silently pick a confirmation option for the user.
+   - If the user is running a step-by-step business acceptance plan, pause after each business step, list what was completed and what needs confirmation, and wait before starting the next step.
 2. Read `.agents/devharness/briefs/AGENT_BRIEF.json` yourself when it exists.
 3. Do not show `harness_commands` to ordinary users unless they explicitly ask for debugging details.
 4. Do not assume a global `dhk` command exists. Prefer the Agent Brief `script` + `args` fields or the project-local wrapper scripts under `.agents/skills/devharness-goal-development/scripts/`.
@@ -148,3 +150,6 @@ DevHarness self-check:
 - `references/knowledge-injection.md`
 - `references/self-check-format.md`
 - `references/forbidden-actions.md`
+- `references/graph-protocol.md`
+- `references/graph-evidence-format.md`
+- `references/graph-forbidden-actions.md`

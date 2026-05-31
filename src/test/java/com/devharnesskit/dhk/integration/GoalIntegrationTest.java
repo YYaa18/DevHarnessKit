@@ -434,6 +434,53 @@ final class GoalIntegrationTest {
     }
 
     @Test
+    void patchGoalCompletionClosesUnmappedWorkflowContext() throws Exception {
+        Path root = tempDir.resolve("patch-workflow-complete");
+        Harness start = new Harness(tempDir);
+        int startExit = new CommandRouter().run(new String[]{
+                "goal", "start",
+                "--project-root", "patch-workflow-complete",
+                "--profile", "java-api-patch",
+                "--task", "Create initial project skeleton",
+                "--module", "app",
+                "--mode", "api"
+        }, start.context());
+        assertEquals(ExitCodes.SUCCESS, startExit);
+        String goalKey = firstValue(start.stdout(), "goal_key: ");
+        String workflowRun = firstValue(start.stdout(), "workflow_run: ");
+
+        step("patch-workflow-complete", goalKey, "Understood patch scope", "",
+                "goal_understanding=Create the skeleton; assumptions=Pure Java; read_files=README.md");
+        step("patch-workflow-complete", goalKey, "Created skeleton files",
+                "src/main/java/Demo.java",
+                "diff_stat=1 file; implementation_summary=Created skeleton; risk_flags=none");
+        step("patch-workflow-complete", goalKey, "Verified skeleton", "",
+                "sensitive_result=passed; verification=manual smoke passed; manual_evidence_status=passed");
+
+        Harness verify = new Harness(tempDir);
+        int verifyExit = new CommandRouter().run(new String[]{
+                "goal", "verify", "--project-root", "patch-workflow-complete", "--goal", goalKey
+        }, verify.context());
+        assertEquals(ExitCodes.SUCCESS, verifyExit);
+        assertTrue(verify.stdout().contains("decision: ready_to_complete"), verify.stdout());
+
+        Harness complete = new Harness(tempDir);
+        int completeExit = new CommandRouter().run(new String[]{
+                "goal", "complete", "--project-root", "patch-workflow-complete", "--goal", goalKey
+        }, complete.context());
+        assertEquals(ExitCodes.SUCCESS, completeExit, complete.stdout() + complete.stderr());
+
+        assertEquals("completed", singleString(root, "SELECT status FROM workflow_run "
+                + "WHERE run_key = '" + workflowRun + "'"));
+        assertEquals(0, countRows(root, "workflow_gate_run WHERE run_key = '" + workflowRun
+                + "' AND severity = 'hard' AND status = 'pending'"));
+        String workflowContext = new String(Files.readAllBytes(PathUtil.workflowContext(root)), "UTF-8");
+        assertTrue(workflowContext.contains("status: completed"));
+        assertTrue(workflowContext.contains("<pending-hard-gates>\nnone"));
+        assertFalse(workflowContext.contains("status: running"));
+    }
+
+    @Test
     void goalStepRequiresEvidenceForCurrentAction() throws Exception {
         Harness start = new Harness(tempDir);
         int startExit = new CommandRouter().run(new String[]{
@@ -2147,7 +2194,7 @@ final class GoalIntegrationTest {
         assertTrue(next.stdout().contains("graph_assist:"));
         assertTrue(next.stdout().contains("integrated_into_main_flow: true"));
         assertTrue(next.stdout().contains("recommended_internal_action: refresh_graph_context"));
-        assertTrue(next.stdout().contains("internal_helper: .agents/skills/devharness-graph-aware-development/scripts/graph-index-export.sh"));
+        assertTrue(next.stdout().contains("internal_helper: .agents/skills/devharness-goal-development/scripts/graph-index-export.sh"));
         assertTrue(next.stdout().contains("next_command: .agents/skills/devharness-goal-development/scripts/goal-step.sh"));
         assertTrue(next.stdout().contains("graph_snapshot"));
         assertTrue(next.stdout().contains("graph_context"));
@@ -2203,7 +2250,7 @@ final class GoalIntegrationTest {
         assertEquals(ExitCodes.SUCCESS, nextExit);
         assertTrue(next.stdout().contains("current_action: inspect_existing_code"));
         assertTrue(next.stdout().contains("recommended_internal_action: prepare_impact_map"));
-        assertTrue(next.stdout().contains("internal_helper: .agents/skills/devharness-graph-aware-development/scripts/graph-impact.sh"));
+        assertTrue(next.stdout().contains("internal_helper: .agents/skills/devharness-goal-development/scripts/graph-impact.sh"));
         assertTrue(next.stdout().contains("next_command: .agents/skills/devharness-goal-development/scripts/goal-step.sh"));
     }
 
@@ -2246,7 +2293,7 @@ final class GoalIntegrationTest {
         assertTrue(next.stdout().contains("snapshot_workspace_fingerprint: fallback:"));
         assertTrue(next.stdout().contains("current_workspace_fingerprint: fallback:"));
         assertTrue(next.stdout().contains("recommended_internal_action: refresh_graph_context"));
-        assertTrue(next.stdout().contains("internal_helper: .agents/skills/devharness-graph-aware-development/scripts/graph-index-export.sh"));
+        assertTrue(next.stdout().contains("internal_helper: .agents/skills/devharness-goal-development/scripts/graph-index-export.sh"));
         assertTrue(next.stdout().contains("next_command: .agents/skills/devharness-goal-development/scripts/goal-step.sh"));
 
         String context = new String(Files.readAllBytes(PathUtil.goalContext(root)), "UTF-8");

@@ -24,7 +24,7 @@ final class GoalCommandSupport {
     private static final GoalProfileService PROFILE_SERVICE = new GoalProfileService();
     private static final GoalGraphStateService GRAPH_STATE_SERVICE = new GoalGraphStateService();
     private static final String GOAL_SCRIPT_DIR = ".agents/skills/devharness-goal-development/scripts/";
-    private static final String GRAPH_SCRIPT_DIR = ".agents/skills/devharness-graph-aware-development/scripts/";
+    private static final String GRAPH_SCRIPT_DIR = ".agents/skills/devharness-goal-development/scripts/";
     private static final String[] ALLOWED_ACTIONS = new String[]{
             "perform_current_action_only",
             "record_goal_step_after_work",
@@ -271,6 +271,9 @@ final class GoalCommandSupport {
         }
         if (command.startsWith("dhk goal mr-summary ")) {
             return GOAL_SCRIPT_DIR + "goal-mr-summary.sh " + command.substring("dhk goal mr-summary ".length());
+        }
+        if (command.startsWith("dhk brief answer ")) {
+            return GOAL_SCRIPT_DIR + "dhk.sh brief answer " + command.substring("dhk brief answer ".length());
         }
         if (command.startsWith("dhk graph impact ")) {
             return GRAPH_SCRIPT_DIR + "graph-impact.sh " + command.substring("dhk graph impact ".length());

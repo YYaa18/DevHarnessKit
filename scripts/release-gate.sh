@@ -385,6 +385,7 @@ for entry in \
   ".agents/skills/devharness-goal-development/SKILL.md" \
   ".agents/skills/devharness-goal-development/contract.json" \
   ".agents/skills/devharness-goal-development/references/knowledge-injection.md" \
+  ".agents/skills/devharness-goal-development/references/graph-protocol.md" \
   ".agents/knowledge/packs/devharness-methodology-core/knowledge-pack.json" \
   ".agents/knowledge/packs/java-enterprise-core/knowledge-pack.json" \
   ".agents/skills/devharness-goal-development/scripts/dhk.sh" \
@@ -393,11 +394,11 @@ for entry in \
   ".agents/skills/devharness-goal-development/scripts/goal-start.bat" \
   ".agents/skills/devharness-goal-development/scripts/goal-verify.sh" \
   ".agents/skills/devharness-goal-development/scripts/goal-verify.bat" \
-  ".agents/skills/devharness-graph-aware-development/SKILL.md" \
-  ".agents/skills/devharness-graph-aware-development/scripts/graph-impact.sh" \
-  ".agents/skills/devharness-graph-aware-development/scripts/graph-impact.bat" \
+  ".agents/skills/devharness-goal-development/scripts/graph-impact.sh" \
+  ".agents/skills/devharness-goal-development/scripts/graph-impact.bat" \
+  ".agents/skills/devharness-goal-development/scripts/graph-index-export.sh" \
+  ".agents/skills/devharness-goal-development/scripts/graph-index-export.bat" \
   ".comate/rules/devharness-goal-protocol.mdr" \
-  ".comate/rules/devharness-graph-aware-protocol.mdr" \
   "scripts/devharness-control-panel.sh" \
   "scripts/install-agent-adapters.sh"
 do
@@ -419,7 +420,9 @@ for entry in \
   "scripts/perf-smoke.sh" \
   "scripts/perf-smoke.bat" \
   "scripts/dev-build.sh" \
-  "scripts/lark-codex-bridge.sh"
+  "scripts/lark-codex-bridge.sh" \
+  ".agents/skills/devharness-graph-aware-development" \
+  ".comate/rules/devharness-graph-aware-protocol.mdr"
 do
   require_no_zip_entry "$entry"
   require_no_tgz_entry "$entry"
@@ -435,6 +438,12 @@ if tar -tzf "$TGZ" | grep 'devharness-java-development' >/dev/null; then
 fi
 if tar -tzf "$TGZ" | grep -E 'project-memory-bootstrap.mdr|java-development-guard.mdr' >/dev/null; then
   fail "tar.gz still contains legacy Comate memory-first rules"
+fi
+if unzip -l "$ZIP" | grep -E 'devharness-graph-aware-development|devharness-graph-aware-protocol.mdr' >/dev/null; then
+  fail "zip still contains obsolete graph-aware skill/rule"
+fi
+if tar -tzf "$TGZ" | grep -E 'devharness-graph-aware-development|devharness-graph-aware-protocol.mdr' >/dev/null; then
+  fail "tar.gz still contains obsolete graph-aware skill/rule"
 fi
 
 log "writing artifact manifest"

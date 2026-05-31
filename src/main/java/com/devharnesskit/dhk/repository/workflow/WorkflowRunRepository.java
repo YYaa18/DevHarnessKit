@@ -56,6 +56,23 @@ public final class WorkflowRunRepository {
         }
     }
 
+    public void complete(Connection connection, String runKey, String currentPhaseKey, String completedAt,
+                         String now) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "UPDATE workflow_run SET status = 'completed', current_phase_key = ?, "
+                        + "completed_at = ?, updated_at = ? WHERE run_key = ?")) {
+            statement.setString(1, currentPhaseKey == null ? "" : currentPhaseKey);
+            if (completedAt == null || completedAt.length() == 0) {
+                statement.setNull(2, java.sql.Types.VARCHAR);
+            } else {
+                statement.setString(2, completedAt);
+            }
+            statement.setString(3, now);
+            statement.setString(4, runKey);
+            statement.executeUpdate();
+        }
+    }
+
     public void updateContextExportPath(Connection connection, String runKey, String path, String now) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(
                 "UPDATE workflow_run SET context_export_path = ?, updated_at = ? WHERE run_key = ?")) {

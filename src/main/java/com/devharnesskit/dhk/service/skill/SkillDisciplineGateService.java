@@ -4,6 +4,7 @@ import com.devharnesskit.dhk.model.goal.GoalProfile;
 import com.devharnesskit.dhk.model.goal.GoalRun;
 import com.devharnesskit.dhk.model.goal.GoalStep;
 import com.devharnesskit.dhk.model.skill.SkillDisciplineGateResult;
+import com.devharnesskit.dhk.util.ChangedFileText;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -339,17 +340,7 @@ public final class SkillDisciplineGateService {
     }
 
     private void addFiles(Set<String> files, String raw) {
-        if (raw == null || raw.trim().length() == 0 || "none".equalsIgnoreCase(raw.trim())) {
-            return;
-        }
-        String normalized = raw.replace('\n', ',').replace(';', ',');
-        String[] parts = normalized.split(",");
-        for (String part : parts) {
-            String file = part.trim();
-            if (file.length() > 0) {
-                files.add(file.replace('\\', '/'));
-            }
-        }
+        ChangedFileText.addFiles(files, raw);
     }
 
     private List<String> abstractionFiles(List<String> changedFiles) {

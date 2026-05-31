@@ -5,6 +5,7 @@ import com.devharnesskit.dhk.model.goal.GoalProfile;
 public final class GoalCheckPolicy {
     public static final String[] DEFAULT_REQUIRED_CHECKS =
             new String[]{"compile", "test", "sensitive", "spec", "workflow"};
+    public static final String PRE_WORK_FILE_WRITE_CHECK = "pre-work-file-write";
     private static final String[] DEFAULT_ACCEPTED_STATUSES =
             new String[]{"passed", "skipped", "waived"};
     private static final String[] PASSED_ONLY = new String[]{"passed"};
@@ -188,7 +189,8 @@ public final class GoalCheckPolicy {
         } else {
             selected = requiredChecks;
         }
-        return withVerificationModeChecks(withBddChecks(withGraphChecks(selected, profile), profile));
+        return withPreWorkFileWriteCheck(
+                withVerificationModeChecks(withBddChecks(withGraphChecks(selected, profile), profile)));
     }
 
     public String[] compileCommand() {
@@ -275,6 +277,9 @@ public final class GoalCheckPolicy {
             return PASSED_ONLY;
         }
         if ("verification-risk".equals(checkKey)) {
+            return PASSED_ONLY;
+        }
+        if (PRE_WORK_FILE_WRITE_CHECK.equals(checkKey)) {
             return PASSED_ONLY;
         }
         if (isBuiltInJavaProfile(profile)) {
@@ -387,6 +392,17 @@ public final class GoalCheckPolicy {
                 merged.add(check);
             }
         }
+        return merged.toArray(new String[merged.size()]);
+    }
+
+    private String[] withPreWorkFileWriteCheck(String[] checks) {
+        java.util.LinkedHashSet<String> merged = new java.util.LinkedHashSet<String>();
+        for (String check : checks) {
+            if (check != null && check.length() > 0) {
+                merged.add(check);
+            }
+        }
+        merged.add(PRE_WORK_FILE_WRITE_CHECK);
         return merged.toArray(new String[merged.size()]);
     }
 

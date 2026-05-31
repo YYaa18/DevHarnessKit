@@ -221,7 +221,7 @@ final class ConfigureCommandIntegrationTest {
         assertEquals(ExitCodes.VALIDATION_ERROR, invalidPresetExit);
         assertTrue(invalidPreset.stderr().contains("error_code: INVALID_CONFIGURE_PRESET"));
         assertTrue(invalidPreset.stderr().contains("valid_values:"));
-        assertTrue(invalidPreset.stderr().contains("demo-no-build"));
+        assertTrue(invalidPreset.stderr().contains("initial-new-project"));
     }
 
     @Test

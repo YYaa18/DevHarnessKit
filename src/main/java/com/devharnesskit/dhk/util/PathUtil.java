@@ -56,6 +56,7 @@ public final class PathUtil {
     public static final String COMPLETION_BRIEF = "COMPLETION_BRIEF.md";
     public static final String KNOWLEDGE_CANDIDATES = "KNOWLEDGE_CANDIDATES.md";
     public static final String INTERACTION_REQUESTS = "INTERACTION_REQUESTS.tsv";
+    public static final String PRE_WORK_GUARD = "PRE_WORK_GUARD.tsv";
     public static final String KNOWLEDGE_CANDIDATES_TSV = "KNOWLEDGE_CANDIDATES.tsv";
     public static final String GROWTH_LESSONS_TSV = "GROWTH_LESSONS.tsv";
     public static final String GROWTH_CONTEXT = "GROWTH_CONTEXT.md";
@@ -225,6 +226,10 @@ public final class PathUtil {
 
     public static Path interactionRequests(Path projectRoot) {
         return devharnessBriefsDirectory(projectRoot).resolve(INTERACTION_REQUESTS);
+    }
+
+    public static Path preWorkGuardStore(Path projectRoot) {
+        return devharnessBriefsDirectory(projectRoot).resolve(PRE_WORK_GUARD);
     }
 
     public static Path knowledgeCandidatesStore(Path projectRoot) {

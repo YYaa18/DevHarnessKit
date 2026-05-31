@@ -2,10 +2,13 @@ package com.devharnesskit.dhk.service.goal;
 
 import com.devharnesskit.dhk.model.goal.GoalPlan;
 import com.devharnesskit.dhk.model.goal.GoalStep;
+import com.devharnesskit.dhk.util.ChangedFileText;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 final class GoalStepEvidenceValidator {
     void validate(GoalPlan plan, String summary, String changedFiles, String evidence) {
@@ -52,15 +55,16 @@ final class GoalStepEvidenceValidator {
     }
 
     String changedFiles(List<GoalStep> steps) {
-        StringBuilder builder = new StringBuilder();
+        Set<String> files = new LinkedHashSet<String>();
         for (GoalStep step : steps) {
-            if (step.changedFiles().length() == 0) {
-                continue;
-            }
+            ChangedFileText.addFiles(files, step.changedFiles());
+        }
+        StringBuilder builder = new StringBuilder();
+        for (String file : files) {
             if (builder.length() > 0) {
                 builder.append('\n');
             }
-            builder.append(step.changedFiles());
+            builder.append(file);
         }
         return builder.length() == 0 ? "none" : builder.toString();
     }

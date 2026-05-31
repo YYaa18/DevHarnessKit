@@ -6,6 +6,7 @@ import com.devharnesskit.dhk.model.policy.DevHarnessPolicy;
 import com.devharnesskit.dhk.repository.goal.GoalStepRepository;
 import com.devharnesskit.dhk.model.bdd.BddBinding;
 import com.devharnesskit.dhk.service.policy.DevHarnessPolicyService;
+import com.devharnesskit.dhk.util.ChangedFileText;
 import com.devharnesskit.dhk.util.EvidenceValueParser;
 import com.devharnesskit.dhk.util.PathUtil;
 
@@ -194,36 +195,7 @@ final class GoalCheckSupport {
     }
 
     static void addChangedFiles(Set<String> files, Path projectRoot, String raw) {
-        if (raw == null || raw.trim().length() == 0 || "none".equalsIgnoreCase(raw.trim())) {
-            return;
-        }
-        String[] parts = raw.split("[,;\\n\\r]+");
-        for (String part : parts) {
-            String normalized = normalizeRelativePath(projectRoot, part);
-            if (normalized.length() > 0) {
-                files.add(normalized);
-            }
-        }
-    }
-
-    static String normalizeRelativePath(Path projectRoot, String value) {
-        String text = value == null ? "" : value.trim().replace('\\', '/');
-        if (text.length() == 0) {
-            return "";
-        }
-        try {
-            Path path = projectRoot.getFileSystem().getPath(text);
-            if (path.isAbsolute()) {
-                text = projectRoot.toAbsolutePath().normalize()
-                        .relativize(path.toAbsolutePath().normalize()).toString().replace('\\', '/');
-            }
-        } catch (Exception ignored) {
-            return text;
-        }
-        while (text.startsWith("./")) {
-            text = text.substring(2);
-        }
-        return text;
+        ChangedFileText.addFiles(files, projectRoot, raw);
     }
 
     static boolean requiresImpactCoverage(String file) {

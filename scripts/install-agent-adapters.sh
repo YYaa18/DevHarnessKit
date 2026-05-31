@@ -36,7 +36,7 @@ DevHarnessKit 交互式安装向导。
 向导会让你选择：
   - 目标项目绝对路径
   - Agent：文心快码、Claude Code、OpenCode 或全部
-  - 使用场景：首次体验、公司 Java 项目、本机 Maven 项目、图分析建议、老旧 Java 项目
+  - 使用场景：初始新项目、公司 Java 项目、本机 Maven 项目、图分析建议、老旧 Java 项目
   - 是否创建第一份 Work Brief/Goal
 
 高级/兼容用法仍然支持，并会转交给：
@@ -151,8 +151,6 @@ ensure_packaged_assets() {
   dist_root="$DIST_ROOT"
   [ -d "$dist_root/.agents/skills/devharness-goal-development" ] \
     || fail "missing packaged .agents/skills. Please run this installer from the DevHarnessKit release package, not from a lone script."
-  [ -d "$dist_root/.agents/skills/devharness-graph-aware-development" ] \
-    || fail "missing packaged graph skill. Please use the full DevHarnessKit release package."
 }
 
 copy_dir_from_dist() {
@@ -192,6 +190,19 @@ install_packaged_assets_to_project() {
     cp "$dist_root/scripts/install-agent-adapters.sh" "$project_root/scripts/install-agent-adapters.sh"
   fi
   chmod +x "$project_root/scripts/devharness-control-panel.sh" "$project_root/scripts/install-agent-adapters.sh"
+
+  remove_obsolete_graph_artifacts "$project_root"
+}
+
+remove_obsolete_graph_artifacts() {
+  project_root="$1"
+  for path in \
+    "$project_root/.agents/skills/devharness-graph-aware-development" \
+    "$project_root/.claude/skills/devharness-graph-aware-development" \
+    "$project_root/.comate/rules/devharness-graph-aware-protocol.mdr"
+  do
+    [ -e "$path" ] && rm -rf "$path" || true
+  done
 }
 
 abs_file() {
@@ -210,7 +221,7 @@ detect_default_preset() {
   if [ -f "$root/pom.xml" ]; then
     printf 'springboot-manual-ide-test'
   else
-    printf 'demo-no-build'
+    printf 'initial-new-project'
   fi
 }
 
@@ -235,8 +246,8 @@ choose_scenario() {
   [ -f "$root/pom.xml" ] && default_choice="2"
 
   section '第 3 步：选择使用场景'
-  printf '  1) 只是先体验一下，目标项目可能还是空的\n'
-  printf '     不跑编译/测试，适合第一次试用。\n\n'
+  printf '  1) 初始新项目，目标目录可能还是空的\n'
+  printf '     暂不跑编译/测试，适合先建立项目骨架和第一份任务。\n\n'
   printf '  2) 公司 Java 项目，编译/测试通常在 IDE、CI 或公司环境里做\n'
   printf '     DevHarnessKit 会要求人工验证证据，不会强行跑 Maven。\n\n'
   printf '  3) 本机就是标准 Maven 项目，可以自动跑 mvn compile/test\n'
@@ -246,12 +257,12 @@ choose_scenario() {
   printf '  5) 老旧 Java/JSP/MyBatis 项目\n'
   printf '     偏保守，默认人工验证并启用图分析。\n\n'
 
-  answer=$(ask_choice "请选择场景" "$default_choice" "1 2 3 4 5 demo-no-build springboot-manual-ide-test springboot-auto-test graph-advisory legacy-jsp-servlet mybatis-monolith-manual-test")
+  answer=$(ask_choice "请选择场景" "$default_choice" "1 2 3 4 5 initial-new-project springboot-manual-ide-test springboot-auto-test graph-advisory legacy-jsp-servlet mybatis-monolith-manual-test")
   case "$answer" in
-    1|demo-no-build)
-      selected_preset="demo-no-build"
-      selected_scenario_label="空项目/首次体验"
-      control_panel_preset="springboot-manual-ide-test"
+    1|initial-new-project|demo-no-build)
+      selected_preset="initial-new-project"
+      selected_scenario_label="初始新项目"
+      control_panel_preset="initial-new-project"
       compile_mode="disabled"
       test_mode="disabled"
       graph_mode="off"
@@ -299,8 +310,8 @@ choose_scenario() {
 modes_for_preset() {
   preset="$1"
   case "$preset" in
-    demo-no-build)
-      printf 'springboot-manual-ide-test disabled disabled off'
+    initial-new-project|demo-no-build)
+      printf 'initial-new-project disabled disabled off'
       ;;
     springboot-auto-test)
       printf 'springboot-auto-test auto auto off'
@@ -390,10 +401,10 @@ run_wizard() {
 
   create_brief=$(ask_yes_no "是否现在创建第一份 Work Brief/Goal?" "$create_brief_default")
   task=""
-  module="demo"
+  module="app"
   if [ "$create_brief" = "yes" ]; then
-    task=$(ask "任务描述" "创建一个 README，说明这是文心快码接入 DevHarnessKit 的空项目体验")
-    module=$(ask "模块名" "demo")
+    task=$(ask "任务描述" "创建初始项目骨架并补充 README")
+    module=$(ask "模块名" "app")
   fi
 
   printf '\n'
@@ -443,6 +454,15 @@ run_wizard() {
     --graph "$graph_mode" \
     --target "$target" \
     --force >/dev/null
+
+  install_state_output=$("$CONTROL_PANEL" refresh-state \
+    --project-root "$project_root" \
+    --target "$target" \
+    --preset "$control_panel_preset" \
+    --compile-mode "$compile_mode" \
+    --test-mode "$test_mode" \
+    --graph "$graph_mode" \
+    $force_arg 2>&1) || { printf '%s\n' "$install_state_output" >&2; exit 1; }
 
   status_output=$("$CONTROL_PANEL" status --project-root "$project_root" --target "$target" --status-format text)
   section '安装完成'
@@ -528,6 +548,7 @@ case "${1:-}" in
     project_root_arg="."
     force_arg="no"
     dry_run_arg="no"
+    preset_arg="no"
     previous=""
     for arg in "$@"; do
       if [ "$previous" = "--project-root" ]; then
@@ -535,9 +556,17 @@ case "${1:-}" in
         previous=""
         continue
       fi
+      if [ "$previous" = "--preset" ]; then
+        preset_arg="yes"
+        previous=""
+        continue
+      fi
       case "$arg" in
         --project-root=*)
           project_root_arg="${arg#--project-root=}"
+          ;;
+        --preset=*)
+          preset_arg="yes"
           ;;
         --force)
           force_arg="yes"
@@ -547,6 +576,9 @@ case "${1:-}" in
           ;;
         --project-root)
           previous="--project-root"
+          ;;
+        --preset)
+          previous="--preset"
           ;;
         *)
           previous=""
@@ -559,6 +591,9 @@ case "${1:-}" in
     ensure_packaged_assets
     if [ "$dry_run_arg" != "yes" ]; then
       install_packaged_assets_to_project "$project_root_arg" "$force_arg"
+    fi
+    if [ "$preset_arg" = "no" ]; then
+      set -- "$@" --preset "$(detect_default_preset "$project_root_arg")"
     fi
     exec "$CONTROL_PANEL" configure "$@"
     ;;

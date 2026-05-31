@@ -9,6 +9,7 @@ import com.devharnesskit.dhk.model.goal.GoalCheck;
 import com.devharnesskit.dhk.model.goal.GoalEvaluation;
 import com.devharnesskit.dhk.model.goal.GoalRun;
 import com.devharnesskit.dhk.service.brief.BriefLifecycleService;
+import com.devharnesskit.dhk.service.goal.GoalCheckPolicy;
 import com.devharnesskit.dhk.service.goal.GoalOrchestrator;
 import com.devharnesskit.dhk.util.JsonOutput;
 import com.devharnesskit.dhk.util.PathUtil;
@@ -214,7 +215,8 @@ public final class GoalVerifyCommand implements Command {
                     || "graph".equals(check)
                     || "impact".equals(check)
                     || "architecture".equals(check)
-                    || "bdd".equals(check)) {
+                    || "bdd".equals(check)
+                    || GoalCheckPolicy.PRE_WORK_FILE_WRITE_CHECK.equals(check)) {
                 selected.add(check);
             }
         }

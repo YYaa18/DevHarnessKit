@@ -98,13 +98,36 @@ public final class DevHarnessConfig {
         return booleanValue("verification.graph.allow_stale_requires_approval", true);
     }
 
+    public boolean preWorkConfirmationRequired() {
+        return booleanValue("workflow.pre_work.confirmation.required", false);
+    }
+
+    public String preWorkConfirmationReason() {
+        return value("workflow.pre_work.confirmation.reason", "项目配置要求实施前确认任务边界和推进顺序。");
+    }
+
     public boolean demoMode() {
-        return booleanValue("verification.demo.enabled", false)
-                || "demo-no-build".equals(preset());
+        return initialProjectMode();
     }
 
     public String demoWarning() {
-        return value("verification.demo.warning", "demo mode does not prove code correctness");
+        return initialProjectWarning();
+    }
+
+    public boolean initialProjectMode() {
+        return booleanValue("verification.initial_project.enabled", false)
+                || booleanValue("verification.demo.enabled", false)
+                || "initial-new-project".equals(preset())
+                || "demo-no-build".equals(preset());
+    }
+
+    public String initialProjectWarning() {
+        String warning = value("verification.initial_project.warning", "");
+        if (warning.length() > 0) {
+            return warning;
+        }
+        return value("verification.demo.warning",
+                "initial project mode does not prove production correctness until real compile/test evidence exists");
     }
 
     public String value(String key, String defaultValue) {

@@ -224,30 +224,186 @@ final class QuickstartCommandIntegrationTest {
     }
 
     @Test
-    void demoNoBuildPresetStartsPatchGoalAndWritesDemoWarning() throws Exception {
+    void initialNewProjectPresetStartsPatchGoalAndWritesInitialProjectWarning() throws Exception {
         Harness quickstart = new Harness(tempDir);
         int exit = new CommandRouter().run(new String[]{
                 "quickstart",
-                "--project-root", "demo-no-build-project",
-                "--preset", "demo-no-build",
-                "--task", "Fix small demo bug",
-                "--module", "demo"
+                "--project-root", "initial-new-project",
+                "--preset", "initial-new-project",
+                "--task", "Create initial project skeleton",
+                "--module", "app"
         }, quickstart.context());
 
-        Path root = tempDir.resolve("demo-no-build-project");
+        Path root = tempDir.resolve("initial-new-project");
         assertEquals(ExitCodes.SUCCESS, exit);
         assertTrue(quickstart.stdout().contains("quickstart: ready"));
-        assertTrue(quickstart.stdout().contains("preset: demo-no-build"));
+        assertTrue(quickstart.stdout().contains("preset: initial-new-project"));
         assertTrue(quickstart.stdout().contains("profile: java-api-patch"));
+        assertTrue(quickstart.stdout().contains("confirmation_required: true"));
+        assertTrue(quickstart.stdout().contains("confirmation_reason: 项目配置要求实施前确认任务边界和推进顺序。"));
 
         String configText = read(PathUtil.devharnessConfig(root));
         assertTrue(configText.contains("\"verification.compile.mode\": \"disabled\""));
         assertTrue(configText.contains("\"verification.test.mode\": \"disabled\""));
-        assertTrue(configText.contains("\"verification.demo.enabled\": \"true\""));
+        assertTrue(configText.contains("\"verification.initial_project.enabled\": \"true\""));
+        assertTrue(configText.contains("\"workflow.pre_work.confirmation.required\": \"true\""));
+        assertFalse(configText.contains("\"verification.demo.enabled\""));
+
+        String workBrief = read(PathUtil.workBrief(root));
+        assertTrue(workBrief.contains("confirmation_required: true"));
+        assertTrue(workBrief.contains("requires_user_confirmation_reason: 项目配置要求实施前确认任务边界和推进顺序。"));
+        assertTrue(workBrief.contains("同意当前任务边界、实施范围和推进顺序"));
+        assertTrue(workBrief.contains("如任务包含分步交付，同意每一步完成后先停下等待确认"));
+        assertTrue(workBrief.contains("了解验证证据可能需要人工、IDE 或替代风险说明"));
+
+        String agentBrief = read(PathUtil.agentBrief(root));
+        assertTrue(agentBrief.contains("\"require_user_confirmation\": true"));
 
         String goalContext = read(PathUtil.goalContext(root));
-        assertTrue(goalContext.contains("<demo-warning>"));
-        assertTrue(goalContext.contains("demo mode does not prove code correctness"));
+        assertTrue(goalContext.contains("<initial-project-warning>"));
+        assertTrue(goalContext.contains("initial project mode does not prove production correctness"));
+    }
+
+    @Test
+    void quickstartRequiresConfirmationForExplicitStepwiseUserIntent() throws Exception {
+        Harness quickstart = new Harness(tempDir);
+        int exit = new CommandRouter().run(new String[]{
+                "quickstart",
+                "--project-root", "stepwise-confirmation-project",
+                "--preset", "springboot-auto-test",
+                "--task", "Implement address validation step-by-step and wait for confirmation after each step",
+                "--module", "address"
+        }, quickstart.context());
+
+        Path root = tempDir.resolve("stepwise-confirmation-project");
+        assertEquals(ExitCodes.SUCCESS, exit);
+        assertTrue(quickstart.stdout().contains("confirmation_required: true"));
+        assertTrue(quickstart.stdout().contains("confirmation_reason: 任务要求分步或确认后推进，需要等待用户确认。"));
+
+        String workBrief = read(PathUtil.workBrief(root));
+        assertTrue(workBrief.contains("confirmation_required: true"));
+        assertTrue(workBrief.contains("同意当前任务边界、实施范围和推进顺序"));
+        assertTrue(workBrief.contains("如任务包含分步交付，同意每一步完成后先停下等待确认"));
+
+        String agentBrief = read(PathUtil.agentBrief(root));
+        assertTrue(agentBrief.contains("\"current_action\": \"wait_for_user_answer\""));
+
+        String goalKey = firstValue(quickstart.stdout(), "goal_key: ");
+        Harness next = new Harness(tempDir);
+        int nextExit = new CommandRouter().run(new String[]{
+                "goal", "next",
+                "--project-root", "stepwise-confirmation-project",
+                "--goal", goalKey
+        }, next.context());
+        assertEquals(ExitCodes.SUCCESS, nextExit);
+        assertTrue(next.stdout().contains("current_action: wait_for_user_answer"));
+        assertTrue(next.stdout().contains("blocking interaction requires user answer"));
+        assertTrue(next.stdout().contains("dhk.sh brief answer --request"));
+
+        String configText = read(PathUtil.devharnessConfig(root));
+        assertTrue(configText.contains("\"workflow.pre_work.confirmation.required\": \"false\""));
+    }
+
+    @Test
+    void preWorkFileWriteCheckFailsWhenBusinessFilesChangeBeforeAnswer() throws Exception {
+        Harness quickstart = new Harness(tempDir);
+        int exit = new CommandRouter().run(new String[]{
+                "quickstart",
+                "--project-root", "pre-work-violation-project",
+                "--preset", "springboot-auto-test",
+                "--task", "Implement address validation step-by-step and wait for confirmation after each step",
+                "--module", "address"
+        }, quickstart.context());
+
+        Path root = tempDir.resolve("pre-work-violation-project");
+        assertEquals(ExitCodes.SUCCESS, exit);
+        String requestId = openPreWorkRequest(root);
+        assertTrue(requestId.length() > 0);
+        Path source = root.resolve("src/main/java/example/App.java");
+        Files.createDirectories(source.getParent());
+        Files.write(source, "package example;\npublic final class App {}\n".getBytes("UTF-8"));
+
+        Harness answer = new Harness(tempDir);
+        int answerExit = new CommandRouter().run(new String[]{
+                "brief", "answer",
+                "--project-root", "pre-work-violation-project",
+                "--request", requestId,
+                "--choice", "按建议继续"
+        }, answer.context());
+        assertEquals(ExitCodes.SUCCESS, answerExit);
+
+        Harness check = new Harness(tempDir);
+        int checkExit = new CommandRouter().run(new String[]{
+                "goal", "check",
+                "--project-root", "pre-work-violation-project",
+                "--goal", firstValue(quickstart.stdout(), "goal_key: "),
+                "--check", "pre-work-file-write"
+        }, check.context());
+
+        assertEquals(ExitCodes.SUCCESS, checkExit);
+        assertTrue(check.stdout().contains("check_key: pre-work-file-write"));
+        assertTrue(check.stdout().contains("status: failed"));
+        assertTrue(check.stdout().contains("pre_work_file_write_violation"));
+    }
+
+    @Test
+    void preWorkFileWriteCheckPassesWhenBusinessFilesChangeAfterAnswer() throws Exception {
+        Harness quickstart = new Harness(tempDir);
+        int exit = new CommandRouter().run(new String[]{
+                "quickstart",
+                "--project-root", "pre-work-allowed-project",
+                "--preset", "springboot-auto-test",
+                "--task", "Implement address validation step-by-step and wait for confirmation after each step",
+                "--module", "address"
+        }, quickstart.context());
+
+        Path root = tempDir.resolve("pre-work-allowed-project");
+        assertEquals(ExitCodes.SUCCESS, exit);
+        String requestId = openPreWorkRequest(root);
+        assertTrue(requestId.length() > 0);
+
+        Harness answer = new Harness(tempDir);
+        int answerExit = new CommandRouter().run(new String[]{
+                "brief", "answer",
+                "--project-root", "pre-work-allowed-project",
+                "--request", requestId,
+                "--choice", "按建议继续"
+        }, answer.context());
+        assertEquals(ExitCodes.SUCCESS, answerExit);
+
+        Path source = root.resolve("src/main/java/example/App.java");
+        Files.createDirectories(source.getParent());
+        Files.write(source, "package example;\npublic final class App {}\n".getBytes("UTF-8"));
+
+        Harness check = new Harness(tempDir);
+        int checkExit = new CommandRouter().run(new String[]{
+                "goal", "check",
+                "--project-root", "pre-work-allowed-project",
+                "--goal", firstValue(quickstart.stdout(), "goal_key: "),
+                "--check", "pre-work-file-write"
+        }, check.context());
+
+        assertEquals(ExitCodes.SUCCESS, checkExit);
+        assertTrue(check.stdout().contains("check_key: pre-work-file-write"));
+        assertTrue(check.stdout().contains("status: passed"));
+        assertTrue(check.stdout().contains("pre-work file write guard passed"));
+    }
+
+    @Test
+    void legacyDemoNoBuildPresetNormalizesToInitialNewProject() throws Exception {
+        Harness quickstart = new Harness(tempDir);
+        int exit = new CommandRouter().run(new String[]{
+                "quickstart",
+                "--project-root", "legacy-initial-project",
+                "--preset", "demo-no-build",
+                "--task", "Create initial project skeleton",
+                "--module", "app"
+        }, quickstart.context());
+
+        assertEquals(ExitCodes.SUCCESS, exit);
+        assertTrue(quickstart.stdout().contains("preset: initial-new-project"));
+        String configText = read(PathUtil.devharnessConfig(tempDir.resolve("legacy-initial-project")));
+        assertTrue(configText.contains("\"preset\": \"initial-new-project\""));
     }
 
     @Test
@@ -273,6 +429,16 @@ final class QuickstartCommandIntegrationTest {
         for (String line : lines) {
             if (line.startsWith(prefix)) {
                 return line.substring(prefix.length()).trim();
+            }
+        }
+        return "";
+    }
+
+    private String openPreWorkRequest(Path root) throws Exception {
+        String[] lines = read(PathUtil.interactionRequests(root)).split("\\r?\\n");
+        for (String line : lines) {
+            if (line.contains("\tpre_work\t") && line.contains("\topen\t")) {
+                return line.split("\\t", -1)[0];
             }
         }
         return "";

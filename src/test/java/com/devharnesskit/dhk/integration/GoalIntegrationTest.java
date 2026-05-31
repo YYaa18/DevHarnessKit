@@ -46,7 +46,8 @@ final class GoalIntegrationTest {
                 "--task", "Implement order query API",
                 "--module", "order",
                 "--mode", "api",
-                "--condition", "compile and focused tests pass"
+                "--condition", "compile and focused tests pass",
+                "--external-ref", "AI-RETRO-2"
         }, start.context());
 
         Path root = tempDir.resolve("demo");
@@ -60,6 +61,7 @@ final class GoalIntegrationTest {
         assertTrue(goalKey.length() > 0);
         assertTrue(start.stdout().contains("workflow_run:"));
         assertTrue(start.stdout().contains("spec_change:"));
+        assertTrue(start.stdout().contains("external_ref: AI-RETRO-2"));
         assertTrue(start.stdout().contains("current_action: inspect_existing_code"));
         assertTrue(Files.isRegularFile(goalContext));
         String initialContext = new String(Files.readAllBytes(goalContext), "UTF-8");
@@ -70,6 +72,7 @@ final class GoalIntegrationTest {
                 "<structured-evidence-fields>", "<required-checks>", "<context-files>",
                 "<completion-blockers>", "<freshness-status>", "<completion-condition>", "<next-command>");
         assertTrue(initialContext.contains("inspect_existing_code"));
+        assertTrue(initialContext.contains("- external_ref: AI-RETRO-2"));
         assertTrue(initialContext.contains("- perform_current_action_only"));
         assertTrue(initialContext.contains("<allowed-commands>"));
         assertTrue(initialContext.contains(".agents/skills/devharness-goal-development/scripts/goal-verify.sh --goal " + goalKey));
@@ -286,6 +289,9 @@ final class GoalIntegrationTest {
         assertSectionOrder(summary, "# GOAL_SUMMARY", "<generated-at>", "<goal>",
                 "<completion-bindings>", "<steps>", "<checks>", "<agent-instructions>");
         assertTrue(summary.contains("- status: completed"));
+        assertTrue(summary.contains("- external_ref: AI-RETRO-2"));
+        assertTrue(summary.contains("- created_at: 2026-05-21T00:00:00Z"));
+        assertTrue(summary.contains("- completed_at: 2026-05-21T00:00:00Z"));
         assertTrue(summary.contains("- workflow_run:"));
         assertTrue(summary.contains("- spec_change:"));
         assertTrue(summary.contains("- workflow_checkpoint_binding: created"));
@@ -319,6 +325,34 @@ final class GoalIntegrationTest {
         assertTrue(auditJson.stdout().contains("\"command\": \"goal audit\""));
         assertTrue(auditJson.stdout().contains("\"status\": \"completed\""));
         assertTrue(auditJson.stdout().contains("\"artifact_passport\": \"present\""));
+
+        Harness retrospective = new Harness(tempDir);
+        int retrospectiveExit = new CommandRouter().run(new String[]{
+                "goal", "retrospective", "--project-root", "demo", "--goal", goalKey
+        }, retrospective.context());
+        assertEquals(ExitCodes.SUCCESS, retrospectiveExit);
+        assertTrue(retrospective.stdout().contains("# GOAL_RETROSPECTIVE"));
+        assertTrue(retrospective.stdout().contains("- external_ref: AI-RETRO-2"));
+        assertTrue(retrospective.stdout().contains("- changed_files: src/main/java/com/devharnesskit/dhk/service/goal/GoalCompletionEvaluator.java"));
+        assertTrue(retrospective.stdout().contains("<checks>"));
+
+        Path retrospectivePath = root.resolve("target/goal-retrospective.md");
+        Harness retrospectiveWrite = new Harness(tempDir);
+        int retrospectiveWriteExit = new CommandRouter().run(new String[]{
+                "goal", "review-summary", "--project-root", "demo", "--goal", goalKey,
+                "--write", retrospectivePath.toString()
+        }, retrospectiveWrite.context());
+        assertEquals(ExitCodes.SUCCESS, retrospectiveWriteExit);
+        assertTrue(retrospectiveWrite.stdout().contains("goal retrospective written"));
+        assertTrue(Files.isRegularFile(retrospectivePath));
+
+        Harness retrospectiveJson = new Harness(tempDir);
+        int retrospectiveJsonExit = new CommandRouter().run(new String[]{
+                "goal", "mr-summary", "--project-root", "demo", "--goal", goalKey, "--json"
+        }, retrospectiveJson.context());
+        assertEquals(ExitCodes.SUCCESS, retrospectiveJsonExit);
+        assertTrue(retrospectiveJson.stdout().contains("\"schema_version\": \"goal-retrospective/v1-alpha\""));
+        assertTrue(retrospectiveJson.stdout().contains("\"external_ref\": \"AI-RETRO-2\""));
 
         Harness recheck = new Harness(tempDir);
         int recheckExit = new CommandRouter().run(new String[]{

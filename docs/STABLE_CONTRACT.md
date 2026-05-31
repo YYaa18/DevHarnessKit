@@ -1,8 +1,9 @@
 # Stable Contract
 
-DevHarness Kit `1.0.0` promotes the smallest documented surface to the
-1.0 stable contract. Anything not listed here is beta-only, experimental, or
-internal.
+DevHarness Kit `1.1.0` preserves the smallest documented stable surface first
+promoted in 1.0 and adds stable-candidate reporting and skill-packaging
+coverage. Anything not listed here is beta-only, experimental, or internal.
+This remains the 1.0 stable contract carried forward under the 1.1 line.
 
 ## Stable Surface
 
@@ -32,7 +33,7 @@ For 1.0 and later, command names, required option names, exit code meanings,
 and the minimum machine-readable fields below should change only under semantic
 versioning and documented deprecation windows.
 
-The current stable artifact is `1.0.0`.
+The current stable artifact is `1.1.0`.
 
 ## Exit Codes
 
@@ -132,6 +133,8 @@ succeeds, and may scan the listed anchors.
 `GOAL_SUMMARY.md`:
 
 - goal identity
+- optional external reference
+- created/completed timestamps
 - final status
 - steps summary
 - checks summary
@@ -141,7 +144,10 @@ succeeds, and may scan the listed anchors.
 
 - `schema_version`
 - `goal_key`
+- `external_ref`
 - `generated_at`
+- `created_at`
+- `completed_at`
 - `artifacts`
 - `checks`
 - `manual_evidence_status`

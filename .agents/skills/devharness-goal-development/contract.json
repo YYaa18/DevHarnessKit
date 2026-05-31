@@ -1,7 +1,7 @@
 {
   "schema_version": "skill-contract/v1",
   "skill_key": "devharness-goal-development",
-  "version": "0.7.1",
+  "version": "0.7.3",
   "task_type": "coding",
   "risk_level": "medium",
   "mode": "strict",
@@ -13,10 +13,18 @@
     "dhk goal resume",
     "dhk goal next",
     "dhk goal step",
+    "dhk goal evidence-template",
+    "dhk goal status",
+    "dhk goal export",
+    "dhk goal check",
+    "dhk goal evaluate",
     "dhk goal verify",
     "dhk goal complete",
     "dhk goal audit",
-    "dhk goal recheck"
+    "dhk goal recheck",
+    "dhk goal retrospective",
+    "dhk goal review-summary",
+    "dhk goal mr-summary"
   ],
   "forbidden_commands": [
     "dhk workflow gate waive",
@@ -31,9 +39,17 @@
     "dhk goal resume",
     "dhk goal next",
     "dhk goal step",
+    "dhk goal evidence-template",
+    "dhk goal status",
+    "dhk goal export",
+    "dhk goal check",
+    "dhk goal evaluate",
     "dhk goal verify",
     "dhk goal complete",
     "dhk goal audit",
-    "dhk goal recheck"
+    "dhk goal recheck",
+    "dhk goal retrospective",
+    "dhk goal review-summary",
+    "dhk goal mr-summary"
   ]
 }

@@ -261,6 +261,17 @@ final class GoalCommandSupport {
         if (command.startsWith("dhk goal complete ")) {
             return GOAL_SCRIPT_DIR + "goal-complete.sh " + command.substring("dhk goal complete ".length());
         }
+        if (command.startsWith("dhk goal retrospective ")) {
+            return GOAL_SCRIPT_DIR + "goal-retrospective.sh "
+                    + command.substring("dhk goal retrospective ".length());
+        }
+        if (command.startsWith("dhk goal review-summary ")) {
+            return GOAL_SCRIPT_DIR + "goal-review-summary.sh "
+                    + command.substring("dhk goal review-summary ".length());
+        }
+        if (command.startsWith("dhk goal mr-summary ")) {
+            return GOAL_SCRIPT_DIR + "goal-mr-summary.sh " + command.substring("dhk goal mr-summary ".length());
+        }
         if (command.startsWith("dhk graph impact ")) {
             return GRAPH_SCRIPT_DIR + "graph-impact.sh " + command.substring("dhk graph impact ".length());
         }

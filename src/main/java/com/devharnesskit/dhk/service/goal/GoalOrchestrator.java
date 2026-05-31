@@ -109,9 +109,16 @@ public final class GoalOrchestrator {
     public GoalStartResult start(CommandContext context, Path projectRoot, String profileKey,
                                  String task, String module, String mode, String condition)
             throws Exception {
+        return start(context, projectRoot, profileKey, task, module, mode, condition, "");
+    }
+
+    public GoalStartResult start(CommandContext context, Path projectRoot, String profileKey,
+                                 String task, String module, String mode, String condition, String externalRef)
+            throws Exception {
         final GoalProfile profile = requireProfile(projectRoot, profileKey);
         final String selectedMode = mode.length() == 0 || "auto".equals(mode) ? profile.defaultMode() : mode;
-        rejectSensitive("goal start", profileKey, task, module, selectedMode, condition);
+        final String workRef = externalRef == null ? "" : externalRef.trim();
+        rejectSensitive("goal start", profileKey, task, module, selectedMode, condition, workRef);
         PathUtil.createMemoryDirectories(projectRoot);
         try (Connection connection = connectionFactory.open(projectRoot)) {
             final Project project = projectService.ensureProject(projectRoot, context.clock());
@@ -140,7 +147,7 @@ public final class GoalOrchestrator {
                                     module, context.clock().now());
                             String firstAction = profile.actions().length == 0 ? "" : profile.actions()[0];
                             GoalRun goal = new GoalRun(goalKey, project.projectKey(), workflowRun.runKey(),
-                                    specChange == null ? "" : specChange.changeKey(), profile.profileKey(),
+                                    specChange == null ? "" : specChange.changeKey(), workRef, profile.profileKey(),
                                     task, module, selectedMode, condition, "context_exporting", firstAction,
                                     30, 0, now, now, "");
                             goalRunRepository.insert(connection, goal);

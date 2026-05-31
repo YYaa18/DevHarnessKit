@@ -1,6 +1,6 @@
 ---
 name: devharness-goal-development
-description: Use DevHarnessKit goal protocol for controlled coding tasks. Strict flow for weaker models and auditable AI development.
+description: Use DevHarnessKit goal protocol for controlled coding tasks, completion review summaries, MR/PR summaries, and retrospective materials.
 ---
 
 # DevHarness Goal Development
@@ -13,7 +13,7 @@ This skill is governed by `contract.json`.
 
 - skill_key: `devharness-goal-development`
 - data_access_level: `context`
-- allowed_commands: `dhk advise`, `dhk quickstart`, `dhk goal start`, `dhk goal resume`, `dhk goal next`, `dhk goal step`, `dhk goal verify`, `dhk goal complete`, `dhk goal audit`, `dhk goal recheck`
+- allowed_commands: `dhk advise`, `dhk quickstart`, `dhk goal start`, `dhk goal resume`, `dhk goal next`, `dhk goal step`, `dhk goal evidence-template`, `dhk goal status`, `dhk goal export`, `dhk goal check`, `dhk goal evaluate`, `dhk goal verify`, `dhk goal complete`, `dhk goal audit`, `dhk goal recheck`, `dhk goal retrospective`, `dhk goal review-summary`, `dhk goal mr-summary`
 - forbidden_commands: `dhk workflow gate waive`, `dhk spec archive`, `dhk memory confirm`, `dhk db sql`
 
 Do not use commands outside this contract unless `GOAL_CONTEXT.md` explicitly authorizes them or the user directly requests them.
@@ -43,6 +43,23 @@ Agent-internal execution still uses the goal protocol:
 6. `goal-verify.sh` runs the readiness checks.
 7. `goal-complete.sh` is allowed only after verification reports
    `ready_to_complete`.
+
+## Retrospective And Review Summaries
+
+Use this skill proactively when the user asks for review material, an MR/PR
+summary, retrospective output, completion recap, "what changed", "what is left",
+or Chinese requests such as "复盘材料", "复盘", "评审摘要", or "合并摘要".
+
+After a goal has recorded meaningful steps and checks, prefer the project-local
+wrapper:
+
+- `scripts/goal-retrospective.sh --goal <goal-key>` for human-readable Markdown.
+- `scripts/goal-retrospective.sh --goal <goal-key> --write <path>` for a shareable file.
+- `scripts/goal-retrospective.sh --goal <goal-key> --json` for automation.
+
+This report is a review artifact, not a substitute for `goal verify` or
+`goal complete`. If the goal is still in progress, clearly label the report as
+in-progress and keep following the active GOAL_CONTEXT action.
 
 The full protocol below keeps weak-model and release-sensitive work auditable.
 
@@ -92,6 +109,10 @@ The full protocol below keeps weak-model and release-sensitive work auditable.
 11. After a goal is completed, use `dhk goal audit --goal <goal>` for read-only
     review and `dhk goal recheck --goal <goal>` to refresh checks without
     reopening the goal.
+12. When the user asks for retrospective, review-summary, MR/PR summary, or
+   复盘 materials, use `scripts/goal-retrospective.sh --goal <goal>` after
+   the goal has enough recorded evidence. Prefer `--write <path>` when the
+   user needs a file they can share.
 
 Use the wrapper scripts instead of composing raw `dhk goal ...` commands; the wrappers pass the repository root even when invoked from a subdirectory. In this repo they live under `.agents/skills/devharness-goal-development/scripts/`.
 

@@ -64,8 +64,8 @@ final class GoalContextExportCoordinator {
 
     private GoalRun withStatus(GoalRun goal, String status, String now) {
         return new GoalRun(goal.goalKey(), goal.projectKey(), goal.workflowRunKey(), goal.specChangeKey(),
-                goal.profileKey(), goal.taskName(), goal.moduleName(), goal.mode(), goal.conditionText(),
-                status, goal.currentAction(), goal.maxSteps(), goal.stepCount(), goal.createdAt(), now,
-                goal.completedAt());
+                goal.externalRef(), goal.profileKey(), goal.taskName(), goal.moduleName(), goal.mode(),
+                goal.conditionText(), status, goal.currentAction(), goal.maxSteps(), goal.stepCount(),
+                goal.createdAt(), now, goal.completedAt());
     }
 }

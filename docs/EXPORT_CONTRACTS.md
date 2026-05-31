@@ -148,10 +148,18 @@ Required section order:
 
 Goal summary is a completion artifact. Sensitive values are redacted before the
 summary is written, and the redacted result is checked again before export.
+The `<goal>` section includes the optional external reference and goal
+created/completed timestamps when available.
 The `<completion-bindings>` section includes `ARTIFACT_PASSPORT.json` and the
 `dhk artifact passport verify` command so release and CI reviewers can audit
 the completion evidence. The passport is evidence metadata, not a substitute
 for human review or correctness proof.
+
+## GOAL_RETROSPECTIVE.md
+
+`dhk goal retrospective --goal <goal>` renders a human-oriented review summary.
+`--write <path>` writes the same content to a caller-chosen file, and `--json`
+uses the additive `goal-retrospective/v1-alpha` reporting schema.
 
 ## BDD_CONTEXT.md
 

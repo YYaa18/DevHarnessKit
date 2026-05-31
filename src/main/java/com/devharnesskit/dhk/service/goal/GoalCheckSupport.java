@@ -6,6 +6,7 @@ import com.devharnesskit.dhk.model.policy.DevHarnessPolicy;
 import com.devharnesskit.dhk.repository.goal.GoalStepRepository;
 import com.devharnesskit.dhk.model.bdd.BddBinding;
 import com.devharnesskit.dhk.service.policy.DevHarnessPolicyService;
+import com.devharnesskit.dhk.util.EvidenceValueParser;
 import com.devharnesskit.dhk.util.PathUtil;
 
 import java.nio.file.Files;
@@ -29,13 +30,8 @@ final class GoalCheckSupport {
         if (steps == null || key == null || key.length() == 0) {
             return "";
         }
-        Pattern pattern = evidencePattern(key);
         for (GoalStep step : steps) {
-            Matcher matcher = pattern.matcher(step.evidence() == null ? "" : step.evidence());
-            String value = "";
-            while (matcher.find()) {
-                value = cleanEvidenceValue(matcher.group(1));
-            }
+            String value = EvidenceValueParser.value(step.evidence(), key);
             if (value.length() > 0) {
                 return value;
             }
@@ -47,31 +43,14 @@ final class GoalCheckSupport {
         if (steps == null || key == null || key.length() == 0) {
             return "";
         }
-        Pattern pattern = evidencePattern(key);
         String latest = "";
         for (GoalStep step : steps) {
-            Matcher matcher = pattern.matcher(step.evidence() == null ? "" : step.evidence());
-            while (matcher.find()) {
-                latest = cleanEvidenceValue(matcher.group(1));
+            String candidate = EvidenceValueParser.value(step.evidence(), key);
+            if (candidate.length() > 0) {
+                latest = candidate;
             }
         }
         return latest;
-    }
-
-    private static Pattern evidencePattern(String key) {
-        return Pattern.compile("(?i)(?:^|[;\\n\\r]|\\s+--field\\s+)\\s*(?:--field\\s+)?"
-                + Pattern.quote(key)
-                + "\\s*=\\s*(.*?)(?=(?:\\s+--field\\s+[A-Za-z0-9_.-]+\\s*=)|[;\\n\\r]|$)");
-    }
-
-    private static String cleanEvidenceValue(String value) {
-        String text = value == null ? "" : value.trim();
-        if (text.length() >= 2
-                && (text.charAt(0) == '"' && text.charAt(text.length() - 1) == '"'
-                || text.charAt(0) == '\'' && text.charAt(text.length() - 1) == '\'')) {
-            return text.substring(1, text.length() - 1).trim();
-        }
-        return text;
     }
 
     static boolean containsEvidenceFlag(List<GoalStep> steps, String key) {

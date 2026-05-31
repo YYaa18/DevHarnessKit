@@ -1,8 +1,8 @@
 # Stable Candidate Contract
 
-DevHarness Kit `1.0.0` promotes the stable-candidate boundary into the first
-stable contract. This document remains as the boundary map so future releases do
-not expand the public promise by accident.
+DevHarness Kit `1.0.0` promoted the stable-candidate boundary into the first
+stable contract. DevHarness Kit `1.1.0` keeps this document as the boundary map
+so future releases do not expand the public promise by accident.
 
 ## Stable Candidate Surface
 
@@ -16,7 +16,10 @@ The first stable-candidate track should be limited to:
 - memory core commands: `init`, `add`, `confirm`, `search`, `export`,
   `checkpoint`, `recover`, and `backup`;
 - goal core commands: `start`, `resume`, `next`, `step`, `status`, `export`,
-  `verify`, `complete`, `audit`, and `recheck`;
+  `verify`, `complete`, `audit`, and `recheck`. Goal retrospective reporting
+  (`retrospective`, `review-summary`, and compatibility alias `mr-summary`) is a
+  stable-candidate reporting surface; its Markdown headings are intended for
+  humans, while `goal-retrospective/v1-alpha` JSON may still grow additively;
 - BDD acceptance commands: `init`, `add`, `scenario create/list/show`, `list`,
   `show`, `export`, `lint`, evidence import, `verify`, `coverage`, and
   traceability bindings for spec, goal, workflow, graph input, and tests;

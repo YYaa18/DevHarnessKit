@@ -23,6 +23,7 @@ final class CommandRouterTest {
         assertTrue(harness.stdout().contains("dhk quickstart"));
         assertTrue(harness.stdout().contains("dhk completion bash|zsh|fish"));
         assertTrue(harness.stdout().contains("dhk goal verify"));
+        assertTrue(harness.stdout().contains("dhk goal retrospective"));
         assertTrue(harness.stdout().contains("dhk bdd init"));
         assertTrue(harness.stdout().contains("dhk bdd scenario create"));
         assertTrue(harness.stdout().contains("dhk bdd bind-workflow"));
@@ -65,9 +66,9 @@ final class CommandRouterTest {
         assertTrue(harness.stdout().contains("release_channel: stable"));
         assertTrue(harness.stdout().contains("stability: stable; Graph Lite is stable-advisory and full governance surfaces remain outside the stable contract"));
         assertTrue(harness.stdout().contains("stable_surface: help,version,doctor,memory-core,goal-core,bdd,configure,status,readiness,advise,quickstart,release-packaging"));
-        assertTrue(harness.stdout().contains("stable_candidate_surface: skill-contract,policy-hooks,routine-report"));
+        assertTrue(harness.stdout().contains("stable_candidate_surface: goal-retrospective,skill-contract,policy-hooks,routine-report"));
         assertTrue(harness.stdout().contains("experimental_surface: graph-aware-goal,skill-governance-full,policy-governance-full,ecc-control-panel,routine"));
-        assertTrue(harness.stdout().contains("schema_version: 15"));
+        assertTrue(harness.stdout().contains("schema_version: 16"));
     }
 
     @Test

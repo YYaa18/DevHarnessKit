@@ -23,11 +23,14 @@ public final class GoalSummaryRenderer {
         builder.append("<generated-at>").append(generatedAt).append("</generated-at>\n\n");
         builder.append("<goal>\n");
         builder.append("- goal_key: ").append(goal.goalKey()).append('\n');
+        builder.append("- external_ref: ").append(emptyValue(goal.externalRef())).append('\n');
         builder.append("- profile: ").append(goal.profileKey()).append('\n');
         builder.append("- task: ").append(goal.taskName()).append('\n');
         builder.append("- module: ").append(goal.moduleName()).append('\n');
         builder.append("- mode: ").append(goal.mode()).append('\n');
         builder.append("- status: completed\n");
+        builder.append("- created_at: ").append(emptyValue(goal.createdAt())).append('\n');
+        builder.append("- completed_at: ").append(emptyValue(completionTime(goal, generatedAt))).append('\n');
         builder.append("- checkpoint_id: ").append(checkpointId).append('\n');
         builder.append("</goal>\n\n");
 
@@ -150,5 +153,9 @@ public final class GoalSummaryRenderer {
 
     private String emptyValue(String value) {
         return value == null || value.length() == 0 ? "none" : value;
+    }
+
+    private String completionTime(GoalRun goal, String generatedAt) {
+        return goal.completedAt().length() == 0 ? generatedAt : goal.completedAt();
     }
 }

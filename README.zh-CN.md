@@ -11,13 +11,14 @@ DevHarness Kit 是一个本地优先的 AI 编程协作工具。它不是让模�
 
 ## 当前状态
 
-DevHarness Kit `1.0.0` 是第一个正式稳定版本。稳定承诺范围刻意收窄：
+DevHarness Kit `1.1.0` 是当前正式稳定版本。稳定承诺范围刻意收窄：
 核心 CLI、memory、goal、status、readiness、configure、brief、BDD 验收证据、
-发布包，以及文档中列出的导出文件锚点。
+发布包，以及文档中列出的导出文件锚点。1.1 版本新增 Goal 复盘材料输出和
+更完整的 Agent skill 打包覆盖，同时保持 1.0 稳定核心兼容。
 
-当前稳定版本：`1.0.0`。
+当前稳定版本：`1.1.0`。
 
-当前 SQLite schema 版本：v15。
+当前 SQLite schema 版本：v16。
 
 准确边界见
 [docs/STABLE_CONTRACT.md](docs/STABLE_CONTRACT.md) 和

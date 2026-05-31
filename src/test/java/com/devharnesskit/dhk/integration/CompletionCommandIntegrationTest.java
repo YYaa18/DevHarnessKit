@@ -59,7 +59,9 @@ final class CompletionCommandIntegrationTest {
         assertEquals(0, advise.subcommands().length);
         assertTrue(CliCommandCatalog.join(advise.options()).contains("--task"));
         assertTrue(CliCommandCatalog.join(goal.subcommands()).contains("verify"));
+        assertTrue(CliCommandCatalog.join(goal.subcommands()).contains("retrospective"));
         assertTrue(CliCommandCatalog.join(goal.options()).contains("--force-new"));
+        assertTrue(CliCommandCatalog.join(goal.options()).contains("--external-ref"));
     }
 
     @Test

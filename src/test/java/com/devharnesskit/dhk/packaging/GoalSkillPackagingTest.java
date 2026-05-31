@@ -37,17 +37,28 @@ final class GoalSkillPackagingTest {
         assertScriptPair(skillRoot, "goal-resume");
         assertScriptPair(skillRoot, "goal-next");
         assertScriptPair(skillRoot, "goal-step");
+        assertScriptPair(skillRoot, "goal-evidence-template");
         assertScriptPair(skillRoot, "goal-check");
         assertScriptPair(skillRoot, "goal-evaluate");
         assertScriptPair(skillRoot, "goal-verify");
         assertScriptPair(skillRoot, "goal-complete");
+        assertScriptPair(skillRoot, "goal-audit");
+        assertScriptPair(skillRoot, "goal-recheck");
         assertScriptPair(skillRoot, "goal-status");
         assertScriptPair(skillRoot, "goal-export");
+        assertScriptPair(skillRoot, "goal-retrospective");
+        assertScriptPair(skillRoot, "goal-review-summary");
+        assertScriptPair(skillRoot, "goal-mr-summary");
 
         String skill = read(skillRoot.resolve("SKILL.md"));
+        String contract = read(skillRoot.resolve("contract.json"));
         assertTrue(skill.contains("## Core Path"));
         assertTrue(skill.contains("## Full Protocol"));
+        assertTrue(skill.contains("## Retrospective And Review Summaries"));
         assertTrue(skill.contains("goal-verify.sh"));
+        assertTrue(skill.contains("goal-retrospective.sh"));
+        assertTrue(skill.contains("review-summary"));
+        assertTrue(skill.contains("复盘材料"));
         assertTrue(skill.contains("Work Brief"));
         assertTrue(skill.contains("AGENT_BRIEF.json"));
         assertTrue(skill.contains("quickstart.sh"));
@@ -62,6 +73,14 @@ final class GoalSkillPackagingTest {
         assertTrue(skill.contains("required evidence keys from GOAL_CONTEXT"));
         assertTrue(skill.contains("Perform only the `current_action`"));
         assertFalse(skill.contains("Do not bypass failed discipline checks"));
+        assertTrue(contract.contains("\"dhk goal retrospective\""));
+        assertTrue(contract.contains("\"dhk goal review-summary\""));
+        assertTrue(contract.contains("\"dhk goal mr-summary\""));
+        assertTrue(contract.contains("\"dhk goal evidence-template\""));
+        assertTrue(contract.contains("\"dhk goal status\""));
+        assertTrue(contract.contains("\"dhk goal export\""));
+        assertTrue(contract.contains("\"dhk goal check\""));
+        assertTrue(contract.contains("\"dhk goal evaluate\""));
 
         assertProjectRootInjection(skillRoot);
         assertQuickstartWrapper(skillRoot);
@@ -69,12 +88,18 @@ final class GoalSkillPackagingTest {
         assertGoalWrapper(skillRoot, "goal-resume", "resume");
         assertGoalWrapper(skillRoot, "goal-next", "next");
         assertGoalWrapper(skillRoot, "goal-step", "step");
+        assertGoalWrapper(skillRoot, "goal-evidence-template", "evidence-template");
         assertGoalWrapper(skillRoot, "goal-check", "check");
         assertGoalWrapper(skillRoot, "goal-evaluate", "evaluate");
         assertGoalWrapper(skillRoot, "goal-verify", "verify");
         assertGoalWrapper(skillRoot, "goal-complete", "complete");
+        assertGoalWrapper(skillRoot, "goal-audit", "audit");
+        assertGoalWrapper(skillRoot, "goal-recheck", "recheck");
         assertGoalWrapper(skillRoot, "goal-status", "status");
         assertGoalWrapper(skillRoot, "goal-export", "export");
+        assertGoalWrapper(skillRoot, "goal-retrospective", "retrospective");
+        assertGoalWrapper(skillRoot, "goal-review-summary", "review-summary");
+        assertGoalWrapper(skillRoot, "goal-mr-summary", "mr-summary");
 
         String protocol = read(skillRoot.resolve("references/goal-protocol.md"));
         String evidence = read(skillRoot.resolve("references/evidence-format.md"));
@@ -82,6 +107,8 @@ final class GoalSkillPackagingTest {
         String selfCheck = read(skillRoot.resolve("references/self-check-format.md"));
         assertTrue(protocol.contains("Use wrapper scripts under `.agents/skills/devharness-goal-development/scripts/`"));
         assertTrue(protocol.contains("Run `goal verify` before final completion"));
+        assertTrue(protocol.contains("goal-retrospective.sh --goal <goal-key>"));
+        assertTrue(protocol.contains("复盘材料"));
         assertTrue(evidence.contains("Mirror required evidence keys exactly"));
         assertTrue(forbidden.contains("direct lower-level `dhk memory ...`"));
         assertTrue(forbidden.contains("`db sql`"));
@@ -290,9 +317,9 @@ final class GoalSkillPackagingTest {
         assertTrue(gate.contains("CURRENT_SCHEMA_VERSION = MigrationRunner"));
         assertTrue(gate.contains("Current schema version is v$SCHEMA_VERSION"));
         assertTrue(gate.contains("Current schema version: \\`$SCHEMA_VERSION\\`"));
-        assertTrue(readme.contains("Current schema version is v15"));
-        assertTrue(compatibility.contains("Current schema version: `15`"));
-        assertTrue(migrations.contains("Current schema version: `15`"));
+        assertTrue(readme.contains("Current schema version is v16"));
+        assertTrue(compatibility.contains("Current schema version: `16`"));
+        assertTrue(migrations.contains("Current schema version: `16`"));
         assertTrue(stableContract.contains("For 1.0 and later"));
         assertTrue(stableContract.contains("under semantic"));
         assertTrue(stableContract.contains("1.0 Boundary Decisions"));

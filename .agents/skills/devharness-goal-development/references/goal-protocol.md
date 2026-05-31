@@ -13,6 +13,11 @@
 11. If `goal verify` is not ready, follow its `next_command`.
 12. Use `goal check --all` plus `goal evaluate` only when debugging readiness.
 13. Run `goal complete` only when `goal verify` returns `ready_to_complete`.
+14. When the user asks for retrospective material, review-summary, MR/PR
+summary, completion recap, or Chinese requests such as "复盘材料" or "评审摘要",
+run `goal-retrospective.sh --goal <goal-key>` after the goal has recorded
+steps/checks. Use `--write <path>` for a shareable Markdown file and `--json`
+for automation.
 
 Use wrapper scripts under `.agents/skills/devharness-goal-development/scripts/` whenever possible. They route through `dhk.sh` and pass the repository root explicitly, so they work from subdirectories.
 

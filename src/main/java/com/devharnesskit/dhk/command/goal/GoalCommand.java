@@ -46,6 +46,15 @@ public final class GoalCommand implements Command {
         commands.put("recheck", new Supplier<Command>() {
             public Command get() { return new GoalRecheckCommand(); }
         });
+        commands.put("retrospective", new Supplier<Command>() {
+            public Command get() { return new GoalRetrospectiveCommand(); }
+        });
+        commands.put("review-summary", new Supplier<Command>() {
+            public Command get() { return new GoalRetrospectiveCommand(); }
+        });
+        commands.put("mr-summary", new Supplier<Command>() {
+            public Command get() { return new GoalRetrospectiveCommand(); }
+        });
         commands.put("complete", new Supplier<Command>() {
             public Command get() { return new GoalCompleteCommand(); }
         });

@@ -10,10 +10,10 @@ import java.sql.SQLException;
 public final class GoalRunRepository {
     public void insert(Connection connection, GoalRun goal) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(
-                "INSERT INTO goal_run(goal_key, project_key, workflow_run_key, spec_change_key, "
+                "INSERT INTO goal_run(goal_key, project_key, workflow_run_key, spec_change_key, external_ref, "
                         + "profile_key, task_name, module_name, mode, condition_text, status, "
                         + "current_action, max_steps, step_count, created_at, updated_at, completed_at) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
             bind(statement, goal);
             statement.executeUpdate();
         }
@@ -98,18 +98,19 @@ public final class GoalRunRepository {
         statement.setString(2, goal.projectKey());
         statement.setString(3, goal.workflowRunKey());
         statement.setString(4, goal.specChangeKey());
-        statement.setString(5, goal.profileKey());
-        statement.setString(6, goal.taskName());
-        statement.setString(7, goal.moduleName());
-        statement.setString(8, goal.mode());
-        statement.setString(9, goal.conditionText());
-        statement.setString(10, goal.status());
-        statement.setString(11, goal.currentAction());
-        statement.setInt(12, goal.maxSteps());
-        statement.setInt(13, goal.stepCount());
-        statement.setString(14, goal.createdAt());
-        statement.setString(15, goal.updatedAt());
-        statement.setString(16, goal.completedAt());
+        statement.setString(5, goal.externalRef());
+        statement.setString(6, goal.profileKey());
+        statement.setString(7, goal.taskName());
+        statement.setString(8, goal.moduleName());
+        statement.setString(9, goal.mode());
+        statement.setString(10, goal.conditionText());
+        statement.setString(11, goal.status());
+        statement.setString(12, goal.currentAction());
+        statement.setInt(13, goal.maxSteps());
+        statement.setInt(14, goal.stepCount());
+        statement.setString(15, goal.createdAt());
+        statement.setString(16, goal.updatedAt());
+        statement.setString(17, goal.completedAt());
     }
 
     private GoalRun map(ResultSet resultSet) throws SQLException {
@@ -118,6 +119,7 @@ public final class GoalRunRepository {
                 resultSet.getString("project_key"),
                 resultSet.getString("workflow_run_key"),
                 resultSet.getString("spec_change_key"),
+                resultSet.getString("external_ref"),
                 resultSet.getString("profile_key"),
                 resultSet.getString("task_name"),
                 resultSet.getString("module_name"),

@@ -32,7 +32,7 @@ public final class HelpCommand implements Command {
         context.out().println("  dhk db test --jdbc-url <url> --user <user> --password-env <env>");
         context.out().println("  dhk db test --host <host> --database <db> [--server-timezone <zone>]");
         context.out().println("  dhk db sql --sql <sql>|--sql-file <path>|--sql-stdin --password-env <env>");
-        context.out().println("  dhk goal start --profile <profile> --task <task> [--module <module>] [--mode <mode>] [--force-new]");
+        context.out().println("  dhk goal start --profile <profile> --task <task> [--module <module>] [--mode <mode>] [--external-ref <ref>] [--force-new]");
         context.out().println("  dhk goal resume [--goal <goal-key>]");
         context.out().println("  dhk goal next [--goal <goal-key>]");
         context.out().println("  dhk goal evidence-template --goal <goal-key>");
@@ -42,6 +42,7 @@ public final class HelpCommand implements Command {
         context.out().println("  dhk goal verify [--goal <goal-key>] [--level fast|standard|release] [--markdown]");
         context.out().println("  dhk goal audit [--goal <goal-key>]");
         context.out().println("  dhk goal recheck [--goal <goal-key>]");
+        context.out().println("  dhk goal retrospective [--goal <goal-key>] [--write <path>|--json]");
         context.out().println("  dhk goal complete [--goal <goal-key>]");
         context.out().println("  dhk goal status [--goal <goal-key>]");
         context.out().println("  dhk goal export [--goal <goal-key>]");

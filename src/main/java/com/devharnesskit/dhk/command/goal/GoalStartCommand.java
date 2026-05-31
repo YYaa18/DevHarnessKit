@@ -30,6 +30,7 @@ public final class GoalStartCommand implements Command {
         }
         String mode = args.option("mode", "auto").trim();
         String condition = args.option("condition", "").trim();
+        String externalRef = args.option("external-ref", args.option("card-ref", "")).trim();
         Path projectRoot = PathUtil.resolveProjectRoot(args, context.workingDirectory());
         try {
             if (!args.hasFlag("force-new")) {
@@ -37,6 +38,7 @@ public final class GoalStartCommand implements Command {
                 if (existing != null) {
                     context.out().println("goal_key: " + existing.goalKey());
                     context.out().println("profile: " + existing.profileKey());
+                    context.out().println("external_ref: " + existing.externalRef());
                     context.out().println("workflow_run: " + existing.workflowRunKey());
                     context.out().println("spec_change: " + existing.specChangeKey());
                     context.out().println("status: " + existing.status());
@@ -49,10 +51,11 @@ public final class GoalStartCommand implements Command {
                 }
             }
             GoalOrchestrator.GoalStartResult result = orchestrator.start(context, projectRoot,
-                    profile, task, module, mode, condition);
+                    profile, task, module, mode, condition, externalRef);
             SpecChange spec = result.specChange();
             context.out().println("goal_key: " + result.goal().goalKey());
             context.out().println("profile: " + result.goal().profileKey());
+            context.out().println("external_ref: " + result.goal().externalRef());
             context.out().println("workflow_run: " + result.workflowRun().runKey());
             context.out().println("spec_change: " + (spec == null ? "" : spec.changeKey()));
             context.out().println("status: " + result.goal().status());

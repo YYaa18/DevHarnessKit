@@ -43,6 +43,27 @@ final class GoalCheckSupportTest {
         assertEquals("GoalCheckSupportTest", GoalCheckSupport.latestEvidenceValue(steps, "test_scope"));
     }
 
+    @Test
+    void evidenceValueDoesNotSplitPlainValuesContainingFieldLikeText() {
+        List<GoalStep> steps = Arrays.asList(
+                step("scope_justification=We set --field inject=false for safety; --field tester=developer"));
+
+        assertEquals("We set --field inject=false for safety",
+                GoalCheckSupport.evidenceValue(steps, "scope_justification"));
+        assertEquals("", GoalCheckSupport.evidenceValue(steps, "inject"));
+        assertEquals("developer", GoalCheckSupport.evidenceValue(steps, "tester"));
+    }
+
+    @Test
+    void evidenceValueKeepsQuotedFieldValuesContainingFieldLikeText() {
+        List<GoalStep> steps = Arrays.asList(step("--field scope_justification=\"We set --field inject=false\" "
+                + "--field tester=developer"));
+
+        assertEquals("We set --field inject=false",
+                GoalCheckSupport.latestEvidenceValue(steps, "scope_justification"));
+        assertEquals("developer", GoalCheckSupport.latestEvidenceValue(steps, "tester"));
+    }
+
     private GoalStep step(String evidence) {
         return new GoalStep(1L, "goal", 1, "verify", "summary", "", evidence,
                 "recorded", "now");

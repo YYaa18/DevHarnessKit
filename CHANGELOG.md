@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.1.0
+
+Stable compatibility release.
+
+- Added Goal retrospective reporting with `dhk goal retrospective` and the
+  compatibility aliases `goal review-summary` and `goal mr-summary`.
+- Added Goal external references through `goal start --external-ref` and
+  `--card-ref`, with `external_ref`, `created_at`, and `completed_at` surfaced
+  in Goal context, summaries, and artifact passports.
+- Added schema v16 for `goal_run.external_ref` and documented the migration.
+- Hardened Goal evidence parsing so embedded `--field key=value` evidence can
+  still be interpreted by generated artifact reports.
+- Expanded the built-in goal-development skill package so agents can discover
+  and proactively use retrospective/review-summary workflows.
+- Added complete goal wrapper coverage for Unix and Windows skill packages, and
+  packaging tests that keep GoalCommand, skill wrappers, and skill contract
+  declarations aligned.
+
 ## 1.0.0
 
 First stable release.

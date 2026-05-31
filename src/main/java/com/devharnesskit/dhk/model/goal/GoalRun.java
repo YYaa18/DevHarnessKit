@@ -5,6 +5,7 @@ public final class GoalRun {
     private final String projectKey;
     private final String workflowRunKey;
     private final String specChangeKey;
+    private final String externalRef;
     private final String profileKey;
     private final String taskName;
     private final String moduleName;
@@ -22,10 +23,20 @@ public final class GoalRun {
                    String profileKey, String taskName, String moduleName, String mode,
                    String conditionText, String status, String currentAction, int maxSteps,
                    int stepCount, String createdAt, String updatedAt, String completedAt) {
+        this(goalKey, projectKey, workflowRunKey, specChangeKey, "", profileKey, taskName,
+                moduleName, mode, conditionText, status, currentAction, maxSteps, stepCount,
+                createdAt, updatedAt, completedAt);
+    }
+
+    public GoalRun(String goalKey, String projectKey, String workflowRunKey, String specChangeKey,
+                   String externalRef, String profileKey, String taskName, String moduleName, String mode,
+                   String conditionText, String status, String currentAction, int maxSteps,
+                   int stepCount, String createdAt, String updatedAt, String completedAt) {
         this.goalKey = value(goalKey);
         this.projectKey = value(projectKey);
         this.workflowRunKey = value(workflowRunKey);
         this.specChangeKey = value(specChangeKey);
+        this.externalRef = value(externalRef);
         this.profileKey = value(profileKey);
         this.taskName = value(taskName);
         this.moduleName = value(moduleName);
@@ -44,6 +55,7 @@ public final class GoalRun {
     public String projectKey() { return projectKey; }
     public String workflowRunKey() { return workflowRunKey; }
     public String specChangeKey() { return specChangeKey; }
+    public String externalRef() { return externalRef; }
     public String profileKey() { return profileKey; }
     public String taskName() { return taskName; }
     public String moduleName() { return moduleName; }

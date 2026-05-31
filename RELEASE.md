@@ -221,7 +221,8 @@ release to be marked as Latest.
 
 Release notes must state:
 
-- DevHarness Kit `1.0.0` is the first stable release.
+- The tagged DevHarness Kit version is a stable release and preserves the 1.0
+  stable contract unless the notes explicitly promote a surface.
 - The current CLI, JSON, export, and schema compatibility contract is in
   `docs/COMPATIBILITY.md`.
 - The stable boundary is in `docs/STABLE_CONTRACT.md` and

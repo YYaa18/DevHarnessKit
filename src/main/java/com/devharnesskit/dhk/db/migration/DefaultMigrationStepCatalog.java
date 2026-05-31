@@ -31,6 +31,7 @@ public final class DefaultMigrationStepCatalog {
         result.add(new V13SkillTrustHardeningMigration());
         result.add(new V14BriefLifecycleSQLiteMigration());
         result.add(new V15KnowledgeCandidateMetadataMigration());
+        result.add(new V16GoalExternalRefMigration());
         return Collections.unmodifiableList(result);
     }
 }

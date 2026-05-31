@@ -101,6 +101,12 @@ Stable-candidate governance command surface:
 - `dhk skill score`
 - `dhk skill report`
 
+Stable-candidate reporting command surface:
+
+- `dhk goal retrospective`
+- `dhk goal review-summary`
+- `dhk goal mr-summary`
+
 Stable-candidate package script entrypoints:
 
 - `install.sh`
@@ -246,7 +252,7 @@ with the matching CLI version.
 
 ## SQLite Schema Contract
 
-Current schema version: `15`.
+Current schema version: `16`.
 
 The SQLite database is an internal storage format, not a public write API.
 Users may rely on these operational guarantees:

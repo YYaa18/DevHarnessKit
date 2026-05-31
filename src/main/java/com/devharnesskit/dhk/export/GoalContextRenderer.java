@@ -90,6 +90,9 @@ public final class GoalContextRenderer {
         builder.append("<generated-at>").append(generatedAt).append("</generated-at>\n\n");
         builder.append("<goal>\n");
         builder.append("- goal_key: ").append(goal.goalKey()).append('\n');
+        if (goal.externalRef().length() > 0) {
+            builder.append("- external_ref: ").append(goal.externalRef()).append('\n');
+        }
         builder.append("- profile: ").append(goal.profileKey()).append('\n');
         builder.append("- task: ").append(goal.taskName()).append('\n');
         builder.append("- module: ").append(goal.moduleName()).append('\n');

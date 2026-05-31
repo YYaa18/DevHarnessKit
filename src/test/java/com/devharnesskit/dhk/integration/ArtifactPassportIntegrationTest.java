@@ -45,7 +45,8 @@ final class ArtifactPassportIntegrationTest {
                 "implementation_summary=Generated artifact passport on completion; "
                         + "rollback_plan=Revert passport renderer and complete hook");
         recordStep("demo-passport", goalKey, "Verified passport", "",
-                "compile_result=passed; test_result=passed; sensitive_result=passed");
+                "compile_result=passed; test_result=passed; sensitive_result=passed; "
+                        + "--field manual_evidence_status=\"passed\"");
 
         Harness verify = new Harness(tempDir);
         int verifyExit = new CommandRouter().run(new String[]{
@@ -72,6 +73,9 @@ final class ArtifactPassportIntegrationTest {
         Path summaryPath = PathUtil.goalSummary(root);
         assertTrue(Files.isRegularFile(summaryPath));
         String summary = new String(Files.readAllBytes(summaryPath), "UTF-8");
+        assertTrue(summary.contains("- external_ref: AI-RETRO-1"));
+        assertTrue(summary.contains("- created_at: 2026-01-01T00:00:00Z"));
+        assertTrue(summary.contains("- completed_at: 2026-01-01T00:00:00Z"));
         assertTrue(summary.contains("- artifact_passport: ARTIFACT_PASSPORT.json"));
         assertTrue(summary.contains("dhk artifact passport verify --path .agents/memory/exports/ARTIFACT_PASSPORT.json"));
 
@@ -80,10 +84,14 @@ final class ArtifactPassportIntegrationTest {
         String passport = new String(Files.readAllBytes(passportPath), "UTF-8");
         assertTrue(passport.contains("\"schema_version\": \"artifact-passport/v1-alpha\""));
         assertTrue(passport.contains("\"goal_key\": \"" + goalKey + "\""));
+        assertTrue(passport.contains("\"external_ref\": \"AI-RETRO-1\""));
+        assertTrue(passport.contains("\"created_at\": \"2026-01-01T00:00:00Z\""));
+        assertTrue(passport.contains("\"completed_at\": \"2026-01-01T00:00:00Z\""));
         assertTrue(passport.contains("\"checks\""));
         assertTrue(passport.contains("\"check_key\": \"sensitive\""));
         assertTrue(passport.contains("\"steps\""));
         assertTrue(passport.contains("\"rollback_plan\": \"Revert passport renderer and complete hook\""));
+        assertTrue(passport.contains("\"manual_evidence_status\": \"passed\""));
         assertTrue(passport.contains("\"goal_summary\""));
         assertTrue(passport.contains("\"artifact_passport\""));
         assertEquals(1, countRows(root, "goal_artifact",
@@ -189,7 +197,8 @@ final class ArtifactPassportIntegrationTest {
                 "--task", "Generate artifact passport",
                 "--module", "artifact",
                 "--mode", "api",
-                "--condition", "sensitive check passes"
+                "--condition", "sensitive check passes",
+                "--external-ref", "AI-RETRO-1"
         }, start.context());
         assertEquals(ExitCodes.SUCCESS, exit);
         return firstValue(start.stdout(), "goal_key: ");

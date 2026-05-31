@@ -5,14 +5,13 @@ import com.devharnesskit.dhk.model.goal.GoalGraphArtifacts;
 import com.devharnesskit.dhk.model.goal.GoalProfile;
 import com.devharnesskit.dhk.model.goal.GoalRun;
 import com.devharnesskit.dhk.model.goal.GoalStep;
+import com.devharnesskit.dhk.util.EvidenceValueParser;
 import com.devharnesskit.dhk.util.JsonOutput;
 import com.devharnesskit.dhk.util.PathUtil;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public final class ArtifactPassportRenderer {
     public String render(Path projectRoot, GoalRun goal, GoalProfile profile,
@@ -23,8 +22,9 @@ public final class ArtifactPassportRenderer {
         return JsonOutput.object(
                 JsonOutput.stringField("schema_version", "artifact-passport/v1-alpha"),
                 JsonOutput.stringField("generated_at", generatedAt),
-                JsonOutput.rawField("goal", goalObject(goal, checkpointId)),
-                JsonOutput.rawField("completion", completionObject(goal, checkpointId, summaryPath, passportPath)),
+                JsonOutput.rawField("goal", goalObject(goal, checkpointId, generatedAt)),
+                JsonOutput.rawField("completion", completionObject(goal, checkpointId, generatedAt,
+                        summaryPath, passportPath)),
                 JsonOutput.rawField("checks", checksArray(checks)),
                 JsonOutput.rawField("steps", stepsArray(steps)),
                 JsonOutput.rawField("evidence", evidenceObject(steps, checks)),
@@ -35,22 +35,27 @@ public final class ArtifactPassportRenderer {
         );
     }
 
-    private String goalObject(GoalRun goal, long checkpointId) {
+    private String goalObject(GoalRun goal, long checkpointId, String generatedAt) {
         return JsonOutput.object(
                 JsonOutput.stringField("goal_key", goal.goalKey()),
+                JsonOutput.stringField("external_ref", goal.externalRef()),
                 JsonOutput.stringField("profile", goal.profileKey()),
                 JsonOutput.stringField("task", goal.taskName()),
                 JsonOutput.stringField("module", goal.moduleName()),
                 JsonOutput.stringField("mode", goal.mode()),
+                JsonOutput.stringField("created_at", goal.createdAt()),
+                JsonOutput.stringField("completed_at", completionTime(goal, generatedAt)),
                 JsonOutput.stringField("workflow_run", goal.workflowRunKey()),
                 JsonOutput.stringField("spec_change", goal.specChangeKey()),
                 JsonOutput.numberField("checkpoint_id", checkpointId)
         ).trim();
     }
 
-    private String completionObject(GoalRun goal, long checkpointId, Path summaryPath, Path passportPath) {
+    private String completionObject(GoalRun goal, long checkpointId, String generatedAt,
+                                    Path summaryPath, Path passportPath) {
         return JsonOutput.object(
                 JsonOutput.stringField("status", "completed"),
+                JsonOutput.stringField("completed_at", completionTime(goal, generatedAt)),
                 JsonOutput.stringField("workflow_run", goal.workflowRunKey()),
                 JsonOutput.stringField("spec_change", goal.specChangeKey()),
                 JsonOutput.numberField("checkpoint_id", checkpointId),
@@ -202,14 +207,11 @@ public final class ArtifactPassportRenderer {
     }
 
     private String evidenceValue(String evidence, String key) {
-        Pattern pattern = Pattern.compile("(?i)(?:^|[;\\n\\r])\\s*" + Pattern.quote(key)
-                + "\\s*=\\s*([^;\\n\\r]+)");
-        Matcher matcher = pattern.matcher(evidence == null ? "" : evidence);
-        String value = "";
-        while (matcher.find()) {
-            value = matcher.group(1).trim();
-        }
-        return value;
+        return EvidenceValueParser.value(evidence, key);
+    }
+
+    private String completionTime(GoalRun goal, String generatedAt) {
+        return firstNonEmpty(goal.completedAt(), generatedAt);
     }
 
     private String firstNonEmpty(String first, String second) {

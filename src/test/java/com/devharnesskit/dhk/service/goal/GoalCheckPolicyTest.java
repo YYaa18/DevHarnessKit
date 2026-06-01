@@ -4,6 +4,7 @@ import com.devharnesskit.dhk.model.goal.GoalProfile;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -46,5 +47,17 @@ final class GoalCheckPolicyTest {
                 .contains(GoalCheckPolicy.PRE_WORK_FILE_WRITE_CHECK));
         assertTrue(policy.accepts(GoalCheckPolicy.PRE_WORK_FILE_WRITE_CHECK, "passed", patch));
         assertFalse(policy.accepts(GoalCheckPolicy.PRE_WORK_FILE_WRITE_CHECK, "failed", patch));
+    }
+
+    @Test
+    void preWorkFileWriteGuardRunsBeforeSpecSoSpecCanDependOnAllChecks() {
+        GoalCheckPolicy policy = GoalCheckPolicy.defaults();
+        GoalProfile strict = new GoalProfileService().find("java-api-change");
+
+        List<String> checks = Arrays.asList(policy.requiredChecks(strict));
+
+        assertTrue(checks.indexOf(GoalCheckPolicy.PRE_WORK_FILE_WRITE_CHECK) >= 0);
+        assertTrue(checks.indexOf("spec") >= 0);
+        assertTrue(checks.indexOf(GoalCheckPolicy.PRE_WORK_FILE_WRITE_CHECK) < checks.indexOf("spec"));
     }
 }

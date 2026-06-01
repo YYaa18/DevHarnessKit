@@ -76,6 +76,7 @@ contracts, experimental surfaces, release material, and historical design notes.
 
 ## Release Notes
 
+- [v1.1.1](releases/v1.1.1.md)
 - [v1.1.0](releases/v1.1.0.md)
 - [v1.0.0](releases/v1.0.0.md)
 - [v0.4.6-beta.1](releases/v0.4.6-beta.1.md)

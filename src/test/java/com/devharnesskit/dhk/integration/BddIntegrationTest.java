@@ -773,7 +773,7 @@ final class BddIntegrationTest {
         assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
                 "goal", "check", "--project-root", "demo",
                 "--goal", goalKey,
-                "--check", "bdd"
+                "--all"
         }, new Harness(tempDir).context()));
         Harness complete = new Harness(tempDir);
         int completeExit = new CommandRouter().run(new String[]{

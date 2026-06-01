@@ -1937,7 +1937,7 @@ final class GoalIntegrationTest {
         assertEquals(ExitCodes.SUCCESS, staleEvaluateExit);
         assertTrue(staleEvaluate.stdout().contains("\"decision\": \"not_ready\""));
         assertTrue(staleEvaluate.stdout().contains("check sensitive is stale: checked_at_step=1 current_step=2"));
-        assertTrue(staleEvaluate.stdout().contains("\"stale_count\": 1"));
+        assertTrue(staleEvaluate.stdout().contains("\"stale_count\": 2"));
         assertTrue(staleEvaluate.stdout().contains("\"sensitive\""));
         assertTrue(staleEvaluate.stdout().contains("\"next_command\": \"dhk goal check --goal " + goalKey
                 + " --check sensitive\""));
@@ -1948,7 +1948,7 @@ final class GoalIntegrationTest {
         }, staleComplete.context());
         assertEquals(ExitCodes.VALIDATION_ERROR, staleCompleteExit);
         assertTrue(staleComplete.stdout().contains("\"status\": \"not_ready\""));
-        assertTrue(staleComplete.stdout().contains("\"stale_count\": 1"));
+        assertTrue(staleComplete.stdout().contains("\"stale_count\": 2"));
 
         Harness verifyFresh = new Harness(tempDir);
         int verifyFreshExit = new CommandRouter().run(new String[]{
@@ -1957,7 +1957,7 @@ final class GoalIntegrationTest {
         assertEquals(ExitCodes.SUCCESS, verifyFreshExit);
         assertTrue(verifyFresh.stdout().contains("\"command\": \"goal verify\""));
         assertTrue(verifyFresh.stdout().contains("\"decision\": \"ready_to_complete\""));
-        assertTrue(verifyFresh.stdout().contains("\"check_count\": 1"));
+        assertTrue(verifyFresh.stdout().contains("\"check_count\": 2"));
         assertTrue(verifyFresh.stdout().contains("\"stale_count\": 0"));
 
         Harness freshCheck = new Harness(tempDir);
@@ -2050,7 +2050,7 @@ final class GoalIntegrationTest {
         assertEquals(ExitCodes.SUCCESS, staleEvaluateExit);
         assertTrue(staleEvaluate.stdout().contains("\"decision\": \"not_ready\""));
         assertTrue(staleEvaluate.stdout().contains("check sensitive is stale: workspace fingerprint changed"));
-        assertTrue(staleEvaluate.stdout().contains("\"stale_count\": 1"));
+        assertTrue(staleEvaluate.stdout().contains("\"stale_count\": 2"));
 
         Harness staleComplete = new Harness(tempDir);
         int staleCompleteExit = new CommandRouter().run(new String[]{
@@ -2154,8 +2154,9 @@ final class GoalIntegrationTest {
                 "goal", "check", "--project-root", "demo", "--goal", goalKey, "--all", "--json"
         }, check.context());
         assertEquals(ExitCodes.SUCCESS, checkExit);
-        assertTrue(check.stdout().contains("\"count\": 1"));
+        assertTrue(check.stdout().contains("\"count\": 2"));
         assertTrue(check.stdout().contains("\"check_key\": \"sensitive\""));
+        assertTrue(check.stdout().contains("\"check_key\": \"pre-work-file-write\""));
         assertTrue(check.stdout().contains("\"step_count_at_check\": 2"));
         assertFalse(check.stdout().contains("\"check_key\": \"compile\""));
 
@@ -3055,9 +3056,10 @@ final class GoalIntegrationTest {
         assertTrue(completeNotReadyJson.stdout().contains("\"command\": \"goal complete\""));
         assertTrue(completeNotReadyJson.stdout().contains("\"status\": \"not_ready\""));
         assertTrue(completeNotReadyJson.stdout().contains("\"ready_to_complete\": false"));
-        assertTrue(completeNotReadyJson.stdout().contains("\"missing_count\": 2"));
+        assertTrue(completeNotReadyJson.stdout().contains("\"missing_count\": 3"));
         assertTrue(completeNotReadyJson.stdout().contains("goal steps incomplete: expected 2 actions, recorded 0"));
         assertTrue(completeNotReadyJson.stdout().contains("check sensitive is pending"));
+        assertTrue(completeNotReadyJson.stdout().contains("check pre-work-file-write is pending"));
 
         Harness statusJson = new Harness(tempDir);
         int statusExit = new CommandRouter().run(new String[]{
@@ -3072,8 +3074,9 @@ final class GoalIntegrationTest {
                 "goal", "check", "--project-root", "demo", "--goal", goalKey, "--all", "--json"
         }, checkJson.context());
         assertEquals(ExitCodes.SUCCESS, checkExit);
-        assertTrue(checkJson.stdout().contains("\"count\": 1"));
+        assertTrue(checkJson.stdout().contains("\"count\": 2"));
         assertTrue(checkJson.stdout().contains("\"check_key\": \"sensitive\""));
+        assertTrue(checkJson.stdout().contains("\"check_key\": \"pre-work-file-write\""));
         assertTrue(checkJson.stdout().contains("\"step_count_at_check\": 0"));
 
         Harness evaluateBeforeStepsJson = new Harness(tempDir);
@@ -3607,8 +3610,8 @@ final class GoalIntegrationTest {
     private void assertCompletedRows(Path root, String goalKey) throws Exception {
         try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(root));
              Statement statement = connection.createStatement()) {
-            assertEquals(5, count(statement, "SELECT COUNT(*) FROM goal_check WHERE goal_key = '" + goalKey + "'"));
-            assertEquals(5, count(statement, "SELECT COUNT(*) FROM goal_check WHERE goal_key = '" + goalKey
+            assertEquals(6, count(statement, "SELECT COUNT(*) FROM goal_check WHERE goal_key = '" + goalKey + "'"));
+            assertEquals(6, count(statement, "SELECT COUNT(*) FROM goal_check WHERE goal_key = '" + goalKey
                     + "' AND step_count_at_check = 4"));
             assertEquals(1, count(statement, "SELECT COUNT(*) FROM checkpoint"));
             assertEquals(1, count(statement, "SELECT COUNT(*) FROM goal_run WHERE goal_key = '" + goalKey + "' AND status = 'completed'"));

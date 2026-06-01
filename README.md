@@ -12,13 +12,14 @@ verification status, and a local recovery trail.
 
 ## Status
 
-DevHarness Kit `1.1.0` is the current stable release. The stable contract is
+DevHarness Kit `1.1.1` is the current stable release. The stable contract is
 intentionally narrow: core CLI, memory, goal, status, readiness, configure,
 brief, BDD acceptance evidence, release packaging, and documented
-generated-export anchors. The 1.1 line adds goal retrospective reporting and
-stronger agent skill packaging coverage while preserving the 1.0 stable core.
+generated-export anchors. The 1.1 line adds goal retrospective reporting,
+stronger agent skill packaging coverage, and safer pre-work confirmation guards
+while preserving the 1.0 stable core.
 
-Current stable release: `1.1.0`.
+Current stable release: `1.1.1`.
 
 Current schema version is v16.
 

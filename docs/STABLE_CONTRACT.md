@@ -1,6 +1,6 @@
 # Stable Contract
 
-DevHarness Kit `1.1.0` preserves the smallest documented stable surface first
+DevHarness Kit `1.1.1` preserves the smallest documented stable surface first
 promoted in 1.0 and adds stable-candidate reporting and skill-packaging
 coverage. Anything not listed here is beta-only, experimental, or internal.
 This remains the 1.0 stable contract carried forward under the 1.1 line.
@@ -33,7 +33,7 @@ For 1.0 and later, command names, required option names, exit code meanings,
 and the minimum machine-readable fields below should change only under semantic
 versioning and documented deprecation windows.
 
-The current stable artifact is `1.1.0`.
+The current stable artifact is `1.1.1`.
 
 ## Exit Codes
 

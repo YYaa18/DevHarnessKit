@@ -398,9 +398,13 @@ public final class GoalCheckPolicy {
     private String[] withPreWorkFileWriteCheck(String[] checks) {
         java.util.LinkedHashSet<String> merged = new java.util.LinkedHashSet<String>();
         for (String check : checks) {
-            if (check != null && check.length() > 0) {
-                merged.add(check);
+            if (check == null || check.length() == 0) {
+                continue;
             }
+            if ("spec".equals(check)) {
+                merged.add(PRE_WORK_FILE_WRITE_CHECK);
+            }
+            merged.add(check);
         }
         merged.add(PRE_WORK_FILE_WRITE_CHECK);
         return merged.toArray(new String[merged.size()]);

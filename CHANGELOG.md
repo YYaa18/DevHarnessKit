@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.1.1
+
+Stable patch release.
+
+- Published a fresh installable package from the latest main branch after the
+  v1.1.0 tag.
+- Added targeted `EvidenceValueParser` unit coverage for plain fields,
+  embedded `--field key=value` fragments, quoted values, escaped values,
+  duplicate keys, and empty input.
+- Improved installer guidance and the Chinese end-to-end acceptance plan for
+  colleague onboarding.
+- Hardened Work Brief / Agent Brief pre-work confirmation behavior so agents
+  wait for explicit confirmation before writing business files, and added the
+  `pre-work-file-write` release check.
+- Kept the v1.1 stable surface compatible; this release does not promote DB
+  inspection beyond beta.
+
 ## 1.1.0
 
 Stable compatibility release.

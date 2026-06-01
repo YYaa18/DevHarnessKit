@@ -1,7 +1,7 @@
 # Stable Candidate Contract
 
 DevHarness Kit `1.0.0` promoted the stable-candidate boundary into the first
-stable contract. DevHarness Kit `1.1.0` keeps this document as the boundary map
+stable contract. DevHarness Kit `1.1.1` keeps this document as the boundary map
 so future releases do not expand the public promise by accident.
 
 ## Stable Candidate Surface

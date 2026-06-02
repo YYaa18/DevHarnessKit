@@ -29,6 +29,15 @@ public final class HelpCommand implements Command {
         context.out().println("  dhk memory checkpoint --task <task> --summary <summary>|--summary-file <path>|--summary-stdin");
         context.out().println("  dhk memory recover --latest");
         context.out().println("  dhk memory backup [--out <path>]");
+        context.out().println("  dhk memory suggest --title <title> --content <content>|--content-file <path>|--content-stdin");
+        context.out().println("  dhk memory candidates list|accept|reject [--id <id>] [--json]");
+        context.out().println("  dhk memory dedupe [--module <module>] [--json]");
+        context.out().println("  dhk memory conflicts [--module <module>] [--json]");
+        context.out().println("  dhk memory supersede --old <id> --new <id> --reason <reason>");
+        context.out().println("  dhk memory stale scan [--module <module>] [--json]");
+        context.out().println("  dhk memory expire --id <id> --reason <reason>");
+        context.out().println("  dhk memory refresh --id <id> --evidence <text>|--evidence-file <path>|--evidence-stdin");
+        context.out().println("  dhk memory pack create --out <zip> | inspect --path <zip> | import --path <zip> --as-draft");
         context.out().println("  dhk db test --jdbc-url <url> --user <user> --password-env <env>");
         context.out().println("  dhk db test --host <host> --database <db> [--server-timezone <zone>]");
         context.out().println("  dhk db sql --sql <sql>|--sql-file <path>|--sql-stdin --password-env <env>");

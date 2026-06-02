@@ -13,9 +13,13 @@ final class GeneratedHashMaskerTest {
     void masksPhoneLikeGeneratedFingerprintsBeforeSensitiveScan() {
         String fingerprint = "current_workspace_fingerprint: "
                 + "git:f16753764299f196e99a06ab14fe95281bb27e7686390ee881e1afa7c24d38fe";
+        String rawFingerprint = "check_fingerprint: "
+                + "abcdef13800138000abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdef";
 
         assertTrue(guard.containsSensitiveData(fingerprint));
         assertFalse(guard.containsSensitiveData(GeneratedHashMasker.mask(fingerprint)));
+        assertTrue(guard.containsSensitiveData(rawFingerprint));
+        assertFalse(guard.containsSensitiveData(GeneratedHashMasker.mask(rawFingerprint)));
     }
 
     @Test

@@ -11,15 +11,15 @@ DevHarness Kit 是一个本地优先的 AI 编程协作工具。它不是让模�
 
 ## 当前状态
 
-DevHarness Kit `1.1.1` 是当前正式稳定版本。稳定承诺范围刻意收窄：
+DevHarness Kit `1.2.0` 是当前正式稳定版本。稳定承诺范围刻意收窄：
 核心 CLI、memory、goal、status、readiness、configure、brief、BDD 验收证据、
-发布包，以及文档中列出的导出文件锚点。1.1 版本新增 Goal 复盘材料输出、
-更完整的 Agent skill 打包覆盖和更安全的开工前确认保护，同时保持 1.0
-稳定核心兼容。
+发布包，以及文档中列出的导出文件锚点。1.2 版本新增 CLI 优先的 memory
+质量治理能力：候选队列、去重/冲突检查、过期治理、可解释检索排序和团队
+memory pack，同时保持 1.0 稳定核心兼容。
 
-当前稳定版本：`1.1.1`。
+当前稳定版本：`1.2.0`。
 
-当前 SQLite schema 版本：v16。
+当前 SQLite schema 版本：v17。
 
 准确边界见
 [docs/STABLE_CONTRACT.md](docs/STABLE_CONTRACT.md) 和
@@ -83,6 +83,9 @@ DevHarness Kit 可以把一个用户需求变成 Work Brief 和 Goal。Goal 会�
 - 项目约定可以跨会话复用；
 - 上下文压缩后也能恢复；
 - 未确认的草稿记忆不会进入默认上下文；
+- 记忆候选可以先审核，再进入草稿记忆；
+- 重复、冲突、过期和被替代的事实可以被发现；
+- 团队 memory pack 会以草稿导入，方便新同事复核；
 - 中断后可以通过恢复文件继续工作。
 
 ### 让验证证据更清楚

@@ -15,6 +15,12 @@ Use `--json` for command status output. Use `--format json` only where a command
 ```bash
 dhk doctor --json
 dhk memory search --q gateway --json
+dhk memory suggest --title "Rule" --content "..." --json
+dhk memory candidates list --json
+dhk memory dedupe --json
+dhk memory conflicts --json
+dhk memory stale scan --json
+dhk memory pack inspect --path team-memory.zip --json
 dhk memory export --task "Order API" --module order --json
 dhk db test --jdbc-url <url> --user <user> --password-env <env> --json
 dhk db sql --dry-run --sql "SELECT 1" --json
@@ -129,9 +135,70 @@ tags
 content
 match
 score
+explanation
 ```
 
-The `match` field lists the weighted fields that contributed to the score, such as `tags`, `title`, `content`, `fts`, `module`, and confidence/status hints.
+The `match` field lists the weighted fields that contributed to the score, such as `tags`, `title`, `content`, `fts`, `module`, and confidence/status hints. When `--explain` is set, `explanation` includes additive score components and penalties such as `tags:+8`, `verified:+1`, `stale:-8`, or `superseded:-12`.
+
+`memory suggest`:
+
+```text
+command
+candidate_id
+status
+fingerprint
+canonical_key
+```
+
+`memory candidates list`:
+
+```text
+command
+status
+limit
+count
+items
+```
+
+Each item includes:
+
+```text
+candidate_id
+title
+status
+module
+type
+confidence
+content
+accepted_memory_id
+```
+
+`memory dedupe` and `memory conflicts`:
+
+```text
+command
+module
+group_count
+groups
+```
+
+`memory stale scan`:
+
+```text
+command
+module
+stale_count
+items
+```
+
+`memory pack inspect`:
+
+```text
+command
+schema_version
+item_count
+checksum_ok
+```
 
 `memory export`:
 

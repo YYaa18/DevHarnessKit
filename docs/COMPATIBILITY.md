@@ -37,6 +37,26 @@ Stable core:
 - `dhk memory recover`
 - `dhk memory backup`
 
+Stable-candidate memory quality command surface:
+
+- `dhk memory suggest`
+- `dhk memory candidates list`
+- `dhk memory candidates accept`
+- `dhk memory candidates reject`
+- `dhk memory dedupe`
+- `dhk memory conflicts`
+- `dhk memory supersede`
+- `dhk memory stale scan`
+- `dhk memory expire`
+- `dhk memory refresh`
+- `dhk memory pack create`
+- `dhk memory pack inspect`
+- `dhk memory pack import`
+
+These commands are CLI-first governance helpers around stable memory core. They
+do not make the SQLite schema public, do not auto-confirm memory, and team pack
+imports default to draft review.
+
 Stable:
 
 - `dhk configure init`
@@ -252,7 +272,7 @@ with the matching CLI version.
 
 ## SQLite Schema Contract
 
-Current schema version: `16`.
+Current schema version: `17`.
 
 The SQLite database is an internal storage format, not a public write API.
 Users may rely on these operational guarantees:

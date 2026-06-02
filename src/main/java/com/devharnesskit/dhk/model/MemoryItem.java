@@ -22,12 +22,30 @@ public final class MemoryItem {
     private final String updatedAt;
     private final String lastUsedAt;
     private final int useCount;
+    private final String fingerprint;
+    private final String canonicalKey;
+    private final long supersededBy;
+    private final String staleReason;
+    private final String lastVerifiedAt;
+    private final String sourceRef;
 
     public MemoryItem(long id, String projectKey, String moduleName, String memoryType, String scope,
                       String title, String content, String tags, String status, int confidence,
                       String sourceKind, String confirmedAt, String confirmedBy, String sourceFiles,
                       String evidence, String effectiveFrom, String effectiveTo, String createdAt,
                       String updatedAt, String lastUsedAt, int useCount) {
+        this(id, projectKey, moduleName, memoryType, scope, title, content, tags, status, confidence,
+                sourceKind, confirmedAt, confirmedBy, sourceFiles, evidence, effectiveFrom, effectiveTo,
+                createdAt, updatedAt, lastUsedAt, useCount, "", "", 0L, "", "", "");
+    }
+
+    public MemoryItem(long id, String projectKey, String moduleName, String memoryType, String scope,
+                      String title, String content, String tags, String status, int confidence,
+                      String sourceKind, String confirmedAt, String confirmedBy, String sourceFiles,
+                      String evidence, String effectiveFrom, String effectiveTo, String createdAt,
+                      String updatedAt, String lastUsedAt, int useCount, String fingerprint,
+                      String canonicalKey, long supersededBy, String staleReason, String lastVerifiedAt,
+                      String sourceRef) {
         this.id = id;
         this.projectKey = value(projectKey);
         this.moduleName = value(moduleName);
@@ -49,6 +67,12 @@ public final class MemoryItem {
         this.updatedAt = value(updatedAt);
         this.lastUsedAt = value(lastUsedAt);
         this.useCount = useCount;
+        this.fingerprint = value(fingerprint);
+        this.canonicalKey = value(canonicalKey);
+        this.supersededBy = supersededBy;
+        this.staleReason = value(staleReason);
+        this.lastVerifiedAt = value(lastVerifiedAt);
+        this.sourceRef = value(sourceRef);
     }
 
     public long id() {
@@ -133,6 +157,30 @@ public final class MemoryItem {
 
     public int useCount() {
         return useCount;
+    }
+
+    public String fingerprint() {
+        return fingerprint;
+    }
+
+    public String canonicalKey() {
+        return canonicalKey;
+    }
+
+    public long supersededBy() {
+        return supersededBy;
+    }
+
+    public String staleReason() {
+        return staleReason;
+    }
+
+    public String lastVerifiedAt() {
+        return lastVerifiedAt;
+    }
+
+    public String sourceRef() {
+        return sourceRef;
     }
 
     public String summary(int maxChars) {

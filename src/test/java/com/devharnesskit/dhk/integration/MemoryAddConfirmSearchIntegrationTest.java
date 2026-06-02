@@ -214,7 +214,8 @@ final class MemoryAddConfirmSearchIntegrationTest {
         assertEquals(ExitCodes.SUCCESS, searchExit);
         assertTrue(search.stdout().contains("[1] Gateway identity file"));
         assertTrue(search.stdout().contains("score:"));
-        assertTrue(search.stdout().contains("explain: match lists weighted fields"));
+        assertTrue(search.stdout().contains("explain:"));
+        assertTrue(search.stdout().contains("tags:+8"));
     }
 
     @Test

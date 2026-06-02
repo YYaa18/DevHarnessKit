@@ -6,7 +6,7 @@ DevHarness Kit stores project state in:
 .agents/memory/memory.db
 ```
 
-Current schema version: `16`.
+Current schema version: `17`.
 
 ## Current Schema Versions
 
@@ -28,6 +28,7 @@ Current schema version: `16`.
 | v14 | Brief lifecycle source-of-truth tables for knowledge candidates, interaction requests, and growth lessons. |
 | v15 | Professional knowledge metadata for rule-triggered knowledge candidates. |
 | v16 | Goal external reference metadata for review and retrospective exports. |
+| v17 | Memory quality metadata and candidate queue. |
 
 ## Alpha Compatibility Policy
 
@@ -40,7 +41,7 @@ When an existing non-empty database is below the current schema version, DevHarn
 .agents/memory/backups/
 ```
 
-The backup filename includes the old and new schema versions, for example `pre-migration-v1-to-v16`.
+The backup filename includes the old and new schema versions, for example `pre-migration-v1-to-v17`.
 
 Current fixture coverage includes:
 
@@ -57,17 +58,17 @@ v11-skill-before-trust.sql
                          skill contract rows before trust source hashes
 v12-human-checkpoint-before-skill-trust.sql
                          human checkpoint rows before skill trust source hashes
-v13-current-minimal.sql v13 fixture used to verify additive v14/v15/v16
+v13-current-minimal.sql v13 fixture used to verify additive v14/v15/v16/v17
                          migrations and post-upgrade idempotency
 ```
 
-These fixtures verify that old databases are backed up before upgrade, important rows are preserved, and the current v16 schema is created.
+These fixtures verify that old databases are backed up before upgrade, important rows are preserved, and the current v17 schema is created.
 
-The workflow fixture verifies that v2 `workflow_template`, `workflow_run`, `workflow_phase_run`, `workflow_gate_run`, and `workflow_event` rows survive upgrade while v3 artifact binding tables, v4 spec tables, v5 goal tables, v6 check metadata, v7 export recovery state, v8 fingerprint columns, v9 graph tables, v10 BDD tables, v11 skill contract tables, v12 human checkpoint tables, v13 skill trust fields, v14 brief lifecycle tables, v15 knowledge metadata fields, and v16 goal external reference fields are added.
+The workflow fixture verifies that v2 `workflow_template`, `workflow_run`, `workflow_phase_run`, `workflow_gate_run`, and `workflow_event` rows survive upgrade while v3 artifact binding tables, v4 spec tables, v5 goal tables, v6 check metadata, v7 export recovery state, v8 fingerprint columns, v9 graph tables, v10 BDD tables, v11 skill contract tables, v12 human checkpoint tables, v13 skill trust fields, v14 brief lifecycle tables, v15 knowledge metadata fields, v16 goal external reference fields, and v17 memory quality metadata are added.
 
-The spec fixture verifies that v4 `spec_change`, `spec_document`, `spec_task`, `spec_acceptance`, `workflow_spec_binding`, and `spec_event` rows survive upgrade while v5 goal tables, v6 check metadata, v7 export recovery state, v8 fingerprint columns, v9 graph tables, v10 BDD tables, v11 skill contract tables, v12 human checkpoint tables, v13 skill trust fields, v14 brief lifecycle tables, v15 knowledge metadata fields, and v16 goal external reference fields are added.
+The spec fixture verifies that v4 `spec_change`, `spec_document`, `spec_task`, `spec_acceptance`, `workflow_spec_binding`, and `spec_event` rows survive upgrade while v5 goal tables, v6 check metadata, v7 export recovery state, v8 fingerprint columns, v9 graph tables, v10 BDD tables, v11 skill contract tables, v12 human checkpoint tables, v13 skill trust fields, v14 brief lifecycle tables, v15 knowledge metadata fields, v16 goal external reference fields, and v17 memory quality metadata are added.
 
-The goal fixture verifies that v5 `goal_check` rows survive upgrade, receive a default `step_count_at_check = 0` value, can be extended with v8 fingerprint metadata, and receives v9 graph tables, v10 BDD tables, v11 skill contract tables, v12 human checkpoint tables, v13 skill trust fields, v14 brief lifecycle tables, v15 knowledge metadata fields, and v16 goal external reference fields without losing rows.
+The goal fixture verifies that v5 `goal_check` rows survive upgrade, receive a default `step_count_at_check = 0` value, can be extended with v8 fingerprint metadata, and receives v9 graph tables, v10 BDD tables, v11 skill contract tables, v12 human checkpoint tables, v13 skill trust fields, v14 brief lifecycle tables, v15 knowledge metadata fields, v16 goal external reference fields, and v17 memory quality metadata without losing rows.
 
 The Graph fixture verifies that v9 `code_graph_snapshot`, `code_graph_file`, `code_graph_node`, `code_graph_edge`, `code_graph_query_cache`, and `goal_graph_binding` rows survive upgrade while BDD, skill contract, human checkpoint, skill trust, and brief lifecycle schema is added.
 
@@ -78,7 +79,7 @@ The skill fixture verifies that v11 `skill_contract` rows survive upgrade and re
 The human checkpoint fixture verifies that v12 `human_checkpoint` rows survive upgrade while existing skill contract rows receive v13 trust columns.
 
 The current-version fixture verifies that a database already reporting schema
-v13 is upgraded to v16 once and then can be migrated repeatedly without
+v13 is upgraded to v17 once and then can be migrated repeatedly without
 duplicate `schema_version` rows or automatic backup churn.
 
 ## MigrationStep Mapping
@@ -107,6 +108,7 @@ behind a versioned step class.
 | v14 | `V0.8 brief lifecycle SQLite schema` | `V14BriefLifecycleSQLiteMigration` |
 | v15 | `V0.8 professional knowledge candidate metadata` | `V15KnowledgeCandidateMetadataMigration` |
 | v16 | `V1.0 goal external reference metadata` | `V16GoalExternalRefMigration` |
+| v17 | `V1.1 memory quality metadata and candidate queue` | `V17MemoryQualityMigration` |
 
 Adding a future migration should add one `MigrationStep` entry, one fixture or
 upgrade test, and one row in this table.

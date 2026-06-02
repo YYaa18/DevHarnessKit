@@ -86,7 +86,7 @@ public final class SearchCommand implements Command {
                 if (explain) {
                     context.out().println("  score: " + result.score());
                     context.out().println("  query: " + query);
-                    context.out().println("  explain: match lists weighted fields; tags=8 title=5 content=3 fts=1 module=10 confirmed=3 confidence=1..2");
+                    context.out().println("  explain: " + result.explanation());
                 }
             }
             return ExitCodes.SUCCESS;
@@ -113,7 +113,8 @@ public final class SearchCommand implements Command {
                     JsonOutput.stringField("tags", result.item().tags()),
                     JsonOutput.stringField("content", result.item().summary(160)),
                     JsonOutput.stringField("match", result.match()),
-                    JsonOutput.numberField("score", result.score())
+                    JsonOutput.numberField("score", result.score()),
+                    JsonOutput.stringField("explanation", explain ? result.explanation() : "")
             ).trim());
         }
         context.out().print(JsonOutput.object(

@@ -8,6 +8,7 @@ import com.devharnesskit.dhk.util.TextUtil;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -49,7 +50,7 @@ public final class MemorySearchService {
 
         List<SearchResult> scored = new ArrayList<SearchResult>();
         for (MemoryItem item : candidates.values()) {
-            SearchResult result = score(item, tokens, module, ftsIds.contains(Long.valueOf(item.id())));
+            SearchResult result = score(item, tokens, module, status, ftsIds.contains(Long.valueOf(item.id())));
             if (result.score() > 0) {
                 scored.add(result);
             }
@@ -69,29 +70,35 @@ public final class MemorySearchService {
         return new ArrayList<SearchResult>(scored.subList(0, limit));
     }
 
-    private SearchResult score(MemoryItem item, List<String> tokens, String requestedModule, boolean ftsMatch) {
+    private SearchResult score(MemoryItem item, List<String> tokens, String requestedModule,
+                               String requestedStatus, boolean ftsMatch) {
         int score = 0;
         List<String> matches = new ArrayList<String>();
+        List<String> explanation = new ArrayList<String>();
         boolean queryMatched = false;
         if (matchesAny(item.tags(), tokens)) {
             score += 8;
             matches.add("tags");
+            explanation.add("tags:+8");
             queryMatched = true;
         }
         if (matchesAny(item.title(), tokens)) {
             score += 5;
             matches.add("title");
+            explanation.add("title:+5");
             queryMatched = true;
         }
         if (matchesAny(item.content(), tokens)) {
             score += 3;
             matches.add("content");
+            explanation.add("content:+3");
             queryMatched = true;
         }
         if (ftsMatch) {
             queryMatched = true;
             score += 1;
             matches.add("fts");
+            explanation.add("fts:+1");
         }
         if (!queryMatched) {
             return new SearchResult(item, 0, "");
@@ -99,19 +106,54 @@ public final class MemorySearchService {
         if (requestedModule.length() > 0 && requestedModule.equals(item.moduleName())) {
             score += 10;
             matches.add("module");
+            explanation.add("module:+10");
         }
         if ("confirmed".equals(item.status())) {
             score += 3;
             matches.add("confirmed");
+            explanation.add("confirmed:+3");
         }
         if (item.confidence() >= 90) {
             score += 2;
             matches.add("confidence>=90");
+            explanation.add("confidence>=90:+2");
         } else if (item.confidence() >= 70) {
             score += 1;
             matches.add("confidence>=70");
+            explanation.add("confidence>=70:+1");
         }
-        return new SearchResult(item, score, join(matches));
+        if (item.lastVerifiedAt().length() > 0) {
+            score += 1;
+            matches.add("verified");
+            explanation.add("verified:+1");
+        }
+        if (item.lastUsedAt().length() > 0) {
+            score += 1;
+            matches.add("used");
+            explanation.add("used:+1");
+        }
+        if (isStale(item)) {
+            score -= 8;
+            matches.add("stale");
+            explanation.add("stale:-8");
+        }
+        if (item.supersededBy() > 0) {
+            score -= 12;
+            matches.add("superseded");
+            explanation.add("superseded:-12");
+        }
+        if ("deprecated".equals(item.status())) {
+            score -= 6;
+            matches.add("deprecated");
+            explanation.add("deprecated:-6");
+        }
+        if ("archived".equals(item.status()) && requestedStatus.length() == 0) {
+            return new SearchResult(item, 0, "");
+        }
+        if (score < 1) {
+            score = 1;
+        }
+        return new SearchResult(item, score, join(matches), join(explanation));
     }
 
     private boolean matchesAny(String text, List<String> tokens) {
@@ -133,5 +175,19 @@ public final class MemorySearchService {
             builder.append(values.get(i));
         }
         return builder.toString();
+    }
+
+    private boolean isStale(MemoryItem item) {
+        if (item.staleReason().length() > 0) {
+            return true;
+        }
+        if (item.effectiveTo().length() == 0) {
+            return false;
+        }
+        try {
+            return Instant.parse(item.effectiveTo()).isBefore(Instant.now());
+        } catch (RuntimeException ex) {
+            return false;
+        }
     }
 }

@@ -1,6 +1,8 @@
 package com.devharnesskit.dhk.repository;
 
+import com.devharnesskit.dhk.model.MemoryCandidate;
 import com.devharnesskit.dhk.model.MemoryItem;
+import com.devharnesskit.dhk.service.MemoryIdentity;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -16,8 +18,9 @@ public final class MemoryRepository {
         try (PreparedStatement statement = connection.prepareStatement(
                 "INSERT INTO memory_item(project_key, module_name, memory_type, scope, title, content, tags, "
                         + "status, confidence, source_kind, confirmed_at, confirmed_by, source_files, evidence, "
-                        + "effective_from, effective_to, created_at, updated_at, last_used_at, use_count) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        + "effective_from, effective_to, created_at, updated_at, last_used_at, use_count, "
+                        + "fingerprint, canonical_key, superseded_by, stale_reason, last_verified_at, source_ref) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 Statement.RETURN_GENERATED_KEYS)) {
             statement.setString(1, item.projectKey());
             statement.setString(2, item.moduleName());
@@ -43,10 +46,56 @@ public final class MemoryRepository {
                 statement.setString(19, item.lastUsedAt());
             }
             statement.setInt(20, item.useCount());
+            String fingerprint = item.fingerprint().length() == 0
+                    ? MemoryIdentity.fingerprint(item.title(), item.content()) : item.fingerprint();
+            String canonicalKey = item.canonicalKey().length() == 0
+                    ? MemoryIdentity.canonicalKey(item.moduleName(), item.title()) : item.canonicalKey();
+            statement.setString(21, fingerprint);
+            statement.setString(22, canonicalKey);
+            statement.setLong(23, item.supersededBy());
+            statement.setString(24, item.staleReason());
+            statement.setString(25, item.lastVerifiedAt());
+            statement.setString(26, item.sourceRef().length() == 0 ? item.sourceFiles() : item.sourceRef());
             statement.executeUpdate();
             try (ResultSet resultSet = statement.getGeneratedKeys()) {
                 if (!resultSet.next()) {
                     throw new SQLException("No generated key returned for memory insert");
+                }
+                return resultSet.getLong(1);
+            }
+        }
+    }
+
+    public long insertCandidate(Connection connection, MemoryCandidate candidate) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "INSERT INTO memory_candidate(project_key, candidate_status, module_name, memory_type, title, "
+                        + "content, tags, confidence, source_kind, source_ref, reason, evidence, fingerprint, "
+                        + "canonical_key, created_at, updated_at, decided_at, decision_reason, accepted_memory_id) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                Statement.RETURN_GENERATED_KEYS)) {
+            statement.setString(1, candidate.projectKey());
+            statement.setString(2, candidate.candidateStatus());
+            statement.setString(3, candidate.moduleName());
+            statement.setString(4, candidate.memoryType());
+            statement.setString(5, candidate.title());
+            statement.setString(6, candidate.content());
+            statement.setString(7, candidate.tags());
+            statement.setInt(8, candidate.confidence());
+            statement.setString(9, candidate.sourceKind());
+            statement.setString(10, candidate.sourceRef());
+            statement.setString(11, candidate.reason());
+            statement.setString(12, candidate.evidence());
+            statement.setString(13, candidate.fingerprint());
+            statement.setString(14, candidate.canonicalKey());
+            statement.setString(15, candidate.createdAt());
+            statement.setString(16, candidate.updatedAt());
+            statement.setString(17, candidate.decidedAt());
+            statement.setString(18, candidate.decisionReason());
+            statement.setLong(19, candidate.acceptedMemoryId());
+            statement.executeUpdate();
+            try (ResultSet resultSet = statement.getGeneratedKeys()) {
+                if (!resultSet.next()) {
+                    throw new SQLException("No generated key returned for memory candidate insert");
                 }
                 return resultSet.getLong(1);
             }
@@ -63,6 +112,20 @@ public final class MemoryRepository {
                     return null;
                 }
                 return map(resultSet);
+            }
+        }
+    }
+
+    public MemoryCandidate findCandidateById(Connection connection, String projectKey, long id) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT * FROM memory_candidate WHERE project_key = ? AND id = ?")) {
+            statement.setString(1, projectKey);
+            statement.setLong(2, id);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    return null;
+                }
+                return mapCandidate(resultSet);
             }
         }
     }
@@ -99,6 +162,31 @@ public final class MemoryRepository {
         }
     }
 
+    public List<MemoryCandidate> listMemoryCandidates(Connection connection, String projectKey,
+                                                      String status, int limit) throws SQLException {
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT * FROM memory_candidate WHERE project_key = ?");
+        if (status != null && status.length() > 0) {
+            sql.append(" AND candidate_status = ?");
+        }
+        sql.append(" ORDER BY updated_at DESC, id DESC LIMIT ?");
+        try (PreparedStatement statement = connection.prepareStatement(sql.toString())) {
+            int index = 1;
+            statement.setString(index++, projectKey);
+            if (status != null && status.length() > 0) {
+                statement.setString(index++, status);
+            }
+            statement.setInt(index, limit);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                List<MemoryCandidate> results = new ArrayList<MemoryCandidate>();
+                while (resultSet.next()) {
+                    results.add(mapCandidate(resultSet));
+                }
+                return results;
+            }
+        }
+    }
+
     public List<MemoryItem> listMemory(Connection connection, String projectKey, String module,
                                        String status, String tag, int limit) throws SQLException {
         StringBuilder sql = new StringBuilder();
@@ -125,6 +213,31 @@ public final class MemoryRepository {
             }
             if (tag != null && tag.length() > 0) {
                 statement.setString(index++, "%" + escapeLike(tag.toLowerCase()) + "%");
+            }
+            statement.setInt(index, limit);
+            return list(statement);
+        }
+    }
+
+    public List<MemoryItem> listAllMemory(Connection connection, String projectKey, String module,
+                                          int limit) throws SQLException {
+        return listMemory(connection, projectKey, module, "", "", limit);
+    }
+
+    public List<MemoryItem> listPackableMemory(Connection connection, String projectKey, String module,
+                                               int limit) throws SQLException {
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT * FROM memory_item WHERE project_key = ? AND status = 'confirmed' "
+                + "AND superseded_by = 0 AND stale_reason = ''");
+        if (module != null && module.length() > 0) {
+            sql.append(" AND (module_name = 'global' OR module_name = ?)");
+        }
+        sql.append(" ORDER BY confidence DESC, updated_at DESC, id DESC LIMIT ?");
+        try (PreparedStatement statement = connection.prepareStatement(sql.toString())) {
+            int index = 1;
+            statement.setString(index++, projectKey);
+            if (module != null && module.length() > 0) {
+                statement.setString(index++, module);
             }
             statement.setInt(index, limit);
             return list(statement);
@@ -191,10 +304,121 @@ public final class MemoryRepository {
         }
     }
 
+    public void markCandidateAccepted(Connection connection, String projectKey, long candidateId,
+                                      long memoryId, String now) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "UPDATE memory_candidate SET candidate_status = 'accepted', accepted_memory_id = ?, "
+                        + "decided_at = ?, updated_at = ? WHERE project_key = ? AND id = ?")) {
+            statement.setLong(1, memoryId);
+            statement.setString(2, now);
+            statement.setString(3, now);
+            statement.setString(4, projectKey);
+            statement.setLong(5, candidateId);
+            statement.executeUpdate();
+        }
+    }
+
+    public void markCandidateRejected(Connection connection, String projectKey, long candidateId,
+                                      String reason, String now) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "UPDATE memory_candidate SET candidate_status = 'rejected', decision_reason = ?, "
+                        + "decided_at = ?, updated_at = ? WHERE project_key = ? AND id = ?")) {
+            statement.setString(1, reason);
+            statement.setString(2, now);
+            statement.setString(3, now);
+            statement.setString(4, projectKey);
+            statement.setLong(5, candidateId);
+            statement.executeUpdate();
+        }
+    }
+
+    public void supersede(Connection connection, String projectKey, long oldId, long newId,
+                          String reason, String now) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "UPDATE memory_item SET status = 'deprecated', superseded_by = ?, stale_reason = ?, "
+                        + "effective_to = ?, updated_at = ? WHERE project_key = ? AND id = ?")) {
+            statement.setLong(1, newId);
+            statement.setString(2, reason);
+            statement.setString(3, now);
+            statement.setString(4, now);
+            statement.setString(5, projectKey);
+            statement.setLong(6, oldId);
+            statement.executeUpdate();
+        }
+    }
+
+    public void expire(Connection connection, String projectKey, long id, String reason,
+                       String now) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "UPDATE memory_item SET status = 'deprecated', stale_reason = ?, effective_to = ?, "
+                        + "updated_at = ? WHERE project_key = ? AND id = ?")) {
+            statement.setString(1, reason);
+            statement.setString(2, now);
+            statement.setString(3, now);
+            statement.setString(4, projectKey);
+            statement.setLong(5, id);
+            statement.executeUpdate();
+        }
+    }
+
+    public void refresh(Connection connection, String projectKey, long id, String evidence,
+                        String now) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "UPDATE memory_item SET status = CASE WHEN status = 'deprecated' AND confirmed_at <> '' "
+                        + "THEN 'confirmed' ELSE status END, "
+                        + "stale_reason = '', last_verified_at = ?, evidence = ?, "
+                        + "effective_to = '', updated_at = ? WHERE project_key = ? AND id = ?")) {
+            statement.setString(1, now);
+            statement.setString(2, evidence);
+            statement.setString(3, now);
+            statement.setString(4, projectKey);
+            statement.setLong(5, id);
+            statement.executeUpdate();
+        }
+    }
+
+    public MemoryItem findByFingerprint(Connection connection, String projectKey,
+                                        String fingerprint) throws SQLException {
+        if (fingerprint == null || fingerprint.length() == 0) {
+            return null;
+        }
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT * FROM memory_item WHERE project_key = ? AND fingerprint = ? "
+                        + "ORDER BY id DESC LIMIT 1")) {
+            statement.setString(1, projectKey);
+            statement.setString(2, fingerprint);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    return null;
+                }
+                return map(resultSet);
+            }
+        }
+    }
+
+    public MemoryItem findByTitleAndContent(Connection connection, String projectKey, String title,
+                                            String content) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT * FROM memory_item WHERE project_key = ? "
+                        + "AND lower(title) = lower(?) AND lower(content) = lower(?) "
+                        + "ORDER BY id DESC LIMIT 1")) {
+            statement.setString(1, projectKey);
+            statement.setString(2, title == null ? "" : title);
+            statement.setString(3, content == null ? "" : content);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    return null;
+                }
+                return map(resultSet);
+            }
+        }
+    }
+
     public List<MemoryItem> listConfirmedForExport(Connection connection, String projectKey, String module,
                                                    int limit) throws SQLException {
         String sql = "SELECT * FROM memory_item WHERE project_key = ? AND status = 'confirmed' "
                 + "AND confidence >= 70 AND (module_name = 'global' OR module_name = ?) "
+                + "AND superseded_by = 0 AND stale_reason = '' "
                 + "ORDER BY confidence DESC, updated_at DESC, id DESC LIMIT ?";
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, projectKey);
@@ -217,7 +441,8 @@ public final class MemoryRepository {
         }
         String sql = "SELECT DISTINCT * FROM memory_item WHERE project_key = ? "
                 + "AND status = 'confirmed' AND confidence >= 70 "
-                + "AND (module_name = 'global' OR module_name = ?)";
+                + "AND (module_name = 'global' OR module_name = ?) "
+                + "AND superseded_by = 0 AND stale_reason = ''";
         StringBuilder builder = new StringBuilder(sql);
         appendLikeClause(builder, tokens.size());
         builder.append(" ORDER BY confidence DESC, updated_at DESC, id DESC LIMIT ?");
@@ -332,7 +557,38 @@ public final class MemoryRepository {
                 resultSet.getString("created_at"),
                 resultSet.getString("updated_at"),
                 resultSet.getString("last_used_at"),
-                resultSet.getInt("use_count")
+                resultSet.getInt("use_count"),
+                resultSet.getString("fingerprint"),
+                resultSet.getString("canonical_key"),
+                resultSet.getLong("superseded_by"),
+                resultSet.getString("stale_reason"),
+                resultSet.getString("last_verified_at"),
+                resultSet.getString("source_ref")
+        );
+    }
+
+    private MemoryCandidate mapCandidate(ResultSet resultSet) throws SQLException {
+        return new MemoryCandidate(
+                resultSet.getLong("id"),
+                resultSet.getString("project_key"),
+                resultSet.getString("candidate_status"),
+                resultSet.getString("module_name"),
+                resultSet.getString("memory_type"),
+                resultSet.getString("title"),
+                resultSet.getString("content"),
+                resultSet.getString("tags"),
+                resultSet.getInt("confidence"),
+                resultSet.getString("source_kind"),
+                resultSet.getString("source_ref"),
+                resultSet.getString("reason"),
+                resultSet.getString("evidence"),
+                resultSet.getString("fingerprint"),
+                resultSet.getString("canonical_key"),
+                resultSet.getString("created_at"),
+                resultSet.getString("updated_at"),
+                resultSet.getString("decided_at"),
+                resultSet.getString("decision_reason"),
+                resultSet.getLong("accepted_memory_id")
         );
     }
 }

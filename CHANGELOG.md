@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.2.0
+
+Stable memory quality release.
+
+English:
+
+- Added CLI-first memory candidate workflows: `memory suggest` and
+  `memory candidates list|accept|reject`. Candidate acceptance creates draft
+  memory only and never bypasses `memory confirm`.
+- Added memory governance commands for duplicate detection, conflict detection,
+  superseding, stale scans, expiration, and refresh evidence.
+- Added explainable memory ranking with score components and stale/superseded
+  penalties in `memory search --explain`.
+- Added safe team memory packs with manifest checksums, zip-entry traversal
+  rejection, inspect-only validation, and import-as-draft behavior.
+- Added schema v17 for memory quality metadata and the memory candidate queue.
+- Added boundary and unsafe-operation tests for sensitive content, duplicate
+  candidate acceptance, stale lifecycle changes, checksum validation, and unsafe
+  zip entries.
+
+中文：
+
+- 新增 CLI 优先的记忆候选流程：`memory suggest` 和
+  `memory candidates list|accept|reject`。接受候选只会生成 draft memory，
+  不会绕过 `memory confirm`。
+- 新增记忆治理命令：重复检测、冲突检测、替代关系、过期扫描、显式过期和刷新证据。
+- 增强 `memory search --explain`，输出排序加分项和 stale/superseded 降权原因。
+- 新增安全的团队 memory pack：manifest checksum、zip 路径穿越拒绝、只读 inspect、
+  默认以 draft 导入。
+- 新增 schema v17，用于 memory quality metadata 和 memory candidate queue。
+- 补充边界与不安全场景测试，覆盖敏感内容、重复接受候选、过期生命周期、
+  checksum 校验和危险 zip entry。
+
 ## 1.1.1
 
 Stable patch release.

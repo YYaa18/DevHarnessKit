@@ -68,7 +68,7 @@ final class CommandRouterTest {
         assertTrue(harness.stdout().contains("stable_surface: help,version,doctor,memory-core,goal-core,bdd,configure,status,readiness,advise,quickstart,release-packaging"));
         assertTrue(harness.stdout().contains("stable_candidate_surface: goal-retrospective,skill-contract,policy-hooks,routine-report"));
         assertTrue(harness.stdout().contains("experimental_surface: graph-aware-goal,skill-governance-full,policy-governance-full,ecc-control-panel,routine"));
-        assertTrue(harness.stdout().contains("schema_version: 16"));
+        assertTrue(harness.stdout().contains("schema_version: 17"));
     }
 
     @Test

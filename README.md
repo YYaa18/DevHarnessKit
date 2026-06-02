@@ -12,16 +12,16 @@ verification status, and a local recovery trail.
 
 ## Status
 
-DevHarness Kit `1.1.1` is the current stable release. The stable contract is
+DevHarness Kit `1.2.0` is the current stable release. The stable contract is
 intentionally narrow: core CLI, memory, goal, status, readiness, configure,
 brief, BDD acceptance evidence, release packaging, and documented
-generated-export anchors. The 1.1 line adds goal retrospective reporting,
-stronger agent skill packaging coverage, and safer pre-work confirmation guards
-while preserving the 1.0 stable core.
+generated-export anchors. The 1.2 line adds CLI-first memory quality workflows
+for candidates, dedupe/conflict checks, stale governance, explainable ranking,
+and team memory packs while preserving the 1.0 stable core.
 
-Current stable release: `1.1.1`.
+Current stable release: `1.2.0`.
 
-Current schema version is v16.
+Current schema version is v17.
 
 See
 [docs/STABLE_CONTRACT.md](docs/STABLE_CONTRACT.md) and
@@ -88,6 +88,9 @@ Typical result:
 - repeated conventions can be reused across sessions;
 - context survives chat compaction;
 - drafts do not enter default context until confirmed;
+- memory candidates can be reviewed before becoming draft memory;
+- duplicate, conflicting, stale, and superseded facts can be surfaced;
+- team memory packs can be imported as drafts for human review;
 - recovery exports help restart after an interrupted run.
 
 ### Make Verification Visible

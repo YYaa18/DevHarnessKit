@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.2.2
+
+Stable patch release.
+
+English:
+
+- Published a fresh installable package that includes the goal-agent hardening
+  commit after `v1.2.1`.
+- Expanded the bundled goal-development skill contract to allow the safe
+  error-to-solution memory loop: agents may search prior memory and suggest a
+  troubleshooting candidate, while confirmation remains user-controlled.
+- Added explicit build/test retry-loop guidance for restricted, legacy, or
+  locally uncompilable projects.
+- Updated generated adapter guidance through the control panel so Claude Code,
+  OpenCode, and Comate receive the same memory and verification constraints.
+- Locked the new skill sections, allowed commands, and generated-rule guidance
+  with packaging tests. SQLite schema remains v17.
+
+中文：
+
+- 基于 `v1.2.1` 之后的 goal-agent 加固提交重新发布可安装包。
+- 扩展内置 goal-development skill contract，允许安全的错误到解决方案记忆闭环：
+  Agent 可以搜索既有记忆并提出排障候选，但确认权仍保留给用户。
+- 为受限、遗留或本地无法编译的项目补充明确的构建/测试重试循环保护。
+- 更新 control panel 生成的适配器说明，让 Claude Code、OpenCode 和 Comate 获得
+  一致的 memory 与验证约束。
+- 通过 packaging tests 固化新的 skill 章节、允许命令和生成规则说明。SQLite schema
+  仍为 v17。
+
 ## 1.2.1
 
 Stable patch release.

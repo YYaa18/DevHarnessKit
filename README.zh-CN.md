@@ -11,14 +11,14 @@ DevHarness Kit 是一个本地优先的 AI 编程协作工具。它不是让模�
 
 ## 当前状态
 
-DevHarness Kit `1.2.1` 是当前正式稳定版本。稳定承诺范围刻意收窄：
+DevHarness Kit `1.2.2` 是当前正式稳定版本。稳定承诺范围刻意收窄：
 核心 CLI、memory、goal、status、readiness、configure、brief、BDD 验收证据、
 发布包，以及文档中列出的导出文件锚点。1.2 版本新增 CLI 优先的 memory
 质量治理能力：候选队列、去重/冲突检查、过期治理、可解释检索排序和团队
-memory pack，同时保持 1.0 稳定核心兼容。1.2.1 补丁发布包含 main 分支最新的
-memory 治理、交互确认、BDD 和 Graph 正确性修复。
+memory pack，同时保持 1.0 稳定核心兼容。1.2.2 补丁增强了目标 Agent 在无法本地
+编译的受限或遗留项目中的使用约束。
 
-当前稳定版本：`1.2.1`。
+当前稳定版本：`1.2.2`。
 
 当前 SQLite schema 版本：v17。
 

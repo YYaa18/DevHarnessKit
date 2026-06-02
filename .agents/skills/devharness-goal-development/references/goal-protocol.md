@@ -26,8 +26,8 @@ re-run the same failing command expecting a different result.
 16. On a non-trivial error, first run `dhk memory search --q "<error signature>"`
 to reuse a recorded solution. After solving it, run
 `dhk memory suggest --title "<error signature>" --content "现象/根因/修复"` to
-queue a troubleshooting candidate for the user to confirm. Never run
-`dhk memory confirm`, never accept candidates yourself, and never put secrets
+queue a troubleshooting candidate for the user to confirm. Never run memory
+confirmation commands, never accept candidates yourself, and never put secrets
 or raw SQL results into a suggestion.
 
 Use wrapper scripts under `.agents/skills/devharness-goal-development/scripts/` whenever possible. They route through `dhk.sh` and pass the repository root explicitly, so they work from subdirectories.

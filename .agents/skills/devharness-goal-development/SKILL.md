@@ -14,7 +14,7 @@ This skill is governed by `contract.json`.
 - skill_key: `devharness-goal-development`
 - data_access_level: `context`
 - allowed_commands: `dhk advise`, `dhk quickstart`, `dhk goal start`, `dhk goal resume`, `dhk goal next`, `dhk goal step`, `dhk goal evidence-template`, `dhk goal status`, `dhk goal export`, `dhk goal check`, `dhk goal evaluate`, `dhk goal verify`, `dhk goal complete`, `dhk goal audit`, `dhk goal recheck`, `dhk goal retrospective`, `dhk goal review-summary`, `dhk goal mr-summary`, `dhk memory search`, `dhk memory suggest`
-- forbidden_commands: `dhk workflow gate waive`, `dhk spec archive`, `dhk memory confirm`, `dhk db sql`
+- forbidden_commands: `dhk workflow gate waive`, `dhk spec archive`, memory confirmation commands, `dhk db sql`
 
 Do not use commands outside this contract unless `GOAL_CONTEXT.md` explicitly authorizes them or the user directly requests them.
 
@@ -76,16 +76,16 @@ exception, failing test with a clear signature, environment/config failure):
 2. After you actually solve it, propose a troubleshooting candidate:
    `dhk memory suggest --title "<short error signature>" --content "现象/Symptom: ...; 根因/Root cause: ...; 修复/Fix: ..."`.
    Keep the title close to the real error text so future searches match.
-3. Tell the user it is a pending candidate and that confirming it
-   (`dhk memory candidates accept` or `dhk memory confirm`) makes it
-   auto-surface in future task context. Do not confirm it yourself.
+3. Tell the user it is a pending candidate and that user-controlled memory
+   confirmation makes it auto-surface in future task context. Do not confirm it
+   yourself.
 
 Boundaries: `dhk memory search` (read) and `dhk memory suggest` (propose) are
-allowed for this loop. You still must not run `dhk memory confirm`, must not
-accept candidates yourself, and must never put secrets, tokens, passwords,
+allowed for this loop. You still must not run memory confirmation commands, must
+not accept candidates yourself, and must never put secrets, tokens, passwords,
 JDBC URLs, Authorization headers, cookies, or raw SQL results into a memory
-suggestion. Record the same fix inside the current `goal step` evidence too,
-so the goal record stays complete.
+suggestion. Record the same fix inside the current `goal step` evidence too, so
+the goal record stays complete.
 
 The full protocol below keeps weak-model and release-sensitive work auditable.
 
@@ -108,7 +108,7 @@ The full protocol below keeps weak-model and release-sensitive work auditable.
    - Run the listed graph helper internally when the current action needs fresh graph context or impact evidence.
    - Record graph evidence such as `graph_snapshot`, `graph_context`, `impact_map`, `recommended_read_files`, or `graph_result` in the current `goal step`.
    - Do not create or expect a separate `graph_*` goal step.
-6. Do not use lower-level `workflow`, `spec`, or `db` commands unless GOAL_CONTEXT explicitly allows it. For `memory`, only `dhk memory search` and `dhk memory suggest` are allowed (see Troubleshooting Memory); never run `dhk memory confirm` or accept candidates yourself.
+6. Do not use lower-level `workflow`, `spec`, or `db` commands unless GOAL_CONTEXT explicitly allows it. For `memory`, only `dhk memory search` and `dhk memory suggest` are allowed (see Troubleshooting Memory); never run memory confirmation commands or accept candidates yourself.
 7. After every investigation, plan, edit, or verification step, run `scripts/goal-step.sh` with summary, structured fields, changed files, and the required evidence keys from GOAL_CONTEXT.
    - If Agent Brief provides `script`, `args`, and `cwd`, execute that project-local script from `cwd`; do not depend on a global `dhk` binary.
    - If files changed but `step_count` did not increase, the action is not recorded. Re-read the required evidence and record the missing `goal step` before replying.

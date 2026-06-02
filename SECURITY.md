@@ -6,12 +6,13 @@ DevHarness Kit is a local-first CLI. It does not run a daemon, open an HTTP port
 
 | Version | Status |
 | --- | --- |
-| `1.2.1` | Current stable release. Security fixes are prioritized for the documented stable surface. |
-| `1.2.0` | Superseded stable release. Upgrade to `1.2.1` when possible. |
-| `1.1.1` | Superseded stable release. Upgrade to `1.2.1` when possible. |
-| `1.1.0` | Superseded stable release. Upgrade to `1.2.1` when possible. |
-| `1.0.0` | Superseded stable release. Upgrade to `1.2.1` when possible. |
-| `0.4.6-beta.1` | Superseded beta developer preview. Upgrade to `1.2.1` when possible. |
+| `1.2.2` | Current stable release. Security fixes are prioritized for the documented stable surface. |
+| `1.2.1` | Superseded stable release. Upgrade to `1.2.2` when possible. |
+| `1.2.0` | Superseded stable release. Upgrade to `1.2.2` when possible. |
+| `1.1.1` | Superseded stable release. Upgrade to `1.2.2` when possible. |
+| `1.1.0` | Superseded stable release. Upgrade to `1.2.2` when possible. |
+| `1.0.0` | Superseded stable release. Upgrade to `1.2.2` when possible. |
+| `0.4.6-beta.1` | Superseded beta developer preview. Upgrade to `1.2.2` when possible. |
 
 ## Threat Model
 

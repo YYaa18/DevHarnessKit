@@ -72,6 +72,42 @@ final class WorkspaceFingerprintServiceTest {
     }
 
     @Test
+    void gitWorkspaceFingerprintIgnoresUntrackedGeneratedHarnessArtifacts() throws Exception {
+        // Regression: in a git repo WITHOUT a .gitignore for .agents/, generated harness
+        // artifacts (graph snapshots/exports, memory db, bdd exports) appear as untracked
+        // content. They must not change the workspace fingerprint, otherwise a freshly
+        // created graph snapshot self-invalidates on the very next command.
+        WorkspaceFingerprintService service = new WorkspaceFingerprintService();
+        Path root = tempDir.resolve("git-untracked-workspace");
+        Path source = root.resolve("src/main/java/demo/App.java");
+        Files.createDirectories(source.getParent());
+        Files.write(source, "class App {}\n".getBytes("UTF-8"));
+        org.junit.jupiter.api.Assumptions.assumeTrue(runGit(root, "init"));
+
+        String initial = service.workspaceFingerprint(root);
+        assertTrue(initial.startsWith("git:"));
+
+        // Generated artifacts under the excluded harness directories (all untracked).
+        writeFile(root, ".agents/graph/snapshots/graph-snap-1.json", "{\"nodes\":13}\n");
+        writeFile(root, ".agents/graph/exports/GRAPH_SNAPSHOT.json", "{\"snapshot\":\"a\"}\n");
+        writeFile(root, ".agents/graph/exports/IMPACT_MAP.md", "# IMPACT_MAP\n");
+        writeFile(root, ".agents/graph/cache/query-cache.json", "{}\n");
+        writeFile(root, ".agents/memory/memory.db", "binary-ish\n");
+        writeFile(root, ".agents/bdd/exports/BDD_EVIDENCE.md", "# BDD_EVIDENCE\n");
+        writeFile(root, ".agents/devharness/briefs/WORK_BRIEF.md", "# Work Brief\n");
+        assertEquals(initial, service.workspaceFingerprint(root));
+
+        // Re-indexing rewrites the same generated artifacts with new content; still no change.
+        writeFile(root, ".agents/graph/snapshots/graph-snap-2.json", "{\"nodes\":14}\n");
+        writeFile(root, ".agents/graph/exports/GRAPH_SNAPSHOT.json", "{\"snapshot\":\"b\"}\n");
+        assertEquals(initial, service.workspaceFingerprint(root));
+
+        // A real (untracked) source change must still move the fingerprint.
+        Files.write(source, "class App { int v = 2; }\n".getBytes("UTF-8"));
+        assertNotEquals(initial, service.workspaceFingerprint(root));
+    }
+
+    @Test
     void contextFingerprintChangesWithGeneratedGoalContext() throws Exception {
         WorkspaceFingerprintService service = new WorkspaceFingerprintService();
         Path root = tempDir.resolve("workspace");
@@ -103,6 +139,12 @@ final class WorkspaceFingerprintServiceTest {
         assertTrue(baseline.startsWith("check:"));
         assertEquals(baseline, same);
         assertNotEquals(baseline, changed);
+    }
+
+    private void writeFile(Path root, String relativePath, String content) throws Exception {
+        Path file = root.resolve(relativePath);
+        Files.createDirectories(file.getParent());
+        Files.write(file, content.getBytes("UTF-8"));
     }
 
     private boolean runGit(Path root, String... args) throws Exception {

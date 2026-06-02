@@ -95,6 +95,13 @@ public final class WorkspaceFingerprintService {
             if (!Files.isRegularFile(file)) {
                 continue;
             }
+            // Apply the same exclusions as the fallback walk path. Otherwise, in a project
+            // without a .gitignore for .agents/, generated harness artifacts (graph
+            // snapshots/exports, memory db, etc.) appear as untracked content and rewrite
+            // the fingerprint on every command, making fresh graph snapshots self-invalidate.
+            if (shouldSkip(root, file)) {
+                continue;
+            }
             try {
                 builder.append("untracked:").append(path).append('\n');
                 builder.append(sha256(Files.readAllBytes(file))).append('\n');
@@ -171,15 +178,29 @@ public final class WorkspaceFingerprintService {
         return false;
     }
 
+    // Generated harness artifacts must not influence the workspace fingerprint. These
+    // exclude pathspecs mirror shouldSkip() so git status/diff/ls-files stay consistent
+    // even when the project has no .gitignore for .agents/.
+    private static final String[] FINGERPRINT_EXCLUDES = {
+            ":(exclude)target/**",
+            ":(exclude).agents/devharness/**",
+            ":(exclude).agents/memory/**",
+            ":(exclude).agents/tools/**",
+            ":(exclude).agents/graph/exports/**",
+            ":(exclude).agents/graph/snapshots/**",
+            ":(exclude).agents/graph/cache/**",
+            ":(exclude).agents/bdd/exports/**"
+    };
+
     private String[] gitCommand(Path root, String... args) {
-        String[] command = new String[args.length + 6];
+        String[] command = new String[args.length + 5 + FINGERPRINT_EXCLUDES.length];
         command[0] = "git";
         command[1] = "-C";
         command[2] = root.toString();
         System.arraycopy(args, 0, command, 3, args.length);
         command[args.length + 3] = "--";
         command[args.length + 4] = ".";
-        command[args.length + 5] = ":(exclude).agents/devharness/**";
+        System.arraycopy(FINGERPRINT_EXCLUDES, 0, command, args.length + 5, FINGERPRINT_EXCLUDES.length);
         return command;
     }
 

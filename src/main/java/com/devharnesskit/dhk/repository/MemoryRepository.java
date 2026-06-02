@@ -364,8 +364,10 @@ public final class MemoryRepository {
     public void refresh(Connection connection, String projectKey, long id, String evidence,
                         String now) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(
-                "UPDATE memory_item SET status = CASE WHEN status = 'deprecated' AND confirmed_at <> '' "
-                        + "THEN 'confirmed' ELSE status END, "
+                "UPDATE memory_item SET status = CASE "
+                        + "WHEN status = 'deprecated' AND superseded_by = 0 AND confirmed_at <> '' THEN 'confirmed' "
+                        + "WHEN status = 'deprecated' AND superseded_by = 0 THEN 'draft' "
+                        + "ELSE status END, "
                         + "stale_reason = '', last_verified_at = ?, evidence = ?, "
                         + "effective_to = '', updated_at = ? WHERE project_key = ? AND id = ?")) {
             statement.setString(1, now);

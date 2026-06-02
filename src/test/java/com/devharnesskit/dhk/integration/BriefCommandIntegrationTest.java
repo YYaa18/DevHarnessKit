@@ -412,6 +412,75 @@ final class BriefCommandIntegrationTest {
                 "lesson_id = 'growth-kc-goal-knowledge-growth' AND status = 'draft'"));
     }
 
+    @Test
+    void orphanAdviseInteractionDoesNotBlockLaterUnrelatedGoal() throws Exception {
+        // Regression (#3): an earlier `advise` for a different task creates a blocking
+        // pre_work interaction with an empty goalKey. It must NOT block or pollute a later
+        // unrelated goal that has its own goal-scoped interaction.
+        String project = "orphan-interaction-project";
+        Path root = tempDir.resolve(project);
+
+        Harness configure = new Harness(tempDir);
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "configure", "init", "--project-root", project,
+                "--preset", "springboot-manual-ide-test"
+        }, configure.context()));
+
+        // 1) advise for task A -> orphan blocking interaction, empty goalKey, never answered.
+        Harness advise = new Harness(tempDir);
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "advise", "--project-root", project,
+                "--task", "Add bulk order export endpoint", "--module", "report"
+        }, advise.context()));
+
+        // 2) quickstart for unrelated task B -> goal G plus its own goal-scoped interaction.
+        Harness quickstart = new Harness(tempDir);
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "quickstart", "--project-root", project,
+                "--task", "Fix order total rounding logic", "--module", "order", "--mode", "patch"
+        }, quickstart.context()));
+        String goalKey = firstValue(quickstart.stdout(), "goal_key: ");
+        assertTrue(goalKey.length() > 0);
+
+        // Both interactions exist: one orphan (empty goalKey) and one scoped to goal G.
+        assertEquals(1, countRowsWhere(root, "interaction_request", "goal_key = ''"));
+        assertEquals(1, countRowsWhere(root, "interaction_request", "goal_key = '" + goalKey + "'"));
+
+        // 3) Answer ONLY goal G's scoped interaction; leave the orphan open.
+        String goalRequestId = queryValue(root,
+                "SELECT request_id FROM interaction_request WHERE goal_key = '" + goalKey + "'");
+        assertTrue(goalRequestId.length() > 0);
+        Harness answer = new Harness(tempDir);
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "brief", "answer", "--project-root", project,
+                "--request", goalRequestId, "--choice", "按建议继续"
+        }, answer.context()));
+
+        // 4) The orphan must no longer block goal progress for G.
+        Harness step = new Harness(tempDir);
+        int stepExit = new CommandRouter().run(new String[]{
+                "goal", "step", "--project-root", project, "--goal", goalKey,
+                "--summary", "Understood patch boundary",
+                "--field", "goal_understanding=Fix order total rounding only",
+                "--field", "assumptions=no API contract change",
+                "--field", "read_files=OrderService.java"
+        }, step.context());
+        assertEquals(ExitCodes.SUCCESS, stepExit);
+        assertTrue(step.stdout().contains("step_id: "));
+    }
+
+    private String queryValue(Path projectRoot, String sql) throws Exception {
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(projectRoot));
+             Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery(sql)) {
+            return resultSet.next() ? value(resultSet.getString(1)) : "";
+        }
+    }
+
+    private String value(String raw) {
+        return raw == null ? "" : raw;
+    }
+
     private int countRows(Path projectRoot, String tableName) throws Exception {
         try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + PathUtil.memoryDb(projectRoot));
              Statement statement = connection.createStatement();

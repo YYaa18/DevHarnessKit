@@ -65,7 +65,8 @@ public final class BriefService {
             Files.createDirectories(PathUtil.devharnessBriefsDirectory(request.projectRoot()));
             Files.write(workPath, workRenderer.render(workBrief).getBytes("UTF-8"));
             Files.write(agentPath, agentRenderer.render(agentBrief).getBytes("UTF-8"));
-            lifecycleService.recordPreWorkInteraction(request.projectRoot(), workBrief);
+            lifecycleService.recordPreWorkInteraction(request.projectRoot(), workBrief,
+                    goal == null ? "" : goal.goalKey());
         }
         return new BriefResult(workBrief, agentBrief, workPath, agentPath);
     }

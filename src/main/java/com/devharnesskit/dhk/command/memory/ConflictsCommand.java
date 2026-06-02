@@ -51,7 +51,7 @@ public final class ConflictsCommand implements Command {
                 return ExitCodes.NOT_FOUND;
             }
             List<MemoryItem> items = memoryRepository.listAllMemory(connection, project.projectKey(), module, limit);
-            List<List<MemoryItem>> groups = conflictGroups(items);
+            List<ConflictGroup> groups = conflictGroups(items);
             if (JsonOutput.enabled(args)) {
                 printJson(context, module, groups);
             } else {
@@ -64,7 +64,7 @@ public final class ConflictsCommand implements Command {
         }
     }
 
-    private List<List<MemoryItem>> conflictGroups(List<MemoryItem> items) {
+    private List<ConflictGroup> conflictGroups(List<MemoryItem> items) {
         Map<String, List<MemoryItem>> byKey = new LinkedHashMap<String, List<MemoryItem>>();
         for (MemoryItem item : items) {
             String key = item.canonicalKey().length() == 0
@@ -76,10 +76,15 @@ public final class ConflictsCommand implements Command {
             }
             group.add(item);
         }
-        List<List<MemoryItem>> result = new ArrayList<List<MemoryItem>>();
+        List<ConflictGroup> result = new ArrayList<ConflictGroup>();
         for (List<MemoryItem> group : byKey.values()) {
-            if (group.size() > 1 && hasOpposition(group)) {
-                result.add(group);
+            if (group.size() <= 1) {
+                continue;
+            }
+            if (hasOpposition(group)) {
+                result.add(new ConflictGroup(group, "semantic_opposition", "high"));
+            } else if (hasDifferentFingerprint(group)) {
+                result.add(new ConflictGroup(group, "fact_variant", "low"));
             }
         }
         return result;
@@ -94,6 +99,22 @@ public final class ConflictsCommand implements Command {
             }
         }
         return false;
+    }
+
+    private boolean hasDifferentFingerprint(List<MemoryItem> group) {
+        for (int i = 0; i < group.size(); i++) {
+            for (int j = i + 1; j < group.size(); j++) {
+                if (!fingerprint(group.get(i)).equals(fingerprint(group.get(j)))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private String fingerprint(MemoryItem item) {
+        return item.fingerprint().length() == 0
+                ? MemoryIdentity.fingerprint(item.title(), item.content()) : item.fingerprint();
     }
 
     private boolean opposes(String left, String right) {
@@ -117,24 +138,30 @@ public final class ConflictsCommand implements Command {
         return value == null ? "" : value.toLowerCase(Locale.ROOT);
     }
 
-    private void printText(CommandContext context, String module, List<List<MemoryItem>> groups) {
+    private void printText(CommandContext context, String module, List<ConflictGroup> groups) {
         context.out().println("memory conflicts");
         context.out().println("module: " + (module.length() == 0 ? "all" : module));
         context.out().println("groups: " + groups.size());
-        for (List<MemoryItem> group : groups) {
+        for (ConflictGroup conflict : groups) {
+            List<MemoryItem> group = conflict.items;
             context.out().println("- canonical_key: " + group.get(0).canonicalKey());
             context.out().println("  ids: " + ids(group));
             context.out().println("  title: " + group.get(0).title());
+            context.out().println("  severity: " + conflict.severity);
+            context.out().println("  reason: " + conflict.reason);
         }
     }
 
-    private void printJson(CommandContext context, String module, List<List<MemoryItem>> groups) {
+    private void printJson(CommandContext context, String module, List<ConflictGroup> groups) {
         List<String> rawGroups = new ArrayList<String>();
-        for (List<MemoryItem> group : groups) {
+        for (ConflictGroup conflict : groups) {
+            List<MemoryItem> group = conflict.items;
             rawGroups.add(JsonOutput.object(
                     JsonOutput.stringField("canonical_key", group.get(0).canonicalKey()),
                     JsonOutput.stringField("ids", ids(group)),
-                    JsonOutput.stringField("title", group.get(0).title())
+                    JsonOutput.stringField("title", group.get(0).title()),
+                    JsonOutput.stringField("severity", conflict.severity),
+                    JsonOutput.stringField("reason", conflict.reason)
             ).trim());
         }
         context.out().print(JsonOutput.object(
@@ -154,5 +181,17 @@ public final class ConflictsCommand implements Command {
             builder.append(group.get(i).id());
         }
         return builder.toString();
+    }
+
+    private static final class ConflictGroup {
+        private final List<MemoryItem> items;
+        private final String reason;
+        private final String severity;
+
+        private ConflictGroup(List<MemoryItem> items, String reason, String severity) {
+            this.items = items;
+            this.reason = reason;
+            this.severity = severity;
+        }
     }
 }

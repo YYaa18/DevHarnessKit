@@ -89,7 +89,7 @@ public final class BriefLifecycleService {
         this.preWorkGuardService = preWorkGuardService;
     }
 
-    public void recordPreWorkInteraction(Path projectRoot, WorkBrief brief) throws Exception {
+    public void recordPreWorkInteraction(Path projectRoot, WorkBrief brief, String goalKey) throws Exception {
         if (!brief.confirmationRequired() && brief.safeToStart()) {
             return;
         }
@@ -99,7 +99,7 @@ public final class BriefLifecycleService {
                 : "当前任务需要用户确认后再继续执行。";
         InteractionRequest request = new InteractionRequest(
                 "interaction-" + brief.briefId(),
-                "",
+                goalKey == null ? "" : goalKey,
                 "pre_work",
                 type,
                 "blocking",
@@ -116,24 +116,50 @@ public final class BriefLifecycleService {
     }
 
     public void requireNoBlockingInteraction(Path projectRoot, String goalKey, String currentAction) {
-        for (InteractionRequest request : loadInteractions(projectRoot)) {
-            if (request.openBlockingFor(goalKey)) {
-                if (("manual_evidence".equals(request.type()) || "manual_verification".equals(request.type()))
-                        && "verify".equals(currentAction)) {
-                    continue;
-                }
-                throw new BlockingInteractionException(request.requestId(), request.question(), request.choices());
+        List<InteractionRequest> requests = loadInteractions(projectRoot);
+        boolean hasGoalScoped = hasGoalScopedInteraction(requests, goalKey);
+        for (InteractionRequest request : requests) {
+            if (!appliesToGoal(request, goalKey, hasGoalScoped)) {
+                continue;
             }
+            if (("manual_evidence".equals(request.type()) || "manual_verification".equals(request.type()))
+                    && "verify".equals(currentAction)) {
+                continue;
+            }
+            throw new BlockingInteractionException(request.requestId(), request.question(), request.choices());
         }
     }
 
     public InteractionRequest findOpenBlockingInteraction(Path projectRoot, String goalKey) {
-        for (InteractionRequest request : loadInteractions(projectRoot)) {
-            if (request.openBlockingFor(goalKey)) {
+        List<InteractionRequest> requests = loadInteractions(projectRoot);
+        boolean hasGoalScoped = hasGoalScopedInteraction(requests, goalKey);
+        for (InteractionRequest request : requests) {
+            if (appliesToGoal(request, goalKey, hasGoalScoped)) {
                 return request;
             }
         }
         return null;
+    }
+
+    // An unscoped (empty goalKey) interaction is a leftover preview/orphan once a
+    // goal has its own scoped interaction; it must not block an unrelated later goal.
+    private boolean appliesToGoal(InteractionRequest request, String goalKey, boolean hasGoalScoped) {
+        if (!request.openBlockingFor(goalKey)) {
+            return false;
+        }
+        return request.goalKey().length() > 0 || !hasGoalScoped;
+    }
+
+    private boolean hasGoalScopedInteraction(List<InteractionRequest> requests, String goalKey) {
+        if (goalKey == null || goalKey.length() == 0) {
+            return false;
+        }
+        for (InteractionRequest request : requests) {
+            if (goalKey.equals(request.goalKey())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public InteractionRequest answerInteraction(Path projectRoot, String requestId, String answer) throws Exception {

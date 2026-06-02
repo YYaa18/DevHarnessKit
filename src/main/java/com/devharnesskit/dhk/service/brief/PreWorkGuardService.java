@@ -53,9 +53,10 @@ public final class PreWorkGuardService {
             throws Exception {
         Map<String, GuardRecord> records = load(projectRoot);
         List<Finding> findings = new ArrayList<Finding>();
+        boolean hasGoalScoped = hasGoalScopedInteraction(requests, goalKey);
         String current = "";
         for (InteractionRequest request : requests) {
-            if (!appliesToGoal(request, goalKey)) {
+            if (!appliesToGoal(request, goalKey, hasGoalScoped)) {
                 continue;
             }
             GuardRecord record = records.get(request.requestId());
@@ -81,9 +82,28 @@ public final class PreWorkGuardService {
         return findings;
     }
 
-    private boolean appliesToGoal(InteractionRequest request, String goalKey) {
-        return isPreWorkBlocking(request)
-                && (request.goalKey().length() == 0 || request.goalKey().equals(goalKey));
+    private boolean appliesToGoal(InteractionRequest request, String goalKey, boolean hasGoalScoped) {
+        if (!isPreWorkBlocking(request)) {
+            return false;
+        }
+        if (request.goalKey().length() > 0) {
+            return request.goalKey().equals(goalKey);
+        }
+        // Unscoped orphan (e.g. from an earlier advise preview) must not pollute a goal
+        // that already has its own scoped interaction.
+        return !hasGoalScoped;
+    }
+
+    private boolean hasGoalScopedInteraction(List<InteractionRequest> requests, String goalKey) {
+        if (goalKey == null || goalKey.length() == 0) {
+            return false;
+        }
+        for (InteractionRequest request : requests) {
+            if (goalKey.equals(request.goalKey())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean isPreWorkBlocking(InteractionRequest request) {

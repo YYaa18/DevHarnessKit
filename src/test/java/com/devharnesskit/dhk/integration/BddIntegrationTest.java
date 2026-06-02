@@ -1289,6 +1289,95 @@ final class BddIntegrationTest {
         assertTrue(evidence.contains("address-single-default [covered]"));
     }
 
+    @Test
+    void bddListJsonAndFeatureFilterCoverReadBranches() throws Exception {
+        addOrderScenario();
+        addScenario("order-query-export", "导出订单", "已有订单数据", "用户导出报表", "生成订单报表");
+        // a second feature so --feature filtering is meaningful
+        Harness secondFeature = new Harness(tempDir);
+        int secondFeatureExit = new CommandRouter().run(new String[]{
+                "bdd", "add", "--project-root", "demo",
+                "--feature", "payment-refund",
+                "--title", "退款",
+                "--scenario", "payment-refund-happy-path",
+                "--scenario-title", "全额退款成功",
+                "--module", "payment",
+                "--given", "已有已支付订单",
+                "--when", "用户申请全额退款",
+                "--then", "退款成功并通知用户"
+        }, secondFeature.context());
+        assertEquals(ExitCodes.SUCCESS, secondFeatureExit);
+
+        // list --json: exercises BddListCommand JSON branch (featuresJson + scenariosJson)
+        Harness listJson = new Harness(tempDir);
+        int listJsonExit = new CommandRouter().run(new String[]{
+                "bdd", "list", "--project-root", "demo", "--json"
+        }, listJson.context());
+        assertEquals(ExitCodes.SUCCESS, listJsonExit);
+        assertTrue(listJson.stdout().contains("\"command\": \"bdd list\""));
+        assertTrue(listJson.stdout().contains("\"feature_count\": 2"));
+        assertTrue(listJson.stdout().contains("\"scenario_count\": 3"));
+        assertTrue(listJson.stdout().contains("\"feature_key\": \"order-query\""));
+        assertTrue(listJson.stdout().contains("\"feature_key\": \"payment-refund\""));
+        assertTrue(listJson.stdout().contains("\"scenario_key\": \"payment-refund-happy-path\""));
+
+        // list --feature: exercises the text-mode feature filter (skip non-matching features)
+        Harness listFiltered = new Harness(tempDir);
+        int listFilteredExit = new CommandRouter().run(new String[]{
+                "bdd", "list", "--project-root", "demo", "--feature", "payment-refund"
+        }, listFiltered.context());
+        assertEquals(ExitCodes.SUCCESS, listFilteredExit);
+        assertTrue(listFiltered.stdout().contains("- payment-refund [active] 退款 (payment)"));
+        assertTrue(listFiltered.stdout().contains("payment-refund-happy-path [active] 全额退款成功"));
+        assertTrue(!listFiltered.stdout().contains("- order-query [active]"));
+    }
+
+    @Test
+    void bddShowFeatureTextJsonAndMissingTargetBranches() throws Exception {
+        addOrderScenario();
+        addScenario("order-query-export", "导出订单", "已有订单数据", "用户导出报表", "生成订单报表");
+
+        // show --feature: exercises showFeature text path
+        Harness showFeature = new Harness(tempDir);
+        int showFeatureExit = new CommandRouter().run(new String[]{
+                "bdd", "show", "--project-root", "demo", "--feature", "order-query"
+        }, showFeature.context());
+        assertEquals(ExitCodes.SUCCESS, showFeatureExit);
+        assertTrue(showFeature.stdout().contains("feature_key: order-query"));
+        assertTrue(showFeature.stdout().contains("title: 订单查询"));
+        assertTrue(showFeature.stdout().contains("module: order"));
+        assertTrue(showFeature.stdout().contains("scenarios:"));
+        assertTrue(showFeature.stdout().contains("order-query-happy-path [active] 分页查询订单成功"));
+        assertTrue(showFeature.stdout().contains("order-query-export [active] 导出订单"));
+
+        // show --feature --json: exercises showFeature JSON path (scenariosJson)
+        Harness showFeatureJson = new Harness(tempDir);
+        int showFeatureJsonExit = new CommandRouter().run(new String[]{
+                "bdd", "show", "--project-root", "demo", "--feature", "order-query", "--json"
+        }, showFeatureJson.context());
+        assertEquals(ExitCodes.SUCCESS, showFeatureJsonExit);
+        assertTrue(showFeatureJson.stdout().contains("\"command\": \"bdd show\""));
+        assertTrue(showFeatureJson.stdout().contains("\"feature_key\": \"order-query\""));
+        assertTrue(showFeatureJson.stdout().contains("\"scenario_count\": 2"));
+        assertTrue(showFeatureJson.stdout().contains("\"scenario_key\": \"order-query-export\""));
+
+        // show --feature missing: exercises BDD_FEATURE_NOT_FOUND
+        Harness missingFeature = new Harness(tempDir);
+        int missingFeatureExit = new CommandRouter().run(new String[]{
+                "bdd", "show", "--project-root", "demo", "--feature", "no-such-feature"
+        }, missingFeature.context());
+        assertEquals(ExitCodes.NOT_FOUND, missingFeatureExit);
+        assertTrue(missingFeature.stderr().contains("error_code: BDD_FEATURE_NOT_FOUND"));
+
+        // show with neither --scenario nor --feature: exercises BDD_SHOW_TARGET_MISSING
+        Harness missingTarget = new Harness(tempDir);
+        int missingTargetExit = new CommandRouter().run(new String[]{
+                "bdd", "show", "--project-root", "demo"
+        }, missingTarget.context());
+        assertEquals(ExitCodes.USAGE_ERROR, missingTargetExit);
+        assertTrue(missingTarget.stderr().contains("error_code: BDD_SHOW_TARGET_MISSING"));
+    }
+
     private int countRows(String tableName, String where) throws Exception {
         try (Connection connection = DriverManager.getConnection(
                 "jdbc:sqlite:" + PathUtil.memoryDb(tempDir.resolve("demo")).toString());

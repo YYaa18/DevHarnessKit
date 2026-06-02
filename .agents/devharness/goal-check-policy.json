@@ -1,3 +1,4 @@
 {
-  "required_checks": "compile,test,sensitive,workflow,spec,think-before-coding,goal-driven,simplicity,surgical-change"
+  "required_checks": "compile,test,sensitive,workflow,spec,think-before-coding,goal-driven,simplicity,surgical-change",
+  "accepted_spec_statuses": "passed,skipped"
 }

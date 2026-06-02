@@ -2,7 +2,8 @@
 
 Forbidden unless GOAL_CONTEXT or the user explicitly allows it:
 
-- direct lower-level `dhk memory ...`
+- direct lower-level `dhk memory ...` writes other than `dhk memory search` and `dhk memory suggest` (those two are allowed for the error-to-solution loop)
+- accepting your own memory candidates (`dhk memory candidates accept`); the user confirms what becomes reusable knowledge
 - direct lower-level `dhk workflow ...`
 - direct lower-level `dhk spec ...`
 - `workflow gate waive`

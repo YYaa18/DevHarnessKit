@@ -63,6 +63,11 @@ final class GoalSkillPackagingTest {
         assertTrue(skill.contains("## Core Path"));
         assertTrue(skill.contains("## Full Protocol"));
         assertTrue(skill.contains("## Retrospective And Review Summaries"));
+        assertTrue(skill.contains("## Troubleshooting Memory (Error To Solution)"));
+        assertTrue(skill.contains("## Build And Verify Loop Guard"));
+        assertTrue(skill.contains("Never retry a failing or hanging build"));
+        assertTrue(skill.contains("dhk memory search"));
+        assertTrue(skill.contains("dhk memory suggest"));
         assertTrue(skill.contains("goal-verify.sh"));
         assertTrue(skill.contains("goal-retrospective.sh"));
         assertTrue(skill.contains("review-summary"));
@@ -91,6 +96,9 @@ final class GoalSkillPackagingTest {
         assertTrue(contract.contains("\"dhk goal export\""));
         assertTrue(contract.contains("\"dhk goal check\""));
         assertTrue(contract.contains("\"dhk goal evaluate\""));
+        assertTrue(contract.contains("\"dhk memory search\""));
+        assertTrue(contract.contains("\"dhk memory suggest\""));
+        assertTrue(contract.contains("\"dhk memory confirm\""));
 
         assertProjectRootInjection(skillRoot);
         assertQuickstartWrapper(skillRoot);
@@ -126,8 +134,11 @@ final class GoalSkillPackagingTest {
         assertTrue(protocol.contains("Run `goal verify` before final completion"));
         assertTrue(protocol.contains("goal-retrospective.sh --goal <goal-key>"));
         assertTrue(protocol.contains("复盘材料"));
+        assertTrue(protocol.contains("dhk memory search --q"));
+        assertTrue(protocol.contains("dhk memory suggest"));
         assertTrue(evidence.contains("Mirror required evidence keys exactly"));
         assertTrue(forbidden.contains("direct lower-level `dhk memory ...`"));
+        assertTrue(forbidden.contains("allowed for the error-to-solution loop"));
         assertTrue(forbidden.contains("`db sql`"));
         assertTrue(forbidden.contains("claiming completion before `goal verify`"));
         assertTrue(selfCheck.contains("goal evaluate"));
@@ -591,8 +602,12 @@ final class GoalSkillPackagingTest {
         assertTrue(Files.isRegularFile(project.resolve("CLAUDE.md")));
         assertTrue(read(project.resolve("CLAUDE.md")).contains("Do not bypass goal"));
         assertTrue(read(project.resolve("CLAUDE.md")).contains("Do not use graph impact --allow-stale"));
+        assertTrue(read(project.resolve("CLAUDE.md")).contains("dhk memory search"));
+        assertTrue(read(project.resolve("CLAUDE.md")).contains("Never retry a failing or hanging build"));
         assertTrue(Files.isRegularFile(project.resolve("AGENTS.md")));
-        assertTrue(read(project.resolve("AGENTS.md")).contains("Do not call lower-level memory/workflow/spec/db commands"));
+        assertTrue(read(project.resolve("AGENTS.md")).contains("Do not call lower-level workflow/spec/db commands"));
+        assertTrue(read(project.resolve("AGENTS.md")).contains("dhk memory suggest"));
+        assertTrue(read(project.resolve("AGENTS.md")).contains("Never retry a failing or hanging build"));
         assertTrue(Files.isRegularFile(project.resolve(".comate/rules/devharness-goal-protocol.mdr")));
         String comateRule = read(project.resolve(".comate/rules/devharness-goal-protocol.mdr"));
         assertTrue(comateRule.contains("AGENT_BRIEF.json"));

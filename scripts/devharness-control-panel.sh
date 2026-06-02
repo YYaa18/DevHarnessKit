@@ -433,7 +433,16 @@ For any code change:
 If GOAL_CONTEXT shows graph_required=true, keep using `/devharness-goal-development`.
 Treat graph-assist as internal evidence guidance inside the current main action.
 
-Do not bypass goal with direct memory/workflow/spec/db commands.
+On a non-trivial error, run `dhk memory search --q "<error signature>"` first to
+reuse a known fix; after solving, run `dhk memory suggest` to queue a
+troubleshooting candidate for the user to confirm. Do not run `dhk memory confirm`.
+
+Do not bypass goal with direct workflow/spec/db commands. For memory, only search
+and suggest are allowed; never confirm memory or write secrets into a suggestion.
+Never retry a failing or hanging build in a loop. If compile/test cannot run or
+fails for environmental reasons, record it once as `compile_result=blocked: <reason>`
+plus risk/rollback evidence, then complete with manual evidence or report the
+blocker to the user. Do not re-run the same failing command expecting a different result.
 Do not use graph impact --allow-stale unless explicit approval evidence is present.
 '
   write_text_file "$PROJECT_ROOT/CLAUDE.md" "$claude_md"
@@ -461,7 +470,11 @@ If GOAL_CONTEXT contains graph_required=true:
 - If GOAL_CONTEXT has graph-assist, run the listed graph helper internally and record graph evidence in the current goal step.
 - Do not use `graph impact --allow-stale` unless explicit approval evidence is present.
 
-Do not call lower-level memory/workflow/spec/db commands unless GOAL_CONTEXT explicitly allows it.
+On a non-trivial error, run `dhk memory search --q "<error signature>"` first to reuse a known fix; after solving, run `dhk memory suggest` to queue a troubleshooting candidate for the user to confirm. Do not run `dhk memory confirm`.
+
+Do not call lower-level workflow/spec/db commands unless GOAL_CONTEXT explicitly allows it. For memory, only `dhk memory search` and `dhk memory suggest` are allowed; never confirm memory or write secrets into a suggestion.
+
+Never retry a failing or hanging build in a loop. If compile/test cannot run or fails for environmental reasons (missing deps, no local toolchain, manual policy), record it once as `compile_result=blocked: <reason>` plus risk/rollback evidence, then complete with manual evidence or report the blocker to the user. Do not re-run the same failing command expecting a different result.
 '
   write_text_file "$PROJECT_ROOT/AGENTS.md" "$agents_md"
 }
@@ -499,7 +512,11 @@ For any code change:
 20. Run `.agents/skills/devharness-goal-development/scripts/goal-verify.sh` before claiming completion.
 21. Run `.agents/skills/devharness-goal-development/scripts/goal-complete.sh` only when ready_to_complete.
 
-Do not bypass goal with direct memory/workflow/spec/db commands.
+On a non-trivial error, run `dhk memory search --q "<error signature>"` first to reuse a known fix; after solving, run `dhk memory suggest` to queue a troubleshooting candidate for the user to confirm. Do not run `dhk memory confirm` or accept candidates yourself.
+
+Never retry a failing or hanging build in a loop. If compile/test cannot run or fails for environmental reasons (missing deps, no local toolchain, manual policy), record it once as `compile_result=blocked: <reason>` plus risk/rollback evidence, then complete with manual evidence or report the friendly blocker to the user. Do not re-run the same failing command expecting a different result.
+
+Do not bypass goal with direct workflow/spec/db commands. For memory, only search and suggest are allowed; never confirm memory or write secrets into a suggestion.
 Do not show Agent Brief `harness_commands` to ordinary users unless they request debugging details.
 
 Before replying that work is done, perform this Harness self-check:

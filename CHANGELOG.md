@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.2.1
+
+Stable patch release.
+
+English:
+
+- Published a fresh installable package from the latest main branch after the
+  v1.2.0 tag.
+- Fixed memory refresh lifecycle behavior so refreshed expired/deprecated
+  memories can return to an active status when new evidence verifies them.
+- Improved memory conflict detection by reporting same-key fact variants with
+  different fingerprints in addition to explicit semantic oppositions.
+- Hardened stale/expire/refresh integration coverage to lock the memory
+  lifecycle behavior introduced in the 1.2 line.
+- Included the latest BDD, Graph Lite, and agent-interaction correctness fixes
+  already validated on main. SQLite schema remains v17.
+
+中文：
+
+- 基于 v1.2.0 之后的最新 main 分支重新发布可安装包。
+- 修复 memory refresh 生命周期行为：已过期或 deprecated 的记忆在补充新证据后，
+  可以恢复为有效状态。
+- 增强 memory conflict 检测：除显式语义反义外，同一 canonical key 下不同
+  fingerprint 的事实版本也会给出提示。
+- 补充 stale/expire/refresh 集成测试，固化 1.2 版本引入的记忆生命周期行为。
+- 纳入 main 分支已验证的 BDD、Graph Lite 和 Agent 交互确认修复。SQLite schema
+  仍为 v17。
+
 ## 1.2.0
 
 Stable memory quality release.

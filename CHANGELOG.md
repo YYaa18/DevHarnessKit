@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.2.3
+
+Stable patch release.
+
+English:
+
+- Published a fresh installable package after the Graph Lite advisory impact
+  fixes on `main`.
+- Fixed Java Lite inheritance target resolution so same-package
+  `implements`/`extends` edges point to declared fully qualified type nodes.
+- Added graph-specific workspace fingerprints based on scanned file metadata,
+  including modified time, hash, and size, so touch-only changes mark graph
+  snapshots stale.
+- Unified Graph status, impact, and graph-aware Goal checks on the same
+  `graph:` fingerprint contract.
+- Preserved Graph precision by traversing inheritance impact from
+  interface/base type to implementation/subclass without expanding from a
+  concrete implementation back into shared base classes.
+- Added parser, CLI, precision-suite, Goal integration, and full Maven
+  regression coverage. SQLite schema remains v17.
+
+中文：
+
+- 基于 `main` 上最新 Graph Lite advisory impact 修复重新发布可安装包。
+- 修复 Java Lite 继承目标解析：同包 `implements`/`extends` 边现在指向已声明的
+  全限定类型节点。
+- 新增 Graph 专用 workspace fingerprint，纳入扫描文件的修改时间、hash 和大小，
+  仅 `touch` 文件也会让 graph snapshot 标记为 stale。
+- 统一 Graph status、impact 和 graph-aware Goal 检查使用同一套 `graph:`
+  fingerprint 契约。
+- 保持 Graph precision：继承影响从接口/基类扩散到实现/子类，但不从具体实现反向
+  扩散到共享基类，避免推荐阅读误召回。
+- 补充 parser、CLI、precision suite、Goal integration 和全量 Maven 回归覆盖。
+  SQLite schema 仍为 v17。
+
 ## 1.2.2
 
 Stable patch release.

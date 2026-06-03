@@ -15,7 +15,6 @@ import com.devharnesskit.dhk.model.graph.GraphSnapshot;
 import com.devharnesskit.dhk.repository.ProjectRepository;
 import com.devharnesskit.dhk.repository.graph.GraphRepository;
 import com.devharnesskit.dhk.service.ProjectService;
-import com.devharnesskit.dhk.service.goal.WorkspaceFingerprintService;
 import com.devharnesskit.dhk.service.policy.DevHarnessPolicyService;
 import com.devharnesskit.dhk.util.Clock;
 import com.devharnesskit.dhk.util.PathUtil;
@@ -44,13 +43,13 @@ public final class GraphService {
     private final ProjectRepository projectRepository;
     private final GraphRepository graphRepository;
     private final TransactionTemplate transactionTemplate;
-    private final WorkspaceFingerprintService fingerprintService;
+    private final GraphWorkspaceFingerprintService fingerprintService;
     private final DevHarnessPolicyService policyService;
 
     public GraphService() {
         this(new GraphConfigService(), new GraphFileScanner(), new GraphLiteParser(), new GraphIndexReportRenderer(),
                 new DbConnectionFactory(), new MigrationRunner(), new ProjectService(), new ProjectRepository(),
-                new GraphRepository(), new TransactionTemplate(), new WorkspaceFingerprintService(),
+                new GraphRepository(), new TransactionTemplate(), new GraphWorkspaceFingerprintService(),
                 new DevHarnessPolicyService());
     }
 
@@ -58,7 +57,7 @@ public final class GraphService {
                  GraphIndexReportRenderer renderer, DbConnectionFactory connectionFactory,
                  MigrationRunner migrationRunner, ProjectService projectService, ProjectRepository projectRepository,
                  GraphRepository graphRepository, TransactionTemplate transactionTemplate,
-                 WorkspaceFingerprintService fingerprintService, DevHarnessPolicyService policyService) {
+                 GraphWorkspaceFingerprintService fingerprintService, DevHarnessPolicyService policyService) {
         this.configService = configService;
         this.scanner = scanner;
         this.parser = parser;
@@ -86,7 +85,7 @@ public final class GraphService {
         Project project = projectService.ensureProject(projectRoot, clock);
         String createdAt = clock.now().toString();
         String completedAt = clock.now().toString();
-        String workspaceFingerprint = fingerprintService.workspaceFingerprint(projectRoot);
+        String workspaceFingerprint = fingerprintService.fingerprint(projectRoot, report);
         String snapshotKey = snapshotKey(clock);
         String configHash = configHash(config);
         String summary = summary(projectRoot, report);
@@ -113,8 +112,8 @@ public final class GraphService {
         PathUtil.createGraphDirectories(projectRoot);
         GraphConfig config = configService.load(projectRoot);
         GraphSnapshot latestSnapshot = latestSnapshot(projectRoot);
-        String currentWorkspaceFingerprint = fingerprintService.workspaceFingerprint(projectRoot);
         GraphScanReport scanned = scan(projectRoot, config, latestSnapshot);
+        String currentWorkspaceFingerprint = fingerprintService.fingerprint(projectRoot, scanned);
         GraphScanReport report = new GraphScanReport(projectRoot, config, scanned.entries(), scanned.parseResult(),
                 latestSnapshot, currentWorkspaceFingerprint, isSnapshotStale(latestSnapshot, currentWorkspaceFingerprint));
         Files.write(PathUtil.graphIndexReport(projectRoot),

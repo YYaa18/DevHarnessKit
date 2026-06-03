@@ -4,6 +4,11 @@ import com.devharnesskit.dhk.model.goal.GoalGraphState;
 import com.devharnesskit.dhk.model.goal.GoalPlan;
 import com.devharnesskit.dhk.model.goal.GoalProfile;
 import com.devharnesskit.dhk.model.policy.DevHarnessPolicy;
+import com.devharnesskit.dhk.model.graph.GraphConfig;
+import com.devharnesskit.dhk.model.graph.GraphScanReport;
+import com.devharnesskit.dhk.service.graph.GraphConfigService;
+import com.devharnesskit.dhk.service.graph.GraphFileScanner;
+import com.devharnesskit.dhk.service.graph.GraphWorkspaceFingerprintService;
 import com.devharnesskit.dhk.service.policy.DevHarnessPolicyService;
 import com.devharnesskit.dhk.util.PathUtil;
 
@@ -19,7 +24,9 @@ public final class GoalGraphStateService {
     private static final Pattern SNAPSHOT_WORKSPACE_FINGERPRINT =
             Pattern.compile("\"workspace_fingerprint\"\\s*:\\s*\"([^\"]*)\"");
     private final DevHarnessPolicyService policyService = new DevHarnessPolicyService();
-    private final WorkspaceFingerprintService fingerprintService = new WorkspaceFingerprintService();
+    private final GraphConfigService configService = new GraphConfigService();
+    private final GraphFileScanner scanner = new GraphFileScanner();
+    private final GraphWorkspaceFingerprintService fingerprintService = new GraphWorkspaceFingerprintService();
 
     public GoalGraphState inspect(Path projectRoot, GoalProfile profile, GoalPlan plan) {
         if (profile == null || !profile.graphRequired()) {
@@ -96,7 +103,10 @@ public final class GoalGraphStateService {
 
     private String currentWorkspaceFingerprint(Path projectRoot) {
         try {
-            return fingerprintService.workspaceFingerprint(projectRoot);
+            GraphConfig config = configService.load(projectRoot);
+            GraphScanReport scan = scanner.scan(projectRoot, config,
+                    policyService.load(projectRoot).protectedFiles());
+            return fingerprintService.fingerprint(projectRoot, scan);
         } catch (RuntimeException ex) {
             return "";
         }

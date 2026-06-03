@@ -10,10 +10,11 @@ import com.devharnesskit.dhk.model.graph.GraphFileEntry;
 import com.devharnesskit.dhk.model.graph.GraphImpactRequest;
 import com.devharnesskit.dhk.model.graph.GraphImpactResult;
 import com.devharnesskit.dhk.model.graph.GraphNode;
+import com.devharnesskit.dhk.model.graph.GraphScanReport;
 import com.devharnesskit.dhk.model.graph.GraphSnapshot;
 import com.devharnesskit.dhk.repository.graph.GraphRepository;
 import com.devharnesskit.dhk.service.ProjectService;
-import com.devharnesskit.dhk.service.goal.WorkspaceFingerprintService;
+import com.devharnesskit.dhk.service.policy.DevHarnessPolicyService;
 import com.devharnesskit.dhk.util.Clock;
 import com.devharnesskit.dhk.util.PathUtil;
 
@@ -39,23 +40,29 @@ public final class GraphImpactService {
     private final GraphImpactRenderer renderer;
     private final GraphConfigService configService;
     private final GraphCgcAdapterService cgcAdapterService;
-    private final WorkspaceFingerprintService fingerprintService;
+    private final GraphFileScanner scanner;
+    private final GraphWorkspaceFingerprintService fingerprintService;
+    private final DevHarnessPolicyService policyService;
 
     public GraphImpactService() {
         this(new DbConnectionFactory(), new ProjectService(), new GraphRepository(), new GraphImpactRenderer(),
-                new GraphConfigService(), new GraphCgcAdapterService(), new WorkspaceFingerprintService());
+                new GraphConfigService(), new GraphCgcAdapterService(), new GraphFileScanner(),
+                new GraphWorkspaceFingerprintService(), new DevHarnessPolicyService());
     }
 
     GraphImpactService(DbConnectionFactory connectionFactory, ProjectService projectService,
                        GraphRepository graphRepository, GraphImpactRenderer renderer, GraphConfigService configService,
-                       GraphCgcAdapterService cgcAdapterService, WorkspaceFingerprintService fingerprintService) {
+                       GraphCgcAdapterService cgcAdapterService, GraphFileScanner scanner,
+                       GraphWorkspaceFingerprintService fingerprintService, DevHarnessPolicyService policyService) {
         this.connectionFactory = connectionFactory;
         this.projectService = projectService;
         this.graphRepository = graphRepository;
         this.renderer = renderer;
         this.configService = configService;
         this.cgcAdapterService = cgcAdapterService;
+        this.scanner = scanner;
         this.fingerprintService = fingerprintService;
+        this.policyService = policyService;
     }
 
     public GraphImpactResult impact(Path projectRoot, GraphImpactRequest request, Clock clock) throws Exception {
@@ -75,7 +82,7 @@ public final class GraphImpactService {
             return result;
         }
         GraphData data = loadData(projectRoot);
-        String currentWorkspaceFingerprint = fingerprintService.workspaceFingerprint(projectRoot);
+        String currentWorkspaceFingerprint = currentWorkspaceFingerprint(projectRoot, config);
         boolean snapshotStale = isSnapshotStale(data.snapshot(), currentWorkspaceFingerprint);
         if (snapshotStale && !effectiveRequest.allowStale()) {
             throw new IllegalStateException("STALE_GRAPH_SNAPSHOT: latest graph snapshot "
@@ -124,6 +131,11 @@ public final class GraphImpactService {
                 && currentWorkspaceFingerprint != null
                 && currentWorkspaceFingerprint.length() > 0
                 && !currentWorkspaceFingerprint.equals(snapshot.workspaceFingerprint());
+    }
+
+    private String currentWorkspaceFingerprint(Path projectRoot, GraphConfig config) {
+        GraphScanReport scan = scanner.scan(projectRoot, config, policyService.load(projectRoot).protectedFiles());
+        return fingerprintService.fingerprint(projectRoot, scan);
     }
 
     private GraphImpactResult buildResult(Path projectRoot, GraphData data, GraphImpactRequest request,
@@ -513,6 +525,9 @@ public final class GraphImpactService {
         }
         if ("includes".equals(edge.edgeKind()) && outgoing
                 && current != null && "jsp_page".equals(current.nodeKind())) {
+            return false;
+        }
+        if (("extends".equals(edge.edgeKind()) || "implements".equals(edge.edgeKind())) && outgoing) {
             return false;
         }
         if (isExternalJavaKey(edge.sourceNodeKey()) || isExternalJavaKey(edge.targetNodeKey())) {

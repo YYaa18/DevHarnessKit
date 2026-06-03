@@ -16,6 +16,7 @@ import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
 import java.security.MessageDigest;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -407,6 +408,58 @@ final class GraphCommandIntegrationTest {
         assertTrue(impactMap.contains("<graph-confidence>"));
         assertTrue(impactMap.contains("- precision: heuristic"));
         assertTrue(impactMap.contains("- do_not_treat_as_correctness_proof: true"));
+    }
+
+    @Test
+    void graphStatusMarksTouchOnlyChangesStale() throws Exception {
+        Path root = tempDir.resolve("demo-touch-stale");
+        write(root, "src/main/java/com/example/App.java",
+                "package com.example;\npublic class App { public void run() {} }\n");
+
+        Harness indexHarness = new Harness(tempDir);
+        int indexExit = new CommandRouter().run(new String[]{"graph", "index", "--project-root", "demo-touch-stale"},
+                indexHarness.context());
+        Path app = root.resolve("src/main/java/com/example/App.java");
+        FileTime touched = FileTime.fromMillis(Files.getLastModifiedTime(app).toMillis() + 60000L);
+        Files.setLastModifiedTime(app, touched);
+
+        Harness statusHarness = new Harness(tempDir);
+        int statusExit = new CommandRouter().run(new String[]{"graph", "status", "--project-root", "demo-touch-stale"},
+                statusHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, indexExit);
+        assertEquals(ExitCodes.SUCCESS, statusExit);
+        assertTrue(statusHarness.stdout().contains("latest_snapshot_stale: true"));
+    }
+
+    @Test
+    void graphImpactFromInterfaceIncludesSamePackageImplementation() throws Exception {
+        Path root = tempDir.resolve("demo-interface-impact");
+        write(root, "src/main/java/com/example/AccountRepository.java",
+                "package com.example;\n"
+                        + "public interface AccountRepository {\n"
+                        + "  void save();\n"
+                        + "}\n");
+        write(root, "src/main/java/com/example/InMemoryAccountRepository.java",
+                "package com.example;\n"
+                        + "public class InMemoryAccountRepository implements AccountRepository {\n"
+                        + "  public void save() {}\n"
+                        + "}\n");
+
+        Harness indexHarness = new Harness(tempDir);
+        int indexExit = new CommandRouter().run(new String[]{"graph", "index", "--project-root", "demo-interface-impact"},
+                indexHarness.context());
+        Harness impactHarness = new Harness(tempDir);
+        int impactExit = new CommandRouter().run(new String[]{
+                "graph", "impact", "--project-root", "demo-interface-impact",
+                "--file", "src/main/java/com/example/AccountRepository.java", "--depth", "2"
+        }, impactHarness.context());
+
+        assertEquals(ExitCodes.SUCCESS, indexExit);
+        assertEquals(ExitCodes.SUCCESS, impactExit);
+        String impactMap = new String(Files.readAllBytes(PathUtil.graphImpactMap(root)), "UTF-8");
+        assertTrue(impactMap.contains("src/main/java/com/example/AccountRepository.java"));
+        assertTrue(impactMap.contains("src/main/java/com/example/InMemoryAccountRepository.java"));
     }
 
     @Test

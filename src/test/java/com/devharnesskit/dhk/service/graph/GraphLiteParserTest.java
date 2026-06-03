@@ -117,6 +117,30 @@ final class GraphLiteParserTest {
     }
 
     @Test
+    void parsesSamePackageImplementsTargetsAsDeclaredInterfaceNodes() throws Exception {
+        write("src/main/java/com/example/AccountRepository.java",
+                "package com.example;\n"
+                        + "public interface AccountRepository {\n"
+                        + "  void save();\n"
+                        + "}\n");
+        write("src/main/java/com/example/InMemoryAccountRepository.java",
+                "package com.example;\n"
+                        + "public class InMemoryAccountRepository implements AccountRepository {\n"
+                        + "  public void save() {}\n"
+                        + "}\n");
+
+        GraphConfig config = GraphConfig.defaults();
+        GraphScanReport scan = new GraphFileScanner().scan(tempDir, config);
+        GraphParseResult result = new GraphLiteParser().parse(tempDir, scan.entries());
+
+        assertNode(result, "interface", "com.example.AccountRepository");
+        assertNode(result, "class", "com.example.InMemoryAccountRepository");
+        assertEdge(result, "implements",
+                "java_type:com.example.InMemoryAccountRepository",
+                "java_type:com.example.AccountRepository");
+    }
+
+    @Test
     void propertiesParserAndReportDoNotExportSensitiveValues() throws Exception {
         write("src/main/resources/application.properties",
                 "db.password=super-secret-value\napp.route=/legacy/orders\n");
@@ -164,5 +188,15 @@ final class GraphLiteParserTest {
             }
         }
         throw new AssertionError("Missing edge: " + kind + " -> " + targetNodeKey);
+    }
+
+    private void assertEdge(GraphParseResult result, String kind, String sourceNodeKey, String targetNodeKey) {
+        for (GraphEdge edge : result.edges()) {
+            if (kind.equals(edge.edgeKind()) && sourceNodeKey.equals(edge.sourceNodeKey())
+                    && targetNodeKey.equals(edge.targetNodeKey())) {
+                return;
+            }
+        }
+        throw new AssertionError("Missing edge: " + kind + " " + sourceNodeKey + " -> " + targetNodeKey);
     }
 }

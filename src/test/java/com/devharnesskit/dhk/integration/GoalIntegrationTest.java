@@ -2291,8 +2291,8 @@ final class GoalIntegrationTest {
         assertTrue(next.stdout().contains("current_action: inspect_existing_code"));
         assertTrue(next.stdout().contains("graph_stale: true"));
         assertTrue(next.stdout().contains("freshness_status: stale"));
-        assertTrue(next.stdout().contains("snapshot_workspace_fingerprint: fallback:"));
-        assertTrue(next.stdout().contains("current_workspace_fingerprint: fallback:"));
+        assertTrue(next.stdout().contains("snapshot_workspace_fingerprint: graph:"));
+        assertTrue(next.stdout().contains("current_workspace_fingerprint: graph:"));
         assertTrue(next.stdout().contains("recommended_internal_action: refresh_graph_context"));
         assertTrue(next.stdout().contains("internal_helper: .agents/skills/devharness-goal-development/scripts/graph-index-export.sh"));
         assertTrue(next.stdout().contains("next_command: .agents/skills/devharness-goal-development/scripts/goal-step.sh"));

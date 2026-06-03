@@ -1,6 +1,12 @@
 package com.devharnesskit.dhk.service.goal;
 
 import com.devharnesskit.dhk.model.goal.GoalCheck;
+import com.devharnesskit.dhk.model.graph.GraphConfig;
+import com.devharnesskit.dhk.model.graph.GraphScanReport;
+import com.devharnesskit.dhk.service.graph.GraphConfigService;
+import com.devharnesskit.dhk.service.graph.GraphFileScanner;
+import com.devharnesskit.dhk.service.graph.GraphWorkspaceFingerprintService;
+import com.devharnesskit.dhk.service.policy.DevHarnessPolicyService;
 import com.devharnesskit.dhk.util.PathUtil;
 
 import java.nio.file.Files;
@@ -10,12 +16,25 @@ import java.util.List;
 
 final class GraphGoalCheckRunner extends AbstractGoalCheckRunner {
     private final GoalCheckRecorder recorder;
-    private final WorkspaceFingerprintService fingerprintService;
+    private final GraphConfigService configService;
+    private final GraphFileScanner scanner;
+    private final GraphWorkspaceFingerprintService fingerprintService;
+    private final DevHarnessPolicyService policyService;
 
     GraphGoalCheckRunner(GoalCheckRecorder recorder, WorkspaceFingerprintService fingerprintService) {
+        this(recorder, new GraphConfigService(), new GraphFileScanner(),
+                new GraphWorkspaceFingerprintService(), new DevHarnessPolicyService());
+    }
+
+    GraphGoalCheckRunner(GoalCheckRecorder recorder, GraphConfigService configService, GraphFileScanner scanner,
+                         GraphWorkspaceFingerprintService fingerprintService,
+                         DevHarnessPolicyService policyService) {
         super("graph");
         this.recorder = recorder;
+        this.configService = configService;
+        this.scanner = scanner;
         this.fingerprintService = fingerprintService;
+        this.policyService = policyService;
     }
 
     public GoalCheck run(GoalCheckContext context) throws Exception {
@@ -48,7 +67,7 @@ final class GraphGoalCheckRunner extends AbstractGoalCheckRunner {
             output.append("generated_at: ").append(generatedAt).append('\n');
             output.append("snapshot_workspace_fingerprint: ").append(snapshotFingerprint).append('\n');
             if (context.profile().graphRequireFreshSnapshot()) {
-                String currentFingerprint = fingerprintService.workspaceFingerprint(context.projectRoot());
+                String currentFingerprint = currentWorkspaceFingerprint(context.projectRoot());
                 output.append("current_workspace_fingerprint: ").append(currentFingerprint).append('\n');
                 if (snapshotFingerprint.length() == 0) {
                     failures.add("graph snapshot stale: workspace fingerprint missing; next_command=" + command);
@@ -70,5 +89,11 @@ final class GraphGoalCheckRunner extends AbstractGoalCheckRunner {
                 : "graph freshness failed: " + failures;
         return recorder.save(context.connection(), context.projectRoot(), context.goal(), key(), "graph",
                 command, status, summary, log, context.now());
+    }
+
+    private String currentWorkspaceFingerprint(Path projectRoot) {
+        GraphConfig config = configService.load(projectRoot);
+        GraphScanReport scan = scanner.scan(projectRoot, config, policyService.load(projectRoot).protectedFiles());
+        return fingerprintService.fingerprint(projectRoot, scan);
     }
 }

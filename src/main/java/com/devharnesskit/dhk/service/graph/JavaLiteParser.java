@@ -89,7 +89,7 @@ final class JavaLiteParser implements GraphSourceParser {
                 }
                 addImportEdges(builder, entry, currentTypeKey, imports, lineNumber);
                 addTypeInheritanceEdges(builder, entry, currentTypeKey, typeMatcher.group(3), importBySimpleName,
-                        lineNumber);
+                        packageName, lineNumber);
                 pendingAnnotations.clear();
                 continue;
             }
@@ -139,13 +139,15 @@ final class JavaLiteParser implements GraphSourceParser {
     }
 
     private void addTypeInheritanceEdges(GraphParseResult.Builder builder, GraphFileEntry entry, String typeKey,
-                                         String tail, Map<String, String> imports, int lineNumber) {
-        addKeywordTargets(builder, entry, typeKey, tail, imports, lineNumber, "extends");
-        addKeywordTargets(builder, entry, typeKey, tail, imports, lineNumber, "implements");
+                                         String tail, Map<String, String> imports, String packageName,
+                                         int lineNumber) {
+        addKeywordTargets(builder, entry, typeKey, tail, imports, packageName, lineNumber, "extends");
+        addKeywordTargets(builder, entry, typeKey, tail, imports, packageName, lineNumber, "implements");
     }
 
     private void addKeywordTargets(GraphParseResult.Builder builder, GraphFileEntry entry, String typeKey,
-                                   String tail, Map<String, String> imports, int lineNumber, String keyword) {
+                                   String tail, Map<String, String> imports, String packageName, int lineNumber,
+                                   String keyword) {
         int offset = tail == null ? -1 : tail.indexOf(keyword);
         if (offset < 0) {
             return;
@@ -160,7 +162,7 @@ final class JavaLiteParser implements GraphSourceParser {
             if (name.length() == 0) {
                 continue;
             }
-            String qualified = imports.containsKey(name) ? imports.get(name) : name;
+            String qualified = resolveType(name, imports, packageName);
             String targetKey = javaTypeKey(qualified);
             builder.addNode(new GraphNode(targetKey, "type_reference", simpleName(qualified), qualified,
                     entry.relativePath(), lineNumber, lineNumber, "java", "", "", 70, "lite",

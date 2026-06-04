@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.2.4
+
+Stable patch release.
+
+English:
+
+- Published a fresh installable package from the latest `main` branch after
+  `v1.2.3`.
+- Auto-superseded older confirmed memory entries when confirming a newer
+  same-topic entry with different content, and reported the retired ids through
+  `memory confirm`.
+- Added freshness-aware memory search ranking so recently verified or updated
+  memories get a small boost while long-untouched memories receive an aging
+  penalty.
+- Added regression coverage for same-topic supersede and ranking behavior.
+  SQLite schema remains v17.
+
+中文：
+
+- 基于 `v1.2.3` 之后最新的 `main` 分支重新发布可安装包。
+- 确认同主题新版本 memory 时，自动将内容不同的旧 confirmed memory 标记为被替代，
+  并通过 `memory confirm` 返回被退役的 id。
+- 增加 freshness-aware memory 检索排序：近期验证或更新的记忆会获得小幅加分，
+  长期未维护的记忆会获得 aging 降权。
+- 补充同主题自动替代和排序行为回归测试。SQLite schema 仍为 v17。
+
 ## 1.2.3
 
 Stable patch release.

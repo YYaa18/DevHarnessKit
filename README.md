@@ -12,15 +12,16 @@ verification status, and a local recovery trail.
 
 ## Status
 
-DevHarness Kit `1.2.3` is the current stable release. The stable contract is
+DevHarness Kit `1.2.4` is the current stable release. The stable contract is
 intentionally narrow: core CLI, memory, goal, status, readiness, configure,
 brief, BDD acceptance evidence, release packaging, and documented
 generated-export anchors. The 1.2 line adds CLI-first memory quality workflows
 for candidates, dedupe/conflict checks, stale governance, explainable ranking,
-and team memory packs while preserving the 1.0 stable core. The 1.2.3 patch
-packages the latest Graph Lite advisory precision and stale snapshot fixes.
+and team memory packs while preserving the 1.0 stable core. The 1.2.4 patch
+packages the latest memory freshness ranking and stale-knowledge retirement
+fixes.
 
-Current stable release: `1.2.3`.
+Current stable release: `1.2.4`.
 
 Current schema version is v17.
 

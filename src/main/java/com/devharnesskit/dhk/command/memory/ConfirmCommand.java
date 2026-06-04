@@ -79,12 +79,30 @@ public final class ConfirmCommand implements Command {
             final long memoryId = id;
             final int confirmedConfidence = confidence;
             final String confirmer = confirmedBy;
+            final int[] supersededCount = {0};
+            final java.util.List<Long> supersededIds = new java.util.ArrayList<Long>();
             transactionTemplate.execute(connection, new TransactionTemplate.Work<Void>() {
                 public Void execute() throws Exception {
                     memoryRepository.confirm(connection, currentProject.projectKey(), memoryId,
                             confirmedConfidence, confirmer, now);
                     MemoryItem updated = memoryRepository.findById(connection, currentProject.projectKey(), memoryId);
                     ftsRepository.sync(connection, updated);
+                    // Auto-retire older confirmed knowledge for the SAME topic (canonical key) that
+                    // says something different, so a newer confirmed version supersedes the stale one.
+                    if (updated.canonicalKey().length() > 0) {
+                        for (MemoryItem other : memoryRepository.findActiveByCanonicalKey(
+                                connection, currentProject.projectKey(), updated.canonicalKey(), memoryId)) {
+                            if (other.fingerprint().equals(updated.fingerprint())) {
+                                continue; // identical knowledge, not a stale conflict
+                            }
+                            memoryRepository.supersede(connection, currentProject.projectKey(), other.id(), memoryId,
+                                    "auto: superseded by newer confirmed knowledge for the same topic", now);
+                            ftsRepository.sync(connection,
+                                    memoryRepository.findById(connection, currentProject.projectKey(), other.id()));
+                            supersededIds.add(Long.valueOf(other.id()));
+                            supersededCount[0]++;
+                        }
+                    }
                     return null;
                 }
             });
@@ -92,6 +110,10 @@ public final class ConfirmCommand implements Command {
             context.out().println("status: confirmed");
             context.out().println("confidence: " + confidence);
             context.out().println("confirmed_by: " + confirmedBy);
+            if (supersededCount[0] > 0) {
+                context.out().println("superseded_same_topic: " + supersededCount[0]);
+                context.out().println("superseded_ids: " + join(supersededIds));
+            }
             return ExitCodes.SUCCESS;
         } catch (SQLException ex) {
             context.err().println("ERROR memory confirm failed: " + ex.getMessage());
@@ -103,6 +125,15 @@ public final class ConfirmCommand implements Command {
             context.err().println("ERROR memory confirm failed: " + ex.getMessage());
             return ExitCodes.RUNTIME_ERROR;
         }
+    }
+
+    private String join(java.util.List<Long> ids) {
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < ids.size(); i++) {
+            if (i > 0) b.append(',');
+            b.append(ids.get(i));
+        }
+        return b.toString();
     }
 
     private long parseId(CommandContext context, Args args, String rawValue) {

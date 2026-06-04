@@ -49,8 +49,9 @@ public final class MemorySearchService {
         }
 
         List<SearchResult> scored = new ArrayList<SearchResult>();
+        Instant now = Instant.now();
         for (MemoryItem item : candidates.values()) {
-            SearchResult result = score(item, tokens, module, status, ftsIds.contains(Long.valueOf(item.id())));
+            SearchResult result = score(item, tokens, module, status, ftsIds.contains(Long.valueOf(item.id())), now);
             if (result.score() > 0) {
                 scored.add(result);
             }
@@ -71,7 +72,7 @@ public final class MemorySearchService {
     }
 
     private SearchResult score(MemoryItem item, List<String> tokens, String requestedModule,
-                               String requestedStatus, boolean ftsMatch) {
+                               String requestedStatus, boolean ftsMatch, Instant now) {
         int score = 0;
         List<String> matches = new ArrayList<String>();
         List<String> explanation = new ArrayList<String>();
@@ -132,6 +133,16 @@ public final class MemorySearchService {
             matches.add("used");
             explanation.add("used:+1");
         }
+        int recency = recencyDelta(item, now);
+        if (recency > 0) {
+            score += recency;
+            matches.add("fresh");
+            explanation.add("fresh:+" + recency);
+        } else if (recency < 0) {
+            score += recency;
+            matches.add("aging");
+            explanation.add("aging:" + recency);
+        }
         if (isStale(item)) {
             score -= 8;
             matches.add("stale");
@@ -175,6 +186,31 @@ public final class MemorySearchService {
             builder.append(values.get(i));
         }
         return builder.toString();
+    }
+
+    // Freshness signal: recently updated/verified knowledge ranks above long-untouched knowledge,
+    // so stale "old but blessed" entries no longer outrank newer correct ones over many versions.
+    private int recencyDelta(MemoryItem item, Instant now) {
+        String ts = item.lastVerifiedAt().length() > 0 ? item.lastVerifiedAt()
+                : (item.updatedAt().length() > 0 ? item.updatedAt() : "");
+        if (ts.length() == 0) {
+            return 0;
+        }
+        try {
+            long days = java.time.Duration.between(Instant.parse(ts), now).toDays();
+            if (days < 0) {
+                return 0;
+            }
+            if (days <= 30) {
+                return 2;
+            }
+            if (days >= 180) {
+                return -2;
+            }
+            return 0;
+        } catch (RuntimeException ex) {
+            return 0;
+        }
     }
 
     private boolean isStale(MemoryItem item) {

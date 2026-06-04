@@ -409,6 +409,41 @@ final class MemoryQualityIntegrationTest {
         assertTrue(unsafeInspect.stderr().contains("unsafe zip entry"));
     }
 
+    @Test
+    void confirmingNewerSameTopicKnowledgeAutoSupersedesOlderAndRanksHigher() throws Exception {
+        String root = "stale-knowledge";
+        initProject(root);
+        // v1: a fact that was correct at the time, confirmed.
+        addMemory(root, "Order status encoding", "orders.status uses numeric codes 0/1/2", "order,status");
+        confirm(root, "1");
+
+        // v3: the code changed; same topic (same title -> same canonical key), different content.
+        addMemory(root, "Order status encoding", "orders.status uses enum strings PENDING/PAID/CANCELLED", "order,status");
+        Harness confirmNew = new Harness(tempDir);
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "memory", "confirm", "--project-root", root, "--id", "2"
+        }, confirmNew.context()));
+        // Confirming the newer version auto-retires the older same-topic entry.
+        assertTrue(confirmNew.stdout().contains("superseded_same_topic: 1"));
+        assertTrue(confirmNew.stdout().contains("superseded_ids: 1"));
+        Path dbRoot = tempDir.resolve(root);
+        assertEquals(1, countRowsWhere(dbRoot, "memory_item",
+                "id = 1 AND status = 'deprecated' AND superseded_by = 2"));
+        assertEquals(1, countRowsWhere(dbRoot, "memory_item", "id = 2 AND status = 'confirmed'"));
+
+        // Search: the newer correct knowledge ranks above the retired stale one, with a freshness boost.
+        Harness search = new Harness(tempDir);
+        assertEquals(ExitCodes.SUCCESS, new CommandRouter().run(new String[]{
+                "memory", "search", "--project-root", root, "--q", "Order status encoding", "--explain"
+        }, search.context()));
+        String out = search.stdout();
+        assertTrue(out.contains("fresh:+"));
+        int posNew = out.indexOf("enum strings");
+        int posOld = out.indexOf("numeric codes");
+        assertTrue(posNew >= 0 && posOld >= 0 && posNew < posOld);
+        assertTrue(out.contains("superseded:-12"));
+    }
+
     private void initProject(String root) {
         Harness init = new Harness(tempDir);
         int exitCode = new CommandRouter().run(new String[]{"memory", "init", "--project-root", root}, init.context());
@@ -444,6 +479,16 @@ final class MemoryQualityIntegrationTest {
              ResultSet resultSet = statement.executeQuery("SELECT COUNT(*) FROM " + table)) {
             resultSet.next();
             return resultSet.getInt(1);
+        }
+    }
+
+    private int countRowsWhere(Path root, String table, String where) throws Exception {
+        try (Connection connection = DriverManager.getConnection(
+                "jdbc:sqlite:" + root.resolve(".agents/memory/memory.db").toString());
+             Statement statement = connection.createStatement();
+             ResultSet rs = statement.executeQuery("SELECT COUNT(*) FROM " + table + " WHERE " + where)) {
+            rs.next();
+            return rs.getInt(1);
         }
     }
 

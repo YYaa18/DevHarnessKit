@@ -224,6 +224,20 @@ public final class MemoryRepository {
         return listMemory(connection, projectKey, module, "", "", limit);
     }
 
+    // Active (confirmed, not yet superseded) memories sharing a canonical key, excluding one id.
+    // Used to auto-retire older same-topic knowledge when a newer version is confirmed.
+    public List<MemoryItem> findActiveByCanonicalKey(Connection connection, String projectKey,
+                                                     String canonicalKey, long excludeId) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT * FROM memory_item WHERE project_key = ? AND canonical_key = ? AND id <> ? "
+                        + "AND status = 'confirmed' AND superseded_by = 0 ORDER BY id DESC")) {
+            statement.setString(1, projectKey);
+            statement.setString(2, canonicalKey);
+            statement.setLong(3, excludeId);
+            return list(statement);
+        }
+    }
+
     public List<MemoryItem> listPackableMemory(Connection connection, String projectKey, String module,
                                                int limit) throws SQLException {
         StringBuilder sql = new StringBuilder();

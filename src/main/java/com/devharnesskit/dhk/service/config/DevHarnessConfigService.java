@@ -32,6 +32,18 @@ public final class DevHarnessConfigService {
             "verification.demo.enabled", "verification.demo.warning",
             "verification.architecture.mode", "verification.rollback.required_when_auto_tests_unavailable",
             "workflow.pre_work.confirmation.required", "workflow.pre_work.confirmation.reason",
+            "context.budget.total_tokens",
+            "context.budget.goal", "context.budget.goal_tokens",
+            "context.budget.current_step", "context.budget.current_step_tokens",
+            "context.budget.memory", "context.budget.memory_tokens",
+            "context.budget.graph", "context.budget.graph_tokens",
+            "context.budget.bdd", "context.budget.bdd_tokens",
+            "context.budget.workflow", "context.budget.workflow_tokens",
+            "context.budget.spec", "context.budget.spec_tokens",
+            "context.budget.evidence", "context.budget.evidence_tokens",
+            "context.budget.risks", "context.budget.risks_tokens",
+            "context.output.headroom_tokens", "context.compress.enabled", "context.compress.evidence",
+            "context.compress.min_lines_to_compress",
             "adapter.target");
 
     public ConfigureInitResult init(Path projectRoot, String preset, boolean force,
@@ -107,6 +119,29 @@ public final class DevHarnessConfigService {
         diagnoseBoolean(values, "verification.graph.fresh_snapshot_required", warnings);
         diagnoseBoolean(values, "verification.graph.impact_map_required", warnings);
         diagnoseBoolean(values, "verification.graph.allow_stale_requires_approval", warnings);
+        diagnosePositiveInteger(values, "context.budget.total_tokens", warnings);
+        diagnosePositiveInteger(values, "context.budget.goal", warnings);
+        diagnosePositiveInteger(values, "context.budget.goal_tokens", warnings);
+        diagnosePositiveInteger(values, "context.budget.current_step", warnings);
+        diagnosePositiveInteger(values, "context.budget.current_step_tokens", warnings);
+        diagnosePositiveInteger(values, "context.budget.memory", warnings);
+        diagnosePositiveInteger(values, "context.budget.memory_tokens", warnings);
+        diagnosePositiveInteger(values, "context.budget.graph", warnings);
+        diagnosePositiveInteger(values, "context.budget.graph_tokens", warnings);
+        diagnosePositiveInteger(values, "context.budget.bdd", warnings);
+        diagnosePositiveInteger(values, "context.budget.bdd_tokens", warnings);
+        diagnosePositiveInteger(values, "context.budget.workflow", warnings);
+        diagnosePositiveInteger(values, "context.budget.workflow_tokens", warnings);
+        diagnosePositiveInteger(values, "context.budget.spec", warnings);
+        diagnosePositiveInteger(values, "context.budget.spec_tokens", warnings);
+        diagnosePositiveInteger(values, "context.budget.evidence", warnings);
+        diagnosePositiveInteger(values, "context.budget.evidence_tokens", warnings);
+        diagnosePositiveInteger(values, "context.budget.risks", warnings);
+        diagnosePositiveInteger(values, "context.budget.risks_tokens", warnings);
+        diagnosePositiveInteger(values, "context.output.headroom_tokens", warnings);
+        diagnoseBoolean(values, "context.compress.enabled", warnings);
+        diagnoseBoolean(values, "context.compress.evidence", warnings);
+        diagnosePositiveInteger(values, "context.compress.min_lines_to_compress", warnings);
         diagnoseManualEvidence(values, "verification.compile", warnings);
         diagnoseManualEvidence(values, "verification.test", warnings);
         return warnings;
@@ -142,6 +177,18 @@ public final class DevHarnessConfigService {
         if ("verification.graph.allow_stale_requires_approval".equals(normalized)) {
             return "verification.graph.allow_stale_requires_approval defaults to true; weak-model skills must not "
                     + "use --allow-stale without explicit policy or human approval evidence.";
+        }
+        if ("context.budget.total_tokens".equals(normalized)) {
+            return "context.budget.total_tokens controls the approximate token budget for generated context exports. "
+                    + "The default estimator is chars/4 and keeps budget reports advisory.";
+        }
+        if ("context.compress.enabled".equals(normalized)) {
+            return "context.compress.enabled controls whether large build/test/shell evidence is summarized into "
+                    + "context artifacts before being surfaced to agents.";
+        }
+        if ("context.compress.evidence".equals(normalized)) {
+            return "context.compress.evidence is the Context Governor blueprint alias for context.compress.enabled; "
+                    + "it controls compressed evidence artifacts for build, test, and shell output.";
         }
         return "Unknown configure key: " + normalized;
     }
@@ -273,6 +320,20 @@ public final class DevHarnessConfigService {
         values.put("verification.architecture.mode", "warn");
         values.put("verification.rollback.required_when_auto_tests_unavailable", "true");
         values.put("workflow.pre_work.confirmation.required", "false");
+        values.put("context.budget.total_tokens", "12000");
+        values.put("context.budget.goal", "2500");
+        values.put("context.budget.current_step", "1500");
+        values.put("context.budget.memory", "3000");
+        values.put("context.budget.graph", "2500");
+        values.put("context.budget.bdd", "1500");
+        values.put("context.budget.workflow", "1600");
+        values.put("context.budget.spec", "1600");
+        values.put("context.budget.evidence", "1800");
+        values.put("context.budget.risks", "800");
+        values.put("context.output.headroom_tokens", "1500");
+        values.put("context.compress.enabled", "true");
+        values.put("context.compress.evidence", "true");
+        values.put("context.compress.min_lines_to_compress", "120");
         return values;
     }
 
@@ -360,6 +421,20 @@ public final class DevHarnessConfigService {
         String value = value(values, key, "");
         if (!validBoolean(value)) {
             warnings.add(key + " should be true/false, yes/no, or 1/0");
+        }
+    }
+
+    private void diagnosePositiveInteger(Map<String, String> values, String key, List<String> warnings) {
+        if (!values.containsKey(key)) {
+            return;
+        }
+        String value = value(values, key, "");
+        try {
+            if (Integer.parseInt(value) < 1) {
+                warnings.add(key + " should be a positive integer");
+            }
+        } catch (NumberFormatException ex) {
+            warnings.add(key + " should be a positive integer");
         }
     }
 

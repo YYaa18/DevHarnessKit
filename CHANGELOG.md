@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.3.0
+
+Stable Context Governor release.
+
+English:
+
+- Added Context Governor budgeting for generated current and goal context,
+  including token-budget reports, truncation reports, output headroom, and
+  explicit section budgets.
+- Added context artifact storage, retrieval, statistics, filtering, pagination,
+  and original evidence recovery for compressed build/test/shell outputs.
+- Routed goal compile/test verification output through compressed artifacts so
+  large logs keep root cause, exit code, retained spans, and artifact references
+  without flooding model context.
+- Added `dhk context stats`, `dhk context artifacts`, `dhk context retrieve`,
+  `dhk context render`, and `dhk context doctor`.
+- Added graph context digest and memory budget integration for generated
+  context, with advisory/stale markers kept visible.
+- Added automated 64k, 128k, and 200k context-window acceptance coverage.
+  SQLite schema advances to v18.
+
+中文：
+
+- 新增 Context Governor 上下文预算编排，生成 current/goal context 时输出
+  token-budget report、truncation report、output headroom 和分区预算。
+- 新增 context artifact 存储、检索、统计、过滤、分页和原始证据恢复能力，用于压缩后的
+  build/test/shell 输出。
+- Goal compile/test 验证输出会写入压缩 artifact，保留 root cause、exit code、
+  retained spans 和 artifact reference，避免长日志淹没模型上下文。
+- 新增 `dhk context stats`、`dhk context artifacts`、`dhk context retrieve`、
+  `dhk context render` 和 `dhk context doctor`。
+- 新增 graph context digest 与 memory budget 接入，保留 advisory/stale 标记。
+- 新增 64k、128k、200k 上下文窗口自动化验收覆盖。SQLite schema 升级到 v18。
+
 ## 1.2.4
 
 Stable patch release.

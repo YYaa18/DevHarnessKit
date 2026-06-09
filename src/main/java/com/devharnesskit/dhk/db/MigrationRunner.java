@@ -29,6 +29,7 @@ public final class MigrationRunner {
     public static final int V15 = 15;
     public static final int V16 = 16;
     public static final int V17 = 17;
+    public static final int V18 = 18;
 
     private final List<MigrationStep> steps;
     private final MigrationBackupCoordinator backupCoordinator;

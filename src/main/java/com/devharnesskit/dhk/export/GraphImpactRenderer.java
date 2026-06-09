@@ -7,6 +7,26 @@ import com.devharnesskit.dhk.model.graph.GraphNode;
 import java.time.Instant;
 
 public final class GraphImpactRenderer {
+    public String renderDigest(GraphImpactResult result) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("## Graph Impact Digest\n");
+        builder.append("goal: ").append(safe(result == null ? "" : result.request().query())).append('\n');
+        builder.append("required_read:\n");
+        appendDigestFiles(builder, result == null ? null : result.recommendedReadFiles());
+        builder.append("optional_read:\n");
+        appendDigestFiles(builder, result == null ? null : result.relatedFiles());
+        builder.append("graph_snapshot: status=").append(result == null ? "unknown" : freshnessStatus(result));
+        if (result != null && result.snapshot() != null) {
+            builder.append("; indexed_at=").append(result.snapshot().completedAt().length() == 0
+                    ? result.snapshot().createdAt() : result.snapshot().completedAt());
+        }
+        builder.append("; confidence=advisory_only\n");
+        if (result != null && result.snapshotStale()) {
+            builder.append("warning: STALE_GRAPH_SNAPSHOT; regenerate with dhk graph index\n");
+        }
+        return builder.toString();
+    }
+
     public String render(GraphImpactResult result, Instant generatedAt) {
         StringBuilder builder = new StringBuilder();
         builder.append("# IMPACT_MAP\n\n");
@@ -147,6 +167,19 @@ public final class GraphImpactRenderer {
             builder.append("- ").append(safe(value)).append('\n');
         }
         builder.append("</").append(section).append(">\n\n");
+    }
+
+    private void appendDigestFiles(StringBuilder builder, Iterable<String> values) {
+        int index = 1;
+        if (values != null) {
+            for (String value : values) {
+                builder.append("  ").append(index++).append(". ").append(safe(value))
+                        .append(" (reason: graph impact relation)\n");
+            }
+        }
+        if (index == 1) {
+            builder.append("  - none\n");
+        }
     }
 
     private String displayName(GraphNode node) {

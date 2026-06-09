@@ -1,5 +1,8 @@
 package com.devharnesskit.dhk.service.goal;
 
+import com.devharnesskit.dhk.context.ContextBudgetPolicy;
+import com.devharnesskit.dhk.context.ContextBudget;
+import com.devharnesskit.dhk.context.token.CharsOverFourTokenEstimator;
 import com.devharnesskit.dhk.export.CurrentContextRenderer;
 import com.devharnesskit.dhk.export.GoalContextRenderer;
 import com.devharnesskit.dhk.export.SpecContextRenderer;
@@ -128,6 +131,13 @@ public final class GoalContextService {
     public Path export(Connection connection, Path projectRoot, Project project, GoalRun goal,
                        WorkflowRun workflowRun, SpecChange specChange, String generatedAt)
             throws Exception {
+        return export(connection, projectRoot, project, goal, workflowRun, specChange, generatedAt, null);
+    }
+
+    public Path export(Connection connection, Path projectRoot, Project project, GoalRun goal,
+                       WorkflowRun workflowRun, SpecChange specChange, String generatedAt,
+                       ContextBudget budgetOverride)
+            throws Exception {
         Files.createDirectories(PathUtil.exportsDirectory(projectRoot));
 
         String workflowContext = workflowRun == null ? "" : workflowExportService.render(connection, workflowRun, generatedAt);
@@ -141,18 +151,22 @@ public final class GoalContextService {
             specContext = write(projectRoot, PathUtil.specContext(projectRoot), specContext);
             inlineSpec = specExportService.renderInline(connection, specChange);
         }
+        DevHarnessConfig verificationConfig = devHarnessConfigService.load(projectRoot);
 
         List<MemoryItem> memory = exportSelectionService.select(connection, project.projectKey(),
                 goal.moduleName(), goal.mode(), goal.taskName(), goal.profileKey(), 30);
         Checkpoint checkpoint = checkpointRepository.latest(connection, project.projectKey(), goal.moduleName());
-        String current = currentContextRenderer.render(project, goal.taskName(), goal.moduleName(),
+        ContextBudget renderBudget = budgetOverride == null
+                ? ContextBudgetPolicy.fromConfig(verificationConfig) : budgetOverride;
+        CurrentContextRenderer budgetedRenderer = new CurrentContextRenderer(
+                renderBudget, new CharsOverFourTokenEstimator());
+        String current = budgetedRenderer.render(project, goal.taskName(), goal.moduleName(),
                 goal.mode(), goal.profileKey(), generatedAt, memory, checkpoint, inlineWorkflow, inlineSpec);
         write(projectRoot, PathUtil.currentContext(projectRoot), current);
 
         GoalProfile profile = profileService.find(projectRoot, goal.profileKey());
         GoalPlan plan = planner.plan(goal, profile);
         GoalCheckPolicy policy = checkPolicyService.load(projectRoot);
-        DevHarnessConfig verificationConfig = devHarnessConfigService.load(projectRoot);
         DevHarnessPolicy devPolicy = devHarnessPolicyService.load(projectRoot);
         String[] requiredChecks = policy.requiredChecks(profile);
         List<GoalCheck> checks = goalCheckRepository.listByGoal(connection, goal.goalKey());

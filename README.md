@@ -12,18 +12,17 @@ verification status, and a local recovery trail.
 
 ## Status
 
-DevHarness Kit `1.2.4` is the current stable release. The stable contract is
+DevHarness Kit `1.3.0` is the current stable release. The stable contract is
 intentionally narrow: core CLI, memory, goal, status, readiness, configure,
-brief, BDD acceptance evidence, release packaging, and documented
-generated-export anchors. The 1.2 line adds CLI-first memory quality workflows
-for candidates, dedupe/conflict checks, stale governance, explainable ranking,
-and team memory packs while preserving the 1.0 stable core. The 1.2.4 patch
-packages the latest memory freshness ranking and stale-knowledge retirement
-fixes.
+brief, BDD acceptance evidence, Context Governor artifacts, release packaging, and documented
+generated-export anchors. The 1.3 line adds Context Governor budgeting,
+compressed evidence artifacts, context render/doctor commands, and automated
+64k/128k/200k context-window acceptance coverage while preserving the 1.0 stable
+core and 1.2 memory quality workflows.
 
-Current stable release: `1.2.4`.
+Current stable release: `1.3.0`.
 
-Current schema version is v17.
+Current schema version is v18.
 
 See
 [docs/STABLE_CONTRACT.md](docs/STABLE_CONTRACT.md) and
@@ -63,6 +62,10 @@ User task
 SQLite is the source of truth. Markdown files such as `GOAL_CONTEXT.md`,
 `CURRENT_CONTEXT.md`, and `GOAL_SUMMARY.md` are generated exports for humans and
 agents to read. They are not meant to be hand-edited.
+
+Context Governor keeps generated context compact by using explicit token
+budgets and storing large build/test/shell evidence as retrievable local
+artifacts under `.agents/context/artifacts`.
 
 ## What It Can Do
 

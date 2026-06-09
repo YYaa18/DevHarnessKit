@@ -9,6 +9,12 @@ import com.devharnesskit.dhk.model.config.DevHarnessConfig;
 import com.devharnesskit.dhk.model.knowledge.KnowledgeSnippet;
 import com.devharnesskit.dhk.model.knowledge.ProfessionalKnowledgeContext;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+
 public final class GoalContextRenderer {
     private static final int MAX_CHARS = 16 * 1024;
     private static final String GOAL_SCRIPT_DIR = ".agents/skills/devharness-goal-development/scripts/";
@@ -350,6 +356,8 @@ public final class GoalContextRenderer {
         builder.append("- impact_map_exists: ").append(graph.impactMapExists()).append('\n');
         builder.append("</graph-context>\n\n");
 
+        appendGraphContextDigest(builder, graph);
+
         builder.append("<graph-assist>\n");
         builder.append("- integrated_into_main_flow: true\n");
         builder.append("- recommended_internal_action: ").append(graph.requiredGraphAction()).append('\n');
@@ -369,6 +377,70 @@ public final class GoalContextRenderer {
             }
             builder.append("- rule: legacy graph profiles require manual confirmation before completion\n");
             builder.append("</protected-impact-risk>\n\n");
+        }
+    }
+
+    private void appendGraphContextDigest(StringBuilder builder, GoalGraphState graph) {
+        List<String> requiredRead = impactSection(graph.impactMapPath(), "recommended-read-files");
+        List<String> optionalRead = impactSection(graph.impactMapPath(), "related-files");
+        builder.append("<graph-context-digest>\n");
+        builder.append("## Graph Impact Digest\n");
+        builder.append("goal: ").append(valueOrNone(graph.impactMapPath())).append('\n');
+        builder.append("required_read:\n");
+        appendDigestList(builder, requiredRead);
+        builder.append("optional_read:\n");
+        appendDigestList(builder, optionalRead);
+        builder.append("graph_snapshot: status=")
+                .append(graph.freshnessStatus().length() == 0 ? "unknown" : graph.freshnessStatus())
+                .append("; indexed_at=unknown; confidence=advisory_only\n");
+        if (graph.snapshotStale()) {
+            builder.append("warning: STALE_GRAPH_SNAPSHOT; regenerate with dhk graph index\n");
+        }
+        builder.append("</graph-context-digest>\n\n");
+    }
+
+    private List<String> impactSection(String rawPath, String section) {
+        List<String> result = new ArrayList<String>();
+        if (rawPath == null || rawPath.length() == 0) {
+            return result;
+        }
+        try {
+            Path path = Paths.get(rawPath);
+            if (!Files.isRegularFile(path)) {
+                return result;
+            }
+            String[] lines = new String(Files.readAllBytes(path), "UTF-8").split("\\r?\\n");
+            boolean inside = false;
+            String start = "<" + section + ">";
+            String end = "</" + section + ">";
+            for (String line : lines) {
+                String trimmed = line.trim();
+                if (start.equals(trimmed)) {
+                    inside = true;
+                    continue;
+                }
+                if (end.equals(trimmed)) {
+                    break;
+                }
+                if (inside && trimmed.startsWith("- ")) {
+                    result.add(trimmed.substring(2).trim());
+                }
+            }
+        } catch (Exception ignored) {
+            return result;
+        }
+        return result;
+    }
+
+    private void appendDigestList(StringBuilder builder, List<String> values) {
+        if (values == null || values.isEmpty()) {
+            builder.append("  - none\n");
+            return;
+        }
+        int index = 1;
+        for (String value : values) {
+            builder.append("  ").append(index++).append(". ").append(value)
+                    .append(" (reason: graph impact relation)\n");
         }
     }
 

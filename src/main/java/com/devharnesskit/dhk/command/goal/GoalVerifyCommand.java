@@ -4,20 +4,32 @@ import com.devharnesskit.dhk.cli.Args;
 import com.devharnesskit.dhk.cli.Command;
 import com.devharnesskit.dhk.cli.CommandContext;
 import com.devharnesskit.dhk.cli.ExitCodes;
+import com.devharnesskit.dhk.context.artifact.ContextArtifact;
+import com.devharnesskit.dhk.context.artifact.ContextArtifactService;
+import com.devharnesskit.dhk.context.compress.BuildLogCompressor;
+import com.devharnesskit.dhk.context.compress.CompressResult;
+import com.devharnesskit.dhk.db.DbConnectionFactory;
+import com.devharnesskit.dhk.db.MigrationRunner;
 import com.devharnesskit.dhk.guidance.EnumGuidance;
+import com.devharnesskit.dhk.model.Project;
 import com.devharnesskit.dhk.model.goal.GoalCheck;
 import com.devharnesskit.dhk.model.goal.GoalEvaluation;
 import com.devharnesskit.dhk.model.goal.GoalRun;
+import com.devharnesskit.dhk.repository.ProjectRepository;
+import com.devharnesskit.dhk.service.ProjectService;
 import com.devharnesskit.dhk.service.brief.BriefLifecycleService;
 import com.devharnesskit.dhk.service.goal.GoalCheckPolicy;
 import com.devharnesskit.dhk.service.goal.GoalOrchestrator;
 import com.devharnesskit.dhk.util.JsonOutput;
 import com.devharnesskit.dhk.util.PathUtil;
 import com.devharnesskit.dhk.util.ProcessCommandUtil;
+import com.devharnesskit.dhk.util.SystemClock;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -25,6 +37,8 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 public final class GoalVerifyCommand implements Command {
+    private static final int MAX_PACKAGE_OUTPUT_BYTES = 2 * 1024 * 1024;
+
     private final GoalOrchestrator orchestrator = new GoalOrchestrator();
     private final BriefLifecycleService briefLifecycleService = new BriefLifecycleService();
 
@@ -43,7 +57,7 @@ public final class GoalVerifyCommand implements Command {
             List<GoalCheck> checks = runSelectedChecks(context, projectRoot, goal.goalKey(), selectedChecks);
             GoalEvaluation evaluation = orchestrator.evaluate(context, projectRoot, goal.goalKey());
             Path verifyBriefPath = briefLifecycleService.writeVerifyBrief(projectRoot, goal, checks, evaluation);
-            ReleaseChecks releaseChecks = "release".equals(level) ? runReleaseChecks(projectRoot) : ReleaseChecks.none();
+            ReleaseChecks releaseChecks = "release".equals(level) ? runReleaseChecks(projectRoot, goal) : ReleaseChecks.none();
             if (args.hasFlag("markdown")) {
                 printMarkdown(context, projectRoot, goal, checks, evaluation, level, selectedChecks,
                         releaseChecks, verifyBriefPath);
@@ -184,6 +198,8 @@ public final class GoalVerifyCommand implements Command {
         context.out().println("- context_path: " + PathUtil.goalContext(projectRoot));
         if (releaseChecks.enabled) {
             context.out().println("- release_package: " + releaseChecks.packageStatus);
+            context.out().println("- release_package_artifact: "
+                    + (releaseChecks.packageArtifactKey.length() == 0 ? "none" : releaseChecks.packageArtifactKey));
         }
         context.out().println("- verify_brief_path: " + verifyBriefPath);
     }
@@ -235,10 +251,12 @@ public final class GoalVerifyCommand implements Command {
         return checks;
     }
 
-    private ReleaseChecks runReleaseChecks(Path projectRoot) {
+    private ReleaseChecks runReleaseChecks(Path projectRoot, GoalRun goal) {
         ReleaseChecks release = new ReleaseChecks();
         release.enabled = true;
-        release.packageStatus = runPackage(projectRoot);
+        PackageRunResult packageResult = runPackage(projectRoot, goal);
+        release.packageStatus = packageResult.status;
+        release.packageArtifactKey = packageResult.artifactKey;
         release.artifactPassport = java.nio.file.Files.isRegularFile(PathUtil.artifactPassport(projectRoot))
                 ? "present" : "missing_until_goal_complete";
         release.exportContract = java.nio.file.Files.isRegularFile(PathUtil.goalContext(projectRoot))
@@ -246,7 +264,8 @@ public final class GoalVerifyCommand implements Command {
         return release;
     }
 
-    private String runPackage(Path projectRoot) {
+    private PackageRunResult runPackage(Path projectRoot, GoalRun goal) {
+        String command = "mvn -q -DskipTests package";
         try {
             Process process = new ProcessBuilder(ProcessCommandUtil.resolveExecutable(
                     new String[]{"mvn", "-q", "-DskipTests", "package"}))
@@ -267,22 +286,67 @@ public final class GoalVerifyCommand implements Command {
                     process.destroyForcibly();
                 }
                 drain(stream, output, buffer);
-                return "failed: package timed out";
+                String text = output.toString("UTF-8") + "\npackage timed out after 180s\n";
+                CompressResult compressed = new BuildLogCompressor().compressBuild(command, -1, text);
+                return new PackageRunResult("failed: package timed out",
+                        storePackageArtifact(projectRoot, goal, command, -1, text, compressed));
             }
-            drain(stream, output, buffer);
-            return process.waitFor() == 0 ? "passed" : "failed";
+            drainFully(stream, output, buffer);
+            int exitCode = process.waitFor();
+            String text = output.toString("UTF-8");
+            CompressResult compressed = new BuildLogCompressor().compressBuild(command, exitCode, text);
+            return new PackageRunResult(exitCode == 0 ? "passed" : "failed",
+                    storePackageArtifact(projectRoot, goal, command, exitCode, text, compressed));
         } catch (Exception ex) {
-            return "failed: " + ex.getMessage();
+            String text = "package command failed before completion: " + ex.getMessage();
+            CompressResult compressed = new BuildLogCompressor().compressBuild(command, -1, text);
+            return new PackageRunResult("failed: " + ex.getMessage(),
+                    storePackageArtifact(projectRoot, goal, command, -1, text, compressed));
         }
     }
 
     private void drain(InputStream stream, ByteArrayOutputStream output, byte[] buffer) throws Exception {
-        while (stream.available() > 0 && output.size() < 8192) {
-            int read = stream.read(buffer, 0, Math.min(buffer.length, 8192 - output.size()));
+        while (stream.available() > 0) {
+            int read = stream.read(buffer, 0, buffer.length);
             if (read < 0) {
                 return;
             }
-            output.write(buffer, 0, read);
+            writeBounded(output, buffer, read);
+        }
+    }
+
+    private void drainFully(InputStream stream, ByteArrayOutputStream output, byte[] buffer) throws Exception {
+        int read;
+        while ((read = stream.read(buffer, 0, buffer.length)) >= 0) {
+            writeBounded(output, buffer, read);
+        }
+    }
+
+    private void writeBounded(ByteArrayOutputStream output, byte[] buffer, int read) {
+        if (output.size() >= MAX_PACKAGE_OUTPUT_BYTES) {
+            return;
+        }
+        int allowed = Math.min(read, MAX_PACKAGE_OUTPUT_BYTES - output.size());
+        if (allowed > 0) {
+            output.write(buffer, 0, allowed);
+        }
+    }
+
+    private String storePackageArtifact(Path projectRoot, GoalRun goal, String command, int exitCode,
+                                        String output, CompressResult compressed) {
+        if (goal == null || !Files.isRegularFile(PathUtil.projectJson(projectRoot))) {
+            return "";
+        }
+        try (Connection connection = new DbConnectionFactory().open(projectRoot)) {
+            new MigrationRunner().migrate(connection, new SystemClock());
+            Project project = new ProjectService().readProject(PathUtil.projectJson(projectRoot));
+            new ProjectRepository().upsert(connection, project);
+            ContextArtifact artifact = new ContextArtifactService().persist(projectRoot, connection,
+                    project.projectKey(), goal.goalKey(), "", compressed.sourceType(), command,
+                    output, compressed, new SystemClock());
+            return artifact.artifactKey();
+        } catch (Exception ex) {
+            return "unavailable: " + ex.getMessage();
         }
     }
 
@@ -562,13 +626,26 @@ public final class GoalVerifyCommand implements Command {
         }
         context.out().println("release_checks:");
         context.out().println("  - package: " + releaseChecks.packageStatus);
+        context.out().println("  - package_artifact: "
+                + (releaseChecks.packageArtifactKey.length() == 0 ? "none" : releaseChecks.packageArtifactKey));
         context.out().println("  - artifact_passport: " + releaseChecks.artifactPassport);
         context.out().println("  - export_contract: " + releaseChecks.exportContract);
+    }
+
+    private static final class PackageRunResult {
+        private final String status;
+        private final String artifactKey;
+
+        private PackageRunResult(String status, String artifactKey) {
+            this.status = status == null ? "" : status;
+            this.artifactKey = artifactKey == null ? "" : artifactKey;
+        }
     }
 
     private static final class ReleaseChecks {
         private boolean enabled;
         private String packageStatus;
+        private String packageArtifactKey;
         private String artifactPassport;
         private String exportContract;
 
@@ -579,6 +656,7 @@ public final class GoalVerifyCommand implements Command {
         private ReleaseChecks() {
             this.enabled = false;
             this.packageStatus = "";
+            this.packageArtifactKey = "";
             this.artifactPassport = "";
             this.exportContract = "";
         }
@@ -590,6 +668,7 @@ public final class GoalVerifyCommand implements Command {
             return JsonOutput.object(
                     JsonOutput.booleanField("enabled", true),
                     JsonOutput.stringField("package", packageStatus),
+                    JsonOutput.stringField("package_artifact", packageArtifactKey),
                     JsonOutput.stringField("artifact_passport", artifactPassport),
                     JsonOutput.stringField("export_contract", exportContract)
             );

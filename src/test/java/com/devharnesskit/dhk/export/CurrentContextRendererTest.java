@@ -21,9 +21,11 @@ final class CurrentContextRendererTest {
         }
 
         String markdown = new CurrentContextRenderer().render(project, "Task", "order", "api",
-                "gateway", "now", memory, null, repeat("workflow ", 800), repeat("spec ", 800));
+                "gateway", "now", memory, null, repeat("workflow ", 800), repeat("spec ", 2000));
 
-        assertTrue(markdown.length() <= 20 * 1024);
+        assertTrue(markdown.length() <= 12000 * 4);
+        assertTrue(markdown.contains("<context-budget-report>"));
+        assertTrue(markdown.contains("total_tokens_budget: 12000"));
         assertTrue(markdown.contains("<truncation-report>"));
         assertTrue(markdown.contains("relevant_memory_total: 40"));
         assertTrue(markdown.contains("relevant_memory_truncated: true"));

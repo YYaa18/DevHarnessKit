@@ -131,6 +131,37 @@ Required content:
 Goal context is the agent protocol export. It guides the next action; it is not
 durable state and must be regenerated after goal state changes.
 
+## CURRENT_CONTEXT.md Context Governor Additions
+
+`CURRENT_CONTEXT.md` keeps its existing stable anchors and additionally includes
+`<context-budget-report>` before `<truncation-report>`.
+
+Required Context Governor content:
+
+- `estimator` names the token estimator used for budget reporting.
+- `total_tokens_budget`, section budgets, and `output_headroom_tokens` are
+  estimated token budgets, not model-token guarantees.
+- `<truncation-report>` remains present for existing readers.
+
+## Graph Impact Digest
+
+When Graph impact is included through Context Governor, the compact digest uses
+this shape:
+
+```text
+## Graph Impact Digest
+goal: <task-or-query>
+required_read:
+  1. <path> (reason: ...)
+optional_read:
+  1. <path> (reason: ...)
+graph_snapshot: status=fresh|stale|stale_allowed; indexed_at=<time>; confidence=advisory_only
+warning: STALE_GRAPH_SNAPSHOT; regenerate with dhk graph index
+```
+
+The digest is advisory context. It must not hide stale snapshots and must not
+be treated as correctness proof.
+
 ## GOAL_SUMMARY.md
 
 Required section order:
@@ -273,4 +304,5 @@ dhk goal export --goal <goal-key>
 dhk workflow export --run <run-key>
 dhk spec export --change <change-key>
 dhk bdd export
+dhk context render --goal <goal-key>
 ```

@@ -12,10 +12,10 @@ public final class VersionCommand implements Command {
         context.out().println("release_channel: " + VersionInfo.RELEASE_CHANNEL);
         context.out().println("schema_version: " + VersionInfo.CURRENT_SCHEMA_VERSION);
         context.out().println("stability: stable; Graph Lite is stable-advisory and full governance surfaces remain outside the stable contract");
-        context.out().println("stable_surface: help,version,doctor,memory-core,goal-core,bdd,configure,status,readiness,advise,quickstart,release-packaging");
-        context.out().println("stable_candidate_surface: goal-retrospective,skill-contract,policy-hooks,routine-report");
+        context.out().println("stable_surface: help,version,doctor,memory-core,goal-core,bdd,configure,status,readiness,context-artifacts,advise,quickstart,release-packaging");
+        context.out().println("stable_candidate_surface: context-governor,goal-retrospective,skill-contract,policy-hooks,routine-report");
         context.out().println("beta_surface: db-readonly");
-        context.out().println("experimental_surface: graph-aware-goal,skill-governance-full,policy-governance-full,ecc-control-panel,routine");
+        context.out().println("experimental_surface: graph-aware-goal,context-headroom,skill-governance-full,policy-governance-full,ecc-control-panel,routine");
         context.out().println("java: " + System.getProperty("java.version"));
         return ExitCodes.SUCCESS;
     }

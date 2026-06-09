@@ -13,6 +13,7 @@ public final class PathUtil {
     public static final String KNOWLEDGE_DIRECTORY = "knowledge";
     public static final String KNOWLEDGE_PACKS_DIRECTORY = "packs";
     public static final String MEMORY_DIRECTORY = "memory";
+    public static final String CONTEXT_DIRECTORY = "context";
     public static final String GRAPH_DIRECTORY = "graph";
     public static final String BDD_DIRECTORY = "bdd";
     public static final String FEATURES_DIRECTORY = "features";
@@ -86,6 +87,18 @@ public final class PathUtil {
 
     public static Path memoryDirectory(Path projectRoot) {
         return projectRoot.resolve(AGENTS_DIRECTORY).resolve(MEMORY_DIRECTORY);
+    }
+
+    public static Path contextDirectory(Path projectRoot) {
+        return projectRoot.resolve(AGENTS_DIRECTORY).resolve(CONTEXT_DIRECTORY);
+    }
+
+    public static Path contextArtifactsDirectory(Path projectRoot) {
+        return contextDirectory(projectRoot).resolve(ARTIFACTS_DIRECTORY);
+    }
+
+    public static Path contextArtifact(Path projectRoot, String artifactKey) {
+        return contextArtifactsDirectory(projectRoot).resolve(artifactKey + ".txt");
     }
 
     public static Path devharnessDirectory(Path projectRoot) {
@@ -323,6 +336,15 @@ public final class PathUtil {
             Files.createDirectories(artifactsDirectory(projectRoot));
         } catch (IOException ex) {
             throw new IllegalStateException("Failed to create memory directories: " + ex.getMessage(), ex);
+        }
+    }
+
+    public static void createContextDirectories(Path projectRoot) {
+        try {
+            Files.createDirectories(contextDirectory(projectRoot));
+            Files.createDirectories(contextArtifactsDirectory(projectRoot));
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to create context directories: " + ex.getMessage(), ex);
         }
     }
 

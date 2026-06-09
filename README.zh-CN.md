@@ -11,16 +11,15 @@ DevHarness Kit 是一个本地优先的 AI 编程协作工具。它不是让模�
 
 ## 当前状态
 
-DevHarness Kit `1.2.4` 是当前正式稳定版本。稳定承诺范围刻意收窄：
+DevHarness Kit `1.3.0` 是当前正式稳定版本。稳定承诺范围刻意收窄：
 核心 CLI、memory、goal、status、readiness、configure、brief、BDD 验收证据、
-发布包，以及文档中列出的导出文件锚点。1.2 版本新增 CLI 优先的 memory
-质量治理能力：候选队列、去重/冲突检查、过期治理、可解释检索排序和团队
-memory pack，同时保持 1.0 稳定核心兼容。1.2.4 补丁打包最新的 memory
-freshness 排序和旧知识自动退役修复。
+Context Governor artifacts、发布包，以及文档中列出的导出文件锚点。1.3 版本新增
+Context Governor 预算编排、压缩证据 artifact、context render/doctor 命令，以及
+64k/128k/200k 上下文窗口自动化验收，同时保持 1.0 稳定核心和 1.2 memory 质量治理能力兼容。
 
-当前稳定版本：`1.2.4`。
+当前稳定版本：`1.3.0`。
 
-当前 SQLite schema 版本：v17。
+当前 SQLite schema 版本：v18。
 
 准确边界见
 [docs/STABLE_CONTRACT.md](docs/STABLE_CONTRACT.md) 和
@@ -60,6 +59,9 @@ DevHarness Kit 是一个 Java CLI。它在本地运行，不启动后台服务�
 SQLite 是真实数据源。`GOAL_CONTEXT.md`、`CURRENT_CONTEXT.md`、
 `GOAL_SUMMARY.md` 这类 Markdown 文件只是导出给人和 Agent 阅读的上下文，不是手工
 维护的源文件。
+
+Context Governor 会用明确的 token 预算控制上下文长度，并把大型构建、测试、Shell
+证据保存为本地可检索 artifact，避免把长日志直接塞进模型上下文。
 
 ## 可以达到什么效果
 

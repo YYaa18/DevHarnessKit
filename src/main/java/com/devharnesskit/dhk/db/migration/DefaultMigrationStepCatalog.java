@@ -33,6 +33,7 @@ public final class DefaultMigrationStepCatalog {
         result.add(new V15KnowledgeCandidateMetadataMigration());
         result.add(new V16GoalExternalRefMigration());
         result.add(new V17MemoryQualityMigration());
+        result.add(new V18ContextArtifactMigration());
         return Collections.unmodifiableList(result);
     }
 }

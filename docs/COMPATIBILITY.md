@@ -67,6 +67,9 @@ Stable:
 - `dhk readiness`
 - `dhk advise`
 - `dhk quickstart`
+- `dhk context stats`
+- `dhk context artifacts`
+- `dhk context retrieve`
 - `dhk goal start`
 - `dhk goal resume`
 - `dhk goal next`
@@ -111,6 +114,14 @@ Stable-advisory:
 - `dhk graph index`
 - `dhk graph impact`
 - `dhk graph export`
+
+Stable-candidate Context Governor command surface:
+
+- `dhk context render`
+- `dhk context doctor`
+
+`dhk context render --compressor headroom` is experimental and opt-in. Default
+Context Governor rendering does not depend on the headroom adapter.
 
 Stable-candidate governance command surface:
 
@@ -258,6 +269,8 @@ Beta exports:
 - Graph Lite stable-advisory exports under `.agents/graph/exports/`:
   `GRAPH_INDEX_REPORT.md`, `GRAPH_CONTEXT.md`, `GRAPH_SNAPSHOT.json`, and
   `IMPACT_MAP.md`.
+- Context Governor artifacts under `.agents/context/artifacts/` when large
+  originals are too large for inline SQLite storage.
 
 Alpha exports:
 
@@ -272,7 +285,7 @@ with the matching CLI version.
 
 ## SQLite Schema Contract
 
-Current schema version: `17`.
+Current schema version: `18`.
 
 The SQLite database is an internal storage format, not a public write API.
 Users may rely on these operational guarantees:
@@ -291,6 +304,9 @@ Users may rely on these operational guarantees:
   pins a trusted source hash, and later source changes are marked
   `review_required`. Direct reads and writes remain unsupported; use CLI output
   contracts instead.
+- Context artifact rows are compressed evidence and retrieval metadata. Direct
+  table reads and writes remain unsupported; use `dhk context stats`,
+  `dhk context artifacts`, and `dhk context retrieve`.
 
 Unsupported:
 
@@ -305,6 +321,8 @@ Unsupported:
   passing evidence, coverage, or goal checks.
 - treating Skill Contract trust status or Skill Evaluation scores as proof that
   a skill is safe, sandboxed, or behaviorally correct.
+- treating compressed context artifacts as proof that compile or test checks
+  passed without the corresponding goal verification evidence.
 
 If downgrade support is added later, it must be explicit in release notes and
 migration docs. Until then, recover by restoring a pre-migration backup.

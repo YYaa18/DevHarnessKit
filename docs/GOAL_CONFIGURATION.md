@@ -168,6 +168,9 @@ objects:
   "verification.test.mode": "manual",
   "verification.test.manual_trigger": "IDE test button",
   "verification.graph.mode": "required",
+  "context.budget.total_tokens": "12000",
+  "context.compress.enabled": "true",
+  "context.compress.evidence": "true",
   "verification.test.cost": "slow",
   "verification.rollback.required_if_test_not_run": "true"
 }
@@ -209,6 +212,30 @@ Supported starter presets:
 | `off` | Graph is not part of the project verification policy. |
 | `advisory` | Graph artifacts may be generated for context, but graph/impact checks are not completion gates. |
 | `required` | Graph freshness and impact artifacts are required by graph-aware profiles and checks. |
+
+Context Governor keys control generated context size and evidence compression:
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `context.budget.total_tokens` | `12000` | Approximate total budget for generated context exports, using the default chars/4 estimator. |
+| `context.budget.goal` | `2500` | Budget target for goal and stable instruction context. |
+| `context.budget.current_step` | `1500` | Budget target for current action and evidence contract context. |
+| `context.budget.memory` | `3000` | Budget for confirmed memory in `CURRENT_CONTEXT.md`. Legacy alias: `context.budget.memory_tokens`. |
+| `context.budget.graph` | `2500` | Reserved graph context budget for graph-aware flows. Legacy alias: `context.budget.graph_tokens`. |
+| `context.budget.bdd` | `1500` | Budget for BDD scenario context. |
+| `context.budget.workflow` | `1600` | Budget for workflow inline context. Legacy alias: `context.budget.workflow_tokens`. |
+| `context.budget.spec` | `1600` | Budget for spec inline context. Legacy alias: `context.budget.spec_tokens`. |
+| `context.budget.evidence` | `1800` | Budget target for compressed evidence digests. Legacy alias: `context.budget.evidence_tokens`. |
+| `context.budget.risks` | `800` | Budget target for risk and recovery-state context. |
+| `context.output.headroom_tokens` | `1500` | Reserved output headroom for agents. |
+| `context.compress.enabled` | `true` | Enables compressed context artifacts for large build/test/shell evidence. |
+| `context.compress.evidence` | `true` | Blueprint-compatible alias for `context.compress.enabled`; supported for build/test/shell evidence compression. |
+| `context.compress.min_lines_to_compress` | `120` | Line-count hint for when evidence should be summarized before entering context. |
+
+Memory context is still selected from confirmed memory first and then trimmed by
+the Context Governor memory budget. Chinese-only memory relevance uses the
+current lightweight token matching and can be weaker than tag/title matches; add
+clear tags for important Chinese facts until a stronger tokenizer is introduced.
 
 `configure init --dry-run` prints the config path, selected preset, effective
 verification modes, graph mode, and whether writing would require `--force`.

@@ -12,6 +12,7 @@ import com.devharnesskit.dhk.command.bdd.BddCommand;
 import com.devharnesskit.dhk.command.brief.BriefCommand;
 import com.devharnesskit.dhk.command.checkpoint.CheckpointCommand;
 import com.devharnesskit.dhk.command.configure.ConfigureCommand;
+import com.devharnesskit.dhk.command.context.ContextCommand;
 import com.devharnesskit.dhk.command.projectdb.DbCommand;
 import com.devharnesskit.dhk.command.graph.GraphCommand;
 import com.devharnesskit.dhk.command.growth.GrowthCommand;
@@ -129,6 +130,11 @@ public final class CommandRouter {
         this.commands.put("configure", new Supplier<Command>() {
             public Command get() {
                 return new ConfigureCommand();
+            }
+        });
+        this.commands.put("context", new Supplier<Command>() {
+            public Command get() {
+                return new ContextCommand();
             }
         });
         this.commands.put("workflow", new Supplier<Command>() {

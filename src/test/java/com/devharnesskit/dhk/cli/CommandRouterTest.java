@@ -28,6 +28,7 @@ final class CommandRouterTest {
         assertTrue(harness.stdout().contains("dhk bdd scenario create"));
         assertTrue(harness.stdout().contains("dhk bdd bind-workflow"));
         assertTrue(harness.stdout().contains("dhk configure init"));
+        assertTrue(harness.stdout().contains("dhk context stats"));
         assertTrue(harness.stdout().contains("Current build: stable 1.0 surface."));
         assertTrue(harness.stdout().contains("Stable surface: help/version/doctor, memory core, goal core, BDD acceptance"));
         assertTrue(harness.stdout().contains("Experimental surface: graph, skill contract/trust"));
@@ -65,10 +66,10 @@ final class CommandRouterTest {
         assertTrue(harness.stdout().contains("DevHarness Kit " + VersionInfo.version()));
         assertTrue(harness.stdout().contains("release_channel: stable"));
         assertTrue(harness.stdout().contains("stability: stable; Graph Lite is stable-advisory and full governance surfaces remain outside the stable contract"));
-        assertTrue(harness.stdout().contains("stable_surface: help,version,doctor,memory-core,goal-core,bdd,configure,status,readiness,advise,quickstart,release-packaging"));
-        assertTrue(harness.stdout().contains("stable_candidate_surface: goal-retrospective,skill-contract,policy-hooks,routine-report"));
-        assertTrue(harness.stdout().contains("experimental_surface: graph-aware-goal,skill-governance-full,policy-governance-full,ecc-control-panel,routine"));
-        assertTrue(harness.stdout().contains("schema_version: 17"));
+        assertTrue(harness.stdout().contains("stable_surface: help,version,doctor,memory-core,goal-core,bdd,configure,status,readiness,context-artifacts,advise,quickstart,release-packaging"));
+        assertTrue(harness.stdout().contains("stable_candidate_surface: context-governor,goal-retrospective,skill-contract,policy-hooks,routine-report"));
+        assertTrue(harness.stdout().contains("experimental_surface: graph-aware-goal,context-headroom,skill-governance-full,policy-governance-full,ecc-control-panel,routine"));
+        assertTrue(harness.stdout().contains("schema_version: 18"));
     }
 
     @Test

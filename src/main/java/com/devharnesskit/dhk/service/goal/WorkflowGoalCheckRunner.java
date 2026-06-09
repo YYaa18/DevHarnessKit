@@ -33,6 +33,11 @@ final class WorkflowGoalCheckRunner extends AbstractGoalCheckRunner {
             return recorder.save(context.connection(), context.projectRoot(), context.goal(), key(), "workflow",
                     "", "failed", "workflow run status is " + run.status(), null, context.now());
         }
+        if (isPatchProfile(context)) {
+            return recorder.save(context.connection(), context.projectRoot(), context.goal(), key(), "workflow",
+                    "", "passed", "patch workflow is advisory; strict workflow gates are not required", null,
+                    context.now());
+        }
         int failedHard = 0;
         int pendingHard = 0;
         int pendingCompletionHard = 0;
@@ -60,5 +65,13 @@ final class WorkflowGoalCheckRunner extends AbstractGoalCheckRunner {
         return recorder.save(context.connection(), context.projectRoot(), context.goal(), key(), "workflow",
                 "", "passed", "workflow run is active; pending_hard_gates=" + pendingHard
                         + " pending_completion_gates=" + pendingCompletionHard, null, context.now());
+    }
+
+    private boolean isPatchProfile(GoalCheckContext context) {
+        if (context.profile() == null) {
+            return false;
+        }
+        return "java-api-patch".equals(context.profile().profileKey())
+                || "safe-patch".equals(context.profile().profileKey());
     }
 }

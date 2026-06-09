@@ -76,6 +76,12 @@ contracts, experimental surfaces, release material, and historical design notes.
 
 ## Release Notes
 
+- [v1.3.0](releases/v1.3.0.md)
+- [v1.2.4](releases/v1.2.4.md)
+- [v1.2.3](releases/v1.2.3.md)
+- [v1.2.2](releases/v1.2.2.md)
+- [v1.2.1](releases/v1.2.1.md)
+- [v1.2.0](releases/v1.2.0.md)
 - [v1.1.1](releases/v1.1.1.md)
 - [v1.1.0](releases/v1.1.0.md)
 - [v1.0.0](releases/v1.0.0.md)

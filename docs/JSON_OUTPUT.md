@@ -28,6 +28,11 @@ dhk db sql --sql "SELECT 1" --format json --jdbc-url <url> --user <user> --passw
 dhk configure show --json
 dhk configure doctor --json
 dhk configure explain [key] --json
+dhk context stats [--goal <goal-key>] --json
+dhk context artifacts [--goal <goal-key>] --json
+dhk context retrieve <artifact-key> [--lines <start-end>] --json
+dhk context render --goal <goal-key> --json
+dhk context doctor [--goal <goal-key>] --json
 dhk advise --task "Order API" --json
 dhk quickstart --task "Order API" --dry-run --json
 dhk goal status --goal <goal-key> --json
@@ -349,6 +354,92 @@ key
 explanation
 ```
 
+`context stats`:
+
+```text
+command
+project_key
+goal_key
+artifact_count
+token_before
+token_after
+token_reduction_percent
+omitted_lines
+sections
+compressed_artifacts
+risks
+artifacts_dir
+```
+
+`context artifacts`:
+
+```text
+command
+project_key
+goal_key
+source_type
+limit
+offset
+count
+artifacts
+```
+
+Each artifact includes:
+
+```text
+artifact_key
+source_type
+goal_key
+source_path
+original_sha256
+omitted_lines
+token_before
+token_after
+created_at
+```
+
+`context retrieve`:
+
+```text
+command
+artifact_key
+source_type
+source_path
+original_sha256
+token_before
+token_after
+content
+```
+
+`context render`:
+
+```text
+command
+goal_key
+compressor
+experimental
+current_context_path
+goal_context_path
+```
+
+`context doctor`:
+
+```text
+command
+project_key
+goal_key
+decision
+checks
+```
+
+Each doctor check includes:
+
+```text
+key
+status
+message
+```
+
 `advise`:
 
 ```text
@@ -478,6 +569,7 @@ completion_blockers
 next_action
 next_command
 context_path
+release_checks
 ```
 
 `goal verify` runs required checks before evaluating readiness. `failed_checks` lists checks with `failed` status; skipped-disallowed checks are reported through `missing`. `freshness_status` is `fresh` only when required checks are current for the latest goal steps and workspace fingerprint. `completion_blockers` combines failed, missing, stale, and policy blockers for agent-facing next-action decisions.
@@ -488,9 +580,13 @@ runs standard checks and adds `release_checks`:
 
 ```text
 package
+package_artifact
 artifact_passport
 export_contract
 ```
+
+`package_artifact` is a Context Governor artifact key when package output was
+persisted successfully.
 
 `goal audit`:
 

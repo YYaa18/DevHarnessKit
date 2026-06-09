@@ -67,6 +67,11 @@ public final class HelpCommand implements Command {
         context.out().println("  dhk configure show --project-root <path>");
         context.out().println("  dhk configure doctor --project-root <path>");
         context.out().println("  dhk configure explain [--key <config-key>]");
+        context.out().println("  dhk context stats [--goal <goal-key>] [--json]");
+        context.out().println("  dhk context artifacts [--goal <goal-key>] [--type <source-type>] [--limit <n>] [--offset <n>] [--json]");
+        context.out().println("  dhk context retrieve <artifact-key> [--lines <start-end>] [--json]");
+        context.out().println("  dhk context render --goal <goal-key> [--compressor headroom] [--json]");
+        context.out().println("  dhk context doctor [--goal <goal-key>] [--json]");
         context.out().println("  dhk bdd init --project-root <path>");
         context.out().println("  dhk bdd add --feature <key> --title <title> --scenario <key> --scenario-title <title>");
         context.out().println("  dhk bdd scenario create --scenario <key> --title <title> [--given <text>] [--when <text>] [--then <text>]");
@@ -120,7 +125,7 @@ public final class HelpCommand implements Command {
         context.out().println();
         context.out().println("Stability:");
         context.out().println("  Current build: stable 1.0 surface.");
-        context.out().println("  Stable surface: help/version/doctor, memory core, goal core, BDD acceptance, configure/status/readiness, release packaging.");
+        context.out().println("  Stable surface: help/version/doctor, memory core, goal core, BDD acceptance, configure/status/readiness, context artifacts, release packaging.");
         context.out().println("  Beta surface: DB inspection. SQL guard is not a database permission boundary.");
         context.out().println("  Experimental surface: graph, skill contract/trust, full policy governance, ECC control panel, routine.");
         context.out().println("  See docs/STABLE_CANDIDATE.md and docs/COMPATIBILITY.md.");
@@ -135,6 +140,9 @@ public final class HelpCommand implements Command {
         context.out().println("Graph configuration:");
         context.out().println("  .agents/graph/config.json controls alpha Graph Lite file scanning.");
         context.out().println("  graph index persists snapshot-bound graph facts to local SQLite.");
+        context.out().println("Context Governor:");
+        context.out().println("  .agents/context/artifacts stores large context artifact originals outside SQLite.");
+        context.out().println("  context commands expose token stats, compressed artifacts, and targeted retrieval.");
         context.out().println("BDD configuration:");
         context.out().println("  .agents/bdd/ stores stable acceptance scenarios and evidence exports.");
         context.out().println("Skill contract configuration:");

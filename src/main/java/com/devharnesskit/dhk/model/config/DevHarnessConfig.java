@@ -106,6 +106,36 @@ public final class DevHarnessConfig {
         return value("workflow.pre_work.confirmation.reason", "项目配置要求实施前确认任务边界和推进顺序。");
     }
 
+    public int contextBudgetTotalTokens(int defaultValue) {
+        return positiveIntValue("context.budget.total_tokens", defaultValue);
+    }
+
+    public int contextBudget(String section, int defaultValue) {
+        String normalized = section == null ? "" : section.trim().toLowerCase().replace('-', '_');
+        if (normalized.length() == 0) {
+            return defaultValue;
+        }
+        String primary = "context.budget." + normalized;
+        String legacy = primary + "_tokens";
+        String raw = value(primary, "");
+        if (raw.length() == 0) {
+            raw = value(legacy, "");
+        }
+        return positiveInt(raw, defaultValue);
+    }
+
+    public int contextOutputHeadroomTokens(int defaultValue) {
+        return positiveIntValue("context.output.headroom_tokens", defaultValue);
+    }
+
+    public boolean contextCompressEnabled() {
+        String evidence = value("context.compress.evidence", "");
+        if (evidence.length() > 0) {
+            return booleanText(evidence, true);
+        }
+        return booleanValue("context.compress.enabled", true);
+    }
+
     public boolean demoMode() {
         return initialProjectMode();
     }
@@ -144,7 +174,11 @@ public final class DevHarnessConfig {
         if (value == null) {
             return defaultValue;
         }
-        String normalized = value.trim().toLowerCase();
+        return booleanText(value, defaultValue);
+    }
+
+    private boolean booleanText(String value, boolean defaultValue) {
+        String normalized = value == null ? "" : value.trim().toLowerCase();
         if ("true".equals(normalized) || "yes".equals(normalized) || "1".equals(normalized)) {
             return true;
         }
@@ -152,5 +186,18 @@ public final class DevHarnessConfig {
             return false;
         }
         return defaultValue;
+    }
+
+    private int positiveIntValue(String key, int defaultValue) {
+        return positiveInt(value(key, ""), defaultValue);
+    }
+
+    private int positiveInt(String raw, int defaultValue) {
+        try {
+            int parsed = Integer.parseInt(raw);
+            return parsed > 0 ? parsed : defaultValue;
+        } catch (NumberFormatException ex) {
+            return defaultValue;
+        }
     }
 }

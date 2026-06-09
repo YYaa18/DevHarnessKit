@@ -17,6 +17,8 @@ The 1.0 stable surface is intentionally narrow:
 - `dhk readiness`
 - `dhk advise`
 - `dhk quickstart`
+- Context Governor artifacts: `context stats`, `context artifacts`, and
+  `context retrieve`
 - memory core: `init`, `add`, `confirm`, `search`, `export`, `checkpoint`,
   `recover`, and `backup`
 - goal core: `start`, `resume`, `next`, `step`, `status`, `export`, `verify`,
@@ -93,6 +95,11 @@ The following fields are the minimum stable JSON fields:
   and `scenario_impact_map`
 - Graph Lite stable-advisory export fields: `snapshot_key`, `files`, `nodes`,
   `edges`, `context_path`, and `snapshot_path`
+- Context Governor artifact fields: `artifact_key`, `artifact_count`,
+  `source_type`, `source_path`, `original_sha256`, `token_before`,
+  `token_after`, `token_reduction_percent`, `omitted_lines`, `artifacts`,
+  `artifacts_dir`, `content`, `current_context_path`, `goal_context_path`,
+  `compressor`, `experimental`, `checks`, and `message`
 
 `goal verify` blocker categories are stable-beta values:
 
@@ -119,6 +126,8 @@ succeeds, and may scan the listed anchors.
 - project summary section
 - confirmed memory section
 - recent checkpoint section
+- context-budget-report section
+- truncation-report section
 
 `GOAL_CONTEXT.md`:
 
@@ -212,6 +221,10 @@ succeeds, and may scan the listed anchors.
 - summary section
 - snapshot-freshness section
 - graph-confidence section
+
+Context Governor render/doctor is a stable-candidate surface for the 1.3 line.
+The headroom compressor option is experimental and disabled unless explicitly
+requested.
 - start-nodes section
 - direct-callers section
 - direct-callees section

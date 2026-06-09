@@ -227,6 +227,44 @@ final class GoalIntegrationTest {
         assertTrue(check.stdout().contains("step_count_at_check: 4"));
         assertTrue(check.stdout().contains("check_key: sensitive"));
         assertTrue(Files.isRegularFile(PathUtil.goalCheckArtifactsDirectory(root, goalKey).resolve("compile.log")));
+        assertTrue(Files.isRegularFile(PathUtil.goalCheckArtifactsDirectory(root, goalKey).resolve("test.log")));
+        String compileDigest = new String(Files.readAllBytes(PathUtil.goalCheckArtifactsDirectory(root, goalKey)
+                .resolve("compile.log")), "UTF-8");
+        String testDigest = new String(Files.readAllBytes(PathUtil.goalCheckArtifactsDirectory(root, goalKey)
+                .resolve("test.log")), "UTF-8");
+        assertTrue(compileDigest.contains("context_digest:"));
+        assertTrue(compileDigest.contains("source_type: build-log"));
+        assertTrue(compileDigest.contains("artifact_ref:"));
+        assertTrue(testDigest.contains("context_digest:"));
+        assertTrue(testDigest.contains("source_type: test-log"));
+        assertTrue(testDigest.contains("artifact_ref:"));
+
+        String compileArtifact = firstValue(compileDigest, "artifact_ref: ");
+        Harness buildArtifacts = new Harness(tempDir);
+        int buildArtifactsExit = new CommandRouter().run(new String[]{
+                "context", "artifacts", "--project-root", "demo", "--goal", goalKey,
+                "--type", "build-log", "--json"
+        }, buildArtifacts.context());
+        assertEquals(ExitCodes.SUCCESS, buildArtifactsExit);
+        assertTrue(buildArtifacts.stdout().contains("\"source_type\": \"build-log\""));
+        assertTrue(buildArtifacts.stdout().contains(compileArtifact));
+
+        Harness retrieveCompile = new Harness(tempDir);
+        int retrieveCompileExit = new CommandRouter().run(new String[]{
+                "context", "retrieve", compileArtifact, "--project-root", "demo", "--lines", "1-4"
+        }, retrieveCompile.context());
+        assertEquals(ExitCodes.SUCCESS, retrieveCompileExit);
+        assertTrue(retrieveCompile.stdout().contains("command:"));
+        assertTrue(retrieveCompile.stdout().contains("working_directory:"));
+
+        Harness contextStats = new Harness(tempDir);
+        int contextStatsExit = new CommandRouter().run(new String[]{
+                "context", "stats", "--project-root", "demo", "--goal", goalKey
+        }, contextStats.context());
+        assertEquals(ExitCodes.SUCCESS, contextStatsExit);
+        assertTrue(contextStats.stdout().contains("sections:"));
+        assertTrue(contextStats.stdout().contains("compressed_artifacts:"));
+        assertTrue(contextStats.stdout().contains("build-log:"));
 
         Harness evaluateReady = new Harness(tempDir);
         int evaluateReadyExit = new CommandRouter().run(new String[]{
@@ -273,6 +311,7 @@ final class GoalIntegrationTest {
         assertTrue(verifyRelease.stdout().contains("check_scope: release"));
         assertTrue(verifyRelease.stdout().contains("release_checks:"));
         assertTrue(verifyRelease.stdout().contains("package: passed"));
+        assertTrue(verifyRelease.stdout().contains("package_artifact:"));
         assertTrue(verifyRelease.stdout().contains("artifact_passport: missing_until_goal_complete"));
 
         Harness complete = new Harness(tempDir);
@@ -436,6 +475,10 @@ final class GoalIntegrationTest {
     @Test
     void patchGoalCompletionClosesUnmappedWorkflowContext() throws Exception {
         Path root = tempDir.resolve("patch-workflow-complete");
+        Files.createDirectories(PathUtil.devharnessDirectory(root));
+        Files.write(PathUtil.goalCheckPolicy(root), ("{\n"
+                + "  \"required_checks\": \"compile,test,sensitive,workflow,think-before-coding,goal-driven,simplicity,surgical-change\"\n"
+                + "}\n").getBytes("UTF-8"));
         Harness start = new Harness(tempDir);
         int startExit = new CommandRouter().run(new String[]{
                 "goal", "start",
@@ -2207,6 +2250,8 @@ final class GoalIntegrationTest {
         String context = new String(Files.readAllBytes(PathUtil.goalContext(tempDir.resolve("demo"))), "UTF-8");
         assertTrue(context.contains("<graph-snapshot>"));
         assertTrue(context.contains("<graph-context>"));
+        assertTrue(context.contains("<graph-context-digest>"));
+        assertTrue(context.contains("## Graph Impact Digest"));
         assertTrue(context.contains("<graph-assist>"));
         assertTrue(context.contains("- integrated_into_main_flow: true"));
         assertTrue(context.contains("- recommended_internal_action: refresh_graph_context"));
@@ -2302,6 +2347,9 @@ final class GoalIntegrationTest {
         assertTrue(context.contains("- freshness_status: stale"));
         assertTrue(context.contains("- recommended_internal_action: refresh_graph_context"));
         assertTrue(context.contains("- warning: STALE_GRAPH_SNAPSHOT"));
+        assertTrue(context.contains("<graph-context-digest>"));
+        assertTrue(context.contains("graph_snapshot: status=stale"));
+        assertTrue(context.contains("warning: STALE_GRAPH_SNAPSHOT; regenerate with dhk graph index"));
         assertTrue(context.contains("- precision: heuristic"));
         assertTrue(context.contains("- graph_usage: advisory_preflight_not_completion_proof"));
     }
@@ -3134,6 +3182,57 @@ final class GoalIntegrationTest {
         assertTrue(completeJson.stdout().contains("\"summary_path\": "));
     }
 
+    @Test
+    void goalCheckStoresFailedCompileDigestAndOriginalArtifact() throws Exception {
+        String projectRoot = "failing-compile-demo";
+        Path root = tempDir.resolve(projectRoot);
+        String goalKey = startPatchGoal(projectRoot, "Failing compile logs are compressed");
+        writeCompilerPom(root);
+        writeSource(root, "src/main/java/com/example/Broken.java",
+                "package com.example;\n"
+                        + "public class Broken {\n"
+                        + "  public String value() {\n"
+                        + "    return missingSymbol;\n"
+                        + "  }\n"
+                        + "}\n");
+
+        Harness check = new Harness(tempDir);
+        int checkExit = new CommandRouter().run(new String[]{
+                "goal", "check", "--project-root", projectRoot, "--goal", goalKey, "--check", "compile"
+        }, check.context());
+
+        assertEquals(ExitCodes.SUCCESS, checkExit);
+        assertTrue(check.stdout().contains("check_key: compile"));
+        assertTrue(check.stdout().contains("status: failed"));
+        assertTrue(check.stdout().contains("context_artifact="));
+
+        String compileDigest = new String(Files.readAllBytes(PathUtil.goalCheckArtifactsDirectory(root, goalKey)
+                .resolve("compile.log")), "UTF-8");
+        assertTrue(compileDigest.contains("context_digest:"));
+        assertTrue(compileDigest.contains("source_type: build-log"));
+        assertTrue(compileDigest.contains("status: failed"));
+        assertTrue(compileDigest.contains("exit_code: 1"));
+        assertTrue(compileDigest.contains("artifact_ref:"));
+        String artifactKey = firstValue(compileDigest, "artifact_ref: ");
+
+        Harness retrieve = new Harness(tempDir);
+        int retrieveExit = new CommandRouter().run(new String[]{
+                "context", "retrieve", artifactKey, "--project-root", projectRoot
+        }, retrieve.context());
+        assertEquals(ExitCodes.SUCCESS, retrieveExit);
+        assertTrue(retrieve.stdout().contains("Broken.java")
+                || retrieve.stdout().contains("missingSymbol"));
+
+        Harness artifacts = new Harness(tempDir);
+        int artifactsExit = new CommandRouter().run(new String[]{
+                "context", "artifacts", "--project-root", projectRoot, "--goal", goalKey,
+                "--type", "build-log", "--json"
+        }, artifacts.context());
+        assertEquals(ExitCodes.SUCCESS, artifactsExit);
+        assertTrue(artifacts.stdout().contains("\"artifact_key\": \"" + artifactKey + "\""));
+        assertTrue(artifacts.stdout().contains("\"source_type\": \"build-log\""));
+    }
+
     private void recordTwoStepGoal(String goalKey) {
         recordTwoStepGoal("demo", goalKey, "verification=done");
     }
@@ -3493,6 +3592,22 @@ final class GoalIntegrationTest {
                 + "  <groupId>demo</groupId>\n"
                 + "  <artifactId>demo</artifactId>\n"
                 + "  <version>1.0.0</version>\n"
+                + "</project>\n").getBytes("UTF-8"));
+    }
+
+    private void writeCompilerPom(Path root) throws Exception {
+        Files.write(root.resolve("pom.xml"), ("<project xmlns=\"http://maven.apache.org/POM/4.0.0\"\n"
+                + "         xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n"
+                + "         xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 "
+                + "https://maven.apache.org/xsd/maven-4.0.0.xsd\">\n"
+                + "  <modelVersion>4.0.0</modelVersion>\n"
+                + "  <groupId>demo</groupId>\n"
+                + "  <artifactId>demo</artifactId>\n"
+                + "  <version>1.0.0</version>\n"
+                + "  <properties>\n"
+                + "    <maven.compiler.source>1.8</maven.compiler.source>\n"
+                + "    <maven.compiler.target>1.8</maven.compiler.target>\n"
+                + "  </properties>\n"
                 + "</project>\n").getBytes("UTF-8"));
     }
 

@@ -368,9 +368,9 @@ final class GoalSkillPackagingTest {
         assertTrue(gate.contains("CURRENT_SCHEMA_VERSION = MigrationRunner"));
         assertTrue(gate.contains("Current schema version is v$SCHEMA_VERSION"));
         assertTrue(gate.contains("Current schema version: \\`$SCHEMA_VERSION\\`"));
-        assertTrue(readme.contains("Current schema version is v17"));
-        assertTrue(compatibility.contains("Current schema version: `17`"));
-        assertTrue(migrations.contains("Current schema version: `17`"));
+        assertTrue(readme.contains("Current schema version is v18"));
+        assertTrue(compatibility.contains("Current schema version: `18`"));
+        assertTrue(migrations.contains("Current schema version: `18`"));
         assertTrue(stableContract.contains("For 1.0 and later"));
         assertTrue(stableContract.contains("under semantic"));
         assertTrue(stableContract.contains("1.0 Boundary Decisions"));

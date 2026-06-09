@@ -1,5 +1,9 @@
 package com.devharnesskit.dhk.export;
 
+import com.devharnesskit.dhk.context.ContextBudget;
+import com.devharnesskit.dhk.context.ContextBudgetPolicy;
+import com.devharnesskit.dhk.context.token.CharsOverFourTokenEstimator;
+import com.devharnesskit.dhk.context.token.TokenEstimator;
 import com.devharnesskit.dhk.model.Checkpoint;
 import com.devharnesskit.dhk.model.MemoryItem;
 import com.devharnesskit.dhk.model.Project;
@@ -7,10 +11,17 @@ import com.devharnesskit.dhk.model.Project;
 import java.util.List;
 
 public final class CurrentContextRenderer {
-    private static final int TOTAL_BUDGET = 20 * 1024;
-    private static final int MEMORY_BUDGET = 8 * 1024;
-    private static final int WORKFLOW_BUDGET = 3 * 1024;
-    private static final int SPEC_BUDGET = 3 * 1024;
+    private final ContextBudget budget;
+    private final TokenEstimator tokenEstimator;
+
+    public CurrentContextRenderer() {
+        this(ContextBudgetPolicy.defaults(), new CharsOverFourTokenEstimator());
+    }
+
+    public CurrentContextRenderer(ContextBudget budget, TokenEstimator tokenEstimator) {
+        this.budget = budget == null ? ContextBudgetPolicy.defaults() : budget;
+        this.tokenEstimator = tokenEstimator == null ? new CharsOverFourTokenEstimator() : tokenEstimator;
+    }
 
     public String render(Project project, String task, String module, String mode, String keywords,
                          String generatedAt, List<MemoryItem> memory, Checkpoint checkpoint) {
@@ -46,7 +57,7 @@ public final class CurrentContextRenderer {
         builder.append("- Do not write secrets, tokens, JDBC URLs, or Authorization headers to memory.\n");
         builder.append("</must-follow>\n\n");
 
-        SectionResult memorySection = renderMemorySection(memory, MEMORY_BUDGET);
+        SectionResult memorySection = renderMemorySection(memory, budget.memoryChars());
         builder.append(memorySection.text);
         builder.append('\n');
 
@@ -61,11 +72,11 @@ public final class CurrentContextRenderer {
         }
         builder.append("</recent-checkpoint>\n\n");
 
-        SectionResult workflowSection = section("workflow-context", workflowContext, WORKFLOW_BUDGET);
+        SectionResult workflowSection = section("workflow-context", workflowContext, budget.workflowChars());
         if (workflowSection.text.length() > 0) {
             builder.append(workflowSection.text).append('\n');
         }
-        SectionResult specSection = section("spec-context", specContext, SPEC_BUDGET);
+        SectionResult specSection = section("spec-context", specContext, budget.specChars());
         if (specSection.text.length() > 0) {
             builder.append(specSection.text).append('\n');
         }
@@ -74,6 +85,18 @@ public final class CurrentContextRenderer {
         builder.append("2. Do not guess missing classes, fields, or database tables.\n");
         builder.append("3. Create a checkpoint after development.\n");
         builder.append("</agent-instructions>\n\n");
+        builder.append("<context-budget-report>\n");
+        builder.append("- estimator: chars_over_four\n");
+        builder.append("- total_tokens_budget: ").append(budget.totalTokens()).append('\n');
+        builder.append("- estimated_tokens_before_final_limit: ")
+                .append(tokenEstimator.estimate(builder.toString())).append('\n');
+        builder.append("- memory_tokens_budget: ").append(budget.memoryTokens()).append('\n');
+        builder.append("- graph_tokens_budget: ").append(budget.graphTokens()).append('\n');
+        builder.append("- workflow_tokens_budget: ").append(budget.workflowTokens()).append('\n');
+        builder.append("- spec_tokens_budget: ").append(budget.specTokens()).append('\n');
+        builder.append("- evidence_tokens_budget: ").append(budget.evidenceTokens()).append('\n');
+        builder.append("- output_headroom_tokens: ").append(budget.outputHeadroomTokens()).append('\n');
+        builder.append("</context-budget-report>\n\n");
         builder.append("<truncation-report>\n");
         builder.append("- relevant_memory_total: ").append(memory.size()).append('\n');
         builder.append("- relevant_memory_exported: ").append(memorySection.itemsExported).append('\n');
@@ -143,10 +166,10 @@ public final class CurrentContextRenderer {
     }
 
     private String finalLimit(String text) {
-        if (text.length() <= TOTAL_BUDGET) {
+        if (text.length() <= budget.totalChars()) {
             return text;
         }
-        return truncateAtLine(text, TOTAL_BUDGET - 120)
+        return truncateAtLine(text, budget.totalChars() - 120)
                 + "\n\n<!-- truncated: output exceeded total context budget -->\n";
     }
 
